@@ -9,23 +9,30 @@
 #define	KVM_H
 
 #include <hypervisor/hypervisor.h>
+#include <hypervisor/guest.h>
 
-namespace captive
-{
-	namespace hypervisor
-	{
-		namespace kvm
-		{
-			class KVM : public Hypervisor
-			{
+namespace captive {
+	namespace hypervisor {
+		namespace kvm {
+			class KVM;
+			
+			class KVMGuest : public Guest {
 			public:
-				KVM();
+				KVMGuest(Hypervisor& owner);
+				virtual ~KVMGuest();
+				
+				void start() override;
+			};
+
+			class KVM : public Hypervisor {
+			public:
+				explicit KVM();
 				virtual ~KVM();
-				
-				void run_guest(Guest& guest) override;
-				
+
+				Guest *create_guest() override;
+
 				static bool supported();
-				
+
 			private:
 				int kvm_fd;
 			};

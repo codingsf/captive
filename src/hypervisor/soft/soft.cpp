@@ -5,15 +5,30 @@ using namespace captive::hypervisor::soft;
 
 Soft::Soft()
 {
-	
+
 }
 
 Soft::~Soft()
 {
+
+}
+
+Guest *Soft::create_guest()
+{
+	return new SoftGuest(*this);
+}
+
+SoftGuest::SoftGuest(Hypervisor& owner) : Guest(owner)
+{
 	
 }
 
-void Soft::run_guest(Guest& guest)
+SoftGuest::~SoftGuest()
+{
+	
+}
+
+void SoftGuest::start()
 {
 
 }

@@ -20,9 +20,9 @@ KVM::~KVM()
 	close(kvm_fd);
 }
 
-void KVM::run_guest(Guest& guest)
+Guest* KVM::create_guest()
 {
-
+	return new KVMGuest(*this);
 }
 
 bool KVM::supported()
@@ -30,6 +30,21 @@ bool KVM::supported()
 	if (access("/dev/kvm", F_OK)) {
 		return false;
 	}
-	
+
 	return true;
+}
+
+KVMGuest::KVMGuest(Hypervisor& owner) : Guest(owner)
+{
+
+}
+
+KVMGuest::~KVMGuest()
+{
+
+}
+
+void KVMGuest::start()
+{
+
 }

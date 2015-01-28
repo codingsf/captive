@@ -8,6 +8,8 @@
 #ifndef HYPERVISOR_H
 #define	HYPERVISOR_H
 
+#include "hypervisor/guest.h"
+
 namespace captive {
 	namespace hypervisor {
 		class Guest;
@@ -17,7 +19,7 @@ namespace captive {
 			Hypervisor();
 			virtual ~Hypervisor();
 
-			virtual void run_guest(Guest& guest) = 0;
+			virtual Guest *create_guest() = 0;
 		};
 	}
 }

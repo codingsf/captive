@@ -11,8 +11,8 @@
 #include "define.h"
 
 namespace captive {
+
 	class CaptiveException {
-		
 	};
 }
 

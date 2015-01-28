@@ -10,8 +10,19 @@
 
 namespace captive {
 	namespace hypervisor {
-
-		class Guest {
+		class Hypervisor;
+		
+		class Guest
+		{
+		public:
+			Guest(Hypervisor& owner);
+			virtual ~Guest();
+			virtual void start() = 0;
+			
+			inline Hypervisor& owner() const { return _owner; }
+			
+		private:
+			Hypervisor& _owner;
 		};
 	}
 }

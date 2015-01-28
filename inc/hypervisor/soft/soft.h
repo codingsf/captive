@@ -10,19 +10,25 @@
 
 #include <hypervisor/hypervisor.h>
 
-namespace captive
-{
-	namespace hypervisor
-	{
-		namespace soft
-		{
-			class Soft : public Hypervisor
+namespace captive {
+	namespace hypervisor {
+		namespace soft {
+			class Soft;
+			
+			class SoftGuest : public Guest
 			{
+			public:
+				SoftGuest(Hypervisor& owner);
+				virtual ~SoftGuest();
+				virtual void start() override;
+			};
+			
+			class Soft : public Hypervisor {
 			public:
 				Soft();
 				virtual ~Soft();
-				
-				void run_guest(Guest& guest) override;
+
+				Guest *create_guest() override;
 			};
 		}
 	}
