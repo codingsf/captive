@@ -13,12 +13,12 @@ Soft::~Soft()
 
 }
 
-Guest *Soft::create_guest()
+Guest *Soft::create_guest(const GuestConfiguration& config)
 {
-	return new SoftGuest(*this);
+	return new SoftGuest(*this, config);
 }
 
-SoftGuest::SoftGuest(Hypervisor& owner, GuestConfiguration& config) : Guest(owner, config)
+SoftGuest::SoftGuest(Hypervisor& owner, const GuestConfiguration& config) : Guest(owner, config)
 {
 	
 }

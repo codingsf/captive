@@ -20,7 +20,7 @@ namespace captive {
 			virtual ~Hypervisor();
 
 			virtual bool init();
-			virtual Guest *create_guest() = 0;
+			virtual Guest *create_guest(const GuestConfiguration& config) = 0;
 		};
 	}
 }

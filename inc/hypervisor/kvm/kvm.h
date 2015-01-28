@@ -21,7 +21,7 @@ namespace captive {
 			
 			class KVMGuest : public Guest {
 			public:
-				KVMGuest(KVM& owner, GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
 				
 				bool start() override;
@@ -38,7 +38,7 @@ namespace captive {
 				virtual ~KVM();
 
 				bool init() override;
-				Guest *create_guest() override;
+				Guest *create_guest(const GuestConfiguration& config) override;
 				
 				int version() const;
 

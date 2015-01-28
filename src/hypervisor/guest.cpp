@@ -2,7 +2,7 @@
 
 using namespace captive::hypervisor;
 
-Guest::Guest(Hypervisor& owner, GuestConfiguration& config) : _owner(owner), _config(config)
+Guest::Guest(Hypervisor& owner, const GuestConfiguration& config) : _owner(owner), _config(config)
 {
 
 }

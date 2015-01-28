@@ -34,7 +34,7 @@ bool KVM::init()
 	return true;
 }
 
-Guest* KVM::create_guest()
+Guest* KVM::create_guest(const GuestConfiguration& config)
 {
 	DEBUG("creating KVM VM\n");
 	int guest_fd = ioctl(kvm_fd, KVM_CREATE_VM, 0);
@@ -43,7 +43,7 @@ Guest* KVM::create_guest()
 	}
 	
 	DEBUG("creating kvm guest object\n");
-	return new KVMGuest(*this, guest_fd);
+	return new KVMGuest(*this, config, guest_fd);
 }
 
 int KVM::version() const
@@ -61,7 +61,7 @@ bool KVM::supported()
 	return true;
 }
 
-KVMGuest::KVMGuest(KVM& owner, GuestConfiguration& config, int fd) : Guest(owner, config), fd(fd)
+KVMGuest::KVMGuest(KVM& owner, const GuestConfiguration& config, int fd) : Guest(owner, config), fd(fd)
 {
 	
 }

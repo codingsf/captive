@@ -18,7 +18,7 @@ namespace captive {
 			class SoftGuest : public Guest
 			{
 			public:
-				SoftGuest(Hypervisor& owner, GuestConfiguration& config);
+				SoftGuest(Hypervisor& owner, const GuestConfiguration& config);
 				virtual ~SoftGuest();
 				virtual bool start() override;
 			};
@@ -28,7 +28,7 @@ namespace captive {
 				Soft();
 				virtual ~Soft();
 
-				Guest *create_guest() override;
+				Guest *create_guest(const GuestConfiguration& config) override;
 			};
 		}
 	}

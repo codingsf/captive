@@ -21,7 +21,8 @@ int main(int argc, char **argv)
 	}
 	
 	// Attempt to create a guest in the hypervisor.
-	Guest *guest = hv->create_guest();
+	GuestConfiguration cfg;
+	Guest *guest = hv->create_guest(cfg);
 	if (!guest) {
 		delete hv;
 		
