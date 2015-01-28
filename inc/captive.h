@@ -11,10 +11,11 @@
 #include "define.h"
 
 namespace captive {
-
 	class CaptiveException {
 	};
 }
+
+#define DEBUG(a...) fprintf(stderr, a)
 
 #endif	/* CAPTIVE_H */
 
