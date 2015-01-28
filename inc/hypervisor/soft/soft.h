@@ -18,7 +18,7 @@ namespace captive {
 			class SoftGuest : public Guest
 			{
 			public:
-				SoftGuest(Hypervisor& owner);
+				SoftGuest(Hypervisor& owner, GuestConfiguration& config);
 				virtual ~SoftGuest();
 				virtual bool start() override;
 			};

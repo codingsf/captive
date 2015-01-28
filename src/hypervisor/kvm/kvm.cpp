@@ -61,7 +61,7 @@ bool KVM::supported()
 	return true;
 }
 
-KVMGuest::KVMGuest(KVM& owner, int fd) : Guest(owner), fd(fd)
+KVMGuest::KVMGuest(KVM& owner, GuestConfiguration& config, int fd) : Guest(owner, config), fd(fd)
 {
 	
 }

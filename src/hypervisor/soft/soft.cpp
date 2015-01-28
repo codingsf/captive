@@ -18,7 +18,7 @@ Guest *Soft::create_guest()
 	return new SoftGuest(*this);
 }
 
-SoftGuest::SoftGuest(Hypervisor& owner) : Guest(owner)
+SoftGuest::SoftGuest(Hypervisor& owner, GuestConfiguration& config) : Guest(owner, config)
 {
 	
 }
