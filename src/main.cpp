@@ -9,24 +9,26 @@ int main(int argc, char **argv)
 {
 	// Check that KVM is supported
 	if (!KVM::supported()) {
-		fprintf(stderr, "kvm not supported\n");
+		ERROR << "KVM is not supported";
 		return 1;
 	}
 	
 	// Create a new hypervisor.
 	Hypervisor *hv = new KVM();
 	if (!hv->init()) {
-		fprintf(stderr, "unable to initialise hypervisor\n");
+		ERROR << "Unable to initialise the hypervisor";
 		return 1;
 	}
 	
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
+	cfg.name = "test";
+	
 	Guest *guest = hv->create_guest(cfg);
 	if (!guest) {
 		delete hv;
 		
-		fprintf(stderr, "unable to create vm\n");
+		ERROR << "Unable to create guest VM";
 		return 1;
 	}
 	
@@ -35,13 +37,15 @@ int main(int argc, char **argv)
 		delete guest;
 		delete hv;
 
-		fprintf(stderr, "unable to start vm\n");
+		ERROR << "Unable to start guest VM";
 		return 1;
 	}
 	
 	// Clean-up
 	delete guest;
 	delete hv;
+	
+	DEBUG << "Complete";
 	
 	return 0;
 }

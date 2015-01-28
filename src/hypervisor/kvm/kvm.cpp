@@ -18,16 +18,19 @@ KVM::KVM() : kvm_fd(-1)
 
 KVM::~KVM()
 {
-	DEBUG("closing kvm device\n");
+	DEBUG << "Closing KVM device";
 	close(kvm_fd);
 }
 
 bool KVM::init()
 {
+	if (kvm_fd != -1)
+		return false;
+	
 	if (!Hypervisor::init())
 		return false;
 	
-	DEBUG("opening kvm device\n");
+	DEBUG << "Opening KVM device";
 	kvm_fd = open(KVM_DEVICE_LOCATION, O_RDWR);
 	if (kvm_fd < 0)
 		return false;
@@ -36,13 +39,13 @@ bool KVM::init()
 
 Guest* KVM::create_guest(const GuestConfiguration& config)
 {
-	DEBUG("creating KVM VM\n");
+	DEBUG << "Creating new KVM VM";
 	int guest_fd = ioctl(kvm_fd, KVM_CREATE_VM, 0);
 	if (guest_fd < 0) {
 		return NULL;
 	}
 	
-	DEBUG("creating kvm guest object\n");
+	DEBUG << "Creating guest object";
 	return new KVMGuest(*this, config, guest_fd);
 }
 
@@ -53,7 +56,7 @@ int KVM::version() const
 
 bool KVM::supported()
 {
-	DEBUG("attempting to access kvm device\n");
+	DEBUG << "Attempting to access KVM device";
 	if (access(KVM_DEVICE_LOCATION, F_OK)) {
 		return false;
 	}
@@ -68,11 +71,12 @@ KVMGuest::KVMGuest(KVM& owner, const GuestConfiguration& config, int fd) : Guest
 
 KVMGuest::~KVMGuest()
 {
-	DEBUG("deleting kvm vm\n");
+	DEBUG << "Closing KVM VM";
 	close(fd);
 }
 
 bool KVMGuest::start()
 {
+	DEBUG << "Starting " << config().name;
 	return false;
 }
