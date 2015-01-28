@@ -8,8 +8,11 @@
 #ifndef DEFINE_H
 #define	DEFINE_H
 
-#include <stdint.h>
+#include <cassert>
+#include <string>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdarg.h>
 
 #endif	/* DEFINE_H */
 

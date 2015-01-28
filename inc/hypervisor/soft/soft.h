@@ -20,7 +20,7 @@ namespace captive {
 			public:
 				SoftGuest(Hypervisor& owner);
 				virtual ~SoftGuest();
-				virtual void start() override;
+				virtual bool start() override;
 			};
 			
 			class Soft : public Hypervisor {

@@ -28,7 +28,7 @@ SoftGuest::~SoftGuest()
 	
 }
 
-void SoftGuest::start()
+bool SoftGuest::start()
 {
-
+	return false;
 }

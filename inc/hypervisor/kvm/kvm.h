@@ -8,6 +8,9 @@
 #ifndef KVM_H
 #define	KVM_H
 
+#include <define.h>
+
+#include <captive.h>
 #include <hypervisor/hypervisor.h>
 #include <hypervisor/guest.h>
 
@@ -18,23 +21,34 @@ namespace captive {
 			
 			class KVMGuest : public Guest {
 			public:
-				KVMGuest(Hypervisor& owner);
+				KVMGuest(KVM& owner, int fd);
 				virtual ~KVMGuest();
 				
-				void start() override;
+				bool start() override;
+				
+			private:
+				int fd;
 			};
 
 			class KVM : public Hypervisor {
+				friend class KVMGuest;
+				
 			public:
 				explicit KVM();
 				virtual ~KVM();
 
+				bool init() override;
 				Guest *create_guest() override;
+				
+				int version() const;
 
 				static bool supported();
 
 			private:
 				int kvm_fd;
+				
+				KVM(const KVM&) = delete;
+				KVM& operator=(const KVM&) = delete;
 			};
 		}
 	}

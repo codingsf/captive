@@ -17,7 +17,7 @@ namespace captive {
 		public:
 			Guest(Hypervisor& owner);
 			virtual ~Guest();
-			virtual void start() = 0;
+			virtual bool start() = 0;
 			
 			inline Hypervisor& owner() const { return _owner; }
 			

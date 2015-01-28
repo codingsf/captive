@@ -11,3 +11,8 @@ Hypervisor::~Hypervisor()
 {
 
 }
+
+bool Hypervisor::init()
+{
+	return true;
+}

@@ -19,6 +19,7 @@ namespace captive {
 			Hypervisor();
 			virtual ~Hypervisor();
 
+			virtual bool init();
 			virtual Guest *create_guest() = 0;
 		};
 	}
