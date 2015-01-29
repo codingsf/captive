@@ -19,11 +19,14 @@ namespace captive {
 
 			class KVMCpu : public CPU {
 			public:
-				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config);
+				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int fd);
 				~KVMCpu();
 
 				bool init();
 				void run() override;
+				
+			private:
+				int fd;
 			};
 		}
 	}

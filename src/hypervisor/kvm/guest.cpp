@@ -31,15 +31,24 @@ KVMGuest::~KVMGuest()
 bool KVMGuest::init()
 {
 	for (auto cpu : config().cpus) {
-		KVMCpu *kvm_cpu = new KVMCpu(*this, cpu);
+		int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, 0);
+		if (cpu_fd < 0) {
+			ERROR << "Failed to create KVM VCPU";
+			return false;
+		}
+		
+		KVMCpu *kvm_cpu = new KVMCpu(*this, cpu, cpu_fd);
 		if (!kvm_cpu->init()) {
+			delete kvm_cpu;
+			
+			ERROR << "Failed to initialise virtual CPU";
 			return false;
 		}
 		
 		kvm_cpus.push_back(kvm_cpu);
 	}
 	
-	return false;
+	return true;
 }
 
 bool KVMGuest::start(Engine& engine)
