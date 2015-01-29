@@ -11,7 +11,7 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), fd(fd), next_cpu_id(0)
+KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _initialised(false), fd(fd), next_cpu_id(0)
 {
 
 }
@@ -24,11 +24,20 @@ KVMGuest::~KVMGuest()
 
 bool KVMGuest::init()
 {
+	if (!Guest::init())
+		return false;
+
+	_initialised = true;
 	return true;
 }
 
 CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 {
+	if (!initialised()) {
+		ERROR << "KVM guest is not yet initialised";
+		return NULL;
+	}
+
 	if (!config.validate()) {
 		ERROR << "Invalid CPU configuration";
 		return NULL;

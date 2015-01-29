@@ -24,7 +24,10 @@ namespace captive {
 				bool init() override;
 				CPU *create_cpu(const GuestCPUConfiguration& config) override;
 
+				inline bool initialised() const { return _initialised; }
+				
 			private:
+				bool _initialised;
 				int fd;
 				int next_cpu_id;
 				std::vector<KVMCpu *> kvm_cpus;
