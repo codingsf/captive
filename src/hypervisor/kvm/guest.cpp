@@ -1,4 +1,5 @@
 #include <hypervisor/kvm/kvm.h>
+#include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/cpu.h>
 #include <hypervisor/config.h>
 

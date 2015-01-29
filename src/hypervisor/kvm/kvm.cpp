@@ -1,6 +1,7 @@
 #include <captive.h>
 #include <hypervisor/config.h>
 #include <hypervisor/kvm/kvm.h>
+#include <hypervisor/kvm/guest.h>
 
 #include <stdio.h>
 #include <fcntl.h>

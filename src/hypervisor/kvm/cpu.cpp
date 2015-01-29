@@ -1,4 +1,5 @@
 #include <hypervisor/kvm/cpu.h>
+#include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
 
 using namespace captive::hypervisor::kvm;
