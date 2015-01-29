@@ -1,4 +1,5 @@
 #include <captive.h>
+#include <hypervisor/config.h>
 #include <hypervisor/kvm/kvm.h>
 
 #include <stdio.h>
@@ -71,7 +72,7 @@ Guest* KVM::create_guest(const GuestConfiguration& config)
 	
 	// Create (and register) the representative guest object.
 	DEBUG << "Creating guest object";
-	KVMGuest *guest = new KVMGuest(*this, config, guest_fd);
+	KVMGuest *guest = new KVMGuest(*this, config, guest_fd);	
 	known_guests.push_back(guest);
 	
 	return guest;
