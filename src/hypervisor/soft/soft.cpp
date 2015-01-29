@@ -1,5 +1,6 @@
 #include <hypervisor/soft/soft.h>
 
+using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::soft;
 
@@ -28,7 +29,7 @@ SoftGuest::~SoftGuest()
 	
 }
 
-bool SoftGuest::start()
+bool SoftGuest::start(Engine& engine)
 {
 	return false;
 }

@@ -20,7 +20,7 @@ namespace captive {
 			public:
 				SoftGuest(Hypervisor& owner, const GuestConfiguration& config);
 				virtual ~SoftGuest();
-				virtual bool start() override;
+				virtual bool start(engine::Engine& engine) override;
 			};
 			
 			class Soft : public Hypervisor {

@@ -1,7 +1,11 @@
 #include <captive.h>
+#include <engine/test/test.h>
 #include <hypervisor/kvm/kvm.h>
+#include <c++/4.9.2/bits/stl_vector.h>
 
 using namespace captive;
+using namespace captive::engine;
+using namespace captive::engine::test;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
@@ -23,6 +27,7 @@ int main(int argc, char **argv)
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
 	cfg.name = "test";
+	cfg.memory_regions.push_back(GuestMemoryRegion(0, 0x100000000));
 	
 	Guest *guest = hv->create_guest(cfg);
 	if (!guest) {
@@ -32,8 +37,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
+	// Create the test engine.
+	TestEngine engine;
+	
 	// Attempt to start the guest.
-	if (!guest->start()) {
+	if (!guest->start(engine)) {
 		delete guest;
 		delete hv;
 
