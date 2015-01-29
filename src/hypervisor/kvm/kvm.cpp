@@ -15,7 +15,7 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-KVM::KVM() : kvm_fd(-1)
+KVM::KVM() : _initialised(false), kvm_fd(-1)
 {
 }
 
@@ -40,12 +40,15 @@ bool KVM::init()
 
 	// Attempt to open the KVM device node.
 	DEBUG << "Opening KVM device";
-	kvm_fd = open(KVM_DEVICE_LOCATION, O_RDWR);
+	kvm_fd = open(KVM_DEVICE_LOCATION, O_RDWR | O_CLOEXEC);
 	if (kvm_fd < 0) {
 		ERROR << "Unable to open KVM device";
 		return false;
 	}
 
+	_initialised = true;
+
+	DEBUG << "KVM Version: " << version();
 	return true;
 }
 
@@ -97,7 +100,13 @@ int KVM::version() const
 		return -1;
 	}
 
-	return ioctl(kvm_fd, KVM_GET_API_VERSION);
+	int rc = ioctl(kvm_fd, KVM_GET_API_VERSION, 0);
+	if (rc == -1) {
+		ERROR << "Unable to ascertain KVM version: " << LAST_ERROR_TEXT;
+		return -1;
+	}
+
+	return rc;
 }
 
 bool KVM::supported()

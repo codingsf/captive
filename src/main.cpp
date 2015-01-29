@@ -61,6 +61,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (!cpu->init()) {
+		delete cpu;
+		delete guest;
+		delete hv;
+
+		ERROR << "Unable to initialise CPU";
+		return 1;
+	}
+
 	if (!cpu->run()) {
 		delete cpu;
 		delete guest;

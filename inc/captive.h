@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   captive.h
  * Author: s0457958
  *
@@ -11,6 +11,8 @@
 #include <define.h>
 #include <iostream>
 #include <sstream>
+#include <errno.h>
+#include <string.h>
 
 namespace captive {
 	class LogStream : public std::stringstream
@@ -24,6 +26,7 @@ namespace captive {
 #define LOG() captive::LogStream()
 #define DEBUG LOG() << "debug: "
 #define ERROR LOG() << "error: "
+#define LAST_ERROR_TEXT strerror(errno)
 
 #endif	/* CAPTIVE_H */
 

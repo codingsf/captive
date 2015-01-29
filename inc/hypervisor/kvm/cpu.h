@@ -8,6 +8,7 @@
 #ifndef KVM_CPU_H
 #define	KVM_CPU_H
 
+#include <define.h>
 #include <hypervisor/cpu.h>
 #include <linux/kvm.h>
 
@@ -26,12 +27,16 @@ namespace captive {
 				bool init();
 				bool run() override;
 
+				inline bool initialised() const { return _initialised; }
+
 				inline int id() const { return _id; }
 
 			private:
+				bool _initialised;
 				int _id;
 				int fd;
 				struct kvm_run *cpu_run_struct;
+				uint32_t cpu_run_struct_size;
 			};
 		}
 	}

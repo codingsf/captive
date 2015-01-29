@@ -20,9 +20,11 @@ namespace captive {
 	namespace hypervisor {
 		namespace kvm {
 			class KVMGuest;
+			class KVMCpu;
 
 			class KVM : public Hypervisor {
 				friend class KVMGuest;
+				friend class KVMCpu;
 
 			public:
 				explicit KVM();
@@ -33,16 +35,17 @@ namespace captive {
 
 				int version() const;
 
+				inline bool initialised() const { return _initialised; }
+
 				static bool supported();
 
 			private:
+				bool _initialised;
 				int kvm_fd;
 				std::vector<Guest *> known_guests;
 
-				inline bool initialised() const { return kvm_fd >= 0; }
-
 				bool validate_configuration(const GuestConfiguration& config) const;
-
+				
 				KVM(const KVM&) = delete;
 				KVM& operator=(const KVM&) = delete;
 			};
