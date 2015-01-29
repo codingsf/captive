@@ -33,11 +33,11 @@ bool KVM::init()
 		ERROR << "KVM Hypervisor already initialised";
 		return false;
 	}
-	
+
 	// Initialise the underlying hypervisor.
 	if (!Hypervisor::init())
 		return false;
-	
+
 	// Attempt to open the KVM device node.
 	DEBUG << "Opening KVM device";
 	kvm_fd = open(KVM_DEVICE_LOCATION, O_RDWR);
@@ -45,24 +45,24 @@ bool KVM::init()
 		ERROR << "Unable to open KVM device";
 		return false;
 	}
-	
+
 	return true;
 }
 
-Guest* KVM::create_guest(const GuestConfiguration& config)
+Guest* KVM::create_guest(engine::Engine& engine, const GuestConfiguration& config)
 {
 	// Ensure we've been initialised.
 	if (!initialised()) {
 		ERROR << "KVM Hypervisor not yet initialised";
 		return NULL;
 	}
-	
+
 	// Validate the incoming guest configuration.
 	if (!validate_configuration(config)) {
 		ERROR << "Invalid configuration";
 		return NULL;
 	}
-	
+
 	// Issue the ioctl to create a new VM.
 	DEBUG << "Creating new KVM VM";
 	int guest_fd = ioctl(kvm_fd, KVM_CREATE_VM, 0);
@@ -70,12 +70,12 @@ Guest* KVM::create_guest(const GuestConfiguration& config)
 		ERROR << "Failed to create KVM VM";
 		return NULL;
 	}
-	
+
 	// Create (and register) the representative guest object.
 	DEBUG << "Creating guest object";
-	KVMGuest *guest = new KVMGuest(*this, config, guest_fd);	
+	KVMGuest *guest = new KVMGuest(*this, engine, config, guest_fd);
 	known_guests.push_back(guest);
-	
+
 	return guest;
 }
 
@@ -85,7 +85,7 @@ bool KVM::validate_configuration(const GuestConfiguration& config) const
 	if (!config.validate()) {
 		return false;
 	}
-	
+
 	// TODO: KVM specific configuration validation
 	return true;
 }
@@ -96,8 +96,8 @@ int KVM::version() const
 		ERROR << "KVM Hypervisor not yet initialised";
 		return -1;
 	}
-	
-	return ioctl(kvm_fd, KVM_GET_API_VERSION);	
+
+	return ioctl(kvm_fd, KVM_GET_API_VERSION);
 }
 
 bool KVM::supported()

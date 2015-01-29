@@ -11,49 +11,38 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-KVMGuest::KVMGuest(KVM& owner, const GuestConfiguration& config, int fd) : Guest(owner, config), fd(fd)
+KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), fd(fd), next_cpu_id(0)
 {
-	
+
 }
 
 KVMGuest::~KVMGuest()
 {
-	for (auto cpu : kvm_cpus) {
-		delete cpu;
-	}
-	
-	kvm_cpus.clear();
-	
 	DEBUG << "Closing KVM VM";
 	close(fd);
 }
 
 bool KVMGuest::init()
 {
-	for (auto cpu : config().cpus) {
-		int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, 0);
-		if (cpu_fd < 0) {
-			ERROR << "Failed to create KVM VCPU";
-			return false;
-		}
-		
-		KVMCpu *kvm_cpu = new KVMCpu(*this, cpu, cpu_fd);
-		if (!kvm_cpu->init()) {
-			delete kvm_cpu;
-			
-			ERROR << "Failed to initialise virtual CPU";
-			return false;
-		}
-		
-		kvm_cpus.push_back(kvm_cpu);
-	}
-	
 	return true;
 }
 
-bool KVMGuest::start(Engine& engine)
+CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 {
-	DEBUG << "Starting " << config().name;
-	return false;
-}
+	if (!config.validate()) {
+		ERROR << "Invalid CPU configuration";
+		return NULL;
+	}
 
+	DEBUG << "Creating KVM VCPU";
+	int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, next_cpu_id);
+	if (cpu_fd < 0) {
+		ERROR << "Failed to create KVM VCPU";
+		return NULL;
+	}
+
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd);
+	kvm_cpus.push_back(cpu);
+
+	return cpu;
+}

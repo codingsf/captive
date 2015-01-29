@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   guest.h
  * Author: s0457958
  *
@@ -11,28 +11,37 @@
 #include <define.h>
 #include <vector>
 
+#include "config.h"
+
 namespace captive {
 	namespace engine {
 		class Engine;
 	}
-	
+
 	namespace hypervisor {
 		class Hypervisor;
+		class CPU;
+
 		class GuestConfiguration;
-		
+		class GuestCPUConfiguration;
+
 		class Guest
 		{
 		public:
-			Guest(Hypervisor& owner, const GuestConfiguration& config);
+			Guest(Hypervisor& owner, engine::Engine& engine, const GuestConfiguration& config);
 			virtual ~Guest();
 			virtual bool init();
-			virtual bool start(engine::Engine& engine) = 0;
-			
+
+			virtual CPU *create_cpu(const GuestCPUConfiguration& config) = 0;
+
 			inline Hypervisor& owner() const { return _owner; }
+			inline engine::Engine& engine() const { return _engine; }
+
 			inline const GuestConfiguration& config() const { return _config; }
-			
+
 		private:
 			Hypervisor& _owner;
+			engine::Engine& _engine;
 			const GuestConfiguration& _config;
 		};
 	}

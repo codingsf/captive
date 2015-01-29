@@ -15,25 +15,15 @@ bool GuestCPUConfiguration::validate() const
 
 bool GuestConfiguration::validate() const
 {
-	if (!have_cpus()) {
-		ERROR << "Guest configuration doesn't define any CPUs";
-		return false;
-	}
-	
 	if (!have_memory_regions()) {
 		ERROR << "Guest configuration doesn't define any memory regions";
 		return false;
 	}
-	
-	for (auto& cpu : cpus) {
-		if (!cpu.validate())
-			return false;
-	}
-	
+
 	for (auto& rgn : memory_regions) {
 		if (!rgn.validate())
 			return false;
 	}
-	
+
 	return true;
 }

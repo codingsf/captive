@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   cpu.h
  * Author: spink
  *
@@ -12,19 +12,19 @@ namespace captive {
 	namespace hypervisor {
 		class Guest;
 		class GuestCPUConfiguration;
-		
+
 		class CPU
 		{
 		public:
 			CPU(Guest& owner, const GuestCPUConfiguration& config);
 			virtual ~CPU();
-			
+
 			virtual bool init();
-			virtual void run() = 0;
-			
+			virtual bool run() = 0;
+
 			inline Guest& owner() const { return _owner; }
 			inline const GuestCPUConfiguration& config() const { return _config; }
-			
+
 		private:
 			Guest& _owner;
 			const GuestCPUConfiguration& _config;

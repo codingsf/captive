@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   hypervisor.h
  * Author: s0457958
  *
@@ -11,6 +11,10 @@
 #include "hypervisor/guest.h"
 
 namespace captive {
+	namespace engine {
+		class Engine;
+	}
+	
 	namespace hypervisor {
 		class Guest;
 
@@ -20,7 +24,7 @@ namespace captive {
 			virtual ~Hypervisor();
 
 			virtual bool init();
-			virtual Guest *create_guest(const GuestConfiguration& config) = 0;
+			virtual Guest *create_guest(engine::Engine& engine, const GuestConfiguration& config) = 0;
 		};
 	}
 }

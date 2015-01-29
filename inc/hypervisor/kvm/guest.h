@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   guest.h
  * Author: spink
  *
@@ -18,14 +18,15 @@ namespace captive {
 
 			class KVMGuest : public Guest {
 			public:
-				KVMGuest(KVM& owner, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
-				
+
 				bool init() override;
-				bool start(engine::Engine& engine) override;
-				
+				CPU *create_cpu(const GuestCPUConfiguration& config) override;
+
 			private:
 				int fd;
+				int next_cpu_id;
 				std::vector<KVMCpu *> kvm_cpus;
 			};
 		}

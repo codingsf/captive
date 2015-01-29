@@ -7,14 +7,14 @@
 
 using namespace captive::hypervisor;
 
-Guest::Guest(Hypervisor& owner, const GuestConfiguration& config) : _owner(owner), _config(config)
+Guest::Guest(Hypervisor& owner, engine::Engine& engine, const GuestConfiguration& config) : _owner(owner), _engine(engine), _config(config)
 {
 
 }
 
 Guest::~Guest()
 {
-	
+
 }
 
 bool Guest::init()
