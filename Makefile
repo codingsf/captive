@@ -1,3 +1,5 @@
+q := @
+	
 top-dir := $(CURDIR)
 src-dir := $(top-dir)/src
 inc-dir := $(top-dir)/inc
@@ -26,9 +28,11 @@ clean:
 	$(rm) -f $(out)
 
 $(out): $(dep) $(obj)
+	@echo "  LD    $(patsubst $(bin-dir)/%,%,$@)"
 	$(q)$(cxx) -o $@ $(ldflags) $(obj)
 
 %.o: %.cpp
+	@echo "  C++   $(patsubst $(src-dir)/%,%,$@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
 
 %.d: %.cpp
