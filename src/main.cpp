@@ -38,6 +38,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
+	// Initialise the guest
+	if (!guest->init()) {
+		delete guest;
+		delete hv;
+		
+		ERROR << "Unable to initialise guest VM";
+		return 1;
+	}
+	
 	// Create the test engine.
 	TestEngine engine;
 	
