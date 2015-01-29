@@ -37,6 +37,8 @@ namespace captive {
 				int fd;
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;
+
+				void dump_regs(const struct kvm_regs *regs);
 			};
 		}
 	}

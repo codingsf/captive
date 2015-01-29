@@ -43,6 +43,7 @@ namespace captive {
 				std::vector<struct vm_mem_region> vm_mem_regions;
 
 				bool prepare_guest_memory();
+				void release_guest_memory();
 			};
 		}
 	}

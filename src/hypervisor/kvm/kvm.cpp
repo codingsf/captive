@@ -49,6 +49,9 @@ bool KVM::init()
 	_initialised = true;
 
 	DEBUG << "KVM Version: " << version();
+
+	DEBUG << "KVM read-only mem: " << check_extension(KVM_CAP_READONLY_MEM);
+
 	return true;
 }
 
@@ -80,6 +83,11 @@ Guest* KVM::create_guest(engine::Engine& engine, const GuestConfiguration& confi
 	known_guests.push_back(guest);
 
 	return guest;
+}
+
+int KVM::check_extension(int extension) const
+{
+	return ioctl(kvm_fd, KVM_CHECK_EXTENSION, extension);
 }
 
 bool KVM::validate_configuration(const GuestConfiguration& config) const

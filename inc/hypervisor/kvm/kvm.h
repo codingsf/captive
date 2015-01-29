@@ -45,7 +45,9 @@ namespace captive {
 				std::vector<Guest *> known_guests;
 
 				bool validate_configuration(const GuestConfiguration& config) const;
-				
+
+				int check_extension(int extension) const;
+
 				KVM(const KVM&) = delete;
 				KVM& operator=(const KVM&) = delete;
 			};
