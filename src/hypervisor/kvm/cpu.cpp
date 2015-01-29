@@ -40,6 +40,7 @@ bool KVMCpu::init()
 bool KVMCpu::run()
 {
 	DEBUG << "Running CPU " << id();
+
 	int rc = ioctl(fd, KVM_RUN);
 	if (rc != 0) {
 		ERROR << "Unable to run VCPU: " << strerror(errno);

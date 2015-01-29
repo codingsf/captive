@@ -14,10 +14,13 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-#define GUEST_PHYS_MEMORY_BASE	0x0
-#define GUEST_PHYS_MEMORY_SIZE	0x100000000
-#define HV_MEMORY_BASE		0x100000000
-#define BOOTLOADER_MEMORY_BASE	HV_MEMORY_BASE
+#define PAGE_SIZE			4096
+#define GUEST_PHYS_MEMORY_BASE		0x0
+#define GUEST_PHYS_MEMORY_MAX_SIZE	0x100000000
+#define HV_MEMORY_BASE			0x100000000
+#define BOOTLOADER_MEMORY_BASE		HV_MEMORY_BASE
+#define TSS_SIZE			(PAGE_SIZE * 3)
+#define TSS_ADDRESS			(GUEST_PHYS_MEMORY_MAX_SIZE - TSS_SIZE)
 
 KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _initialised(false), fd(fd), next_cpu_id(0)
 {
@@ -75,7 +78,15 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 bool KVMGuest::prepare_guest_memory()
 {
+	int rc;
 	int slot_index = 0;
+
+	DEBUG << "Setting TSS";
+	rc = ioctl(fd, KVM_SET_TSS_ADDR, TSS_ADDRESS);
+	if (rc) {
+		ERROR << "Unable to set TSS address";
+		return false;
+	}
 
 	DEBUG << "Installing bootloader";
 	struct kvm_userspace_memory_region bootloader_rgn;
@@ -85,7 +96,7 @@ bool KVMGuest::prepare_guest_memory()
 	bootloader_rgn.memory_size = engine().get_bootloader_size();
 	bootloader_rgn.userspace_addr = (uint64_t)engine().get_bootloader_addr();
 
-	int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &bootloader_rgn);
+	rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &bootloader_rgn);
 	if (rc) {
 		ERROR << "Unable to install bootloader";
 		return false;
@@ -114,8 +125,8 @@ bool KVMGuest::prepare_guest_memory()
 			", hva=" << std::hex << vm_region.buffer;
 
 		// Instruct the VM to create a region for guest physical memory
-		int rrc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &vm_region.kvm);
-		if (rrc) {
+		rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &vm_region.kvm);
+		if (rc) {
 			ERROR << "Unable to initialise VM memory region";
 			munmap((void *)vm_region.buffer, vm_region.buffer_size);
 			return false;

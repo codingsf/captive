@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
 	cfg.name = "test";
-	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x100000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x40000000));	// 1Gb
 
 	// Create the test engine.
 	TestEngine engine;
