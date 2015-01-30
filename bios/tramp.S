@@ -3,24 +3,40 @@
 .text
 
 .org 0
-nop
 
 .globl entry16
 entry16:
     cli
-    lgdt %cs:gdt_ptr
+
+    lidt %cs:idt_ptr
+
+    mov $0xa0, %eax
+    mov %eax, %cr4
+
+.extern pgd
+    movl $0xf1000, %eax
+    //addl pgd, %eax
+    movl %eax, %cr3
+
+    mov $0xc0000080, %ecx
+    rdmsr
+    or $0x100, %eax
+    wrmsr
 
     mov %cr0, %eax
-    or $1, %eax
+    or $0x80000001, %eax
     mov %eax, %cr0
 
-    .word 0xea66, entry32, 0x000f, 0x0010
+    lgdt %cs:gdt_ptr
+
+    .word 0xea66, entry64, 0x000f, 0x0008
 
     nop
+    nop
 
-.code32
-entry32:
-    movl $0x18, %eax
+.code64
+entry64:
+    movl $0x10, %eax
     movw %ax, %ds
     movw %ax, %es
     mov %ax, %ss
@@ -29,23 +45,26 @@ entry32:
     movw %ax, %fs
     movw %ax, %gs
 
-    cld
-
     jmp main
 
 .code16
+.align 4
 gdt_ptr:
-    .word 0x30
+    .word 0x18
     .word gdt
     .word 0x000f
+    .word 0
 
+.align 16
 gdt:
-    .word 0, 0, 0, 0
-    .word 0, 0, 0, 0
-    .word 0xffff, 0, 0x9b00, 0x00cf // 32 bit flat code segment (0x10)
-    .word 0xffff, 0, 0x9300, 0x00cf // 32 bit flat data segment (0x18)
-    .word 0xffff, 0, 0x9b0f, 0x0000 // 16 bit code segment base=0xf0000 limit=0xffff
-    .word 0xffff, 0, 0x9300, 0x0000 // 16 bit data segment base=0x0 limit=0xffff
+    .quad 0x0000000000000000
+    .quad 0x0020980000000000
+    .quad 0x0000900000000000
+
+idt_ptr:
+    .word 0
+    .long 0
+    .word 0
 
 .section ".reset_vector", "ax"
 reset_vector:

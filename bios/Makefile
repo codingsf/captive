@@ -11,8 +11,9 @@ as := as
 rm := rm
 objcopy := objcopy
 
-cflags := -g -Os -march=i686 -ffreestanding -m32 -Wall -fno-asynchronous-unwind-tables
-ldflags := -static -Tlinker.ld -nostdlib -melf_i386
+cflags := -g -Os -ffreestanding -m64 -Wall -fno-asynchronous-unwind-tables
+ldflags := -static -Tlinker.ld -nostdlib
+	#-melf_i386
 
 all: $(out)
 

@@ -167,5 +167,6 @@ void KVMCpu::dump_regs()
 
 #undef PCREG
 
-	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl;
+	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl
+	<< "efer=" << std::hex << sregs.efer << std::endl;
 }

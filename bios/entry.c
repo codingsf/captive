@@ -1,4 +1,6 @@
-__asm__(".code32\n");
+asm (".code64\n");
+
+unsigned long int pgd[4] __attribute__((aligned(0x1000)))= {0xf0003};
 
 void main()
 {
