@@ -21,6 +21,8 @@ using namespace captive::hypervisor::kvm;
 #define IDENTITY_BASE			0x50000000
 #define TSS_BASE			0x50001000
 
+#define DEFAULT_NR_SLOTS		32
+
 KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
 {
 
@@ -41,6 +43,16 @@ bool KVMGuest::init()
 
 	if (!Guest::init())
 		return false;
+
+	// Initialise memory region slot pool.
+	for (int i = 0; i < DEFAULT_NR_SLOTS; i++) {
+		vm_mem_region *region = new vm_mem_region();
+		bzero(region, sizeof(*region));
+
+		region->kvm.slot = i;
+
+		vm_mem_region_free.push_back(region);
+	}
 
 	/*DEBUG << "Setting identity map to " << std::hex << IDENTITY_BASE;
 	uint64_t idb = IDENTITY_BASE;
@@ -99,9 +111,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 bool KVMGuest::prepare_guest_memory()
 {
-	int rc;
-
-	const struct vm_mem_region *bootstrap = alloc_guest_memory(0xffff0000, 0x10000);
+	struct vm_mem_region *bootstrap = alloc_guest_memory(0xffff0000, 0x10000);
 	if (!bootstrap) {
 		ERROR << "Unable to allocate memory for the bootstrap";
 		return false;
@@ -114,7 +124,7 @@ bool KVMGuest::prepare_guest_memory()
 
 	DEBUG << "Installing guest memory regions";
 	for (auto& region : config().memory_regions) {
-		const struct vm_mem_region *vm_region = alloc_guest_memory(GUEST_PHYS_MEMORY_BASE + region.base_address(), region.size());
+		struct vm_mem_region *vm_region = alloc_guest_memory(GUEST_PHYS_MEMORY_BASE + region.base_address(), region.size());
 		if (!vm_region) {
 			release_all_guest_memory();
 			ERROR << "Unable to allocate guest memory region";
@@ -134,24 +144,45 @@ bool KVMGuest::prepare_bootstrap(uint8_t* base)
 	return true;
 }
 
-const KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t size)
+KVMGuest::vm_mem_region *KVMGuest::get_mem_slot()
 {
-	// TODO: Check that there is an available slot - maintain a slot index queue?
-	// or maybe just a vm_mem_region free/used pool with pre-allocated slot
-	// indicies.
+	if (vm_mem_region_free.size() == 0)
+		return NULL;
 
-	struct vm_mem_region *rgn = new struct vm_mem_region();
+	vm_mem_region *region = vm_mem_region_free.front();
+	vm_mem_region_free.pop_front();
+	vm_mem_region_used.push_back(region);
+
+	return region;
+}
+
+void KVMGuest::put_mem_slot(vm_mem_region* region)
+{
+	for (auto RI = vm_mem_region_used.begin(), RE = vm_mem_region_used.end(); RI != RE; ++RI) {
+		if (*RI == region) {
+			vm_mem_region_used.erase(RI);
+			vm_mem_region_free.push_back(region);
+			break;
+		}
+	}
+}
+
+KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t size)
+{
+	// Try to obtain a free memory region slot.
+	vm_mem_region *rgn = get_mem_slot();
+	if (rgn == NULL)
+		return NULL;
 
 	// Fill in the KVM memory structure.
 	rgn->kvm.flags = 0;
 	rgn->kvm.guest_phys_addr = gpa;
 	rgn->kvm.memory_size = size;
-	rgn->kvm.slot = next_slot_idx++;
 
 	// Allocate a userspace buffer for the region.
 	rgn->host_buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS, -1, 0);
 	if (rgn->host_buffer == MAP_FAILED) {
-		delete rgn;
+		put_mem_slot(rgn);
 
 		ERROR << "Unable to allocate memory";
 		return NULL;
@@ -164,18 +195,17 @@ const KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64
 	int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &rgn->kvm);
 	if (rc) {
 		munmap(rgn->host_buffer, rgn->kvm.memory_size);
-		delete rgn;
+		put_mem_slot(rgn);
 
 		ERROR << "Unable to install memory";
 		return NULL;
 	}
 
-	DEBUG << "Allocated guest memory, gpa=" << std::hex << rgn->kvm.guest_phys_addr << ", size=" << std::hex << rgn->kvm.memory_size;
-	vm_mem_regions.push_back(rgn);
+	DEBUG << "Allocated guest memory, gpa=" << std::hex << rgn->kvm.guest_phys_addr << ", size=" << std::hex << rgn->kvm.memory_size << ", hva=" << std::hex << rgn->host_buffer;
 	return rgn;
 }
 
-void KVMGuest::release_guest_memory(const vm_mem_region *region)
+void KVMGuest::release_guest_memory(vm_mem_region *region)
 {
 	struct kvm_userspace_memory_region kvm;
 
@@ -190,12 +220,17 @@ void KVMGuest::release_guest_memory(const vm_mem_region *region)
 
 	// Release the associated buffer.
 	munmap(region->host_buffer, region->kvm.memory_size);
-	delete region;
+
+	// Return the memory slot to the free pool.
+	put_mem_slot(region);
 }
 
 void KVMGuest::release_all_guest_memory()
 {
-	for (auto region : vm_mem_regions) {
+	// Copy the list, to avoid destroying something we're iterating over.
+	std::list<vm_mem_region *> used_regions = vm_mem_region_used;
+
+	for (auto region : used_regions) {
 		release_guest_memory(region);
 	}
 }

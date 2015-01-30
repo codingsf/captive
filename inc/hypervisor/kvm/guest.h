@@ -8,6 +8,8 @@
 #ifndef KVM_GUEST_H
 #define	KVM_GUEST_H
 
+#include <list>
+
 #include <hypervisor/guest.h>
 #include <linux/kvm.h>
 
@@ -39,13 +41,17 @@ namespace captive {
 					void *host_buffer;
 				};
 
-				std::vector<struct vm_mem_region *> vm_mem_regions;
+				std::list<vm_mem_region *> vm_mem_region_free;
+				std::list<vm_mem_region *> vm_mem_region_used;
 
 				bool prepare_guest_memory();
 				bool prepare_bootstrap(uint8_t *base);
 
-				const vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size);
-				void release_guest_memory(const vm_mem_region *rgn);
+				vm_mem_region *get_mem_slot();
+				void put_mem_slot(vm_mem_region *region);
+
+				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size);
+				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
 			};
 		}
