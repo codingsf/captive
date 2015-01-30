@@ -10,6 +10,7 @@
 
 #include <define.h>
 #include <hypervisor/cpu.h>
+#include <sys/ioctl.h>
 #include <linux/kvm.h>
 
 namespace captive {
@@ -38,7 +39,19 @@ namespace captive {
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;
 
-				void dump_regs(const struct kvm_regs *regs);
+				inline int vmioctl(unsigned long int req) const {
+					return vmioctl(req, (unsigned long int)0);
+				}
+
+				inline int vmioctl(unsigned long int req, unsigned long int arg) const {
+					return ioctl(fd, req, arg);
+				}
+
+				inline int vmioctl(unsigned long int req, void *arg) const {
+					return ioctl(fd, req, arg);
+				}
+
+				void dump_regs();
 			};
 		}
 	}

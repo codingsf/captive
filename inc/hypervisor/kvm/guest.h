@@ -31,19 +31,22 @@ namespace captive {
 				bool _initialised;
 				int fd;
 				int next_cpu_id;
+				int next_slot_idx;
 				std::vector<KVMCpu *> kvm_cpus;
 
 				struct vm_mem_region {
 					struct kvm_userspace_memory_region kvm;
-
-					uint64_t buffer;
-					uint64_t buffer_size;
+					void *host_buffer;
 				};
 
-				std::vector<struct vm_mem_region> vm_mem_regions;
+				std::vector<struct vm_mem_region *> vm_mem_regions;
 
 				bool prepare_guest_memory();
-				void release_guest_memory();
+				bool prepare_bootstrap(uint8_t *base);
+
+				const vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size);
+				void release_guest_memory(const vm_mem_region *rgn);
+				void release_all_guest_memory();
 			};
 		}
 	}

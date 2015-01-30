@@ -60,30 +60,8 @@ bool KVMCpu::run()
 	}
 
 	DEBUG << "Running CPU " << id();
-
-	struct kvm_sregs sregs;
-	bzero(&sregs, sizeof(sregs));
-
-	rc = ioctl(fd, KVM_SET_SREGS, &sregs);
-	if (rc) {
-		ERROR << "Unable to set initial special register values";
-		return false;
-	}
-
-	struct kvm_regs regs;
-	bzero(&regs, sizeof(regs));
-	regs.rax = 0xbabe;
-	regs.rip = 0;
-	regs.rflags = 2;
-
-	rc = ioctl(fd, KVM_SET_REGS, &regs);
-	if (rc) {
-		ERROR << "Unable to set initial register values";
-		return false;
-	}
-
 	do {
-		rc = ioctl(fd, KVM_RUN, 0);
+		rc = vmioctl(KVM_RUN);
 		if (rc < 0) {
 			ERROR << "Unable to run VCPU: " << LAST_ERROR_TEXT;
 			return false;
@@ -105,48 +83,80 @@ bool KVMCpu::run()
 				DEBUG << "DATA: " << std::hex << cpu_run_struct->internal.data[i];
 			}
 			break;
+		case KVM_EXIT_FAIL_ENTRY:
+			DEBUG << "EXIT FAIL ENTRY, error=" << cpu_run_struct->fail_entry.hardware_entry_failure_reason;
+			break;
 		default:
 			DEBUG << "UNKNOWN: " << cpu_run_struct->exit_reason;
 			break;
 		}
 	} while (false);
 
-	rc = ioctl(fd, KVM_GET_REGS, &regs);
-	if (rc) {
-		ERROR << "Unable to get register values";
-	} else {
-		dump_regs(&regs);
-	}
+	dump_regs();
 
 	return true;
 }
 
-void KVMCpu::dump_regs(const struct kvm_regs *regs)
+void KVMCpu::dump_regs()
 {
-	DEBUG << "Registers:";
+	struct kvm_regs regs;
+	struct kvm_sregs sregs;
 
-#define PREG(rg) DEBUG << #rg " = " << std::hex << regs->rg << " (" << std::dec << regs->rg << ")"
+	int rc = ioctl(fd, KVM_GET_REGS, &regs);
+	if (rc) {
+		ERROR << "Unable to retrieve CPU registers";
+		return;
+	}
 
-	PREG(rax);
-	PREG(rbx);
-	PREG(rcx);
-	PREG(rdx);
-	PREG(rsi);
-	PREG(rdi);
-	PREG(rsp);
-	PREG(rbp);
+	rc = ioctl(fd, KVM_GET_SREGS, &sregs);
+	if (rc) {
+		ERROR << "Unable to retrieve special CPU registers";
+		return;
+	}
 
-	PREG(r8);
-	PREG(r9);
-	PREG(r10);
-	PREG(r11);
-	PREG(r12);
-	PREG(r13);
-	PREG(r14);
-	PREG(r15);
+#define PREG(rg) << #rg " = " << std::hex << regs.rg << " (" << std::dec << regs.rg << ")" << std::endl
 
-	PREG(rip);
-	PREG(rflags);
+	DEBUG << "Registers:" << std::endl
+
+	PREG(rax)
+	PREG(rbx)
+	PREG(rcx)
+	PREG(rdx)
+	PREG(rsi)
+	PREG(rdi)
+	PREG(rsp)
+	PREG(rbp)
+
+	PREG(r8)
+	PREG(r9)
+	PREG(r10)
+	PREG(r11)
+	PREG(r12)
+	PREG(r13)
+	PREG(r14)
+	PREG(r15)
+
+	PREG(rip)
+	PREG(rflags)
 
 #undef PREG
+#define PSREG(rg) << #rg ": base=" << std::hex << sregs.rg.base << ", limit=" << std::hex << sregs.rg.limit << std::endl
+
+	PSREG(cs)
+	PSREG(ds)
+	PSREG(es)
+	PSREG(fs)
+	PSREG(gs)
+	PSREG(ss)
+
+#undef PSREG
+#define PCREG(rg) << #rg ": " << std::hex << sregs.rg << std::endl
+
+	PCREG(cr0)
+	PCREG(cr2)
+	PCREG(cr3)
+	PCREG(cr4)
+	PCREG(cr8);
+
+#undef PCREG
 }
