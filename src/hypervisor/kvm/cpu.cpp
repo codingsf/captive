@@ -59,6 +59,13 @@ bool KVMCpu::run()
 		return false;
 	}
 
+	struct kvm_sregs sregs;
+	vmioctl(KVM_GET_SREGS, &sregs);
+	sregs.cs.base = 0xf0000;
+	vmioctl(KVM_SET_SREGS, &sregs);
+
+	dump_regs();
+
 	DEBUG << "Running CPU " << id();
 	do {
 		rc = vmioctl(KVM_RUN);
@@ -140,7 +147,7 @@ void KVMCpu::dump_regs()
 	PREG(rflags)
 
 #undef PREG
-#define PSREG(rg) << #rg ": base=" << std::hex << sregs.rg.base << ", limit=" << std::hex << sregs.rg.limit << std::endl
+#define PSREG(rg) << #rg ": base=" << std::hex << sregs.rg.base << ", limit=" << std::hex << sregs.rg.limit << ", selector=" << std::hex << sregs.rg.selector << std::endl
 
 	PSREG(cs)
 	PSREG(ds)
@@ -156,7 +163,9 @@ void KVMCpu::dump_regs()
 	PCREG(cr2)
 	PCREG(cr3)
 	PCREG(cr4)
-	PCREG(cr8);
+	PCREG(cr8)
 
 #undef PCREG
+
+	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl;
 }

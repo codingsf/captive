@@ -23,6 +23,8 @@ using namespace captive::hypervisor::kvm;
 
 #define DEFAULT_NR_SLOTS		32
 
+extern char __bios_bin_start, __bios_bin_end;
+
 KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
 {
 
@@ -111,14 +113,31 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 bool KVMGuest::prepare_guest_memory()
 {
-	struct vm_mem_region *bootstrap = alloc_guest_memory(0xffff0000, 0x10000);
-	if (!bootstrap) {
-		ERROR << "Unable to allocate memory for the bootstrap";
+	struct vm_mem_region *init_code = alloc_guest_memory(0xfffff000, 0x1000);
+	if (!init_code) {
 		return false;
 	}
 
-	if (!prepare_bootstrap((uint8_t *)bootstrap->host_buffer)) {
-		ERROR << "Unable to prepare bootstrap";
+	((uint8_t *)init_code->host_buffer)[0xff0] = 0xea;
+	((uint8_t *)init_code->host_buffer)[0xff1] = 0x00;
+	((uint8_t *)init_code->host_buffer)[0xff2] = 0x00;
+	((uint8_t *)init_code->host_buffer)[0xff3] = 0x00;
+	((uint8_t *)init_code->host_buffer)[0xff4] = 0xf0;
+
+	struct vm_mem_region *bootstrap_code = alloc_guest_memory(0xf0000, 0x10000);
+	if (!bootstrap_code) {
+		ERROR << "Unable to allocate memory for the bootstrap code";
+		return false;
+	}
+
+	if (!prepare_bootstrap((uint8_t *)bootstrap_code->host_buffer)) {
+		ERROR << "Unable to initialise bootstrap code";
+		return false;
+	}
+
+	struct vm_mem_region *bootstrap_data = alloc_guest_memory(0x0, 0x10000);
+	if (!bootstrap_data) {
+		ERROR << "Unable to allocate memory for the bootstrap data";
 		return false;
 	}
 
@@ -137,9 +156,9 @@ bool KVMGuest::prepare_guest_memory()
 
 bool KVMGuest::prepare_bootstrap(uint8_t* base)
 {
-	base[0xfff0] = 0xb8;
-	base[0xfff1] = 0xff;
-	base[0xfff3] = 0xcc;
+	unsigned int bios_size = &__bios_bin_end - &__bios_bin_start;
+
+	memcpy(base, &__bios_bin_start, bios_size);
 
 	return true;
 }

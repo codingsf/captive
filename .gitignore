@@ -2,3 +2,6 @@
 *.d
 nbproject/
 bin/
+bios.bin
+bios.elf
+
