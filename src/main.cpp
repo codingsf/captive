@@ -13,8 +13,8 @@ using namespace captive::hypervisor::kvm;
 
 int main(int argc, char **argv)
 {
-	if (argc != 2) {
-		ERROR << "usage: " << argv[0] << " <zimage>";
+	if (argc != 3) {
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage>";
 		return 1;
 	}
 
@@ -37,7 +37,14 @@ int main(int argc, char **argv)
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x40000000));	// 1Gb
 
 	// Create the engine.
-	Engine engine;
+	Engine engine(argv[1]);
+
+	if (!engine.init()) {
+		delete hv;
+
+		ERROR << "Unable to initialise engine";
+		return 1;
+	}
 
 	Guest *guest = hv->create_guest(engine, cfg);
 	if (!guest) {
@@ -57,7 +64,7 @@ int main(int argc, char **argv)
 	}
 
 	// Load the zimage
-	ZImageLoader loader(argv[1]);
+	ZImageLoader loader(argv[2]);
 	if (!guest->load(loader)) {
 		delete guest;
 		delete hv;

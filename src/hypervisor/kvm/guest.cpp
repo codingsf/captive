@@ -120,6 +120,12 @@ bool KVMGuest::prepare_guest_memory()
 		return false;
 	}
 
+	// Install the engine code
+	if (!engine().install(&((uint8_t *)system->host_buffer)[0xb0000])) {
+		ERROR << "Unable to install execution engine";
+		return false;
+	}
+
 	DEBUG << "Installing guest memory regions";
 	for (auto& region : config().memory_regions) {
 		struct vm_mem_region *vm_region = alloc_guest_memory(GUEST_PHYS_MEMORY_BASE + region.base_address(), region.size());

@@ -1,5 +1,5 @@
 MAKEFLAGS += -rR --no-print-directory
-q := @
+export q := @
 
 top-dir := $(CURDIR)
 src-dir := $(top-dir)/src

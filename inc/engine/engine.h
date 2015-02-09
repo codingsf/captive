@@ -15,10 +15,19 @@ namespace captive {
 		class Engine
 		{
 		public:
-			explicit Engine();
+			Engine(std::string libfile);
 			virtual ~Engine();
 
+			bool init();
 			bool install(uint8_t *base);
+
+		private:
+			bool load();
+			bool loaded;
+
+			std::string libfile;
+			void *lib;
+			size_t lib_size;
 		};
 	}
 }
