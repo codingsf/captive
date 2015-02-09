@@ -4,6 +4,9 @@ top-dir := $(CURDIR)
 cc := gcc
 cxx := g++
 
+cflags := -nostdlib -O3
+ldflags := -nostdlib
+
 engines := test
 test-obj := start.o
 
