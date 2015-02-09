@@ -2,7 +2,7 @@
  * start.cpp
  */
 
-extern void printf(const char *fmt, ...);
+void printf(const char *fmt, ...);
 
 extern "C" void engine_start(unsigned int entry_point)
 {
