@@ -5,6 +5,7 @@ src-dir := $(top-dir)/src
 inc-dir := $(top-dir)/inc
 bin-dir := $(top-dir)/bin
 bios-dir := $(top-dir)/bios
+engines-dir := $(top-dir)/engines
 
 out := $(bin-dir)/captive
 src := $(patsubst src/%,$(src-dir)/%,$(shell find src/ | grep -e "\.cpp"))
@@ -25,6 +26,7 @@ rm  := rm
 make := make
 
 all: $(out)
+	$(q)$(make) -C $(engines-dir)
 
 clean:
 	$(rm) -f $(obj)

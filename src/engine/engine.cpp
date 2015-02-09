@@ -12,3 +12,8 @@ Engine::~Engine()
 {
 
 }
+
+bool Engine::install(uint8_t* base)
+{
+	return false;
+}

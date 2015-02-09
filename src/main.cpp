@@ -1,12 +1,11 @@
 #include <captive.h>
-#include <engine/test/test.h>
+#include <engine/engine.h>
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
 
 using namespace captive;
 using namespace captive::engine;
-using namespace captive::engine::test;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
@@ -30,8 +29,8 @@ int main(int argc, char **argv)
 	cfg.name = "test";
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x40000000));	// 1Gb
 
-	// Create the test engine.
-	TestEngine engine;
+	// Create the engine.
+	Engine engine;
 
 	Guest *guest = hv->create_guest(engine, cfg);
 	if (!guest) {

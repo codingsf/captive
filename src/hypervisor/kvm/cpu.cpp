@@ -52,6 +52,7 @@ bool KVMCpu::init()
 
 bool KVMCpu::run()
 {
+	bool run_cpu = true;
 	int rc;
 
 	if (!initialised()) {
@@ -76,33 +77,72 @@ bool KVMCpu::run()
 
 		switch (cpu_run_struct->exit_reason) {
 		case KVM_EXIT_IO:
-			DEBUG << "EXIT IO";
+			if (cpu_run_struct->io.port == 0xff) {
+				struct kvm_regs regs;
+				vmioctl(KVM_GET_REGS, &regs);
+
+				DEBUG << "Handling hypercall";
+				run_cpu = handle_hypercall(regs.rax);
+			} else {
+				run_cpu = false;
+				DEBUG << "EXIT IO "
+					"port=" << std::hex << cpu_run_struct->io.port << ", "
+					"data offset=" << std::hex << cpu_run_struct->io.data_offset << ", "
+					"count=" << std::hex << cpu_run_struct->io.count;
+			}
 			break;
 		case KVM_EXIT_MMIO:
+			run_cpu = false;
 			DEBUG << "EXIT MMIO, pa=" << std::hex << cpu_run_struct->mmio.phys_addr << ", size=" << std::hex << cpu_run_struct->mmio.len;
 			break;
 		case KVM_EXIT_UNKNOWN:
+			run_cpu = false;
 			DEBUG << "EXIT UNKNOWN, reason=" << cpu_run_struct->hw.hardware_exit_reason;
 			break;
 		case KVM_EXIT_INTERNAL_ERROR:
+			run_cpu = false;
 			DEBUG << "EXIT INTERNAL ERROR, error=" << cpu_run_struct->internal.suberror;
 			for (uint32_t i = 0; i < cpu_run_struct->internal.ndata; i++) {
 				DEBUG << "DATA: " << std::hex << cpu_run_struct->internal.data[i];
 			}
 			break;
 		case KVM_EXIT_FAIL_ENTRY:
+			run_cpu = false;
 			DEBUG << "EXIT FAIL ENTRY, error=" << cpu_run_struct->fail_entry.hardware_entry_failure_reason;
 			break;
+		case KVM_EXIT_SHUTDOWN:
+			run_cpu = false;
+			DEBUG << "EXIT SHUTDOWN";
+			break;
+		case KVM_EXIT_HYPERCALL:
+			run_cpu = false;
+			DEBUG << "EXIT HYPERCALL";
+			break;
 		default:
+			run_cpu = false;
 			DEBUG << "UNKNOWN: " << cpu_run_struct->exit_reason;
 			break;
 		}
-	} while (false);
+	} while (run_cpu);
 
 	dump_regs();
 
 	return true;
 }
+
+bool KVMCpu::handle_hypercall(uint64_t data)
+{
+	DEBUG << "Hypercall " << data;
+
+	switch(data) {
+	case 1:
+		// TODO: remap guest memory, jump to 0x100001000
+		return false;
+	}
+
+	return false;
+}
+
 
 void KVMCpu::dump_regs()
 {

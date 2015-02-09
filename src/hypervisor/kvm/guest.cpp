@@ -113,31 +113,22 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 bool KVMGuest::prepare_guest_memory()
 {
-	struct vm_mem_region *init_code = alloc_guest_memory(0xfffff000, 0x1000);
-	if (!init_code) {
+	// Allocate the first 2MB for system usage.
+	struct vm_mem_region *system = alloc_guest_memory(0x0, 0x200000);
+	if (!system) {
+		ERROR << "Unable to allocate memory for the system";
 		return false;
 	}
 
-	((uint8_t *)init_code->host_buffer)[0xff0] = 0xea;
-	((uint8_t *)init_code->host_buffer)[0xff1] = 0x00;
-	((uint8_t *)init_code->host_buffer)[0xff2] = 0x00;
-	((uint8_t *)init_code->host_buffer)[0xff3] = 0x00;
-	((uint8_t *)init_code->host_buffer)[0xff4] = 0xf0;
-
-	struct vm_mem_region *bootstrap_code = alloc_guest_memory(0xf0000, 0x10000);
-	if (!bootstrap_code) {
-		ERROR << "Unable to allocate memory for the bootstrap code";
-		return false;
-	}
-
-	if (!prepare_bootstrap((uint8_t *)bootstrap_code->host_buffer)) {
+	// Install the bios into the correct location.
+	if (!install_bios(&((uint8_t *)system->host_buffer)[0xf0000])) {
 		ERROR << "Unable to initialise bootstrap code";
 		return false;
 	}
 
-	struct vm_mem_region *bootstrap_data = alloc_guest_memory(0x0, 0x10000);
-	if (!bootstrap_data) {
-		ERROR << "Unable to allocate memory for the bootstrap data";
+	// Prepare initial guest page tables
+	if (!install_initial_pgt((uint8_t *)system->host_buffer)) {
+		ERROR << "Unable to create initial page tables";
 		return false;
 	}
 
@@ -154,11 +145,30 @@ bool KVMGuest::prepare_guest_memory()
 	return true;
 }
 
-bool KVMGuest::prepare_bootstrap(uint8_t* base)
+bool KVMGuest::install_bios(uint8_t* base)
 {
 	unsigned int bios_size = &__bios_bin_end - &__bios_bin_start;
-
 	memcpy(base, &__bios_bin_start, bios_size);
+
+	return true;
+}
+
+bool KVMGuest::install_initial_pgt(uint8_t* base)
+{
+	uint64_t *pg4 = (uint64_t *)(&base[0x1000]);
+	uint64_t *pg3 = (uint64_t *)(&base[0x2000]);
+	uint64_t *pg2 = (uint64_t *)(&base[0x3000]);
+	uint64_t *pg1 = (uint64_t *)(&base[0x4000]);
+
+	*pg4 = 0x2003;
+	*pg3 = 0x3003;
+	*pg2 = 0x4003;
+
+	uint64_t addr = 3;
+	for (int i = 0; i < 512; i++) {
+		pg1[i] = addr;
+		addr += 0x1000;
+	}
 
 	return true;
 }

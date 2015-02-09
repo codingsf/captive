@@ -18,11 +18,9 @@ namespace captive {
 			explicit Engine();
 			virtual ~Engine();
 
-			virtual void *get_bootloader_addr() const = 0;
-			virtual uint64_t get_bootloader_size() const = 0;
+			bool install(uint8_t *base);
 		};
 	}
 }
 
 #endif	/* ENGINE_H */
-

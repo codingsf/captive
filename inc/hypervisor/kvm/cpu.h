@@ -51,6 +51,8 @@ namespace captive {
 					return ioctl(fd, req, arg);
 				}
 
+				bool handle_hypercall(uint64_t data);
+
 				void dump_regs();
 			};
 		}

@@ -45,7 +45,8 @@ namespace captive {
 				std::list<vm_mem_region *> vm_mem_region_used;
 
 				bool prepare_guest_memory();
-				bool prepare_bootstrap(uint8_t *base);
+				bool install_bios(uint8_t *base);
+				bool install_initial_pgt(uint8_t *base);
 
 				vm_mem_region *get_mem_slot();
 				void put_mem_slot(vm_mem_region *region);
