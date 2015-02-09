@@ -13,7 +13,7 @@ entry16:
 	// Load the IDT with a null pointer
     lidt %cs:idt_ptr
 
-	// Enable something
+	// Enable PAE and PGE
     mov $0xa0, %eax
     mov %eax, %cr4
 
@@ -27,7 +27,7 @@ entry16:
     or $0x100, %eax
     wrmsr
 
-	// Enable paging
+	// Enable paging and protected mode
     mov %cr0, %eax
     or $0x80000001, %eax
     mov %eax, %cr0
@@ -38,25 +38,21 @@ entry16:
 	// ljmp to entry64
     .word 0xea66, entry64, 0x000f, 0x0008
 
-    nop
-    nop
-
+.align 8
 .code64
 entry64:
+	// Clear the segment registers
     xorl %eax, %eax
     movw %ax, %fs
     movw %ax, %gs
-
-    //movl $0x10, %eax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %ss
 
+	// Make a hypercall to instruct the hypervisor to restructure the
+	// page tables
 	movl $1, %eax
 	out %al, $0xff
-
-	/*movq $0x100001000, %rax
-    jmp *%rax*/
 
 .align 4
 gdt_ptr:

@@ -3,7 +3,7 @@ q   := @
 out := bios.bin.o
 bin := bios.bin
 elf := bios.elf
-obj := entry.o tramp.o
+obj := tramp.o
 
 ld := ld
 cc := gcc
@@ -13,7 +13,6 @@ objcopy := objcopy
 
 cflags := -g -Os -ffreestanding -m64 -Wall -fno-asynchronous-unwind-tables
 ldflags := -static -Tlinker.ld -nostdlib
-	#-melf_i386
 
 all: $(out)
 

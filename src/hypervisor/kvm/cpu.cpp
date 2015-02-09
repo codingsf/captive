@@ -65,8 +65,6 @@ bool KVMCpu::run()
 	sregs.cs.base = 0xf0000;
 	vmioctl(KVM_SET_SREGS, &sregs);
 
-	dump_regs();
-
 	DEBUG << "Running CPU " << id();
 	do {
 		rc = vmioctl(KVM_RUN);
@@ -81,8 +79,11 @@ bool KVMCpu::run()
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);
 
-				DEBUG << "Handling hypercall";
+				DEBUG << "Handling hypercall " << std::hex << regs.rax;
 				run_cpu = handle_hypercall(regs.rax);
+				if (!run_cpu) {
+					ERROR << "Unhandled hypercall " << std::hex << regs.rax;
+				}
 			} else {
 				run_cpu = false;
 				DEBUG << "EXIT IO "
