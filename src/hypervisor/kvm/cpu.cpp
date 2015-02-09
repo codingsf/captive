@@ -6,6 +6,8 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
+#include "engine/engine.h"
+
 using namespace captive::hypervisor::kvm;
 
 KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd) : CPU(owner, config), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
@@ -84,6 +86,11 @@ bool KVMCpu::run()
 				if (!run_cpu) {
 					ERROR << "Unhandled hypercall " << std::hex << regs.rax;
 				}
+			} else if (cpu_run_struct->io.port == 0xfe) {
+				struct kvm_regs regs;
+				vmioctl(KVM_GET_REGS, &regs);
+
+				printf("%c", (char)regs.rax & 0xff);
 			} else {
 				run_cpu = false;
 				DEBUG << "EXIT IO "
@@ -133,12 +140,28 @@ bool KVMCpu::run()
 
 bool KVMCpu::handle_hypercall(uint64_t data)
 {
+	KVMGuest& kvm_guest = (KVMGuest &)owner();
+
 	DEBUG << "Hypercall " << data;
 
 	switch(data) {
 	case 1:
-		// TODO: remap guest memory, jump to 0x100001000
-		return false;
+		if (kvm_guest.stage2_init()) {
+			struct kvm_regs regs;
+			vmioctl(KVM_GET_REGS, &regs);
+			regs.rip = 0x100000000 + kvm_guest.engine().entrypoint_offset();
+			regs.rsp = 0x100010000;
+			vmioctl(KVM_SET_REGS, &regs);
+
+			// Cause a TLB invalidation - maybe?
+			struct kvm_sregs sregs;
+			vmioctl(KVM_GET_SREGS, &sregs);
+			vmioctl(KVM_SET_SREGS, &sregs);
+
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	return false;

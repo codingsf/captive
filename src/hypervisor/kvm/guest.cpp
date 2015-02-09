@@ -71,7 +71,12 @@ bool KVMGuest::load(loader::Loader& loader)
 		return false;
 	}
 
-	return loader.install((uint8_t *)gpm.front()->host_buffer);
+	if (!loader.install((uint8_t *)gpm.front()->host_buffer)) {
+		return false;
+	}
+
+	guest_entrypoint = loader.entrypoint();
+	return true;
 }
 
 CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
@@ -101,27 +106,27 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 bool KVMGuest::prepare_guest_memory()
 {
-	// Allocate the first 2MB for system usage.
-	struct vm_mem_region *system = alloc_guest_memory(0x0, 0x200000);
-	if (!system) {
+	// Allocate the first 32MB for system usage.
+	sys_mem_rgn = alloc_guest_memory(0x0, 0x2000000);
+	if (!sys_mem_rgn) {
 		ERROR << "Unable to allocate memory for the system";
 		return false;
 	}
 
 	// Install the bios into the correct location.
-	if (!install_bios(&((uint8_t *) system->host_buffer)[0xf0000])) {
+	if (!install_bios()) {
 		ERROR << "Unable to initialise bootstrap code";
 		return false;
 	}
 
 	// Prepare initial guest page tables
-	if (!install_initial_pgt((uint8_t *) system->host_buffer)) {
+	if (!install_initial_pgt()) {
 		ERROR << "Unable to create initial page tables";
 		return false;
 	}
 
 	// Install the engine code
-	if (!engine().install(&((uint8_t *)system->host_buffer)[0xb0000])) {
+	if (!engine().install(&((uint8_t *)sys_mem_rgn->host_buffer)[0x600000])) {
 		ERROR << "Unable to install execution engine";
 		return false;
 	}
@@ -141,16 +146,19 @@ bool KVMGuest::prepare_guest_memory()
 	return true;
 }
 
-bool KVMGuest::install_bios(uint8_t* base)
+bool KVMGuest::install_bios()
 {
+	uint8_t *base = &((uint8_t *)sys_mem_rgn->host_buffer)[0xf0000];
+
 	unsigned int bios_size = &__bios_bin_end - &__bios_bin_start;
 	memcpy(base, &__bios_bin_start, bios_size);
 
 	return true;
 }
 
-bool KVMGuest::install_initial_pgt(uint8_t* base)
+bool KVMGuest::install_initial_pgt()
 {
+	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
 	uint64_t *pg4 = (uint64_t *) (&base[0x1000]);
 	uint64_t *pg3 = (uint64_t *) (&base[0x2000]);
 	uint64_t *pg2 = (uint64_t *) (&base[0x3000]);
@@ -168,6 +176,53 @@ bool KVMGuest::install_initial_pgt(uint8_t* base)
 
 	return true;
 }
+
+bool KVMGuest::stage2_init()
+{
+	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
+
+	// First, map the the emulated guest physical memory into virtual
+	// memory
+	uint64_t pt_addr = 0x4000;
+	uint64_t phys_addr = GUEST_PHYS_MEMORY_BASE;
+
+	uint64_t *pgd_base = (uint64_t *) (&base[0x3000]);
+	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
+		pgd_base[pgd_idx] = pt_addr | 3;
+
+		uint64_t *pt_base = (uint64_t *) (&base[pt_addr]);
+
+		for (uint32_t pt_idx = 0; pt_idx < 0x200; pt_idx++) {
+			pt_base[pt_idx] = phys_addr | 3;
+			phys_addr += 0x1000;
+		}
+
+		pt_addr += 0x1000;
+	}
+
+	// Now, map the execution engine into virtual memory
+	uint64_t *pdp_base = (uint64_t *) (&base[0x2000]);
+	pdp_base[4] = pt_addr | 3;
+
+	pgd_base = (uint64_t *) (&base[pt_addr]);
+	phys_addr = 0x600000;
+	pt_addr += 0x1000;
+	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
+		pgd_base[pgd_idx] = pt_addr | 3;
+
+		uint64_t *pt_base = (uint64_t *) (&base[pt_addr]);
+
+		for (uint32_t pt_idx = 0; pt_idx < 0x200; pt_idx++) {
+			pt_base[pt_idx] = phys_addr | 3;
+			phys_addr += 0x1000;
+		}
+
+		pt_addr += 0x1000;
+	}
+
+	return true;
+}
+
 
 KVMGuest::vm_mem_region *KVMGuest::get_mem_slot()
 {
