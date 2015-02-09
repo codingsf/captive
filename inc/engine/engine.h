@@ -21,13 +21,17 @@ namespace captive {
 			bool init();
 			bool install(uint8_t *base);
 
+			uint64_t entrypoint_offset() const { return _entrypoint_offset; }
+
 		private:
 			bool load();
 			bool loaded;
 
 			std::string libfile;
-			void *lib;
+			uint8_t *lib;
 			size_t lib_size;
+
+			uint64_t _entrypoint_offset;
 		};
 	}
 }
