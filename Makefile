@@ -1,3 +1,4 @@
+MAKEFLAGS += -rR --no-print-directory
 q := @
 
 top-dir := $(CURDIR)
@@ -29,6 +30,8 @@ all: $(out)
 	$(q)$(make) -C $(engines-dir)
 
 clean:
+	$(q)$(make) -C $(bios-dir) clean
+	$(q)$(make) -C $(engines-dir) clean
 	$(rm) -f $(obj)
 	$(rm) -f $(dep)
 	$(rm) -f $(out)

@@ -1,3 +1,5 @@
 all:
-	@echo yarp
-	
+	@
+
+clean:
+	@
