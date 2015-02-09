@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   define.h
  * Author: s0457958
  *
@@ -14,6 +14,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+
+typedef uint32_t gpa_t;
+typedef uint32_t gva_t;
 
 #endif	/* DEFINE_H */
 

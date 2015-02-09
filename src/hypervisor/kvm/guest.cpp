@@ -9,6 +9,7 @@
 #include <linux/kvm.h>
 
 #include "engine/engine.h"
+#include "loader/loader.h"
 
 using namespace captive::engine;
 using namespace captive::hypervisor;
@@ -41,7 +42,7 @@ KVMGuest::~KVMGuest()
 
 bool KVMGuest::init()
 {
-//	int rc;
+	//	int rc;
 
 	if (!Guest::init())
 		return false;
@@ -56,34 +57,21 @@ bool KVMGuest::init()
 		vm_mem_region_free.push_back(region);
 	}
 
-	/*DEBUG << "Setting identity map to " << std::hex << IDENTITY_BASE;
-	uint64_t idb = IDENTITY_BASE;
-	rc = ioctl(fd, KVM_SET_IDENTITY_MAP_ADDR, &idb);
-	if (rc) {
-		ERROR << "Unable to set identity map address to " << std::hex << IDENTITY_BASE;
-		return false;
-	}
-
-	DEBUG << "Setting TSS to " << std::hex << TSS_BASE;
-	rc = ioctl(fd, KVM_SET_TSS_ADDR, TSS_BASE);
-	if (rc) {
-		ERROR << "Unable to set TSS address to " << std::hex << TSS_BASE;
-		return false;
-	}
-
-	DEBUG << "Creating CPU IRQ chip";
-	rc = ioctl(fd, KVM_CREATE_IRQCHIP, 0);
-	if (rc) {
-		release_guest_memory();
-		ERROR << "Unable to create IRQ chip";
-		return false;
-	}*/
-
 	if (!prepare_guest_memory())
 		return false;
 
 	_initialised = true;
 	return true;
+}
+
+bool KVMGuest::load(loader::Loader& loader)
+{
+	if (!initialised()) {
+		ERROR << "KVM guest is not yet initialised";
+		return false;
+	}
+
+	return loader.install((uint8_t *)gpm.front()->host_buffer);
 }
 
 CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
@@ -121,13 +109,13 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	// Install the bios into the correct location.
-	if (!install_bios(&((uint8_t *)system->host_buffer)[0xf0000])) {
+	if (!install_bios(&((uint8_t *) system->host_buffer)[0xf0000])) {
 		ERROR << "Unable to initialise bootstrap code";
 		return false;
 	}
 
 	// Prepare initial guest page tables
-	if (!install_initial_pgt((uint8_t *)system->host_buffer)) {
+	if (!install_initial_pgt((uint8_t *) system->host_buffer)) {
 		ERROR << "Unable to create initial page tables";
 		return false;
 	}
@@ -140,6 +128,8 @@ bool KVMGuest::prepare_guest_memory()
 			ERROR << "Unable to allocate guest memory region";
 			return false;
 		}
+
+		gpm.push_back(vm_region);
 	}
 
 	return true;
@@ -155,10 +145,10 @@ bool KVMGuest::install_bios(uint8_t* base)
 
 bool KVMGuest::install_initial_pgt(uint8_t* base)
 {
-	uint64_t *pg4 = (uint64_t *)(&base[0x1000]);
-	uint64_t *pg3 = (uint64_t *)(&base[0x2000]);
-	uint64_t *pg2 = (uint64_t *)(&base[0x3000]);
-	uint64_t *pg1 = (uint64_t *)(&base[0x4000]);
+	uint64_t *pg4 = (uint64_t *) (&base[0x1000]);
+	uint64_t *pg3 = (uint64_t *) (&base[0x2000]);
+	uint64_t *pg2 = (uint64_t *) (&base[0x3000]);
+	uint64_t *pg1 = (uint64_t *) (&base[0x4000]);
 
 	*pg4 = 0x2003;
 	*pg3 = 0x3003;
@@ -218,7 +208,7 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 	}
 
 	// Store the buffer address in the KVM memory structure.
-	rgn->kvm.userspace_addr = (uint64_t)rgn->host_buffer;
+	rgn->kvm.userspace_addr = (uint64_t) rgn->host_buffer;
 
 	// Install the memory region into the guest.
 	int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &rgn->kvm);
@@ -262,4 +252,6 @@ void KVMGuest::release_all_guest_memory()
 	for (auto region : used_regions) {
 		release_guest_memory(region);
 	}
+
+	gpm.clear();
 }

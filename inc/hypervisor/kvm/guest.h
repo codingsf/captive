@@ -25,6 +25,8 @@ namespace captive {
 				virtual ~KVMGuest();
 
 				bool init() override;
+				bool load(loader::Loader& loader) override;
+
 				CPU *create_cpu(const GuestCPUConfiguration& config) override;
 
 				inline bool initialised() const { return _initialised; }
@@ -43,6 +45,7 @@ namespace captive {
 
 				std::list<vm_mem_region *> vm_mem_region_free;
 				std::list<vm_mem_region *> vm_mem_region_used;
+				std::list<vm_mem_region *> gpm;
 
 				bool prepare_guest_memory();
 				bool install_bios(uint8_t *base);

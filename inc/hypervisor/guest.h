@@ -18,6 +18,10 @@ namespace captive {
 		class Engine;
 	}
 
+	namespace loader {
+		class Loader;
+	}
+
 	namespace hypervisor {
 		class Hypervisor;
 		class CPU;
@@ -31,6 +35,8 @@ namespace captive {
 			Guest(Hypervisor& owner, engine::Engine& engine, const GuestConfiguration& config);
 			virtual ~Guest();
 			virtual bool init();
+
+			virtual bool load(loader::Loader& loader) = 0;
 
 			virtual CPU *create_cpu(const GuestCPUConfiguration& config) = 0;
 

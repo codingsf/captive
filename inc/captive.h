@@ -26,6 +26,7 @@ namespace captive {
 #define LOG() captive::LogStream()
 #define DEBUG LOG() << "debug: "
 #define ERROR LOG() << "error: "
+#define WARNING LOG() << "warning: "
 #define LAST_ERROR_TEXT strerror(errno)
 
 #endif	/* CAPTIVE_H */

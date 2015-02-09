@@ -1,0 +1,61 @@
+#include <captive.h>
+#include <loader/loader.h>
+
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
+using namespace captive::loader;
+
+FileBasedLoader::FileBasedLoader(std::string filename) : _filename(filename), _opened(false), mmap_base(NULL), mmap_size(0)
+{
+
+}
+
+bool FileBasedLoader::open()
+{
+	struct stat st;
+
+	int fd = ::open(filename().c_str(), O_RDONLY);
+	if (fd < 0) {
+		ERROR << "Unable to open file";
+		return false;
+	}
+
+	if (fstat(fd, &st)) {
+		::close(fd);
+
+		ERROR << "Unable to stat file";
+		return false;
+	}
+
+	mmap_size = st.st_size;
+	mmap_base = mmap(NULL, mmap_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	::close(fd);
+
+	if (mmap_base == MAP_FAILED) {
+		ERROR << "Unable to map file";
+		return false;
+	}
+
+	_opened = true;
+	return true;
+}
+
+void FileBasedLoader::close()
+{
+	_opened = false;
+	munmap(mmap_base, mmap_size);
+}
+
+uint8_t* FileBasedLoader::read(off_t offset, size_t size)
+{
+	if (!is_open()) {
+		WARNING << "Attempted read in file-based loader, when file was not open";
+		return NULL;
+	}
+
+	return &((uint8_t *)mmap_base)[offset];
+}
