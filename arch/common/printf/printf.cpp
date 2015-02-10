@@ -14,7 +14,15 @@ static inline void putnum(int v, int base, int sgn)
 	char buffer[12];
 	int buffer_idx = 0;
 
-	while (v > 0 && buffer_idx < sizeof(buffer)) {
+	if (v == 0) {
+		putch('0');
+		return;
+	} else if (v < 0 && sgn) {
+		putch('-');
+		v = -v;
+	}
+
+	while (v != 0 && buffer_idx < sizeof(buffer)) {
 		int val = v % base;
 
 		switch (val) {
@@ -29,7 +37,7 @@ static inline void putnum(int v, int base, int sgn)
 		v /= base;
 	}
 
-	for (; buffer_idx >= 0; buffer_idx--) {
+	for (buffer_idx--; buffer_idx >= 0; buffer_idx--) {
 		putch(buffer[buffer_idx]);
 	}
 }
