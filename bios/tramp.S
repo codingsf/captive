@@ -21,10 +21,10 @@ entry16:
     movl $0x1000, %eax
     movl %eax, %cr3
 
-	// Enter long mode
+	// Enable LME and NXE
     mov $0xc0000080, %ecx
     rdmsr
-    or $0x100, %eax
+    or $0x900, %eax
     wrmsr
 
 	// Enable paging and protected mode

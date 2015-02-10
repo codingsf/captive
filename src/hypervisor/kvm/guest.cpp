@@ -185,6 +185,10 @@ bool KVMGuest::install_initial_pgt()
 	return true;
 }
 
+#define PT_PRESENT	(1ULL << 0)
+#define PT_WRITABLE	(1ULL << 1)
+#define PT_NO_EXECUTE	(1ULL << 63)
+
 bool KVMGuest::stage2_init()
 {
 	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
@@ -196,12 +200,12 @@ bool KVMGuest::stage2_init()
 
 	uint64_t *pgd_base = (uint64_t *) (&base[0x3000]);
 	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
-		pgd_base[pgd_idx] = pt_addr | 3;
+		pgd_base[pgd_idx] = pt_addr | PT_PRESENT | PT_WRITABLE | PT_NO_EXECUTE;
 
 		uint64_t *pt_base = (uint64_t *) (&base[pt_addr]);
 
 		for (uint32_t pt_idx = 0; pt_idx < 0x200; pt_idx++) {
-			pt_base[pt_idx] = phys_addr | 3;
+			pt_base[pt_idx] = phys_addr | PT_PRESENT | PT_WRITABLE | PT_NO_EXECUTE;
 			phys_addr += 0x1000;
 		}
 
@@ -216,12 +220,12 @@ bool KVMGuest::stage2_init()
 	phys_addr = ENGINE_PHYS_BASE;
 	pt_addr += 0x1000;
 	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
-		pgd_base[pgd_idx] = pt_addr | 3;
+		pgd_base[pgd_idx] = pt_addr | PT_PRESENT;
 
 		uint64_t *pt_base = (uint64_t *) (&base[pt_addr]);
 
 		for (uint32_t pt_idx = 0; pt_idx < 0x200; pt_idx++) {
-			pt_base[pt_idx] = phys_addr | 3;
+			pt_base[pt_idx] = phys_addr | PT_PRESENT;
 			phys_addr += 0x1000;
 		}
 

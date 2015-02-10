@@ -55,8 +55,10 @@ bool Engine::install(uint8_t* base)
 		DEBUG << "Program Header: type=" << phdr->p_type << ", flags=" << phdr->p_flags << ", file offset=" << phdr->p_offset << ", file size=" << phdr->p_filesz << ", paddr=" << std::hex << phdr->p_paddr << ", vaddr=" << phdr->p_vaddr;
 
 		if (phdr->p_type == PT_LOAD) {
-			DEBUG << "Loading";
-			memcpy(base, lib + phdr->p_offset, phdr->p_filesz);
+			uint64_t offset = phdr->p_vaddr - 0x100000000;
+
+			DEBUG << "Loading @ " << std::hex << offset;
+			memcpy(base + offset, lib + phdr->p_offset, phdr->p_filesz);
 		}
 	}
 

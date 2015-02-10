@@ -75,6 +75,11 @@ bool KVMCpu::run()
 		}
 
 		switch (cpu_run_struct->exit_reason) {
+		case KVM_EXIT_DEBUG:
+			DEBUG << "DEBUG";
+			dump_regs();
+			break;
+
 		case KVM_EXIT_IO:
 			if (cpu_run_struct->io.port == 0xff) {
 				struct kvm_regs regs;
@@ -149,8 +154,8 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			struct kvm_regs regs;
 			vmioctl(KVM_GET_REGS, &regs);
 			regs.rip = 0x100000000 + kvm_guest.engine().entrypoint_offset();
-			regs.rsp = 0x110000000;
-			regs.rbp = regs.rsp;
+			regs.rsp = 0x110000000 - 16;
+			regs.rbp = 0; //regs.rsp;
 			regs.rdi = kvm_guest.guest_entrypoint();
 			vmioctl(KVM_SET_REGS, &regs);
 
@@ -158,6 +163,14 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			struct kvm_sregs sregs;
 			vmioctl(KVM_GET_SREGS, &sregs);
 			vmioctl(KVM_SET_SREGS, &sregs);
+
+			/*struct kvm_guest_debug dbg;
+			bzero(&dbg, sizeof(dbg));
+			dbg.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
+			if (vmioctl(KVM_SET_GUEST_DEBUG, &dbg)) {
+				ERROR << "Unable to set debug flags";
+				return false;
+			}*/
 
 			return true;
 		} else {
@@ -234,4 +247,12 @@ void KVMCpu::dump_regs()
 
 	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl
 	<< "efer=" << std::hex << sregs.efer << std::endl;
+
+	// Instruction Data
+	KVMGuest& guest = (KVMGuest&)owner();
+
+	uint8_t *sys_mem = (uint8_t *)guest.sys_mem_rgn->host_buffer;
+
+	if (regs.rip > 0x100000000)
+		DEBUG << "DATA @ RIP: " << std::hex << (uint32_t)sys_mem[regs.rip-0xffa00000];
 }

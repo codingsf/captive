@@ -21,6 +21,8 @@ namespace captive {
 			virtual bool init(unsigned int ep) = 0;
 			virtual bool run() = 0;
 
+			virtual uint32_t read_pc() const = 0;
+
 		private:
 			Environment& _env;
 		};

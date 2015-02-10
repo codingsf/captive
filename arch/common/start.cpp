@@ -9,7 +9,7 @@ extern captive::arch::Environment *create_environment();
 extern "C" {
 	void __attribute__((noreturn)) start(unsigned int ep)
 	{
-		printf("start\n");
+		printf("start %x\n", ep);
 
 		captive::arch::Environment *env = create_environment();
 		env->run(ep);
