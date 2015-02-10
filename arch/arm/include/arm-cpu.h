@@ -10,6 +10,7 @@
 
 #include <define.h>
 #include <cpu.h>
+#include <arm-decode.h>
 
 namespace captive {
 	namespace arch {
@@ -28,6 +29,8 @@ namespace captive {
 				virtual uint32_t read_pc() const override { return regs.RB[15]; }
 
 			private:
+				ArmDecode cur_insn;
+				
 				unsigned int _ep;
 
 				struct {

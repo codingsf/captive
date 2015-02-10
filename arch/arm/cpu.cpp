@@ -1,5 +1,6 @@
 #include <arm-cpu.h>
 #include <arm-env.h>
+#include <arm-decode.h>
 #include <printf.h>
 
 using namespace captive::arch::arm;
@@ -21,9 +22,15 @@ bool ArmCPU::run()
 	do {
 		uint32_t pc = read_pc();
 
-		printf("exec: %x\n", pc);
+		cur_insn.decode(pc);
+		switch (cur_insn.opcode) {
+		case ArmDecode::UNKNOWN:
+		default:
+			printf("cpu unknown instruction: %x\n", cur_insn.ir);
+			return false;
+		}
 
-	} while(false);
+	} while(true);
 
 	return true;
 }
