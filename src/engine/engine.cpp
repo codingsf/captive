@@ -11,7 +11,7 @@
 using namespace captive;
 using namespace captive::engine;
 
-Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _entrypoint_offset(0)
+Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _arch(NULL), _entrypoint_offset(0)
 {
 
 }
@@ -56,42 +56,11 @@ bool Engine::install(uint8_t* base)
 
 		if (phdr->p_type == PT_LOAD) {
 			DEBUG << "Loading";
-			memcpy(base + phdr->p_vaddr, lib + phdr->p_offset, phdr->p_filesz);
+			memcpy(base, lib + phdr->p_offset, phdr->p_filesz);
 		}
 	}
 
-	// Try and find the symbol table and string table
-	Elf64_Sym *symtab;
-	char *strtab;
-	uint32_t symtab_size, strtab_size = 0;
-	for (int i = 0; i < hdr->e_shnum; i++) {
-		Elf64_Shdr *shdr = (Elf64_Shdr *)(lib + hdr->e_shoff + (i * hdr->e_shentsize));
-
-		DEBUG << "Program Section: type=" << shdr->sh_type;
-
-		if (shdr->sh_type == SHT_SYMTAB) {
-			DEBUG << "Symbol Table";
-			symtab = (Elf64_Sym *)(lib + shdr->sh_offset);
-			symtab_size = shdr->sh_size;
-		} else if (shdr->sh_type == SHT_STRTAB) {
-			DEBUG << "String Table";
-			strtab = (char *)(lib + shdr->sh_offset);
-			strtab_size = shdr->sh_size;
-		}
-	}
-
-	// Try and find the entry-point symbol
-	for (int i = 0; i < symtab_size / sizeof(Elf64_Sym); i++) {
-		if (ELF64_ST_TYPE(symtab[i].st_info) == STT_FUNC) {
-			DEBUG << "fn symbol: " << &strtab[symtab[i].st_name];
-			if (strcmp(&strtab[symtab[i].st_name], "engine_start") == 0) {
-				_entrypoint_offset = symtab[i].st_value;
-				DEBUG << "Entry Point Offset: " << std::hex << _entrypoint_offset;
-			}
-		}
-	}
-
-	// Fill in relocations.
+	_entrypoint_offset = hdr->e_entry - 0x100000000;
 
 	return true;
 }

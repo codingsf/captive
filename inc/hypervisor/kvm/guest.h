@@ -14,6 +14,10 @@
 #include <linux/kvm.h>
 
 namespace captive {
+	namespace arch {
+		class SystemEnvironment;
+	}
+
 	namespace hypervisor {
 		namespace kvm {
 			class KVM;
@@ -21,7 +25,7 @@ namespace captive {
 
 			class KVMGuest : public Guest {
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, arch::SystemEnvironment& sys_env, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;
@@ -30,10 +34,12 @@ namespace captive {
 				CPU *create_cpu(const GuestCPUConfiguration& config) override;
 
 				inline bool initialised() const { return _initialised; }
+				inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
 
 				bool stage2_init();
 
 			private:
+				arch::SystemEnvironment& _sys_env;
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
@@ -41,7 +47,7 @@ namespace captive {
 				int next_cpu_id;
 				int next_slot_idx;
 
-				gpa_t guest_entrypoint;
+				gpa_t _guest_entrypoint;
 
 				struct vm_mem_region {
 					struct kvm_userspace_memory_region kvm;

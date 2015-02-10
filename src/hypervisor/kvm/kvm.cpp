@@ -9,6 +9,10 @@
 #include <sys/ioctl.h>
 #include <linux/kvm.h>
 
+#include "engine/engine.h"
+#include "arch/arch.h"
+#include "arch/sys-env.h"
+
 #define KVM_DEVICE_LOCATION		"/dev/kvm"
 
 using namespace captive::engine;
@@ -69,6 +73,13 @@ Guest* KVM::create_guest(engine::Engine& engine, const GuestConfiguration& confi
 		return NULL;
 	}
 
+	// Create the system environment
+	arch::SystemEnvironment *sys_env = engine.arch().create_system();
+	if (!sys_env) {
+		ERROR << "Unable to create system environment";
+		return NULL;
+	}
+
 	// Issue the ioctl to create a new VM.
 	DEBUG << "Creating new KVM VM";
 	int guest_fd = ioctl(kvm_fd, KVM_CREATE_VM, 0);
@@ -79,7 +90,7 @@ Guest* KVM::create_guest(engine::Engine& engine, const GuestConfiguration& confi
 
 	// Create (and register) the representative guest object.
 	DEBUG << "Creating guest object";
-	KVMGuest *guest = new KVMGuest(*this, engine, config, guest_fd);
+	KVMGuest *guest = new KVMGuest(*this, engine, *sys_env, config, guest_fd);
 	known_guests.push_back(guest);
 
 	return guest;

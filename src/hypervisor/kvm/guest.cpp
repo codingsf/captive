@@ -10,6 +10,8 @@
 
 #include "engine/engine.h"
 #include "loader/loader.h"
+#include "arch/sys-env.h"
+#include "arch/cpu-env.h"
 
 using namespace captive::engine;
 using namespace captive::hypervisor;
@@ -26,7 +28,7 @@ using namespace captive::hypervisor::kvm;
 
 extern char __bios_bin_start, __bios_bin_end;
 
-KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
+KVMGuest::KVMGuest(KVM& owner, Engine& engine, arch::SystemEnvironment& sys_env, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _sys_env(sys_env), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
 {
 
 }
@@ -42,8 +44,6 @@ KVMGuest::~KVMGuest()
 
 bool KVMGuest::init()
 {
-	//	int rc;
-
 	if (!Guest::init())
 		return false;
 
@@ -75,7 +75,7 @@ bool KVMGuest::load(loader::Loader& loader)
 		return false;
 	}
 
-	guest_entrypoint = loader.entrypoint();
+	_guest_entrypoint = loader.entrypoint();
 	return true;
 }
 
@@ -91,6 +91,12 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
+	arch::CpuEnvironment *cpu_env = _sys_env.create_cpu();
+	if (!cpu_env) {
+		ERROR << "Unable to create CPU environment";
+		return NULL;
+	}
+
 	DEBUG << "Creating KVM VCPU";
 	int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, next_cpu_id);
 	if (cpu_fd < 0) {
@@ -98,7 +104,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd);
+	KVMCpu *cpu = new KVMCpu(*this, *cpu_env, config, next_cpu_id++, cpu_fd);
 	kvm_cpus.push_back(cpu);
 
 	return cpu;

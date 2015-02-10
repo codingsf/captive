@@ -14,6 +14,10 @@
 #include <linux/kvm.h>
 
 namespace captive {
+	namespace arch {
+		class CpuEnvironment;
+	}
+
 	namespace hypervisor {
 		class GuestCPUConfiguration;
 
@@ -22,7 +26,7 @@ namespace captive {
 
 			class KVMCpu : public CPU {
 			public:
-				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd);
+				KVMCpu(KVMGuest& owner, arch::CpuEnvironment& cpu_env, const GuestCPUConfiguration& config, int id, int fd);
 				~KVMCpu();
 
 				bool init();
@@ -33,6 +37,8 @@ namespace captive {
 				inline int id() const { return _id; }
 
 			private:
+				arch::CpuEnvironment& cpu_env;
+				
 				bool _initialised;
 				int _id;
 				int fd;

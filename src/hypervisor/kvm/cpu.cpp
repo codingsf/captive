@@ -10,7 +10,7 @@
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd) : CPU(owner, config), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
+KVMCpu::KVMCpu(KVMGuest& owner, arch::CpuEnvironment& cpu_env, const GuestCPUConfiguration& config, int id, int fd) : CPU(owner, config), cpu_env(cpu_env), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
 {
 
 }
@@ -151,6 +151,8 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			vmioctl(KVM_GET_REGS, &regs);
 			regs.rip = 0x100000000 + kvm_guest.engine().entrypoint_offset();
 			regs.rsp = 0x100010000;
+			regs.rbp = regs.rsp;
+			regs.rdi = 0x1234; //kvm_guest.guest_entrypoint();
 			vmioctl(KVM_SET_REGS, &regs);
 
 			// Cause a TLB invalidation - maybe?
