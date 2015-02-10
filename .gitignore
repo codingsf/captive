@@ -1,6 +1,8 @@
 *.o
 *.so
 *.d
+*.arch
+*.a
 nbproject/
 bin/
 bios.bin

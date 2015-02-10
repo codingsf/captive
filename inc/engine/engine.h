@@ -11,10 +11,6 @@
 #include <define.h>
 
 namespace captive {
-	namespace arch {
-		class Architecture;
-	}
-
 	namespace engine {
 		class Engine
 		{
@@ -25,8 +21,6 @@ namespace captive {
 			bool init();
 			bool install(uint8_t *base);
 
-			inline arch::Architecture& arch() const { return *_arch; }
-
 			uint64_t entrypoint_offset() const { return _entrypoint_offset; }
 
 		private:
@@ -36,8 +30,6 @@ namespace captive {
 			std::string libfile;
 			uint8_t *lib;
 			size_t lib_size;
-
-			arch::Architecture *_arch;
 
 			uint64_t _entrypoint_offset;
 		};

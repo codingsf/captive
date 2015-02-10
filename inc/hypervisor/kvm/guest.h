@@ -14,10 +14,6 @@
 #include <linux/kvm.h>
 
 namespace captive {
-	namespace arch {
-		class SystemEnvironment;
-	}
-
 	namespace hypervisor {
 		namespace kvm {
 			class KVM;
@@ -25,7 +21,7 @@ namespace captive {
 
 			class KVMGuest : public Guest {
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, arch::SystemEnvironment& sys_env, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;
@@ -39,7 +35,6 @@ namespace captive {
 				bool stage2_init();
 
 			private:
-				arch::SystemEnvironment& _sys_env;
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;

@@ -11,7 +11,7 @@
 using namespace captive;
 using namespace captive::engine;
 
-Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _arch(NULL), _entrypoint_offset(0)
+Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _entrypoint_offset(0)
 {
 
 }
