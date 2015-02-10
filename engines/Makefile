@@ -3,32 +3,37 @@ top-dir := $(CURDIR)
 
 cc := gcc
 cxx := g++
-
-cflags := -nostdlib -O3
-ldflags := -nostdlib
-
+rm := rm
 engines := test
 test-obj := start.o
 
+common-dir := $(top-dir)/common
 common-obj := printf.o
 real-common-obj := $(patsubst %,$(top-dir)/common/%,$(common-obj))
-engine-outputs := $(patsubst %,$(top-dir)/%-engine.so,$(engines))
+engine-outputs := $(patsubst %,$(top-dir)/%-engine,$(engines))
+
+cflags := -nostdlib -O3 -fPIC -I$(common-dir)
+ldflags := -nostdlib -Wl,-Ttext-segment=0x100000000 -Wl,-eengine_start
 
 all: $(engine-outputs)
 
 clean:
-	@
+	$(rm) -f $(engine-outputs)
+	$(rm) -f $(real-common-obj)
+
 
 engine-only = $(patsubst %-engine,%,$(basename $(notdir $@)))
 engine-dir = $(top-dir)/$(engine-only)
 engine-objs = $(patsubst %,$(engine-dir)/%,$($(engine-only)-obj))
 
-%.so: $(engine-objs) $(real-common-obj)
+%-engine: $(engine-objs) $(real-common-obj)
 	@make $(engine-objs)
-	$(q)$(cxx) -o $@ -shared $(ldflags) $(engine-objs) $(real-common-obj)
+	$(q)$(cxx) -o $@ $(ldflags) $(engine-objs) $(real-common-obj)
 
 %.o: %.cpp
-	$(q)$(cxx) -c -o $@ -fPIC $(cflags) $<
+	@echo "  C++   $(notdir $@)"
+	$(q)$(cxx) -c -o $@ $(cflags) $<
 
 %.o: %.c
-	$(q)$(cxx) -c -o $@ -fPIC $(cflags) $<
+	@echo "  CC    $(notdir $@)"
+	$(q)$(cxx) -c -o $@ $(cflags) $<
