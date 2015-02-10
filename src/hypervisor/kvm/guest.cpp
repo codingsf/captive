@@ -14,12 +14,16 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-#define BOOTSTRAP_BASE			0x0
-#define BOOTSTRAP_SIZE			0x10000
 #define GUEST_PHYS_MEMORY_BASE		0x100000000
 #define GUEST_PHYS_MEMORY_MAX_SIZE	0x100000000
-#define IDENTITY_BASE			0x50000000
-#define TSS_BASE			0x50001000
+
+#define SYSTEM_MEMORY_PHYS_BASE		0
+#define SYSTEM_MEMORY_PHYS_SIZE		0x40000000
+
+#define BIOS_PHYS_BASE			0xf0000
+
+#define ENGINE_PHYS_BASE		0x600000
+#define ENGINE_PHYS_SIZE		0x1000000
 
 #define DEFAULT_NR_SLOTS		32
 
@@ -103,12 +107,19 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 bool KVMGuest::prepare_guest_memory()
 {
-	// Allocate the first 32MB for system usage.
-	sys_mem_rgn = alloc_guest_memory(0x0, 0x2000000);
+	// Allocate the first 1GB for system usage.
+	sys_mem_rgn = alloc_guest_memory(SYSTEM_MEMORY_PHYS_BASE, SYSTEM_MEMORY_PHYS_SIZE);
 	if (!sys_mem_rgn) {
 		ERROR << "Unable to allocate memory for the system";
 		return false;
 	}
+
+	// Hack in the GDT
+	uint64_t *gdt = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x10];
+
+	*gdt++ = 0;
+	*gdt++ = 0x0020980000000000;
+	*gdt++ = 0x0000900000000000;
 
 	// Install the bios into the correct location.
 	if (!install_bios()) {
@@ -123,7 +134,7 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	// Install the engine code
-	if (!engine().install(&((uint8_t *)sys_mem_rgn->host_buffer)[0x600000])) {
+	if (!engine().install(&((uint8_t *)sys_mem_rgn->host_buffer)[ENGINE_PHYS_BASE])) {
 		ERROR << "Unable to install execution engine";
 		return false;
 	}
@@ -145,7 +156,7 @@ bool KVMGuest::prepare_guest_memory()
 
 bool KVMGuest::install_bios()
 {
-	uint8_t *base = &((uint8_t *)sys_mem_rgn->host_buffer)[0xf0000];
+	uint8_t *base = &((uint8_t *)sys_mem_rgn->host_buffer)[BIOS_PHYS_BASE];
 
 	unsigned int bios_size = &__bios_bin_end - &__bios_bin_start;
 	memcpy(base, &__bios_bin_start, bios_size);
@@ -156,10 +167,10 @@ bool KVMGuest::install_bios()
 bool KVMGuest::install_initial_pgt()
 {
 	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
-	uint64_t *pg4 = (uint64_t *) (&base[0x1000]);
-	uint64_t *pg3 = (uint64_t *) (&base[0x2000]);
-	uint64_t *pg2 = (uint64_t *) (&base[0x3000]);
-	uint64_t *pg1 = (uint64_t *) (&base[0x4000]);
+	uint64_t *pg4 = (uint64_t *) (&base[0x1000]);	// PAGE MAP
+	uint64_t *pg3 = (uint64_t *) (&base[0x2000]);	// PAGE DIRECTORY PTR
+	uint64_t *pg2 = (uint64_t *) (&base[0x3000]);	// PAGE DIRECTORY
+	uint64_t *pg1 = (uint64_t *) (&base[0x4000]);	// PAGE TABLE
 
 	*pg4 = 0x2003;
 	*pg3 = 0x3003;
@@ -202,7 +213,7 @@ bool KVMGuest::stage2_init()
 	pdp_base[4] = pt_addr | 3;
 
 	pgd_base = (uint64_t *) (&base[pt_addr]);
-	phys_addr = 0x600000;
+	phys_addr = ENGINE_PHYS_BASE;
 	pt_addr += 0x1000;
 	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
 		pgd_base[pgd_idx] = pt_addr | 3;
@@ -216,6 +227,8 @@ bool KVMGuest::stage2_init()
 
 		pt_addr += 0x1000;
 	}
+
+	DEBUG << "Last PT Address: " << std::hex << pt_addr << ", phys=" << phys_addr;
 
 	return true;
 }

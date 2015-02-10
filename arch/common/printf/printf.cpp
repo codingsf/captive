@@ -9,7 +9,7 @@ static inline void putch(char c)
 	asm volatile("out %0, $0xfe\n" : : "a"(c));
 }
 
-static inline void putnum(int v, int base, int sgn)
+static inline void putnum(unsigned int v, int base, int sgn)
 {
 	char buffer[12];
 	int buffer_idx = 0;
@@ -17,12 +17,12 @@ static inline void putnum(int v, int base, int sgn)
 	if (v == 0) {
 		putch('0');
 		return;
-	} else if (v < 0 && sgn) {
+	} else if ((int)v < 0 && sgn) {
 		putch('-');
 		v = -v;
 	}
 
-	while (v != 0 && buffer_idx < sizeof(buffer)) {
+	while (v > 0 && buffer_idx < sizeof(buffer)) {
 		int val = v % base;
 
 		switch (val) {

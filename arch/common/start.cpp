@@ -2,11 +2,18 @@
  * start.c
  */
 #include <printf.h>
+#include <env.h>
 
-extern "C" void start(unsigned int ep)
-{
-	printf("Hello, world.\n");
-	printf("Entry Point=0x%x\n", ep);
+extern captive::arch::Environment *create_environment();
 
-	for(;;);
+extern "C" {
+	void __attribute__((noreturn)) start(unsigned int ep)
+	{
+		printf("start\n");
+
+		captive::arch::Environment *env = create_environment();
+		env->run(ep);
+
+		asm volatile("out %0, $0xff\n" : : "a"(0x02));
+	}
 }

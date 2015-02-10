@@ -41,13 +41,15 @@ entry16:
 .align 8
 .code64
 entry64:
+	xorl %eax, %eax
+    movw %ax, %ss
+
 	// Clear the segment registers
-    xorl %eax, %eax
-    movw %ax, %fs
-    movw %ax, %gs
+	mov $0x10, %eax
     movw %ax, %ds
     movw %ax, %es
-    movw %ax, %ss
+    movw %ax, %fs
+    movw %ax, %gs
 
 	// Make a hypercall to instruct the hypervisor to restructure the
 	// page tables
@@ -57,16 +59,7 @@ entry64:
 .align 4
 gdt_ptr:
     .word 0x18
-    .word gdt
-    .word 0x000f
-    .word 0
-	.word 0
-
-.align 16
-gdt:
-    .quad 0x0000000000000000		// NULL descriptor
-    .quad 0x0020980000000000		// Code descriptor
-    .quad 0x0000900000000000		// Data descriptor
+	.long 0x10
 
 idt_ptr:
     .long 0

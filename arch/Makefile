@@ -3,6 +3,7 @@ export q := @
 
 top-dir := $(CURDIR)
 export cmn-dir := $(top-dir)/common
+export cmn-inc-dir := $(cmn-dir)/include
 export cmn-out := $(cmn-dir)/common.a
 
 export make := make

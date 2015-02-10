@@ -149,7 +149,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			struct kvm_regs regs;
 			vmioctl(KVM_GET_REGS, &regs);
 			regs.rip = 0x100000000 + kvm_guest.engine().entrypoint_offset();
-			regs.rsp = 0x100010000;
+			regs.rsp = 0x110000000;
 			regs.rbp = regs.rsp;
 			regs.rdi = kvm_guest.guest_entrypoint();
 			vmioctl(KVM_SET_REGS, &regs);

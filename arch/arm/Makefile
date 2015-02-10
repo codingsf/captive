@@ -1,11 +1,18 @@
-local-inc-dir := $(arch-dir)/include
+top-dir := $(CURDIR)
+local-inc-dir := $(top-dir)/include
 
-obj := env.o
+src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
+obj := $(src:.cpp=.o)
+dep := $(src:.cpp=.d)
+
+cflags := -I$(cmn-inc-dir) -I$(local-inc-dir) -nostdlib -fPIC -g
+cxxflags := -I$(cmn-inc-dir) -I$(local-inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11
 
 all: $(arch-out)
 
 clean:
 	$(rm) -f $(arch-out)
+	$(rm) -f $(obj)
 
 $(arch-out): $(obj) $(cmn-out)
 	@echo "  LD    $(notdir $@)"

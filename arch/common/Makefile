@@ -5,11 +5,10 @@ inc-dir := $(top-dir)/include
 
 src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
 obj := $(src:.cpp=.o)
-obj := $(obj:.c=.o)
 dep := $(src:.cpp=.d)
 
-cflags := -I$(inc-dir) -nostdlib -fPIC
-cxxflags := -I$(inc-dir) -nostdlib -fPIC
+cflags := -I$(inc-dir) -nostdlib -fPIC -g
+cxxflags := -I$(inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11
 
 all: $(out)
 
