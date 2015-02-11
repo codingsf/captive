@@ -32,6 +32,5 @@ $(cmn-out): .FORCE
 %.arch.clean: .FORCE
 	$(q)$(make) arch-out=$(basename $@) -C $(basename $(basename $@)) clean
 
-
 .FORCE:
 .PHONY: .FORCE

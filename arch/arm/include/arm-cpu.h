@@ -10,15 +10,16 @@
 
 #include <define.h>
 #include <cpu.h>
-#include <arm-decode.h>
 
 namespace captive {
 	namespace arch {
 		namespace arm {
 			class ArmEnvironment;
+			class ArmInterp;
 
 			class ArmCPU : public CPU
 			{
+				friend class ArmInterp;
 			public:
 				ArmCPU(ArmEnvironment& env);
 				virtual ~ArmCPU();
@@ -26,16 +27,32 @@ namespace captive {
 				bool init(unsigned int ep) override;
 				bool run() override;
 
-				virtual uint32_t read_pc() const override { return regs.RB[15]; }
+				uint32_t read_pc() const override { return state.regs.RB[15]; }
+				void dump_state() const;
+
+				struct cpu_state {
+					uint32_t last_exception_action;
+					uint32_t isa_mode;
+
+					struct {
+						uint32_t RB[16];
+						uint32_t RB_usr[17];
+						uint32_t RB_fiq[17];
+						uint32_t RB_irq[17];
+						uint32_t RB_svc[17];
+						uint32_t RB_abt[17];
+						uint32_t RB_und[17];
+
+						uint8_t C, V, Z, N, X, M, F, I, cpV;
+						uint32_t SPSR;
+					} regs;
+				};
 
 			private:
-				ArmDecode cur_insn;
-				
 				unsigned int _ep;
+				cpu_state state;
 
-				struct {
-					uint32_t RB[16];
-				} regs;
+				void cpu_take_exception(uint32_t code, uint32_t data);
 			};
 		}
 	}

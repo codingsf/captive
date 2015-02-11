@@ -28,7 +28,10 @@ $(out): $(obj)
 	@echo "  C++   $(notdir $@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
 
-.FORCE:
-.PHONY: .FORCE
+%.d: %.cpp
+	$(q)$(cxx) -M -MT $(@:.d=.o) -o $@ $(cxxflags) $<
 
-# -include $(dep)
+.FORCE:
+.PHONY: $(PHONY) .FORCE
+
+-include $(dep)

@@ -8,6 +8,8 @@
 #ifndef CPU_H
 #define	CPU_H
 
+#include <define.h>
+
 namespace captive {
 	namespace arch {
 		class Environment;
@@ -22,6 +24,7 @@ namespace captive {
 			virtual bool run() = 0;
 
 			virtual uint32_t read_pc() const = 0;
+			virtual void dump_state() const = 0;
 
 		private:
 			Environment& _env;

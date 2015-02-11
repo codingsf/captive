@@ -15,5 +15,6 @@ extern "C" {
 		env->run(ep);
 
 		asm volatile("out %0, $0xff\n" : : "a"(0x02));
+		for(;;);
 	}
 }

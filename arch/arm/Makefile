@@ -21,3 +21,11 @@ $(arch-out): $(obj) $(cmn-out)
 %.o: %.cpp
 	@echo "  C++   $(notdir $@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
+	
+%.d: %.cpp
+	$(q)$(cxx) -M -MT $(@:.d=.o) -o $@ $(cxxflags) $<
+
+.FORCE:
+.PHONY: $(PHONY) .FORCE
+
+-include $(dep)
