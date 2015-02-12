@@ -2,21 +2,24 @@
  * start.c
  */
 #include <printf.h>
+#include <mm.h>
 #include <env.h>
 
 extern captive::arch::Environment *create_environment();
 
 extern "C" {
-	void __attribute__((noreturn)) start(unsigned int ep)
+	void __attribute__((noreturn)) start(uint64_t first_phys_page, unsigned int ep)
 	{
+		captive::arch::Memory mm(first_phys_page);
 		captive::arch::Environment *env = create_environment();
+		
 		if (!env) {
 			printf("error: unable to create environment\n");
 		} else {
 			if (!env->run(ep)) {
 				printf("error: unable to launch environment\n");
 			}
-			
+
 			delete env;
 		}
 

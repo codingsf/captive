@@ -77,7 +77,7 @@ bool KVMGuest::load(loader::Loader& loader)
 		return false;
 	}
 
-	if (!loader.install((uint8_t *)gpm.front()->host_buffer)) {
+	if (!loader.install((uint8_t *)gpm.front().vmr->host_buffer)) {
 		return false;
 	}
 
@@ -153,7 +153,11 @@ bool KVMGuest::prepare_guest_memory()
 			return false;
 		}
 
-		gpm.push_back(vm_region);
+		gpm_desc desc;
+		desc.cfg = &region;
+		desc.vmr = vm_region;
+
+		gpm.push_back(desc);
 	}
 
 	return true;
@@ -194,6 +198,13 @@ bool KVMGuest::stage2_init()
 	// Map the DATA area into memory
 	for (uint64_t va = DATA_VIRT_BASE, pa = DATA_PHYS_BASE; va < (DATA_VIRT_BASE + DATA_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+	}
+
+	// Map GUEST physical memory regions in
+	for (auto pmr : gpm) {
+		for (uint64_t va = pmr.cfg->base_address(), pa = pmr.vmr->kvm.guest_phys_addr; va < pmr.cfg->base_address() + pmr.cfg->size(); va += 0x1000, pa += 0x1000) {
+			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		}
 	}
 
 	return true;

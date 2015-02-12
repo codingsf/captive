@@ -153,10 +153,18 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		if (kvm_guest.stage2_init()) {
 			struct kvm_regs regs;
 			vmioctl(KVM_GET_REGS, &regs);
+
+			// Entry Point
 			regs.rip = 0x100000000 + kvm_guest.engine().entrypoint_offset();
-			regs.rsp = 0x110000000 - 16;
-			regs.rbp = 0; //regs.rsp;
-			regs.rdi = kvm_guest.guest_entrypoint();
+
+			// Stack + Base Pointer
+			regs.rsp = 0x110000000;
+			regs.rbp = 0;
+
+			// Startup Arguments
+			regs.rdi = kvm_guest.next_avail_phys_page();
+			regs.rsi = kvm_guest.guest_entrypoint();
+
 			vmioctl(KVM_SET_REGS, &regs);
 
 			// Cause a TLB invalidation - maybe?

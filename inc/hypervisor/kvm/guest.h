@@ -35,6 +35,8 @@ namespace captive {
 
 				bool stage2_init();
 
+				uint64_t next_avail_phys_page() const { return next_page; }
+
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
 
@@ -54,7 +56,13 @@ namespace captive {
 
 				std::list<vm_mem_region *> vm_mem_region_free;
 				std::list<vm_mem_region *> vm_mem_region_used;
-				std::list<vm_mem_region *> gpm;
+
+				struct gpm_desc {
+					vm_mem_region *vmr;
+					const GuestMemoryRegionConfiguration *cfg;
+				};
+
+				std::list<gpm_desc> gpm;
 
 				bool prepare_guest_memory();
 				bool install_bios();
@@ -66,7 +74,6 @@ namespace captive {
 				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size);
 				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
-
 
 				typedef uint64_t pte_t;
 				typedef pte_t *pm_t;
@@ -84,13 +91,6 @@ namespace captive {
 				}
 
 				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
-
-				/*struct sys_page {
-					gpa_t gpa;
-					void *hva;
-				};
-
-				sys_page alloc_sys_page();*/
 			};
 		}
 	}
