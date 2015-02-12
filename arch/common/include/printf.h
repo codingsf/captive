@@ -9,6 +9,7 @@
 #define	PRINTF_H
 
 extern void printf(const char *fmt, ...);
+extern void sprintf(char *dest, const char *fmt, ...);
 
 #endif	/* PRINTF_H */
 

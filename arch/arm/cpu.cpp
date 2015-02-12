@@ -4,6 +4,7 @@
 #include <arm-env.h>
 #include <arm-decode.h>
 #include <arm-interp.h>
+#include <arm-disasm.h>
 #include <new>
 
 #include <printf.h>
@@ -39,6 +40,7 @@ bool ArmCPU::run()
 
 	ArmDecode *insn = (ArmDecode *)insn_data;
 	ArmInterp interp(*this);
+	ArmDisasm disasm;
 
 	printf("constructing default decode\n");
 	new (insn) ArmDecode();
@@ -51,7 +53,7 @@ bool ArmCPU::run()
 		insn->decode(ArmDecode::arm, state.regs.RB[15]);
 
 #ifdef TRACE
-		printf("[%08x] %08x %s ", state.regs.RB[15], insn->ir, "???");
+		printf("[%08x] %08x %30s ", state.regs.RB[15], insn->ir, disasm.disassemble(state.regs.RB[15], *insn));
 #endif
 		step_ok = interp.step_single(*insn);
 

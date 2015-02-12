@@ -13,5 +13,11 @@
 extern void *memset(void *, int, size_t);
 extern void *bzero(void *, size_t);
 
+extern int strlen(const char *);
+extern char *strcpy(char *, const char *);
+extern char *strncpy(char *, const char *, int n);
+extern char *strcat(char *, const char *);
+extern char *strncat(char *, const char *, int n);
+
 #endif	/* STRING_H */
 

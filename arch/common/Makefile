@@ -7,8 +7,8 @@ src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
 obj := $(src:.cpp=.o)
 dep := $(src:.cpp=.d)
 
-cflags := -I$(inc-dir) -nostdlib -fPIC -g
-cxxflags := -I$(inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11
+cflags := -I$(inc-dir) -nostdlib -fPIC -g -O3 -fno-builtin
+cxxflags := -I$(inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11 -O3 -fno-builtin -mno-sse -mno-mmx -mno-sse2 -fno-delete-null-pointer-checks
 
 all: $(out)
 

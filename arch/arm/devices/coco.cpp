@@ -152,12 +152,14 @@ bool CoCo::mrc(uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& d
 	case 3:
 		data = DACR;
 		break;
-
 	case 5:
 		data = FSR;
 		break;
 	case 6:
 		data = FAR;
+		break;
+	case 7:
+		data = 1 << 30;
 		break;
 	}
 

@@ -2,6 +2,7 @@
  * printf.c
  */
 #include <printf.h>
+#include <string.h>
 #include <stdarg.h>
 
 static inline void putch(char c)
@@ -58,10 +59,15 @@ static inline void putnum(unsigned int v, int base, int sgn, int pad, char pad_c
 	}
 }
 
-static inline void putstr(const char *str)
+static inline void putstr(const char *str, int pad, char pad_char)
 {
+	int len = strlen(str);
 	while (*str) {
 		putch(*str++);
+	}
+
+	for (int i = 0; i < pad - len; i++) {
+		putch(pad_char);
 	}
 }
 
@@ -83,7 +89,11 @@ retry_format:
 
 			switch (*fmt) {
 			case '0':
-				pad_char = '0';
+				if (pad == 0) {
+					pad_char = '0';
+				} else {
+					pad *= 10;
+				}
 				goto retry_format;
 			case '1' ... '9':
 				pad *= 10;
@@ -99,7 +109,7 @@ retry_format:
 				putnum(va_arg(args, int), 16, 0, pad, pad_char);
 				break;
 			case 's':
-				putstr(va_arg(args, const char *));
+				putstr(va_arg(args, const char *), pad, pad_char);
 				break;
 			default:
 				putch(*fmt);
@@ -113,4 +123,10 @@ retry_format:
 	}
 
 	va_end(args);
+}
+
+void sprintf(char *dest, const char *fmt, ...)
+{
+	*dest++ = '?';
+	*dest = 0;
 }
