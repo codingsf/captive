@@ -28,7 +28,22 @@ namespace captive {
 				bool run() override;
 
 				uint32_t read_pc() const override { return state.regs.RB[15]; }
+
+				uint32_t write_pc(uint32_t value) override {
+					uint32_t tmp = state.regs.RB[15];
+					state.regs.RB[15] = value;
+					return tmp;
+				}
+
+				uint32_t inc_pc(uint32_t delta) override {
+					uint32_t tmp = state.regs.RB[15];
+					state.regs.RB[15] += delta;
+					return tmp;
+				}
+
 				void dump_state() const;
+
+				void handle_angel_syscall();
 
 				struct cpu_state {
 					uint32_t last_exception_action;
@@ -51,8 +66,6 @@ namespace captive {
 			private:
 				unsigned int _ep;
 				cpu_state state;
-
-				void cpu_take_exception(uint32_t code, uint32_t data);
 			};
 		}
 	}

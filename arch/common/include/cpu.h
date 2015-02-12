@@ -24,6 +24,9 @@ namespace captive {
 			virtual bool run() = 0;
 
 			virtual uint32_t read_pc() const = 0;
+			virtual uint32_t write_pc(uint32_t new_pc_val) = 0;
+			virtual uint32_t inc_pc(uint32_t delta) = 0;
+			
 			virtual void dump_state() const = 0;
 
 		private:

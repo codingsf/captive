@@ -44,10 +44,12 @@ bool ArmCPU::run()
 	printf("cpu run\n");
 
 	do {
+		state.last_exception_action = 0;
+
 		insn->decode(ArmDecode::arm, state.regs.RB[15]);
 
-		printf("insn: %x: %x (%d)\n", state.regs.RB[15], insn->ir, insn->opcode);
-		dump_state();
+		//printf("[%08x] %08x %s\n", state.regs.RB[15], insn->ir, "???");
+		printf(".word 0x%08x\n", insn->ir);
 		step_ok = interp.step_single(*insn);
 	} while(step_ok);
 
@@ -59,10 +61,13 @@ bool ArmCPU::init(unsigned int ep)
 	printf("cpu init @ %x\n", ep);
 	_ep = ep;
 
-	uint32_t *mem = (uint32_t *)0;
+	volatile uint32_t *mem = (volatile uint32_t *)0;
 	*mem++ = 0xef000000;
 	*mem++ = 0xe1a00000;
 	*mem++ = 0xe12fff1c;
+
+	printf("clearing state\n");
+	bzero(&state, sizeof(state));
 
 	state.regs.RB[1] = 0x25e;
 	state.regs.RB[2] = 0x1234;
@@ -72,7 +77,7 @@ bool ArmCPU::init(unsigned int ep)
 	return true;
 }
 
-void ArmCPU::cpu_take_exception(uint32_t code, uint32_t data)
+void ArmCPU::handle_angel_syscall()
 {
-	printf("exception %x %x\n", code, data);
+	printf("ANGEL\n");
 }

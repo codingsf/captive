@@ -9,7 +9,7 @@ static inline void putch(char c)
 	asm volatile("out %0, $0xfe\n" : : "a"(c));
 }
 
-static inline void putnum(unsigned int v, int base, int sgn)
+static inline void putnum(unsigned int v, int base, int sgn, int pad, char pad_char)
 {
 	char buffer[12];
 	int buffer_idx = 0;
@@ -20,6 +20,10 @@ static inline void putnum(unsigned int v, int base, int sgn)
 	} else if ((int)v < 0 && sgn) {
 		putch('-');
 		v = -v;
+	}
+
+	for (int i = 0; i < sizeof(buffer); i++) {
+		buffer[i] = pad_char;
 	}
 
 	while (v > 0 && buffer_idx < sizeof(buffer)) {
@@ -36,6 +40,11 @@ static inline void putnum(unsigned int v, int base, int sgn)
 
 		v /= base;
 	}
+
+	//43210000
+
+	if (buffer_idx < pad)
+		buffer_idx += pad - buffer_idx;
 
 	for (buffer_idx--; buffer_idx >= 0; buffer_idx--) {
 		putch(buffer[buffer_idx]);
@@ -56,20 +65,31 @@ void printf(const char *fmt, ...)
 
 	while (*fmt) {
 		if (*fmt == '%') {
+			char pad_char = ' ';
+			int pad = 0;
+
+retry_format:
 			fmt++;
 			if (!*fmt) {
 				break;
 			}
 
 			switch (*fmt) {
+			case '0':
+				pad_char = '0';
+				goto retry_format;
+			case '1' ... '9':
+				pad *= 10;
+				pad += *fmt - '0';
+				goto retry_format;
 			case 'd':
-				putnum(va_arg(args, int), 10, 1);
+				putnum(va_arg(args, int), 10, 1, pad, pad_char);
 				break;
 			case 'u':
-				putnum(va_arg(args, int), 10, 0);
+				putnum(va_arg(args, int), 10, 0, pad, pad_char);
 				break;
 			case 'x':
-				putnum(va_arg(args, int), 16, 0);
+				putnum(va_arg(args, int), 16, 0, pad, pad_char);
 				break;
 			case 's':
 				putstr(va_arg(args, const char *));

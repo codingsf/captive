@@ -31,11 +31,6 @@
 #define trap() asm volatile ("out %0, $0xff\n" :: "a"(2))
 #define halt_cpu() asm volatile ("out %0, $0xff\n" :: "a"(2))
 
-#define read_pc() read_register_bank(RB, 15)
-
-#define take_exception(a, b) do { cpu.state.last_exception_action = 1; take_arm_exception(a, b); } while (0)
-//cpu.cpu_take_exception(a, b)
-
 #define write_device(a, b, c)
 #define read_device(a, b, c)
 
