@@ -30,8 +30,16 @@ namespace captive {
 			virtual void dump_state() const = 0;
 
 			inline Environment& env() const { return _env; }
+
+			inline uint64_t get_insns_executed() const { return insns_executed; }
 			
+		protected:
+			inline void inc_insns_executed() {
+				insns_executed++;
+			}
+
 		private:
+			uint64_t insns_executed;
 			Environment& _env;
 		};
 	}

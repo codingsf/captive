@@ -11,11 +11,16 @@
 #include <define.h>
 #include <cpu.h>
 
+#define DECODE_CACHE_SIZE	8192
+#define DECODE_OBJ_SIZE		128
+#define DECODE_CACHE_ENTRIES	(DECODE_CACHE_SIZE / DECODE_OBJ_SIZE)
+
 namespace captive {
 	namespace arch {
 		namespace arm {
 			class ArmEnvironment;
 			class ArmInterp;
+			class ArmDecode;
 
 			class ArmCPU : public CPU
 			{
@@ -64,6 +69,12 @@ namespace captive {
 				};
 
 			private:
+				char decode_cache[DECODE_CACHE_SIZE];
+
+				inline ArmDecode *get_decode(uint32_t pc) const {
+					return (ArmDecode *)&decode_cache[(pc % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
+				}
+
 				unsigned int _ep;
 				cpu_state state;
 			};

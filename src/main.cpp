@@ -33,8 +33,11 @@ int main(int argc, char **argv)
 
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
-	cfg.name = "test";
-	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x40000000));	// 1Gb
+	cfg.name = "linux";
+	
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x40000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x80000000, 0x60000000));
 
 	// Create the engine.
 	Engine engine(argv[1]);

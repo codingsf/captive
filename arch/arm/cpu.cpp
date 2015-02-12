@@ -33,34 +33,46 @@ void ArmCPU::dump_state() const
 
 bool ArmCPU::run()
 {
-	bool step_ok = true;
-
-	char insn_data[512];
-	bzero(insn_data, sizeof(insn_data));
-
-	ArmDecode *insn = (ArmDecode *)insn_data;
 	ArmInterp interp(*this);
 	ArmDisasm disasm;
 
-	printf("constructing default decode\n");
-	new (insn) ArmDecode();
+	bool step_ok = true;
 
-	printf("cpu run\n");
+	printf("initialising decode cache\n");
+	for (int i = 0; i < DECODE_CACHE_ENTRIES; i++) {
+		ArmDecode *decode = get_decode(i);
+		new (decode) ArmDecode();
+		decode->pc = 0;
+	}
+
+	printf("starting cpu execution\n");
 
 	do {
+		uint32_t pc = state.regs.RB[15];
+
 		state.last_exception_action = 0;
 
-		insn->decode(ArmDecode::arm, state.regs.RB[15]);
+		ArmDecode *insn = get_decode(pc);
+		if (pc == 0 || insn->pc != pc) insn->decode(ArmDecode::arm, pc);
 
 #ifdef TRACE
-		printf("[%08x] %08x %30s ", state.regs.RB[15], insn->ir, disasm.disassemble(state.regs.RB[15], *insn));
+		printf("[%08x] %08x %30s ", pc, insn->ir, disasm.disassemble(pc, *insn));
 #endif
+
 		step_ok = interp.step_single(*insn);
+		inc_insns_executed();
+
+		if ((get_insns_executed() % 10000000) == 0)
+			printf("insns: %d\n", get_insns_executed());
 
 #ifdef TRACE
 		printf("\n");
 #endif
 	} while(step_ok);
+
+	uint32_t pcx = state.regs.RB[15];
+	ArmDecode *insnx = get_decode(pcx);
+	printf("[%08x] %08x %30s\n", pcx, insnx->ir, disasm.disassemble(pcx, *insnx));
 
 	return true;
 }
