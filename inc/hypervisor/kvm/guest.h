@@ -67,6 +67,24 @@ namespace captive {
 				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
 
+
+				typedef uint64_t pte_t;
+				typedef pte_t *pm_t;
+				typedef pte_t *pdp_t;
+				typedef pte_t *pd_t;
+				typedef pte_t *pt_t;
+
+				uint64_t next_page;
+
+				inline uint64_t alloc_page()
+				{
+					uint64_t page = next_page;
+					next_page += 0x1000;
+					return page;
+				}
+
+				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
+
 				/*struct sys_page {
 					gpa_t gpa;
 					void *hva;

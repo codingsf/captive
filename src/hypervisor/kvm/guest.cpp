@@ -20,10 +20,15 @@ using namespace captive::hypervisor::kvm;
 #define SYSTEM_MEMORY_PHYS_BASE		0
 #define SYSTEM_MEMORY_PHYS_SIZE		0x40000000
 
-#define BIOS_PHYS_BASE			0xf0000
+#define ENGINE_PHYS_BASE		(SYSTEM_MEMORY_PHYS_BASE + 0x10000000)
+#define ENGINE_VIRT_BASE		0x100000000
+#define ENGINE_SIZE			(SYSTEM_MEMORY_PHYS_SIZE - ENGINE_PHYS_BASE)
 
-#define ENGINE_PHYS_BASE		0x600000
-#define ENGINE_PHYS_SIZE		0x1000000
+#define DATA_PHYS_BASE			SYSTEM_MEMORY_PHYS_BASE
+#define DATA_VIRT_BASE			0x200000000
+#define DATA_SIZE			(ENGINE_PHYS_BASE - SYSTEM_MEMORY_PHYS_BASE)
+
+#define BIOS_PHYS_BASE			0xf0000
 
 #define DEFAULT_NR_SLOTS		32
 
@@ -164,75 +169,32 @@ bool KVMGuest::install_bios()
 	return true;
 }
 
+#define PT_PRESENT	(1ULL << 0)
+#define PT_WRITABLE	(1ULL << 1)
+#define PT_NO_EXECUTE	(1ULL << 63)
+
 bool KVMGuest::install_initial_pgt()
 {
-	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
-	uint64_t *pg4 = (uint64_t *) (&base[0x1000]);	// PAGE MAP
-	uint64_t *pg3 = (uint64_t *) (&base[0x2000]);	// PAGE DIRECTORY PTR
-	uint64_t *pg2 = (uint64_t *) (&base[0x3000]);	// PAGE DIRECTORY
-	uint64_t *pg1 = (uint64_t *) (&base[0x4000]);	// PAGE TABLE
+	next_page = 0x2000;
 
-	*pg4 = 0x2003;
-	*pg3 = 0x3003;
-	*pg2 = 0x4003;
-
-	uint64_t addr = 3;
-	for (int i = 0; i < 512; i++) {
-		pg1[i] = addr;
-		addr += 0x1000;
+	for (uint64_t va = 0, pa = 0; va < 0x200000; va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
 	return true;
 }
 
-#define PT_PRESENT	(1ULL << 0)
-#define PT_WRITABLE	(1ULL << 1)
-#define PT_NO_EXECUTE	(1ULL << 63)
-
 bool KVMGuest::stage2_init()
 {
-	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
-
-	// First, map the the emulated guest physical memory into virtual
-	// memory
-	uint64_t pt_addr = 0x4000;
-	uint64_t phys_addr = GUEST_PHYS_MEMORY_BASE;
-
-	uint64_t *pgd_base = (uint64_t *) (&base[0x3000]);
-	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
-		pgd_base[pgd_idx] = pt_addr | PT_PRESENT | PT_WRITABLE | PT_NO_EXECUTE;
-
-		uint64_t *pt_base = (uint64_t *) (&base[pt_addr]);
-
-		for (uint32_t pt_idx = 0; pt_idx < 0x200; pt_idx++) {
-			pt_base[pt_idx] = phys_addr | PT_PRESENT | PT_WRITABLE | PT_NO_EXECUTE;
-			phys_addr += 0x1000;
-		}
-
-		pt_addr += 0x1000;
+	// Map the ENGINE into memory
+	for (uint64_t va = ENGINE_VIRT_BASE, pa = ENGINE_PHYS_BASE; va < (ENGINE_VIRT_BASE + ENGINE_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
-	// Now, map the execution engine into virtual memory
-	uint64_t *pdp_base = (uint64_t *) (&base[0x2000]);
-	pdp_base[4] = pt_addr | 3;
-
-	pgd_base = (uint64_t *) (&base[pt_addr]);
-	phys_addr = ENGINE_PHYS_BASE;
-	pt_addr += 0x1000;
-	for (uint32_t pgd_idx = 0; pgd_idx < 0x200; pgd_idx++) {
-		pgd_base[pgd_idx] = pt_addr | PT_PRESENT;
-
-		uint64_t *pt_base = (uint64_t *) (&base[pt_addr]);
-
-		for (uint32_t pt_idx = 0; pt_idx < 0x200; pt_idx++) {
-			pt_base[pt_idx] = phys_addr | PT_PRESENT;
-			phys_addr += 0x1000;
-		}
-
-		pt_addr += 0x1000;
+	// Map the DATA area into memory
+	for (uint64_t va = DATA_VIRT_BASE, pa = DATA_PHYS_BASE; va < (DATA_VIRT_BASE + DATA_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
-
-	DEBUG << "Last PT Address: " << std::hex << pt_addr << ", phys=" << phys_addr;
 
 	return true;
 }
@@ -329,4 +291,44 @@ void KVMGuest::release_all_guest_memory()
 	}
 
 	gpm.clear();
+}
+
+#define ADDR_MASK (uint64_t)~((uint64_t)(0xfff))
+#define FLAGS_MASK (uint64_t)((uint64_t)(0xfff))
+
+#define BITS(val, start, end) ((val >> start) & (((1 << (end - start + 1)) - 1)))
+
+void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
+{
+	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
+
+	uint16_t pm_idx = BITS(va, 39, 47);
+	uint16_t pdp_idx = BITS(va, 30, 38);
+	uint16_t pd_idx = BITS(va, 21, 29);
+	uint16_t pt_idx = BITS(va, 12, 20);
+
+	pm_t pm = (pm_t)&base[0x1000];
+	if (pm[pm_idx] == 0) {
+		pm[pm_idx] = alloc_page() | PT_PRESENT | PT_WRITABLE;
+	}
+
+	pdp_t pdp = (pdp_t)&base[pm[pm_idx] & ADDR_MASK];
+	if (pdp[pdp_idx] == 0) {
+		pdp[pdp_idx] = alloc_page() | PT_PRESENT | PT_WRITABLE;
+	}
+
+	pd_t pd = (pd_t)&base[pdp[pdp_idx] & ADDR_MASK];
+	if (pd[pd_idx] == 0) {
+		pd[pd_idx] = alloc_page() | PT_PRESENT | PT_WRITABLE;
+	}
+
+	pt_t pt = (pt_t)&base[pd[pd_idx] & ADDR_MASK];
+	pt[pt_idx] = (pa & ADDR_MASK) | (flags & FLAGS_MASK);
+
+	/*DEBUG << "Map Page VA=" << std::hex << va
+		<< ", PA=" << pa
+		<< ", PM[1000]=" << (uint32_t)pm_idx
+		<< ", PDP[" << pm[pm_idx] << "]=" << (uint32_t)pdp_idx
+		<< ", PD[" << pdp[pdp_idx] << "]=" << (uint32_t)pd_idx
+		<< ", PT[" << pd[pd_idx] << "]=" << (uint32_t)pt_idx;*/
 }
