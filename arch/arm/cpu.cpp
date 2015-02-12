@@ -48,8 +48,7 @@ bool ArmCPU::run()
 
 		insn->decode(ArmDecode::arm, state.regs.RB[15]);
 
-		//printf("[%08x] %08x %s\n", state.regs.RB[15], insn->ir, "???");
-		printf(".word 0x%08x\n", insn->ir);
+		printf("[%08x] %08x %s\n", state.regs.RB[15], insn->ir, "???");
 		step_ok = interp.step_single(*insn);
 	} while(step_ok);
 
