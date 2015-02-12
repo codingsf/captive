@@ -15,7 +15,14 @@ static inline void putnum(unsigned int v, int base, int sgn, int pad, char pad_c
 	int buffer_idx = 0;
 
 	if (v == 0) {
-		putch('0');
+		if (pad > 0) {
+			for (int i = 0; i < pad; i++) {
+				putch(pad_char);
+			}
+		} else {
+			putch('0');
+		}
+
 		return;
 	} else if ((int)v < 0 && sgn) {
 		putch('-');

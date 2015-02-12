@@ -8,6 +8,8 @@
 #ifndef DEFINE_H
 #define	DEFINE_H
 
+#include <assert.h>
+
 typedef unsigned long size_t;
 
 typedef unsigned char uint8_t;

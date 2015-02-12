@@ -5,8 +5,10 @@ static uint8_t *heap = (uint8_t *)0x110000000;
 
 void *operator new(size_t size)
 {
-	printf("new: %x\n", heap);
-
+	if (size % 16) {
+		size += 16 - (size % 16);
+	}
+	
 	uint8_t *obj = heap;
 	heap += size;
 

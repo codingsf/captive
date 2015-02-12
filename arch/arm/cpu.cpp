@@ -1,3 +1,5 @@
+//#define TRACE
+
 #include <arm-cpu.h>
 #include <arm-env.h>
 #include <arm-decode.h>
@@ -48,8 +50,14 @@ bool ArmCPU::run()
 
 		insn->decode(ArmDecode::arm, state.regs.RB[15]);
 
-		printf("[%08x] %08x %s\n", state.regs.RB[15], insn->ir, "???");
+#ifdef TRACE
+		printf("[%08x] %08x %s ", state.regs.RB[15], insn->ir, "???");
+#endif
 		step_ok = interp.step_single(*insn);
+
+#ifdef TRACE
+		printf("\n");
+#endif
 	} while(step_ok);
 
 	return true;
