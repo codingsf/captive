@@ -87,7 +87,7 @@ bool ArmCPU::init(unsigned int ep)
 	bzero(&state, sizeof(state));
 
 	state.regs.RB[1] = 0x25e;
-	state.regs.RB[2] = 0x1234;
+	state.regs.RB[2] = 0x1000;
 	state.regs.RB[12] = ep;
 	state.regs.RB[15] = 0;
 
