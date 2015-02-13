@@ -62,17 +62,13 @@ bool ArmCPU::run()
 		step_ok = interp.step_single(*insn);
 		inc_insns_executed();
 
-		if ((get_insns_executed() % 10000000) == 0)
-			printf("insns: %d\n", get_insns_executed());
+		/*if ((get_insns_executed() % 10000000) == 0)
+			printf("insns: %d\n", get_insns_executed());*/
 
 #ifdef TRACE
 		printf("\n");
 #endif
 	} while(step_ok);
-
-	uint32_t pcx = state.regs.RB[15];
-	ArmDecode *insnx = get_decode(pcx);
-	printf("[%08x] %08x %30s\n", pcx, insnx->ir, disasm.disassemble(pcx, *insnx));
 
 	return true;
 }

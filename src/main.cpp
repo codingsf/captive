@@ -5,6 +5,9 @@
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
 
+#include "devices/device.h"
+#include "devices/arm/pl011.h"
+
 using namespace captive;
 using namespace captive::engine;
 using namespace captive::loader;
@@ -34,10 +37,13 @@ int main(int argc, char **argv)
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
 	cfg.name = "linux";
-	
+
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x40000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x80000000, 0x60000000));
+
+	devices::arm::PL011 *uart = new devices::arm::PL011();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, 0x1000, *uart));
 
 	// Create the engine.
 	Engine engine(argv[1]);

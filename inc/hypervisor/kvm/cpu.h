@@ -14,6 +14,10 @@
 #include <linux/kvm.h>
 
 namespace captive {
+	namespace devices {
+		class Device;
+	}
+
 	namespace hypervisor {
 		class GuestCPUConfiguration;
 
@@ -52,6 +56,7 @@ namespace captive {
 				}
 
 				bool handle_hypercall(uint64_t data);
+				bool handle_device_access(devices::Device *device, uint64_t pa, struct kvm_run& rs);
 
 				void dump_regs();
 			};

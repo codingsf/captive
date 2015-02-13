@@ -12,11 +12,13 @@ extern "C" {
 	{
 		captive::arch::Memory mm(first_phys_page);
 		captive::arch::Environment *env = create_environment();
-		
+
 		if (!env) {
 			printf("error: unable to create environment\n");
 		} else {
-			if (!env->run(ep)) {
+			if (!env->init()) {
+				printf("error: unable to initialise environment\n");
+			} else if (!env->run(ep)) {
 				printf("error: unable to launch environment\n");
 			}
 

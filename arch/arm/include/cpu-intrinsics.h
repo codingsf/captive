@@ -57,8 +57,8 @@
 #define trap() asm volatile ("out %0, $0xff\n" :: "a"(2))
 #define halt_cpu() asm volatile ("out %0, $0xff\n" :: "a"(2))
 
-#define write_device(a, b, c) cpu.env().write_device(a, b, c)
-#define read_device(a, b, c) cpu.env().read_device(a, b, c)
+#define write_device(a, b, c) cpu.env().write_core_device(cpu, a, b, c)
+#define read_device(a, b, c) cpu.env().read_core_device(cpu, a, b, c)
 
 #define flush_dtlb_entry(v)
 #define flush_itlb_entry(v)

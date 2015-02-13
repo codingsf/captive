@@ -1,6 +1,7 @@
 #include <arm-env.h>
 #include <arm-cpu.h>
 #include <devices/coco.h>
+
 #include <printf.h>
 
 using namespace captive::arch;
@@ -13,7 +14,8 @@ Environment *create_environment()
 
 ArmEnvironment::ArmEnvironment()
 {
-	install_device(15, new devices::CoCo(*this));
+	// TODO: Abstract into platform-specific setup
+	install_core_device(15, new devices::CoCo(*this));
 }
 
 ArmEnvironment::~ArmEnvironment()

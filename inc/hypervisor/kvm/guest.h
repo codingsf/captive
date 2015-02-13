@@ -14,6 +14,10 @@
 #include <linux/kvm.h>
 
 namespace captive {
+	namespace devices {
+		class Device;
+	}
+
 	namespace hypervisor {
 		namespace kvm {
 			class KVM;
@@ -64,14 +68,24 @@ namespace captive {
 
 				std::list<gpm_desc> gpm;
 
+				struct dev_desc {
+					devices::Device *dev;
+					const GuestDeviceConfiguration *cfg;
+				};
+
+				std::list<dev_desc> devices;
+
 				bool prepare_guest_memory();
+				bool attach_guest_devices();
+				devices::Device *lookup_device(uint64_t addr);
+
 				bool install_bios();
 				bool install_initial_pgt();
 
 				vm_mem_region *get_mem_slot();
 				void put_mem_slot(vm_mem_region *region);
 
-				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size);
+				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags = 0);
 				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
 

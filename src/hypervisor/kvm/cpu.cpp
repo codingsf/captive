@@ -7,6 +7,8 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
+#include "devices/device.h"
+
 using namespace captive::hypervisor::kvm;
 
 KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd) : CPU(owner, config), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
@@ -53,6 +55,8 @@ bool KVMCpu::init()
 
 bool KVMCpu::run()
 {
+	KVMGuest& kvm_guest = (KVMGuest &)owner();
+
 	bool run_cpu = true;
 	int rc;
 
@@ -104,8 +108,18 @@ bool KVMCpu::run()
 			}
 			break;
 		case KVM_EXIT_MMIO:
+			if (cpu_run_struct->mmio.phys_addr > 0x100000000 && cpu_run_struct->mmio.phys_addr < 0x200000000) {
+				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
+				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
+				if (dev != NULL) {
+					run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct);
+					break;
+				}
+			}
+
 			run_cpu = false;
 			DEBUG << "EXIT MMIO, pa=" << std::hex << cpu_run_struct->mmio.phys_addr << ", size=" << std::hex << cpu_run_struct->mmio.len;
+
 			break;
 		case KVM_EXIT_UNKNOWN:
 			run_cpu = false;
@@ -140,6 +154,18 @@ bool KVMCpu::run()
 	dump_regs();
 
 	return true;
+}
+
+bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run& rs)
+{
+	uint64_t offset = pa & 0xfff;
+	//DEBUG << "Handling Device Access: is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
+
+	if (rs.mmio.is_write) {
+		return device->write(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);
+	} else {
+		return device->read(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);
+	}
 }
 
 bool KVMCpu::handle_hypercall(uint64_t data)

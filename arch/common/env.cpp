@@ -16,6 +16,12 @@ Environment::~Environment()
 
 }
 
+bool Environment::init()
+{
+	// IDT
+	return true;
+}
+
 bool Environment::run(unsigned int ep)
 {
 	CPU *core = create_cpu();
@@ -35,22 +41,22 @@ bool Environment::run(unsigned int ep)
 	return result;
 }
 
-bool Environment::read_device(uint32_t id, uint32_t reg, uint32_t& data)
+bool Environment::read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data)
 {
 	if (id > 15 || devices[id] == NULL) {
 		printf("attempted read of invalid device %d\n", id);
 		return false;
 	}
 
-	return devices[id]->read(reg, data);
+	return devices[id]->read(cpu, reg, data);
 }
 
-bool Environment::write_device(uint32_t id, uint32_t reg, uint32_t data)
+bool Environment::write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t data)
 {
 	if (id > 15 || devices[id] == NULL) {
 		printf("attempted write of invalid device %d\n", id);
 		return false;
 	}
 
-	return devices[id]->write(reg, data);
+	return devices[id]->write(cpu, reg, data);
 }

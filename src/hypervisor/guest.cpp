@@ -19,5 +19,8 @@ Guest::~Guest()
 
 bool Guest::init()
 {
-	return config().validate();
+	if (!config().validate())
+		return false;
+
+	return true;
 }

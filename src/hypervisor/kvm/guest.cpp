@@ -6,9 +6,13 @@
 #include <engine/engine.h>
 
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/eventfd.h>
 #include <linux/kvm.h>
+
+#include "devices/device.h"
 
 using namespace captive::engine;
 using namespace captive::hypervisor;
@@ -66,6 +70,9 @@ bool KVMGuest::init()
 	if (!prepare_guest_memory())
 		return false;
 
+	if (!attach_guest_devices())
+		return false;
+
 	_initialised = true;
 	return true;
 }
@@ -108,6 +115,34 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	kvm_cpus.push_back(cpu);
 
 	return cpu;
+}
+
+bool KVMGuest::attach_guest_devices()
+{
+	for (const auto& device : config().devices) {
+		DEBUG << "Attaching device @ " << std::hex << device.base_address();
+
+		device.device().attach(*this);
+
+		dev_desc desc;
+		desc.cfg = &device;
+		desc.dev = &device.device();
+
+		devices.push_back(desc);
+	}
+
+	return true;
+}
+
+captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
+{
+	for (const auto& desc : devices) {
+		if (addr >= desc.cfg->base_address() && addr <= desc.cfg->base_address() + desc.cfg->size()) {
+			return desc.dev;
+		}
+	}
+
+	return NULL;
 }
 
 bool KVMGuest::prepare_guest_memory()
@@ -201,9 +236,20 @@ bool KVMGuest::stage2_init()
 	}
 
 	// Map GUEST physical memory regions in
-	for (auto pmr : gpm) {
+	for (const auto& pmr : gpm) {
 		for (uint64_t va = pmr.cfg->base_address(), pa = pmr.vmr->kvm.guest_phys_addr; va < pmr.cfg->base_address() + pmr.cfg->size(); va += 0x1000, pa += 0x1000) {
 			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		}
+	}
+
+	for (const auto& dev : devices) {
+		uint64_t va = dev.cfg->base_address();
+		uint64_t pa = GUEST_PHYS_MEMORY_BASE + va;
+
+		for (int i = 0; i < dev.cfg->size() / 0x1000; i++) {
+			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+			va += 0x1000;
+			pa += 0x1000;
 		}
 	}
 
@@ -234,7 +280,7 @@ void KVMGuest::put_mem_slot(vm_mem_region* region)
 	}
 }
 
-KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t size)
+KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags)
 {
 	// Try to obtain a free memory region slot.
 	vm_mem_region *rgn = get_mem_slot();
@@ -242,7 +288,7 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 		return NULL;
 
 	// Fill in the KVM memory structure.
-	rgn->kvm.flags = 0;
+	rgn->kvm.flags = flags;
 	rgn->kvm.guest_phys_addr = gpa;
 	rgn->kvm.memory_size = size;
 

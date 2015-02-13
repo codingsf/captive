@@ -13,7 +13,7 @@ CoCo::~CoCo()
 
 }
 
-bool CoCo::mcr(uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data)
+bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data)
 {
 	switch (rn) {
 	case 1:
@@ -67,7 +67,7 @@ bool CoCo::mcr(uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t da
 	return true;
 }
 
-bool CoCo::mrc(uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data)
+bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data)
 {
 	data = 0;
 

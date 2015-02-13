@@ -21,8 +21,8 @@ namespace captive {
 					~CoCo();
 
 				protected:
-					bool mcr(uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) override;
-					bool mrc(uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
+					bool mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) override;
+					bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
 
 				private:
 					bool L2;
