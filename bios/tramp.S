@@ -51,6 +51,15 @@ entry64:
     movw %ax, %fs
     movw %ax, %gs
 
+	// Enable SSE
+	mov %cr0, %rax
+	and $~(1<<2), %rax
+	or $(1<<1), %rax
+	mov %rax, %cr0
+	mov %cr4, %rax
+	or $(3<<9), %rax
+	mov %rax, %cr4
+
 	// Make a hypercall to instruct the hypervisor to restructure the
 	// page tables
 	movl $1, %eax
