@@ -35,7 +35,6 @@ namespace captive {
 				CPU *create_cpu(const GuestCPUConfiguration& config) override;
 
 				inline bool initialised() const { return _initialised; }
-				inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
 
 				bool stage2_init();
 
@@ -48,8 +47,6 @@ namespace captive {
 				int fd;
 				int next_cpu_id;
 				int next_slot_idx;
-
-				gpa_t _guest_entrypoint;
 
 				struct vm_mem_region {
 					struct kvm_userspace_memory_region kvm;

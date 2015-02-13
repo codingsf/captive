@@ -98,7 +98,7 @@ bool KVMCpu::run()
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);
 
-				printf("%c", (char)regs.rax & 0xff);
+				fprintf(stderr, "%c", (char)regs.rax & 0xff);
 			} else {
 				run_cpu = false;
 				DEBUG << "EXIT IO "

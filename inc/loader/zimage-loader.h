@@ -22,7 +22,8 @@ namespace captive {
 			ZImageLoader(std::string filename);
 
 			virtual bool install(uint8_t* gpm) override;
-			virtual gpa_t entrypoint() const override;
+			virtual gpa_t entrypoint() const;
+			
 		private:
 			struct zimage_header {
 				uint32_t code[9];

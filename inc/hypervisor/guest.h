@@ -45,10 +45,15 @@ namespace captive {
 
 			inline const GuestConfiguration& config() const { return _config; }
 
+			inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
+			inline void guest_entrypoint(gpa_t ep) { _guest_entrypoint = ep; }
+
 		private:
 			Hypervisor& _owner;
 			engine::Engine& _engine;
 			const GuestConfiguration& _config;
+
+			gpa_t _guest_entrypoint;
 		};
 	}
 }

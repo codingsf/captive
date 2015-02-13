@@ -1,6 +1,7 @@
 #include <captive.h>
 #include <engine/engine.h>
 #include <loader/zimage-loader.h>
+#include <loader/devtree-loader.h>
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
@@ -16,8 +17,8 @@ using namespace captive::hypervisor::kvm;
 
 int main(int argc, char **argv)
 {
-	if (argc != 3) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage>";
+	if (argc != 4) {
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree>";
 		return 1;
 	}
 
@@ -73,12 +74,24 @@ int main(int argc, char **argv)
 	}
 
 	// Load the zimage
-	ZImageLoader loader(argv[2]);
-	if (!guest->load(loader)) {
+	ZImageLoader zimage(argv[2]);
+	if (!guest->load(zimage)) {
 		delete guest;
 		delete hv;
 
 		ERROR << "Unable to load ZIMAGE";
+		return 1;
+	}
+
+	guest->guest_entrypoint(zimage.entrypoint());
+
+	// Load the device-tree
+	DeviceTreeLoader device_tree(argv[3], 0x1000);
+	if (!guest->load(device_tree)) {
+		delete guest;
+		delete hv;
+
+		ERROR << "Unable to load device tree";
 		return 1;
 	}
 

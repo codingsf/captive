@@ -88,7 +88,6 @@ bool KVMGuest::load(loader::Loader& loader)
 		return false;
 	}
 
-	_guest_entrypoint = loader.entrypoint();
 	return true;
 }
 

@@ -6,7 +6,7 @@ obj := $(src:.cpp=.o)
 dep := $(src:.cpp=.d)
 
 cflags := -I$(cmn-inc-dir) -I$(local-inc-dir) -nostdlib -fPIC -g -O3 -fno-builtin
-cxxflags := -I$(cmn-inc-dir) -I$(local-inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11 -O3 -fno-builtin -mno-sse -mno-mmx -fno-delete-null-pointer-checks
+cxxflags := -I$(cmn-inc-dir) -I$(local-inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11 -O3 -fno-builtin -fno-delete-null-pointer-checks
 
 all: $(arch-out)
 
