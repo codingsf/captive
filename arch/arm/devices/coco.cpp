@@ -3,7 +3,7 @@
 
 using namespace captive::arch::arm::devices;
 
-CoCo::CoCo(Environment& env) : Coprocessor(env)
+CoCo::CoCo(Environment& env) : Coprocessor(env), V(false), S(false), R(false), M(false)
 {
 
 }

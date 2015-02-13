@@ -13,6 +13,8 @@
 #include <printf.h>
 #include <env.h>
 
+extern uint32_t page_fault_code;
+
 #define TRACE_REG_READ(_id) printf("(R[%s] => %08x)", #_id, cpu.state.regs._id)
 #define TRACE_REG_WRITE(_id) printf("(R[%s] <= %08x)", #_id, cpu.state.regs._id)
 #define TRACE_RB_READ(_bank, _id) printf("(RB[%s][%d] => %08x)", #_bank, _id, cpu.state.regs._bank[_id])
@@ -63,15 +65,15 @@
 #define flush_dtlb_entry(v)
 #define flush_itlb_entry(v)
 
-#define mem_read_8(_addr, _data) (_data = *((uint8_t*)((uint64_t)_addr)), 0)
-#define mem_read_16(_addr, _data) (_data = *((uint16_t*)((uint64_t)_addr)), 0)
-#define mem_read_32(_addr, _data) (_data = *((uint32_t*)((uint64_t)_addr)), 0)
-#define mem_read_64(_addr, _data) (_data = *((uint64_t*)((uint64_t)_addr)), 0)
+#define mem_read_8(_addr, _data) (_data = *((uint8_t*)((uint64_t)_addr)), page_fault_code)
+#define mem_read_16(_addr, _data) (_data = *((uint16_t*)((uint64_t)_addr)), page_fault_code)
+#define mem_read_32(_addr, _data) (_data = *((uint32_t*)((uint64_t)_addr)), page_fault_code)
+#define mem_read_64(_addr, _data) (_data = *((uint64_t*)((uint64_t)_addr)), page_fault_code)
 
-#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), 0)
-#define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), 0)
-#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), 0)
-#define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), 0)
+#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
+#define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), page_fault_code)
+#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
+#define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)
 
 #define mem_read_8_user(_addr, _data) mem_read_8(_addr, _data)
 #define mem_read_16_user(_addr, _data) mem_read_16(_addr, _data)

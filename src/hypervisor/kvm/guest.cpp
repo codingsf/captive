@@ -365,17 +365,26 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 
 	pm_t pm = (pm_t)&base[0x1000];
 	if (pm[pm_idx] == 0) {
-		pm[pm_idx] = alloc_page() | PT_PRESENT | PT_WRITABLE;
+		uint64_t new_page = alloc_page();
+		bzero(&base[new_page], 0x1000);
+
+		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE;
 	}
 
 	pdp_t pdp = (pdp_t)&base[pm[pm_idx] & ADDR_MASK];
 	if (pdp[pdp_idx] == 0) {
-		pdp[pdp_idx] = alloc_page() | PT_PRESENT | PT_WRITABLE;
+		uint64_t new_page = alloc_page();
+		bzero(&base[new_page], 0x1000);
+
+		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE;
 	}
 
 	pd_t pd = (pd_t)&base[pdp[pdp_idx] & ADDR_MASK];
 	if (pd[pd_idx] == 0) {
-		pd[pd_idx] = alloc_page() | PT_PRESENT | PT_WRITABLE;
+		uint64_t new_page = alloc_page();
+		bzero(&base[new_page], 0x1000);
+
+		pd[pd_idx] = new_page | PT_PRESENT | PT_WRITABLE;
 	}
 
 	pt_t pt = (pt_t)&base[pd[pd_idx] & ADDR_MASK];

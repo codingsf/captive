@@ -47,7 +47,11 @@ namespace captive {
 		public:
 			Memory(uint64_t first_phys_page);
 
+			static void *alloc_page();
+
 		private:
+			static Memory *mm;
+			
 			uint64_t _first_phys_page;
 			void *_data_base;
 		};

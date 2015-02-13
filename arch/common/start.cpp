@@ -5,6 +5,8 @@
 #include <mm.h>
 #include <env.h>
 
+uint32_t page_fault_code;
+
 extern captive::arch::Environment *create_environment();
 
 extern "C" {
@@ -12,6 +14,8 @@ extern "C" {
 	{
 		captive::arch::Memory mm(first_phys_page);
 		captive::arch::Environment *env = create_environment();
+
+		page_fault_code = 0;
 
 		if (!env) {
 			printf("error: unable to create environment\n");
@@ -25,7 +29,45 @@ extern "C" {
 			delete env;
 		}
 
-		asm volatile("out %0, $0xff\n" : : "a"(0x02));
+		abort();
 		for(;;);
+	}
+
+	void handle_trap_unk()
+	{
+		printf("IT'S A TRAP\n");
+		abort();
+	}
+
+	void handle_trap_dbz()
+	{
+		printf("trap: divide-by-zero\n");
+		abort();
+	}
+
+	void handle_trap_dbg()
+	{
+		printf("trap: debug\n");
+		abort();
+	}
+
+	void handle_trap_nmi()
+	{
+		printf("trap: nmi\n");
+		abort();
+	}
+
+	void handle_trap_pf(uint64_t rip, uint64_t code)
+	{
+		uint64_t va;
+		asm ("mov %%cr2, %0\n" : "=r"(va));
+
+		printf("trap: page-fault: rip=%x va=%x, code=%x\n", rip, va, code);
+
+		if (va < 0x100000000) {
+			page_fault_code = 1;
+		} else {
+			abort();
+		}
 	}
 }

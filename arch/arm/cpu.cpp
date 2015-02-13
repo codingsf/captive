@@ -62,8 +62,13 @@ bool ArmCPU::run()
 		step_ok = interp.step_single(*insn);
 		inc_insns_executed();
 
-		/*if ((get_insns_executed() % 10000000) == 0)
-			printf("insns: %d\n", get_insns_executed());*/
+		/*if (get_insns_executed() > 95597725) {
+			printf(".word 0x%x\n", insn->ir);
+		}
+
+		if (get_insns_executed() > 95598214) {
+			break;
+		}*/
 
 #ifdef TRACE
 		printf("\n");

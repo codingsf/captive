@@ -3,6 +3,60 @@
 #include <printf.h>
 #include <string.h>
 #include <device.h>
+#include <mm.h>
+
+typedef void (*trap_fn_t)(void);
+
+extern "C" void trap_unk(void);
+extern "C" void trap_dbz(void);
+extern "C" void trap_dbg(void);
+extern "C" void trap_nmi(void);
+extern "C" void trap_pf(void);
+
+static trap_fn_t trap_fns[] = {
+	trap_dbz,
+	trap_dbg,
+	trap_nmi,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_pf,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+	trap_unk,
+};
+
+struct IDT {
+	uint16_t off_low;
+	uint16_t sel;
+	uint8_t zero0;
+	uint8_t type;
+	uint16_t off_mid;
+	uint32_t off_high;
+	uint32_t zero1;
+} packed;
 
 using namespace captive::arch;
 
@@ -16,9 +70,37 @@ Environment::~Environment()
 
 }
 
+static void set_idt(IDT* idt, trap_fn_t fn)
+{
+	idt->zero0 = 0;
+	idt->zero1 = 0;
+
+	idt->off_low = ((uint64_t)fn) & 0xffff;
+	idt->off_mid = (((uint64_t)fn) >> 16) & 0xffff;
+	idt->off_high = (((uint64_t)fn) >> 32);
+
+	idt->sel = 0x8;
+	idt->type = 0x8f;
+}
+
 bool Environment::init()
 {
-	// IDT
+	struct {
+		uint16_t limit;
+		uint64_t base;
+	} packed IDTR;
+
+	IDTR.limit = sizeof(struct IDT) * 32;
+	IDTR.base = 0x200000030;
+
+	IDT *idt = (IDT *)0x200000030;
+
+	for (int i = 0; i < sizeof(trap_fns) / sizeof(trap_fns[0]); i++) {
+		set_idt(idt++, trap_fns[i]);
+	}
+
+	asm volatile("lidt %0\n" :: "m"(IDTR));
+
 	return true;
 }
 

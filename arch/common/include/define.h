@@ -24,5 +24,7 @@ typedef signed long long int int64_t;
 
 #define NULL 0
 
+#define abort() asm volatile("out %0, $0xff\n" : : "a"(0x02))
+
 #endif	/* DEFINE_H */
 

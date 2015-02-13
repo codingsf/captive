@@ -280,6 +280,7 @@ void KVMCpu::dump_regs()
 #undef PCREG
 
 	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl
+	<< "idt base=" << std::hex << sregs.idt.base << ", limit=" << std::hex << sregs.idt.limit << std::endl
 	<< "efer=" << std::hex << sregs.efer << std::endl;
 
 	// Instruction Data

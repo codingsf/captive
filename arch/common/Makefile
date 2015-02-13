@@ -4,11 +4,12 @@ top-dir := $(CURDIR)
 inc-dir := $(top-dir)/include
 
 src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
-obj := $(src:.cpp=.o)
+obj := $(src:.cpp=.o) trap.o
 dep := $(src:.cpp=.d)
 
-cflags := -I$(inc-dir) -nostdlib -fPIC -g -O3 -fno-builtin
-cxxflags := -I$(inc-dir) -nostdlib -fPIC -fno-rtti -fno-exceptions -g -std=gnu++11 -O3 -fno-builtin -fno-delete-null-pointer-checks
+export cflags := -I$(inc-dir) $(common-cflags)
+export cxxflags := -I$(inc-dir) $(common-cflags) -fno-rtti -fno-exceptions -std=gnu++11 -fno-delete-null-pointer-checks
+export asflags := -nostdlib -g
 
 all: $(out)
 
@@ -27,6 +28,10 @@ $(out): $(obj)
 %.o: %.cpp
 	@echo "  C++   $(notdir $@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
+
+%.o: %.S
+	@echo "  AS    $(notdir $@)"
+	$(q)$(cxx) -c -o $@ $(asflags) $<
 
 %.d: %.cpp
 	$(q)$(cxx) -M -MT $(@:.d=.o) -o $@ $(cxxflags) $<

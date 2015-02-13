@@ -56,6 +56,7 @@ entry64:
 	and $~(1<<2), %rax
 	or $(1<<1), %rax
 	mov %rax, %cr0
+
 	mov %cr4, %rax
 	or $(3<<9), %rax
 	mov %rax, %cr4
