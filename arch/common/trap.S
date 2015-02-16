@@ -16,6 +16,7 @@
 	push %r13
 	push %r14
 	push %r15*/
+	pushf
 	push %rax
 	push %rcx
 	push %rdx
@@ -48,6 +49,7 @@
 	pop %rdx
 	pop %rcx
 	pop %rax
+	popf
 .endm
 
 .macro trap_macro x

@@ -62,8 +62,24 @@ namespace captive {
 				asm volatile("mov %0, %%cr3" :: "r"(val), "m"(__force_order));
 			}
 
+			inline unsigned long read_cr4() const {
+				unsigned long val;
+				asm volatile("mov %%cr4, %0\n\t" : "=r"(val), "=m"(__force_order));
+				return val;
+			}
+
+			inline void write_cr4(unsigned long val) {
+				asm volatile("mov %0, %%cr4" :: "r"(val), "m"(__force_order));
+			}
+
 			inline void flush_tlb() {
 				write_cr3(read_cr3());
+			}
+
+			inline void flush_tlb_all() {
+				unsigned long cr4 = read_cr4();
+				write_cr4(cr4 & ~(1 << 7));
+				write_cr4(cr4);
 			}
 
 			#define BITS(val, start, end) ((val >> start) & (((1 << (end - start + 1)) - 1)))

@@ -210,6 +210,13 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		} else {
 			return false;
 		}
+	case 2:
+		DEBUG << "Abort Requested";
+		return false;
+
+	case 3:
+		dump_regs();
+		return true;
 	}
 
 	return false;
