@@ -217,6 +217,10 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	case 3:
 		dump_regs();
 		return true;
+
+	case 4:
+		//kvm_guest.map_page(0x10000, 0x100010000, 0);
+		return true;
 	}
 
 	return false;

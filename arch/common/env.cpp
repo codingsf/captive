@@ -89,6 +89,16 @@ bool Environment::init()
 	struct {
 		uint16_t limit;
 		uint64_t base;
+	} packed GDTR;
+
+	GDTR.limit = 8 * 3;
+	GDTR.base = 0x200000010;
+
+	asm volatile("lgdt %0\n" :: "m"(GDTR));
+
+	struct {
+		uint16_t limit;
+		uint64_t base;
 	} packed IDTR;
 
 	IDTR.limit = sizeof(struct IDT) * 32;

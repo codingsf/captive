@@ -25,21 +25,13 @@ bool MMU::clear_vma()
 	va_entries(0, pm, pdp, pd, pt);
 	printf("mmu: clear vma: %p (%x) %p (%x) %p (%x) %p (%x)\n", pm, *pm, pdp, *pdp, pd, *pd, pt, *pt);
 
-	// Clear PRESENT bit of mappings for 4GB area
+	// Clear flags on the 4G mapping.
 	for (int pdp_idx = 0; pdp_idx < 4; pdp_idx++) {
-		printf("mmu: pdp: %016x\n", pdp[pdp_idx]);
-		pdp[pdp_idx] &= ~1ULL; // &= ~0xffdULL;			// Clear PRESENT bit
-		printf("mmu: pdp: %016x\n", pdp[pdp_idx]);
+		pdp[pdp_idx] &= ~0xffdULL; // Clear all flags, except the RW bit
 	}
 
-	// Flush TLB
+	// Flush the TLB
 	flush_tlb();
-	flush_tlb_all();
-
-	asm volatile("out %0, $0xff\n" :: "a"(3));
-
-	uint64_t p = *(volatile uint64_t *)0x10000; //0x200000030; //0x10000; //ffffffff;
-	printf("%x\n", p);
 
 	return true;
 }
