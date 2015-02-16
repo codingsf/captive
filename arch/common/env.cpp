@@ -12,6 +12,7 @@ extern "C" void trap_dbz(void);
 extern "C" void trap_dbg(void);
 extern "C" void trap_nmi(void);
 extern "C" void trap_pf(void);
+extern "C" void trap_gpf(void);
 
 static trap_fn_t trap_fns[] = {
 	trap_dbz,
@@ -27,7 +28,7 @@ static trap_fn_t trap_fns[] = {
 	trap_unk,
 	trap_unk,
 	trap_unk,
-	trap_unk,
+	trap_gpf,
 	trap_pf,
 	trap_unk,
 	trap_unk,
@@ -80,7 +81,7 @@ static void set_idt(IDT* idt, trap_fn_t fn)
 	idt->off_high = (((uint64_t)fn) >> 32);
 
 	idt->sel = 0x8;
-	idt->type = 0x8f;
+	idt->type = 0x8e;
 }
 
 bool Environment::init()

@@ -1,7 +1,7 @@
 .code64
 
 .macro push_regs
-	push %rax
+/*	push %rax
 	push %rbx
 	push %rcx
 	push %rdx
@@ -15,11 +15,18 @@
 	push %r12
 	push %r13
 	push %r14
-	push %r15
+	push %r15*/
+	push %rax
+	push %rcx
+	push %rdx
+	push %r8
+	push %r9
+	push %r10
+	push %r11
 .endm
 
 .macro pop_regs
-	pop %r15
+/*	pop %r15
 	pop %r14
 	pop %r13
 	pop %r12
@@ -33,6 +40,13 @@
 	pop %rdx
 	pop %rcx
 	pop %rbx
+	pop %rax*/
+	pop %r11
+	pop %r10
+	pop %r9
+	pop %r8
+	pop %rdx
+	pop %rcx
 	pop %rax
 .endm
 
@@ -69,3 +83,4 @@ trap_macro dbz
 trap_macro dbg
 trap_macro nmi
 trap_macro_arg pf
+trap_macro_arg gpf

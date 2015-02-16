@@ -60,21 +60,33 @@ extern "C" {
 		abort();
 	}
 
+	void handle_trap_gpf(uint64_t rip, uint64_t code)
+	{
+		printf("general protection fault\n");
+		abort();
+	}
+
 	void handle_trap_pf(uint64_t rip, uint64_t code)
 	{
 		uint64_t va;
 		asm ("mov %%cr2, %0\n" : "=r"(va));
 
-		captive::arch::CPU *core = captive::arch::active_cpu;
-		if (core) {
-			if (core->mmu().handle_fault(va)) {
-				return;
+		if (va < 0x100000000) {
+			captive::arch::CPU *core = captive::arch::active_cpu;
+			if (core) {
+				if (core->mmu().handle_fault(va)) {
+					printf("trap: handled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
+					return;
+				} else {
+					printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
+					abort();
+				}
 			} else {
-				printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
+				printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, (no cpu)\n", rip, va, code);
 				abort();
 			}
 		} else {
-			printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, (no cpu)\n", rip, va, code);
+			printf("trap: internal page-fault: rip=%x va=%x, code=%x\n", rip, va, code);
 			abort();
 		}
 	}
