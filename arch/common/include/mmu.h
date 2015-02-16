@@ -35,6 +35,7 @@ namespace captive {
 			virtual bool handle_fault(uint64_t va) = 0;
 
 		private:
+			uint64_t pml4_phys;
 			pm_t pml4;
 
 		protected:
@@ -48,6 +49,22 @@ namespace captive {
 
 			void map_page(struct page *pml4, uint64_t va, uint64_t pa);
 			void unmap_page(struct page *pml4, uint64_t va);
+
+			static unsigned long __force_order;
+
+			inline unsigned long read_cr3() const {
+				unsigned long val;
+				asm volatile("mov %%cr3, %0\n\t" : "=r"(val), "=m"(__force_order));
+				return val;
+			}
+
+			inline void write_cr3(unsigned long val) {
+				asm volatile("mov %0, %%cr3" :: "r"(val), "m"(__force_order));
+			}
+
+			inline void flush_tlb() {
+				write_cr3(read_cr3());
+			}
 
 			#define BITS(val, start, end) ((val >> start) & (((1 << (end - start + 1)) - 1)))
 
@@ -69,7 +86,8 @@ namespace captive {
 				uint16_t pm_idx, pdp_idx, pd_idx, pt_idx;
 				va_idx(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
-				pm = &pml4[pm_idx];
+				//pm = &pml4[pm_idx];
+				pm = &((pm_t)phys_to_virt(pml4_phys))[pm_idx];
 
 				uint64_t pdp_phys = *pm & ~0xfffULL;
 				pdp = &((pdp_t)phys_to_virt(pdp_phys))[pdp_idx];
