@@ -36,21 +36,13 @@ bool ArmMMU::disable()
 	return true;
 }
 
-bool ArmMMU::handle_fault(uint64_t va)
+bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa) const
 {
-	pm_t pm;
-	pdp_t pdp;
-	pd_t pd;
-	pt_t pt;
-
-	printf("mmu: (%s) handle fault va=%x\n", _enabled ? "enabled" : "disabled", va);
-
-	va_entries(va, pm, pdp, pd, pt);
-	printf("mmu: pm=%p, pdp=%p, pd=%p, pt=%p (%x)\n", pm, pdp, pd, pt, *pt);
-
 	if (!_enabled) {
-		return false;
+		pa = va;
+		return true;
 	}
 
+	pa = va;
 	return true;
 }

@@ -28,8 +28,8 @@ namespace captive {
 					return _enabled;
 				}
 
-
-				bool handle_fault(uint64_t va) override;
+			protected:
+				bool resolve_gpa(gva_t va, gpa_t& pa) const override;
 
 			private:
 				ArmCPU& _cpu;

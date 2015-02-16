@@ -22,6 +22,9 @@ typedef signed short int16_t;
 typedef signed int int32_t;
 typedef signed long long int int64_t;
 
+typedef uint32_t gpa_t;
+typedef uint32_t gva_t;
+
 #define NULL 0
 
 #define abort() asm volatile("out %0, $0xff\n" : : "a"(0x02))

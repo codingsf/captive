@@ -75,7 +75,7 @@ extern "C" {
 			captive::arch::CPU *core = captive::arch::active_cpu;
 			if (core) {
 				if (core->mmu().handle_fault(va)) {
-					printf("trap: handled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
+					//printf("trap: handled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
 					return;
 				} else {
 					printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());

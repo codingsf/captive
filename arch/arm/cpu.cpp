@@ -48,7 +48,12 @@ bool ArmCPU::run()
 
 	printf("starting cpu execution\n");
 
+#ifdef TRACE
+	interp.trace = true;
+#else
 	interp.trace = false;
+#endif
+
 	do {
 		uint32_t pc = state.regs.RB[15];
 

@@ -32,7 +32,7 @@ namespace captive {
 
 			inline Environment& env() const { return _env; }
 
-			virtual bool handle_fault(uint64_t va) = 0;
+			bool handle_fault(uint64_t va);
 
 		private:
 			uint64_t pml4_phys;
@@ -41,6 +41,8 @@ namespace captive {
 		protected:
 			bool clear_vma();
 			bool install_phys_vma();
+
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa) const = 0;
 
 			struct page {
 				uint64_t pa;

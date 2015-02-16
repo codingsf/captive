@@ -1,6 +1,8 @@
 #include <mmu.h>
 #include <printf.h>
 
+#include "include/mmu.h"
+
 using namespace captive::arch;
 
 unsigned long MMU::__force_order;
@@ -69,4 +71,75 @@ void MMU::unmap_page(page *pml4, uint64_t va)
 {
 	uint16_t pm, pdp, pd, pt;
 	va_idx(va, pm, pdp, pd, pt);
+}
+
+bool MMU::handle_fault(uint64_t va)
+{
+	pm_t pm;
+	pdp_t pdp;
+	pd_t pd;
+	pt_t pt;
+
+	va_entries(va, pm, pdp, pd, pt);
+
+	if (!(*pm & 1)) {
+		// The associated Page Directory Pointer Table is not marked as
+		// present, so invalidate the page directory pointer table, and
+		// mark it as present.
+
+		// Determine the base address of the page directory pointer table.
+		pdp_t base = (pdp_t)((uint64_t)pdp & ~0xfffULL);
+
+		// Loop over each entry and clear the PRESENT flag.
+		for (int i = 0; i < 0x200; i++) {
+			base[i] &= ~0xffdULL;
+		}
+
+		// Set the PRESENT flag for the page directory pointer table.
+		*pm |= 1;
+	}
+
+	if (!(*pdp & 1)) {
+		// The associated Page Directory Table is not marked as present,
+		// so invalidate the page directory table and mark it as
+		// present.
+
+		// Determine the base address of the page directory table.
+		pd_t base = (pd_t)((uint64_t)pd & ~0xfffULL);
+
+		// Loop over each entry and clear the PRESENT flag.
+		for (int i = 0; i < 0x200; i++) {
+			base[i] &= ~0xffdULL;
+		}
+
+		// Set the PRESENT flag for the page directory table.
+		*pdp |= 1;
+	}
+
+	if (!(*pd & 1)) {
+		// The associated Page Table is not marked as present, so
+		// invalidate the page table and mark it as present.
+
+		// Determine the base address of the page table.
+		pt_t base = (pt_t)((uint64_t)pt & ~0xfffULL);
+
+		// Loop over each entry and clear the PRESENT flag.
+		for (int i = 0; i < 0x200; i++) {
+			base[i] &= ~0xffdULL;
+		}
+
+		// Set the PRESENT flag for the page table.
+		*pd |= 1;
+	}
+
+	gpa_t pa;
+	if (!resolve_gpa((gva_t)va, pa)) {
+		return false;
+	}
+
+	// Update the corresponding page table address entry and mark it as
+	// present and writable.
+	*pt = 0x100000000 | pa | 3;
+
+	return true;
 }
