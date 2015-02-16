@@ -10,6 +10,8 @@
 
 #include <list>
 
+#include <sys/ioctl.h>
+
 #include <hypervisor/guest.h>
 #include <linux/kvm.h>
 
@@ -102,6 +104,18 @@ namespace captive {
 				}
 
 				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
+
+				inline int vmioctl(unsigned long int req) const {
+					return vmioctl(req, (unsigned long int)0);
+				}
+
+				inline int vmioctl(unsigned long int req, unsigned long int arg) const {
+					return ioctl(fd, req, arg);
+				}
+
+				inline int vmioctl(unsigned long int req, void *arg) const {
+					return ioctl(fd, req, arg);
+				}
 			};
 		}
 	}

@@ -18,22 +18,28 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-#define GUEST_PHYS_MEMORY_BASE		0x100000000
-#define GUEST_PHYS_MEMORY_VIRT_BASE	0
-#define GUEST_PHYS_MEMORY_MAX_SIZE	0x100000000
+#define GUEST_PHYS_MEMORY_BASE		0x100000000ULL
+#define GUEST_PHYS_MEMORY_VIRT_BASE	0ULL
+#define GUEST_PHYS_MEMORY_MAX_SIZE	0x100000000ULL
 
-#define SYSTEM_MEMORY_PHYS_BASE		0
-#define SYSTEM_MEMORY_PHYS_SIZE		0x40000000
+#define SYSTEM_MEMORY_PHYS_BASE		0ULL
+#define SYSTEM_MEMORY_PHYS_SIZE		0x40000000ULL
 
-#define ENGINE_PHYS_BASE		(SYSTEM_MEMORY_PHYS_BASE + 0x10000000)
-#define ENGINE_VIRT_BASE		0x100000000
+#define ENGINE_PHYS_BASE		(SYSTEM_MEMORY_PHYS_BASE + 0x10000000ULL)
+#define ENGINE_VIRT_BASE		0x100000000ULL
 #define ENGINE_SIZE			(SYSTEM_MEMORY_PHYS_SIZE - ENGINE_PHYS_BASE)
 
+#define IDMAP_PHYS_ADDR			(SYSTEM_MEMORY_PHYS_BASE + SYSTEM_MEMORY_PHYS_SIZE)
+#define IDMAP_PHYS_SIZE			(1 * 0x1000)
+
+#define TSS_PHYS_ADDR			(IDMAP_PHYS_ADDR + IDMAP_PHYS_SIZE)
+#define TSS_PHYS_SIZE			(3 * 0x1000)
+
 #define DATA_PHYS_BASE			SYSTEM_MEMORY_PHYS_BASE
-#define DATA_VIRT_BASE			0x200000000
+#define DATA_VIRT_BASE			0x200000000ULL
 #define DATA_SIZE			(ENGINE_PHYS_BASE - SYSTEM_MEMORY_PHYS_BASE)
 
-#define BIOS_PHYS_BASE			0xf0000
+#define BIOS_PHYS_BASE			0xf0000ULL
 
 #define DEFAULT_NR_SLOTS		32
 
@@ -147,6 +153,40 @@ captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 
 bool KVMGuest::prepare_guest_memory()
 {
+	/*unsigned int rc;
+
+	rc = vmioctl(KVM_CAP_CHECK_EXTENSION_VM, KVM_CAP_SET_IDENTITY_MAP_ADDR);
+	if (rc) {
+		if (!alloc_guest_memory(IDMAP_PHYS_ADDR, IDMAP_PHYS_SIZE)) {
+			ERROR << "Unable to allocate storage for IDMAP";
+			return false;
+		}
+
+		DEBUG << "Setting IDMAP to " << std::hex << IDMAP_PHYS_ADDR;
+		unsigned long idmap_addr = IDMAP_PHYS_ADDR;
+		rc = vmioctl(KVM_SET_IDENTITY_MAP_ADDR, &idmap_addr);
+		if (rc) {
+			ERROR << "Unable to set IDMAP address";
+			return false;
+		}
+	}
+
+	rc = vmioctl(KVM_CAP_CHECK_EXTENSION_VM, KVM_CAP_SET_TSS_ADDR);
+	if (rc) {
+		if (!alloc_guest_memory(TSS_PHYS_ADDR, TSS_PHYS_SIZE)) {
+			ERROR << "Unable to allocate storage for TSS";
+			return false;
+		}
+
+		DEBUG << "Setting TSS to " << std::hex << TSS_PHYS_ADDR;
+		unsigned long tss_addr = TSS_PHYS_ADDR;
+		rc = vmioctl(KVM_SET_TSS_ADDR, tss_addr);
+		if (rc) {
+			ERROR << "Unable to set TSS address";
+			return false;
+		}
+	}*/
+
 	// Allocate the first 1GB for system usage.
 	sys_mem_rgn = alloc_guest_memory(SYSTEM_MEMORY_PHYS_BASE, SYSTEM_MEMORY_PHYS_SIZE);
 	if (!sys_mem_rgn) {
