@@ -4,6 +4,9 @@
 #include <printf.h>
 #include <mm.h>
 #include <env.h>
+#include <cpu.h>
+
+#include "mmu.h"
 
 uint32_t page_fault_code;
 
@@ -62,11 +65,16 @@ extern "C" {
 		uint64_t va;
 		asm ("mov %%cr2, %0\n" : "=r"(va));
 
-		printf("trap: page-fault: rip=%x va=%x, code=%x\n", rip, va, code);
-
-		if (va < 0x100000000) {
-			page_fault_code = 1;
+		captive::arch::CPU *core = captive::arch::active_cpu;
+		if (core) {
+			if (core->mmu().handle_fault(va)) {
+				return;
+			} else {
+				printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
+				abort();
+			}
 		} else {
+			printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, (no cpu)\n", rip, va, code);
 			abort();
 		}
 	}

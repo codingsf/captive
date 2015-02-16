@@ -19,6 +19,7 @@ using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
 #define GUEST_PHYS_MEMORY_BASE		0x100000000
+#define GUEST_PHYS_MEMORY_VIRT_BASE	0
 #define GUEST_PHYS_MEMORY_MAX_SIZE	0x100000000
 
 #define SYSTEM_MEMORY_PHYS_BASE		0
@@ -234,13 +235,19 @@ bool KVMGuest::stage2_init()
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
-	// Map GUEST physical memory regions in
+	// Map ALL guest physical memory, but don't mark it as present.
+	for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, 0);
+	}
+
+	// Remap only the available physical memory.
 	for (const auto& pmr : gpm) {
 		for (uint64_t va = pmr.cfg->base_address(), pa = pmr.vmr->kvm.guest_phys_addr; va < pmr.cfg->base_address() + pmr.cfg->size(); va += 0x1000, pa += 0x1000) {
 			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 		}
 	}
 
+	// Remap devices
 	for (const auto& dev : devices) {
 		uint64_t va = dev.cfg->base_address();
 		uint64_t pa = GUEST_PHYS_MEMORY_BASE + va;

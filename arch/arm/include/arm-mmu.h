@@ -21,12 +21,15 @@ namespace captive {
 				ArmMMU(ArmCPU& cpu);
 				~ArmMMU();
 
-				virtual bool enable() override;
-				virtual bool disable() override;
+				bool enable() override;
+				bool disable() override;
 
-				virtual bool enabled() const override {
+				bool enabled() const override {
 					return _enabled;
 				}
+
+
+				bool handle_fault(uint64_t va) override;
 
 			private:
 				ArmCPU& _cpu;

@@ -44,6 +44,8 @@ namespace captive {
 			uint64_t insns_executed;
 			Environment& _env;
 		};
+
+		extern CPU *active_cpu;
 	}
 }
 

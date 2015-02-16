@@ -175,6 +175,9 @@ retry_format:
 			case 'x':
 				putnum(va_arg(args, long long int), 16, 0, pad, pad_char);
 				break;
+			case 'p':
+				putnum((unsigned long long int)va_arg(args, void *), 16, 0, pad, pad_char);
+				break;
 			case 's':
 				putstr(va_arg(args, const char *), pad, pad_char);
 				break;

@@ -8,7 +8,7 @@
 #ifndef CPU_INTRINSICS_H
 #define	CPU_INTRINSICS_H
 
-#define TRACE
+//#define TRACE
 
 #include <printf.h>
 #include <env.h>

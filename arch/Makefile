@@ -18,7 +18,7 @@ archs := arm
 arch-outs := $(patsubst %,$(top-dir)/%.arch,$(archs))
 arch-cleans := $(patsubst %,$(top-dir)/%.arch.clean,$(archs))
 
-export common-cflags := -nostdlib -fPIC -g -O3 -fno-builtin -mno-sse -mno-mmx -mno-sse2
+export common-cflags := -nostdlib -fPIC -g -fno-builtin -mno-sse -mno-mmx -mno-sse2 -O3
 
 all: $(arch-outs)
 

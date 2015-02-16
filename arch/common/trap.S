@@ -60,7 +60,7 @@ trap_\x:
 	add $8, %rsp
 
 // TODO: FIX THIS TERRIBLE HACK
-	add $3, (%rsp)
+//	add $3, (%rsp)
 	iretq
 .endm
 

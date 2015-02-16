@@ -117,6 +117,8 @@ bool Environment::run(unsigned int ep)
 		return false;
 	}
 
+	captive::arch::active_cpu = core;
+
 	bool result = core->run();
 	delete core;
 

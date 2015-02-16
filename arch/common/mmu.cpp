@@ -4,7 +4,7 @@
 
 using namespace captive::arch;
 
-MMU::MMU(Environment& env) : _env(env), pml4((pm_t)0x200000000)
+MMU::MMU(Environment& env) : _env(env), pml4((pm_t)0x200001000)
 {
 
 }
