@@ -10,13 +10,6 @@ static inline void putch(char c)
 	asm volatile("out %0, $0xfe\n" : : "a"(c));
 }
 
-static inline void sputch(char **b, char c)
-{
-	char *x = *b;
-	*x++ = c;
-	*b = x;
-}
-
 static inline void sputnum(char **ob, unsigned long long int v, int base, int sgn, int pad, char pad_char)
 {
 	char buffer[16];
@@ -25,15 +18,18 @@ static inline void sputnum(char **ob, unsigned long long int v, int base, int sg
 	if (v == 0) {
 		if (pad > 0) {
 			for (int i = 0; i < pad; i++) {
-				putch(pad_char);
+				**ob = pad_char;
+				*ob = *ob + 1;
 			}
 		} else {
-			putch('0');
+			**ob = '0';
+			*ob = *ob + 1;
 		}
 
 		return;
 	} else if ((signed long long int)v < 0 && sgn) {
-		putch('-');
+		**ob = '-';
+		*ob = *ob + 1;
 		v = -v;
 	}
 
@@ -62,7 +58,8 @@ static inline void sputnum(char **ob, unsigned long long int v, int base, int sg
 		buffer_idx += pad - buffer_idx;
 
 	for (buffer_idx--; buffer_idx >= 0; buffer_idx--) {
-		sputch(ob, buffer[buffer_idx]);
+		**ob = buffer[buffer_idx];
+		*ob = *ob + 1;
 	}
 }
 
@@ -127,19 +124,21 @@ static inline void putstr(const char *str, int pad, char pad_char)
 	}
 }
 
-static inline void sputstr(char **ob, const char *str, int pad, char pad_char)
+static inline void sputstr(char **buffer, const char *str, int pad, char pad_char)
 {
 	int len = strlen(str);
 	while (*str) {
-		putch(*str++);
+		**buffer = *str++;
+		*buffer = *buffer + 1;
 	}
 
 	for (int i = 0; i < pad - len; i++) {
-		sputch(ob, pad_char);
+		**buffer = pad_char;
+		*buffer = *buffer + 1;
 	}
 }
 
-void printf(const char *fmt, ...)
+int printf(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -191,10 +190,15 @@ retry_format:
 	}
 
 	va_end(args);
+
+	return 0;
 }
 
 void sprintf(char *dest, const char *fmt, ...)
 {
+	char *dest_buffer = dest;
+	*dest_buffer = 0;
+
 	va_list args;
 	va_start(args, fmt);
 
@@ -222,29 +226,28 @@ retry_format:
 				pad += *fmt - '0';
 				goto retry_format;
 			case 'd':
-				sputnum(&dest, va_arg(args, int), 10, 1, pad, pad_char);
+				sputnum(&dest_buffer, va_arg(args, int), 10, 1, pad, pad_char);
 				break;
 			case 'u':
-				sputnum(&dest, va_arg(args, int), 10, 0, pad, pad_char);
+				sputnum(&dest_buffer, va_arg(args, int), 10, 0, pad, pad_char);
 				break;
 			case 'x':
-				sputnum(&dest, va_arg(args, long long int), 16, 0, pad, pad_char);
+				sputnum(&dest_buffer, va_arg(args, int), 16, 0, pad, pad_char);
 				break;
 			case 's':
-				sputstr(&dest, va_arg(args, const char *), pad, pad_char);
+				sputstr(&dest_buffer, va_arg(args, const char *), pad, pad_char);
 				break;
 			default:
-				sputch(&dest, *fmt);
+				*dest_buffer++ = *fmt;
 				break;
 			}
 
 			fmt++;
 		} else {
-			sputch(&dest, *fmt++);
+			*dest_buffer++ = *fmt++;
 		}
 	}
 
-	*dest++ = '0';
-
+	*dest_buffer = '0';
 	va_end(args);
 }

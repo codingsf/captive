@@ -33,7 +33,6 @@ namespace captive {
 					bool FI;
 					bool L4;
 					bool RR;
-					bool V;
 					bool I;
 					bool Z;
 					bool F;

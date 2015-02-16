@@ -8,17 +8,17 @@
 #ifndef CPU_INTRINSICS_H
 #define	CPU_INTRINSICS_H
 
-//#define TRACE
+#define TRACE
 
 #include <printf.h>
 #include <env.h>
 
 extern uint32_t page_fault_code;
 
-#define TRACE_REG_READ(_id) printf("(R[%s] => %08x)", #_id, cpu.state.regs._id)
-#define TRACE_REG_WRITE(_id) printf("(R[%s] <= %08x)", #_id, cpu.state.regs._id)
-#define TRACE_RB_READ(_bank, _id) printf("(RB[%s][%d] => %08x)", #_bank, _id, cpu.state.regs._bank[_id])
-#define TRACE_RB_WRITE(_bank, _id) printf("(RB[%s][%d] <= %08x)", #_bank, _id, cpu.state.regs._bank[_id])
+#define TRACE_REG_READ(_id) ((trace) ? (printf("(R[%s] => %08x)", #_id, cpu.state.regs._id)) : (0))
+#define TRACE_REG_WRITE(_id) ((trace) ? (printf("(R[%s] <= %08x)", #_id, cpu.state.regs._id)) : (0))
+#define TRACE_RB_READ(_bank, _id) ((trace) ? (printf("(RB[%s][%d] => %08x)", #_bank, _id, cpu.state.regs._bank[_id])) : (0))
+#define TRACE_RB_WRITE(_bank, _id) ((trace) ? (printf("(RB[%s][%d] <= %08x)", #_bank, _id, cpu.state.regs._bank[_id])) : (0))
 
 #ifdef TRACE
 

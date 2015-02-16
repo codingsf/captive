@@ -17,14 +17,21 @@
 
 namespace captive {
 	namespace arch {
+		namespace devices {
+			class CoCo;
+		}
+
 		namespace arm {
 			class ArmEnvironment;
 			class ArmInterp;
 			class ArmDecode;
+			class ArmMMU;
 
 			class ArmCPU : public CPU
 			{
 				friend class ArmInterp;
+				friend class devices::CoCo;
+
 			public:
 				ArmCPU(ArmEnvironment& env);
 				virtual ~ArmCPU();
@@ -48,6 +55,8 @@ namespace captive {
 
 				void dump_state() const;
 
+				virtual MMU& mmu() const override { return (MMU&)*_mmu; }
+
 				void handle_angel_syscall();
 
 				struct cpu_state {
@@ -69,6 +78,7 @@ namespace captive {
 				};
 
 			private:
+				ArmMMU *_mmu;
 				char decode_cache[DECODE_CACHE_SIZE];
 
 				inline ArmDecode *get_decode(uint32_t pc) const {

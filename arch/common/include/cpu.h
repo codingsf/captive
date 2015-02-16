@@ -13,6 +13,7 @@
 namespace captive {
 	namespace arch {
 		class Environment;
+		class MMU;
 
 		class CPU
 		{
@@ -30,9 +31,10 @@ namespace captive {
 			virtual void dump_state() const = 0;
 
 			inline Environment& env() const { return _env; }
+			virtual MMU& mmu() const = 0;
 
 			inline uint64_t get_insns_executed() const { return insns_executed; }
-			
+
 		protected:
 			inline void inc_insns_executed() {
 				insns_executed++;

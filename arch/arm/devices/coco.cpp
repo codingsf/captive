@@ -1,9 +1,11 @@
 #include <devices/coco.h>
+#include <arm-cpu.h>
+#include <mmu.h>
 #include <printf.h>
 
 using namespace captive::arch::arm::devices;
 
-CoCo::CoCo(Environment& env) : Coprocessor(env), V(false), S(false), R(false), M(false)
+CoCo::CoCo(Environment& env) : Coprocessor(env), S(false), R(false), M(false)
 {
 
 }
@@ -25,7 +27,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		FI = (data & (1 << 21)) != 0;
 		L4 = (data & (1 << 15)) != 0;
 		RR = (data & (1 << 14)) != 0;
-		V = (data & (1 << 13)) != 0;
+		((ArmCPU&)cpu).state.regs.V = (data & (1 << 13)) != 0;
 		I = (data & (1 << 12)) != 0;
 		Z = (data & (1 << 11)) != 0;
 		F = (data & (1 << 10)) != 0;
@@ -39,6 +41,13 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		C = (data & (1 << 2)) != 0;
 		A = (data & (1 << 1)) != 0;
 		M = (data & (1 << 0)) != 0;
+
+		if (M) {
+			cpu.mmu().enable();
+		} else {
+			cpu.mmu().disable();
+		}
+
 		break;
 
 	case 2:
@@ -114,7 +123,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		//NIBBLE 3
 		data |= 1 << 12; //I L1 I$
 
-		data |= V << 13; //V, exception vectors
+		data |= ((ArmCPU&)cpu).state.regs.V << 13; //V, exception vectors
 
 		data |= 0 << 14; //RR
 		data |= 0 << 15; //L4
