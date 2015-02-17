@@ -1,15 +1,11 @@
 #include <mmu.h>
+#include <mm.h>
 #include <printf.h>
-
-#include "include/mmu.h"
 
 using namespace captive::arch;
 
-unsigned long MMU::__force_order;
-
-MMU::MMU(Environment& env) : _env(env), pml4_phys(0x1000), pml4(NULL)
+MMU::MMU(Environment& env) : _env(env)
 {
-	pml4 = (pm_t)phys_to_virt(pml4_phys);
 }
 
 MMU::~MMU()
@@ -19,31 +15,34 @@ MMU::~MMU()
 
 bool MMU::clear_vma()
 {
-	pm_t pm;
-	pdp_t pdp;
-	pd_t pd;
-	pt_t pt;
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
 
-	va_entries(0, pm, pdp, pd, pt);
-	printf("mmu: clear vma: %p (%x) %p (%x) %p (%x) %p (%x)\n", pm, *pm, pdp, *pdp, pd, *pd, pt, *pt);
+	printf("mmu: clearing vma\n");
+	Memory::get_va_table_entries(0, pm, pdp, pd, pt);
+	printf("mmu: clear vma: %p (%x) %p (%x) %p (%x) %p (%x)\n", pm, pm->data, pdp, pdp->data, pd, pd->data, pt, pt->data);
+
+	page_dir_ptr_t *pdp_base = (page_dir_ptr_t *)pdp;
 
 	// Clear flags on the 4G mapping.
 	for (int pdp_idx = 0; pdp_idx < 4; pdp_idx++) {
-		pdp[pdp_idx] &= ~0xffdULL; // Clear all flags, except the RW bit
+		pdp_base->entries[pdp_idx].present(false);
 	}
 
 	// Flush the TLB
-	flush_tlb();
+	Memory::flush_tlb();
 
 	return true;
 }
 
-void* MMU::map_phys_page(gpa_t pa)
+void* MMU::map_guest_phys_page(gpa_t pa)
 {
 	return NULL;
 }
 
-void* MMU::map_phys_pages(gpa_t pa, int nr)
+void* MMU::map_guest_phys_pages(gpa_t pa, int nr)
 {
 	return NULL;
 }
@@ -55,61 +54,63 @@ void MMU::unmap_phys_page(void* p)
 
 bool MMU::handle_fault(uint64_t va)
 {
-	pm_t pm;
-	pdp_t pdp;
-	pd_t pd;
-	pt_t pt;
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
 
-	va_entries(va, pm, pdp, pd, pt);
+	Memory::get_va_table_entries((va_t)va, pm, pdp, pd, pt);
 
-	if (!(*pm & 1)) {
+	//printf("mmu: handle fault: %x %p (%x) %p (%x) %p (%x) %p (%x)\n", va, pm, pm->data, pdp, pdp->data, pd, pd->data, pt, pt->data);
+
+	if (!pm->present()) {
 		// The associated Page Directory Pointer Table is not marked as
 		// present, so invalidate the page directory pointer table, and
 		// mark it as present.
 
 		// Determine the base address of the page directory pointer table.
-		pdp_t base = (pdp_t)((uint64_t)pdp & ~0xfffULL);
+		page_dir_ptr_t *base = (page_dir_ptr_t *)((uint64_t)pdp & ~0xfffULL);
 
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
-			base[i] &= ~0xffdULL;
+			base->entries[i].present(false);
 		}
 
 		// Set the PRESENT flag for the page directory pointer table.
-		*pm |= 1;
+		pm->present(true);
 	}
 
-	if (!(*pdp & 1)) {
+	if (!pdp->present()) {
 		// The associated Page Directory Table is not marked as present,
 		// so invalidate the page directory table and mark it as
 		// present.
 
 		// Determine the base address of the page directory table.
-		pd_t base = (pd_t)((uint64_t)pd & ~0xfffULL);
+		page_dir_t *base = (page_dir_t *)((uint64_t)pd & ~0xfffULL);
 
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
-			base[i] &= ~0xffdULL;
+			base->entries[i].present(false);
 		}
 
 		// Set the PRESENT flag for the page directory table.
-		*pdp |= 1;
+		pdp->present(true);
 	}
 
-	if (!(*pd & 1)) {
+	if (!pd->present()) {
 		// The associated Page Table is not marked as present, so
 		// invalidate the page table and mark it as present.
 
 		// Determine the base address of the page table.
-		pt_t base = (pt_t)((uint64_t)pt & ~0xfffULL);
+		page_table_t *base = (page_table_t *)((uint64_t)pt & ~0xfffULL);
 
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
-			base[i] &= ~0xffdULL;
+			base->entries[i].present(false);
 		}
 
 		// Set the PRESENT flag for the page table.
-		*pd |= 1;
+		pd->present(true);
 	}
 
 	gpa_t pa;
@@ -119,7 +120,11 @@ bool MMU::handle_fault(uint64_t va)
 
 	// Update the corresponding page table address entry and mark it as
 	// present and writable.
-	*pt = 0x100000000 | pa | 3;
+	pt->base_address(0x100000000 | (uint64_t)pa);
+	pt->present(true);
+	pt->writable(true);
+
+	Memory::flush_tlb();
 
 	return true;
 }

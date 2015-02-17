@@ -9,51 +9,189 @@
 #define	MM_H
 
 #include <define.h>
+#include <printf.h>
 
 #define packed __attribute__((packed))
 
 namespace captive {
 	namespace arch {
-		union entry_t {
-			uint64_t data;
-			struct {
-				uint64_t addr : 52;
-				uint32_t flags : 12;
+		class MMU;
+
+		namespace arm {
+			class ArmMMU;
+		}
+
+		struct entry_t {
+			enum entry_flags_t {
+				PRESENT = 1,
+				WRITABLE = 2,
 			};
+
+			uint64_t data;
+
+			inline uint64_t base_address() const { return data & ~0xfffULL; }
+			inline uint64_t base_address(uint64_t v) { data &= 0xfffULL; data |= v &~0xfffULL; }
+
+			inline uint16_t flags() const { return data & 0xfffULL; }
+			inline void flags(uint16_t v) { data &= ~0xfffULL; data |= v & 0xfffULL;}
+
+			inline bool present() const { return (flags() & PRESENT) == PRESENT; }
+			inline bool present(bool v) { if (v) flags(flags() | PRESENT); else flags(flags() & ~PRESENT); }
+			inline bool writable() const { return (flags() & WRITABLE) == WRITABLE; }
+			inline bool writable(bool v) { if (v) flags(flags() | WRITABLE); else flags(flags() & ~WRITABLE); }
+
+			inline void dump() const {
+				printf("mm: entry: data=%x, addr=%x, flags=%x\n", data, base_address(), flags());
+			}
 		} packed;
 
+		static_assert(sizeof(entry_t) == 8, "x86 page table entry must be 64-bits");
+
 		typedef entry_t page_map_entry_t;
-		typedef entry_t page_desc_ptr_entry_t;
-		typedef entry_t page_desc_entry_t;
+		typedef entry_t page_dir_ptr_entry_t;
+		typedef entry_t page_dir_entry_t;
 		typedef entry_t page_table_entry_t;
 
 		struct page_map_t {
 			page_map_entry_t entries[4];
 		} packed;
 
-		struct page_desc_ptr_t {
-			page_desc_ptr_entry_t entries[512];
+		static_assert(sizeof(page_map_t) == 32, "x86 page map must be 32 bytes");
+
+		struct page_dir_ptr_t {
+			page_dir_ptr_entry_t entries[512];
 		} packed;
 
-		struct page_desc_t {
-			page_desc_entry_t entries[512];
+		static_assert(sizeof(page_dir_ptr_t) == 0x1000, "x86 page directory pointer table must be 4096 bytes");
+
+		struct page_dir_t {
+			page_dir_entry_t entries[512];
 		} packed;
+
+		static_assert(sizeof(page_dir_t) == 0x1000, "x86 page directory table must be 4096 bytes");
 
 		struct page_table_t {
 			page_table_entry_t entries[512];
 		} packed;
 
+		static_assert(sizeof(page_table_t) == 0x1000, "x86 page table must be 4096 bytes");
+
+		typedef uint16_t table_idx_t;
+
+		typedef void *pa_t;
+		typedef void *va_t;
+
 		class Memory {
+			friend class MMU;
+			friend class arm::ArmMMU;
+
 		public:
+			struct Page {
+				va_t va;
+				pa_t pa;
+			};
+
 			Memory(uint64_t first_phys_page);
 
-			static void *alloc_page();
+			static Page alloc_page();
+			static void free_page(Page& page);
+			static void map_page(va_t va, Page& page);
 
 		private:
 			static Memory *mm;
-			
-			uint64_t _first_phys_page;
-			void *_data_base;
+
+			pa_t _next_phys_page;
+			va_t _data_base;
+
+			static uint64_t __force_order;
+
+			static inline pa_t read_cr3() {
+				uint64_t val;
+				asm volatile("mov %%cr3, %0\n\t" : "=r"(val), "=m"(__force_order));
+				return (pa_t)val;
+			}
+
+			static inline void write_cr3(pa_t val) {
+				asm volatile("mov %0, %%cr3" :: "r"((uint64_t)val), "m"(__force_order));
+			}
+
+			static inline uint64_t read_cr4() {
+				uint64_t val;
+				asm volatile("mov %%cr4, %0\n\t" : "=r"(val), "=m"(__force_order));
+				return val;
+			}
+
+			static inline void write_cr4(uint64_t val) {
+				asm volatile("mov %0, %%cr4" :: "r"(val), "m"(__force_order));
+			}
+
+			static inline void flush_page(uint64_t addr) {
+				//asm volatile("invlpg %0\n" :: "")
+			}
+
+			static inline void flush_tlb() {
+				write_cr3(read_cr3());
+			}
+
+			static inline void flush_tlb_all() {
+				uint64_t cr4 = read_cr4();
+				write_cr4(cr4 & ~(1 << 7));
+				write_cr4(cr4);
+			}
+
+			#define BITS(val, start, end) ((((uint64_t)val) >> start) & (((1 << (end - start + 1)) - 1)))
+
+			static inline va_t phys_to_virt(pa_t pa) {
+				if ((uint64_t)pa >= 0 && (uint64_t)pa < 0x10000000) {
+					return (va_t *)(0x200000000 + (uint64_t)pa);
+				} else {
+					return NULL;
+				}
+			}
+
+			static inline void va_table_indicies(va_t va, table_idx_t& pm, table_idx_t& pdp, table_idx_t& pd, table_idx_t& pt) {
+				pm = BITS(va, 39, 47);
+				pdp = BITS(va, 30, 38);
+				pd = BITS(va, 21, 29);
+				pt = BITS(va, 12, 20);
+			}
+
+			static inline void get_va_table_entries(va_t va, page_map_entry_t*& pm, page_dir_ptr_entry_t*& pdp, page_dir_entry_t*& pd, page_table_entry_t*& pt, bool allocate=true) {
+				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
+
+				// L4
+				pm = &((page_map_t *)phys_to_virt(read_cr3()))->entries[pm_idx];
+				if (pm->base_address() == 0) {
+					auto page = Memory::alloc_page();
+					pm->base_address((uint64_t)page.pa);
+					pm->present(true);
+					pm->writable(true);
+				}
+
+				// L3
+				pdp = &((page_dir_ptr_t *)phys_to_virt((pa_t)(uint64_t)pm->base_address()))->entries[pdp_idx];
+				if (pdp->base_address() == 0) {
+					printf("%x\n", pm->base_address());
+					auto page = Memory::alloc_page();
+					pdp->base_address((uint64_t)page.pa);
+					pdp->present(true);
+					pdp->writable(true);
+				}
+
+				// L2
+				pd = &((page_dir_t *)phys_to_virt((pa_t)(uint64_t)pdp->base_address()))->entries[pd_idx];
+				if (pd->base_address() == 0) {
+					auto page = Memory::alloc_page();
+					pd->base_address((uint64_t)page.pa);
+					pd->present(true);
+					pd->writable(true);
+				}
+
+				pt = &((page_table_t *)phys_to_virt((pa_t)(uint64_t)pd->base_address()))->entries[pt_idx];
+			}
+
+			#undef BITS
 		};
 	}
 }

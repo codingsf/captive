@@ -35,7 +35,7 @@ namespace captive {
 				}
 
 			protected:
-				bool resolve_gpa(gva_t va, gpa_t& pa) const override;
+				bool resolve_gpa(gva_t va, gpa_t& pa) override;
 
 			private:
 				ArmCPU& _cpu;
@@ -108,23 +108,15 @@ namespace captive {
 				static_assert(sizeof(fine_table_entry) == 4, "Fine Table Entry Structure must be 32-bits");
 
 				typedef tt_entry *tt_base;
+				typedef coarse_table_entry *ct_base;
+				typedef fine_table_entry *ft_base;
+				typedef section_table_entry *st_base;
 
-				inline tt_base get_ttbr() const {
-					tt_base virt_base = (tt_base)0x210000000;
+				bool resolve_coarse_page(gva_t va, gpa_t& pa, tt_entry& entry);
+				bool resolve_fine_page(gva_t va, gpa_t& pa, tt_entry& entry);
+				bool resolve_section(gva_t va, gpa_t& pa, tt_entry& entry);
 
-					pm_t pm;
-					pdp_t pdp;
-					pd_t pd;
-					pt_t pt;
-					va_entries((uint64_t)virt_base, pm, pdp, pd, pt);
-
-					*pt++ = 0x100000000 | _coco.TTBR0() | 1;
-					*pt++ = 0x100000000 | (_coco.TTBR0() + 0x1000) | 1;
-					*pt++ = 0x100000000 | (_coco.TTBR0() + 0x2000) | 1;
-					*pt++ = 0x100000000 | (_coco.TTBR0() + 0x3000) | 1;
-
-					return virt_base;
-				}
+				va_t temp_map(gpa_t gpa);
 			};
 		}
 	}
