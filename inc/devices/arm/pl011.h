@@ -23,8 +23,8 @@ namespace captive {
 				PL011();
 				virtual ~PL011();
 
-				virtual bool read(uint64_t off, uint8_t len, uint64_t& data) override;
-				virtual bool write(uint64_t off, uint8_t len, uint64_t data) override;
+				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
+				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
 			private:
 				uint32_t control_word;

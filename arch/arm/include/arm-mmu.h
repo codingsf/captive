@@ -42,18 +42,18 @@ namespace captive {
 				devices::CoCo& _coco;
 				bool _enabled;
 
-				struct l0_entry {
+				struct l1_descriptor {
 					uint32_t data;
 
-					enum tt_entry_type {
+					enum l1_descriptor_type {
 						TT_ENTRY_FAULT = 0,
 						TT_ENTRY_COARSE = 1,
 						TT_ENTRY_SECTION = 2,
 						TT_ENTRY_FINE = 3,
 					};
 
-					inline tt_entry_type type() const {
-						return (tt_entry_type)(data & 0x3);
+					inline l1_descriptor_type type() const {
+						return (l1_descriptor_type)(data & 0x3);
 					}
 
 					inline uint8_t domain() const {
@@ -77,19 +77,19 @@ namespace captive {
 						case TT_ENTRY_FAULT:
 							return 0;
 						case TT_ENTRY_COARSE:
-							return data & ~0x3ffULL;
+							return data & ~0x3ffUL;
 						case TT_ENTRY_SECTION:
-							return data & ~0xfffffULL;
+							return data & ~0xfffffUL;
 						case TT_ENTRY_FINE:
-							return data & ~0xfffULL;
+							return data & ~0xfffUL;
 						default:
 							return 0;
 						}
 					}
 				} packed;
 
-				struct l1_entry {
-					enum table_entry_type {
+				struct l2_descriptor {
+					enum l2_descriptor_type {
 						TE_FAULT = 0,
 						TE_LARGE = 1,
 						TE_SMALL = 2,
@@ -98,24 +98,24 @@ namespace captive {
 
 					uint32_t data;
 
-					inline table_entry_type type() const { return (table_entry_type)(data & 0x3); }
+					inline l2_descriptor_type type() const { return (l2_descriptor_type)(data & 0x3); }
 
 					inline uint32_t base_addr() const {
 						switch(type()) {
 						case TE_FAULT:
 							return 0;
 						case TE_LARGE:
-							return data & ~0xffff;
+							return data & ~0xffffUL;
 						case TE_SMALL:
-							return data & ~0xfff;
+							return data & ~0xfffUL;
 						case TE_TINY:
-							return data & ~0x3ff;
+							return data & ~0x3ffUL;
 						}
 					}
 				} packed;
 
-				static_assert(sizeof(l0_entry) == 4, "TT Entry Structure must be 32-bits");
-				static_assert(sizeof(l1_entry) == 4, "Table Entry Structure must be 32-bits");
+				static_assert(sizeof(l1_descriptor) == 4, "L1 Descriptor Structure must be 32-bits");
+				static_assert(sizeof(l2_descriptor) == 4, "L2 Descriptor Structure must be 32-bits");
 
 				enum arm_resolution_fault {
 					NONE,
@@ -130,9 +130,9 @@ namespace captive {
 					COARSE_PERMISSION,
 				};
 
-				bool resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry);
-				bool resolve_fine_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry);
-				bool resolve_section(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry);
+				bool resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_fine_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_section(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1);
 
 				va_t temp_map(va_t base, gpa_t gpa, int n);
 			};

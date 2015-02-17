@@ -64,12 +64,13 @@ va_t ArmMMU::temp_map(va_t base, gpa_t gpa, int n)
 }
 
 #define TTBR_TEMP_BASE	(va_t)0x220000000
-#define L1_TEMP_BASE	(va_t)0x220004000
+#define L1_TEMP_BASE	(va_t)0x220005000
 
 bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 {
 	arm_resolution_fault arm_fault = NONE;
 	fault = arch::MMU::NONE;
+	pa = 0xf0f0f0f0;
 
 	if (!_enabled) {
 		pa = va;
@@ -78,32 +79,25 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 
 	//printf("mmu: resolve va=%08x, ttbr0=%x\n", va, _coco.TTBR0());
 
-	// Acquire the actual TTBR
-	l0_entry *ttbr = (l0_entry *)temp_map(TTBR_TEMP_BASE, _coco.TTBR0(), 4);
-	if (!ttbr) {
-		return false;
-	}
+	uint16_t l1_idx = va >> 20;
+	l1_descriptor *l1 = &((l1_descriptor *)temp_map(TTBR_TEMP_BASE, _coco.TTBR0(), 4))[l1_idx];
 
-	// Calculate the ttbr index, and grab the entry
-	uint16_t ttbr_idx = va >> 20;
-	l0_entry *ttbr_entry = &ttbr[ttbr_idx];
+	printf("l1: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, l1->type(), l1->base_addr(), l1->ap(), l1->domain());
 
-	//printf("ttb entry: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, ttbr_entry->type(), ttbr_entry->base_addr(), ttbr_entry->ap(), ttbr_entry->domain());
-
-	switch (ttbr_entry->type()) {
-	case l0_entry::TT_ENTRY_COARSE:
-		if (!resolve_coarse_page(va, pa, arm_fault, ttbr_entry))
+	switch (l1->type()) {
+	case l1_descriptor::TT_ENTRY_COARSE:
+		if (!resolve_coarse_page(va, pa, arm_fault, l1))
 			return false;
 		break;
-	case l0_entry::TT_ENTRY_FINE:
-		if (!resolve_fine_page(va, pa, arm_fault, ttbr_entry))
+	case l1_descriptor::TT_ENTRY_FINE:
+		if (!resolve_fine_page(va, pa, arm_fault, l1))
 			return false;
 		break;
-	case l0_entry::TT_ENTRY_SECTION:
-		if (!resolve_section(va, pa, arm_fault, ttbr_entry))
+	case l1_descriptor::TT_ENTRY_SECTION:
+		if (!resolve_section(va, pa, arm_fault, l1))
 			return false;
 		break;
-	case l0_entry::TT_ENTRY_FAULT:
+	case l1_descriptor::TT_ENTRY_FAULT:
 		arm_fault = SECTION_FAULT;
 		break;
 	}
@@ -114,7 +108,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 
 	fault = FAULT;
 
-	uint32_t fsr = (uint32_t)ttbr_entry->domain() << 4;
+	uint32_t fsr = (uint32_t)l1->domain() << 4;
 	switch (arm_fault) {
 	case SECTION_FAULT:
 		fsr |= 0x5;
@@ -145,42 +139,58 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 	return true;
 }
 
-bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry)
+bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1)
 {
-	uint16_t l1_idx = ((uint32_t)va >> 12) & 0xff;
-	l1_entry *l1 = (l1_entry *)temp_map(L1_TEMP_BASE, entry->base_addr(), 1);
+	uint16_t l2_idx = ((uint32_t)va >> 12) & 0xff;
+	l2_descriptor *l2 = &((l2_descriptor *)temp_map(L1_TEMP_BASE, l1->base_addr(), 1))[l2_idx];
 
-	printf("resolving coarse descriptor for %x @ %x = %p, idx=%d, data=%x\n", va, entry->base_addr(), l1, l1_idx, l1[l1_idx].data);
+	printf("resolving coarse descriptor: va=%x, type=%d, base=%x, data=%x\n", va, l2->type(), l2->base_addr(), l2->data);
 
-	switch(l1[l1_idx].type()) {
-	case l1_entry::TE_FAULT:
+	uint32_t dacr = _coco.DACR();
+	dacr >>= l1->domain() * 2;
+	dacr &= 0x3;
+
+	switch (dacr) {
+	case 0:
+		printf("mmu: coarse: domain fail\n");
+		fault = COARSE_DOMAIN;
+		return true;
+
+	case 1:
+		printf("mmu: coarse: permission fail\n");
+		fault = COARSE_PERMISSION;
+		return true;
+
+	case 3:
+		break;
+	}
+
+	switch(l2->type()) {
+	case l2_descriptor::TE_FAULT:
 		fault = COARSE_FAULT;
 		return true;
-	case l1_entry::TE_LARGE:
-		pa = (gpa_t)(l1[l1_idx].base_addr() | (((uint32_t)va) & 0xffff));
+	case l2_descriptor::TE_LARGE:
+		pa = (gpa_t)(l2->base_addr() | (((uint32_t)va) & 0xffff));
 		return true;
-	case l1_entry::TE_SMALL:
-		pa = (gpa_t)(l1[l1_idx].base_addr() | (((uint32_t)va) & 0xfff));
+	case l2_descriptor::TE_SMALL:
+		pa = (gpa_t)(l2->base_addr() | (((uint32_t)va) & 0xfff));
 		return true;
-	case l1_entry::TE_TINY:
+	case l2_descriptor::TE_TINY:
 		printf("mmu: unsupported tiny page\n");
 		return false;
 	}
-/*10000552
-10000653*/
+
 	return false;
 }
 
-bool ArmMMU::resolve_fine_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry)
+bool ArmMMU::resolve_fine_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1)
 {
-	printf("ttb fine\n");
+	printf("mmu: unsupported fine page table\n");
 	return false;
 }
 
-bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry)
+bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1)
 {
-	//printf("ttb section va=%x offset=%x addr=%x\n", va, va_offset, entry.base_addr());
-
-	pa = (gpa_t)(entry->base_addr() | (((uint32_t)va) & 0xfffff));
+	pa = (gpa_t)(l1->base_addr() | (((uint32_t)va) & 0xfffff));
 	return true;
 }

@@ -6,8 +6,8 @@
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
 
-#include "devices/device.h"
-#include "devices/arm/pl011.h"
+#include <devices/arm/pl011.h>
+#include <devices/arm/sp810.h>
 
 using namespace captive;
 using namespace captive::engine;
@@ -45,6 +45,9 @@ int main(int argc, char **argv)
 
 	devices::arm::PL011 *uart = new devices::arm::PL011();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, 0x1000, *uart));
+
+	devices::arm::SP810 *sysctl = new devices::arm::SP810();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, 0x1000, *sysctl));
 
 	// Create the engine.
 	Engine engine(argv[1]);

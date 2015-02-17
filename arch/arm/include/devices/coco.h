@@ -23,6 +23,8 @@ namespace captive {
 					inline uint32_t TTBR0() const { return _TTBR0; }
 					inline uint32_t TTBR1() const { return _TTBR1; }
 
+					inline uint32_t DACR() const { return _DACR; }
+
 					inline uint32_t FSR() const { return _FSR; }
 					inline void FSR(uint32_t v) { _FSR = v; }
 					inline uint32_t FAR() const { return _FAR; }
