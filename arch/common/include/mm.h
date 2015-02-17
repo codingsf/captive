@@ -125,8 +125,8 @@ namespace captive {
 				asm volatile("mov %0, %%cr4" :: "r"(val), "m"(__force_order));
 			}
 
-			static inline void flush_page(uint64_t addr) {
-				//asm volatile("invlpg %0\n" :: "")
+			static inline void flush_page(va_t addr) {
+				asm volatile("invlpg (%0)\n" :: "b"(addr) : "memory");
 			}
 
 			static inline void flush_tlb() {

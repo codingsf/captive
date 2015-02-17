@@ -35,14 +35,14 @@ namespace captive {
 				}
 
 			protected:
-				bool resolve_gpa(gva_t va, gpa_t& pa) override;
+				bool resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault) override;
 
 			private:
 				ArmCPU& _cpu;
 				devices::CoCo& _coco;
 				bool _enabled;
 
-				struct tt_entry {
+				struct l0_entry {
 					uint32_t data;
 
 					enum tt_entry_type {
@@ -77,46 +77,64 @@ namespace captive {
 						case TT_ENTRY_FAULT:
 							return 0;
 						case TT_ENTRY_COARSE:
-							return data & 0x1ff;
+							return data & ~0x3ffULL;
 						case TT_ENTRY_SECTION:
-							return data & 0x7ffff;
+							return data & ~0xfffffULL;
 						case TT_ENTRY_FINE:
-							return data & 0x7ff;
+							return data & ~0xfffULL;
 						default:
 							return 0;
 						}
 					}
 				} packed;
 
-				struct section_table_entry {
+				struct l1_entry {
+					enum table_entry_type {
+						TE_FAULT = 0,
+						TE_LARGE = 1,
+						TE_SMALL = 2,
+						TE_TINY = 3,
+					};
+
 					uint32_t data;
+
+					inline table_entry_type type() const { return (table_entry_type)(data & 0x3); }
+
+					inline uint32_t base_addr() const {
+						switch(type()) {
+						case TE_FAULT:
+							return 0;
+						case TE_LARGE:
+							return data & ~0xffff;
+						case TE_SMALL:
+							return data & ~0xfff;
+						case TE_TINY:
+							return data & ~0x3ff;
+						}
+					}
 				} packed;
 
-				struct table_entry {
-					uint32_t data;
-				} packed;
+				static_assert(sizeof(l0_entry) == 4, "TT Entry Structure must be 32-bits");
+				static_assert(sizeof(l1_entry) == 4, "Table Entry Structure must be 32-bits");
 
-				struct coarse_table_entry : table_entry {
+				enum arm_resolution_fault {
+					NONE,
+					OTHER,
+
+					SECTION_FAULT,
+					SECTION_DOMAIN,
+					SECTION_PERMISSION,
+
+					COARSE_FAULT,
+					COARSE_DOMAIN,
+					COARSE_PERMISSION,
 				};
 
-				struct fine_table_entry : table_entry {
-				};
+				bool resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry);
+				bool resolve_fine_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry);
+				bool resolve_section(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l0_entry *entry);
 
-				static_assert(sizeof(tt_entry) == 4, "TT Entry Structure must be 32-bits");
-				static_assert(sizeof(section_table_entry) == 4, "Section Table Entry Structure must be 32-bits");
-				static_assert(sizeof(coarse_table_entry) == 4, "Coarse Table Entry Structure must be 32-bits");
-				static_assert(sizeof(fine_table_entry) == 4, "Fine Table Entry Structure must be 32-bits");
-
-				typedef tt_entry *tt_base;
-				typedef coarse_table_entry *ct_base;
-				typedef fine_table_entry *ft_base;
-				typedef section_table_entry *st_base;
-
-				bool resolve_coarse_page(gva_t va, gpa_t& pa, tt_entry& entry);
-				bool resolve_fine_page(gva_t va, gpa_t& pa, tt_entry& entry);
-				bool resolve_section(gva_t va, gpa_t& pa, tt_entry& entry);
-
-				va_t temp_map(gpa_t gpa);
+				va_t temp_map(va_t base, gpa_t gpa, int n);
 			};
 		}
 	}

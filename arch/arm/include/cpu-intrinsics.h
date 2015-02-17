@@ -8,12 +8,13 @@
 #ifndef CPU_INTRINSICS_H
 #define	CPU_INTRINSICS_H
 
-//#define TRACE
+#define TRACE
 
 #include <printf.h>
 #include <env.h>
 
 extern uint32_t page_fault_code;
+extern bool trace;
 
 #define TRACE_REG_READ(_id) ((trace) ? (printf("(R[%s] => %08x)", #_id, cpu.state.regs._id)) : (0))
 #define TRACE_REG_WRITE(_id) ((trace) ? (printf("(R[%s] <= %08x)", #_id, cpu.state.regs._id)) : (0))

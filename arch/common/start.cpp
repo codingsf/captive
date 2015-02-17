@@ -9,6 +9,7 @@
 #include "mmu.h"
 
 uint32_t page_fault_code;
+bool trace;
 
 extern captive::arch::Environment *create_environment();
 
@@ -74,7 +75,7 @@ extern "C" {
 		if (va < 0x100000000) {
 			captive::arch::CPU *core = captive::arch::active_cpu;
 			if (core) {
-				if (core->mmu().handle_fault(va)) {
+				if (core->mmu().handle_fault((captive::arch::va_t)va)) {
 					//printf("trap: handled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
 					return;
 				} else {

@@ -2,6 +2,8 @@
 #include <mm.h>
 #include <printf.h>
 
+extern uint32_t page_fault_code;
+
 using namespace captive::arch;
 
 MMU::MMU(Environment& env) : _env(env)
@@ -26,7 +28,7 @@ bool MMU::clear_vma()
 
 	page_dir_ptr_t *pdp_base = (page_dir_ptr_t *)pdp;
 
-	// Clear flags on the 4G mapping.
+	// Clear PRESENT flag on the 4G mapping.
 	for (int pdp_idx = 0; pdp_idx < 4; pdp_idx++) {
 		pdp_base->entries[pdp_idx].present(false);
 	}
@@ -52,7 +54,9 @@ void MMU::unmap_phys_page(void* p)
 	//
 }
 
-bool MMU::handle_fault(uint64_t va)
+extern bool trace;
+
+bool MMU::handle_fault(va_t va)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
@@ -113,18 +117,28 @@ bool MMU::handle_fault(uint64_t va)
 		pd->present(true);
 	}
 
+	resolution_fault fault;
 	gpa_t pa;
-	if (!resolve_gpa((gva_t)va, pa)) {
+	if (!resolve_gpa((gva_t)(uint64_t)va, pa, fault)) {
 		return false;
 	}
 
-	// Update the corresponding page table address entry and mark it as
-	// present and writable.
-	pt->base_address(0x100000000 | (uint64_t)pa);
+	if (fault == NONE) {
+		// Update the corresponding page table address entry and mark it as
+		// present and writable.
+		pt->base_address(0x100000000 | (uint64_t)pa);
+		page_fault_code = 0;
+	} else {
+		pt->base_address(0x100000000 - 0x1000);
+
+		printf("fault %x\n", va);
+		page_fault_code = (uint32_t)fault;
+	}
+
 	pt->present(true);
 	pt->writable(true);
 
-	Memory::flush_tlb();
+	Memory::flush_page(va);
 
 	return true;
 }

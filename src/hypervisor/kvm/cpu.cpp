@@ -115,6 +115,9 @@ bool KVMCpu::run()
 					run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct);
 					break;
 				}
+			} else if (cpu_run_struct->mmio.phys_addr >= 0xfffff000 && cpu_run_struct->mmio.phys_addr < 0x100000000) {
+				bzero(cpu_run_struct->mmio.data, sizeof(cpu_run_struct->mmio.data));
+				break;
 			}
 
 			run_cpu = false;

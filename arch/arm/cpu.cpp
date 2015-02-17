@@ -48,12 +48,6 @@ bool ArmCPU::run()
 
 	printf("starting cpu execution\n");
 
-#ifdef TRACE
-	interp.trace = true;
-#else
-	interp.trace = false;
-#endif
-
 	do {
 		uint32_t pc = state.regs.RB[15];
 
@@ -62,13 +56,13 @@ bool ArmCPU::run()
 		ArmDecode *insn = get_decode(pc);
 		if (pc == 0 || insn->pc != pc) insn->decode(ArmDecode::arm, pc);
 
-		if (interp.trace)
+		if (trace)
 			printf("%d [%08x] %08x %30s ", get_insns_executed(), pc, insn->ir, disasm.disassemble(pc, *insn));
 
 		step_ok = interp.step_single(*insn);
 		inc_insns_executed();
 
-		if (interp.trace)
+		if (trace)
 			printf("\n");
 	} while(step_ok);
 

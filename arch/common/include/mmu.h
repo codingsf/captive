@@ -28,7 +28,11 @@ namespace captive {
 
 			inline Environment& env() const { return _env; }
 
-			bool handle_fault(uint64_t va);
+			bool handle_fault(va_t va);
+
+			inline void flush() {
+				clear_vma();
+			}
 
 		private:
 			Environment& _env;
@@ -39,7 +43,12 @@ namespace captive {
 			void *map_guest_phys_pages(gpa_t pa, int nr);
 			void unmap_phys_page(void *p);
 
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa) = 0;
+			enum resolution_fault {
+				NONE,
+				FAULT,
+			};
+
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault) = 0;
 		};
 	}
 }

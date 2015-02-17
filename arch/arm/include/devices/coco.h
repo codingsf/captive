@@ -23,6 +23,11 @@ namespace captive {
 					inline uint32_t TTBR0() const { return _TTBR0; }
 					inline uint32_t TTBR1() const { return _TTBR1; }
 
+					inline uint32_t FSR() const { return _FSR; }
+					inline void FSR(uint32_t v) { _FSR = v; }
+					inline uint32_t FAR() const { return _FAR; }
+					inline void FAR(uint32_t v) { _FAR = v; }
+
 				protected:
 					bool mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) override;
 					bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
