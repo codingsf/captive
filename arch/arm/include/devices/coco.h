@@ -20,6 +20,9 @@ namespace captive {
 					CoCo(Environment& env);
 					~CoCo();
 
+					inline uint32_t TTBR0() const { return _TTBR0; }
+					inline uint32_t TTBR1() const { return _TTBR1; }
+
 				protected:
 					bool mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) override;
 					bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
@@ -47,8 +50,8 @@ namespace captive {
 					bool A;
 					bool M;
 
-					uint32_t TTBR0, TTBR1;
-					uint32_t DACR, FSR, FAR;
+					uint32_t _TTBR0, _TTBR1;
+					uint32_t _DACR, _FSR, _FAR;
 				};
 			}
 		}

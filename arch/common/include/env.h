@@ -30,11 +30,23 @@ namespace captive {
 			bool read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data);
 
 			inline bool install_core_device(uint32_t id, CoreDevice *device) {
+				if (id > 15) {
+					return false;
+				}
+
 				if (devices[id])
 					return false;
 
 				devices[id] = device;
 				return true;
+			}
+
+			inline CoreDevice *lookup_core_device(uint32_t id) {
+				if (id > 15) {
+					return NULL;
+				}
+
+				return devices[id];
 			}
 
 		private:

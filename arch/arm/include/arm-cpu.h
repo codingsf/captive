@@ -11,6 +11,8 @@
 #include <define.h>
 #include <cpu.h>
 
+#include "devices/coco.h"
+
 #define DECODE_CACHE_SIZE	8192
 #define DECODE_OBJ_SIZE		128
 #define DECODE_CACHE_ENTRIES	(DECODE_CACHE_SIZE / DECODE_OBJ_SIZE)
@@ -30,6 +32,7 @@ namespace captive {
 			class ArmCPU : public CPU
 			{
 				friend class ArmInterp;
+				friend class ArmMMU;
 				friend class devices::CoCo;
 
 			public:
@@ -79,6 +82,7 @@ namespace captive {
 
 			private:
 				ArmMMU *_mmu;
+				
 				char decode_cache[DECODE_CACHE_SIZE];
 
 				inline ArmDecode *get_decode(uint32_t pc) const {

@@ -29,15 +29,13 @@ using namespace captive::hypervisor::kvm;
 #define ENGINE_VIRT_BASE		0x100000000ULL
 #define ENGINE_SIZE			(SYSTEM_MEMORY_PHYS_SIZE - ENGINE_PHYS_BASE)
 
-#define IDMAP_PHYS_ADDR			(SYSTEM_MEMORY_PHYS_BASE + SYSTEM_MEMORY_PHYS_SIZE)
-#define IDMAP_PHYS_SIZE			(1 * 0x1000)
-
-#define TSS_PHYS_ADDR			(IDMAP_PHYS_ADDR + IDMAP_PHYS_SIZE)
-#define TSS_PHYS_SIZE			(3 * 0x1000)
-
 #define DATA_PHYS_BASE			SYSTEM_MEMORY_PHYS_BASE
 #define DATA_VIRT_BASE			0x200000000ULL
 #define DATA_SIZE			(ENGINE_PHYS_BASE - SYSTEM_MEMORY_PHYS_BASE)
+
+#define SHMEM_PHYS_BASE			(SYSTEM_MEMORY_PHYS_BASE + SYSTEM_MEMORY_PHYS_SIZE)
+#define SHMEM_VIRT_BASE			(DATA_VIRT_BASE + DATA_SIZE)
+#define SHMEM_PHYS_SIZE			0x10000000ULL
 
 #define BIOS_PHYS_BASE			0xf0000ULL
 
@@ -187,10 +185,10 @@ bool KVMGuest::prepare_guest_memory()
 		}
 	}*/
 
-	// Allocate the first 1GB for system usage.
+	// Allocate system memory
 	sys_mem_rgn = alloc_guest_memory(SYSTEM_MEMORY_PHYS_BASE, SYSTEM_MEMORY_PHYS_SIZE);
 	if (!sys_mem_rgn) {
-		ERROR << "Unable to allocate memory for the system";
+		ERROR << "Unable to allocate system memory region";
 		return false;
 	}
 
@@ -200,6 +198,13 @@ bool KVMGuest::prepare_guest_memory()
 	*gdt++ = 0;
 	*gdt++ = 0x0020980000000000;
 	*gdt++ = 0x0000900000000000;
+
+	// Allocate shared memory
+	sh_mem_rgn = alloc_guest_memory(SHMEM_PHYS_BASE, SHMEM_PHYS_SIZE);
+	if (!sh_mem_rgn) {
+		ERROR << "Unable to allocate shared memory region";
+		return false;
+	}
 
 	// Install the bios into the correct location.
 	if (!install_bios()) {
@@ -275,6 +280,11 @@ bool KVMGuest::stage2_init()
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
+	// Map the shared memory region into memory
+	for (uint64_t va = SHMEM_VIRT_BASE, pa = SHMEM_PHYS_BASE; va < (SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+	}
+
 	// Map ALL guest physical memory, but don't mark it as present.
 	for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, 0);
@@ -287,7 +297,8 @@ bool KVMGuest::stage2_init()
 		}
 	}
 
-	// Remap devices
+	// Remap devices - these haven't got backing userspace buffers because
+	// we need to do MMIO on them.
 	for (const auto& dev : devices) {
 		uint64_t va = dev.cfg->base_address();
 		uint64_t pa = GUEST_PHYS_MEMORY_BASE + va;

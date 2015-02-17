@@ -35,24 +35,18 @@ namespace captive {
 			bool handle_fault(uint64_t va);
 
 		private:
+			static unsigned long __force_order;
+
 			uint64_t pml4_phys;
 			pm_t pml4;
 
 		protected:
 			bool clear_vma();
-			bool install_phys_vma();
+			void *map_phys_page(gpa_t pa);
+			void *map_phys_pages(gpa_t pa, int nr);
+			void unmap_phys_page(void *p);
 
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa) const = 0;
-
-			struct page {
-				uint64_t pa;
-				uint64_t va;
-			};
-
-			void map_page(struct page *pml4, uint64_t va, uint64_t pa);
-			void unmap_page(struct page *pml4, uint64_t va);
-
-			static unsigned long __force_order;
 
 			inline unsigned long read_cr3() const {
 				unsigned long val;

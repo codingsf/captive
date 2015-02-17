@@ -56,6 +56,7 @@ namespace captive {
 				};
 
 				vm_mem_region *sys_mem_rgn;
+				vm_mem_region *sh_mem_rgn;
 
 				std::list<vm_mem_region *> vm_mem_region_free;
 				std::list<vm_mem_region *> vm_mem_region_used;

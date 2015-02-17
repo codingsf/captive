@@ -53,23 +53,23 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	case 2:
 		switch (op2) {
 		case 0:
-			TTBR0 = data;
+			_TTBR0 = data;
 			break;
 		case 1:
-			TTBR1 = data;
+			_TTBR1 = data;
 			break;
 		}
 		break;
 
 	case 3:
-		DACR = data;
+		_DACR = data;
 		break;
 
 	case 5:
-		FSR = data;
+		_FSR = data;
 		break;
 	case 6:
-		FAR = data;
+		_FAR = data;
 		break;
 	}
 
@@ -150,22 +150,22 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	case 2:
 		switch (op2) {
 		case 0:
-			data = TTBR0;
+			data = _TTBR0;
 			break;
 		case 1:
-			data = TTBR1;
+			data = _TTBR1;
 			break;
 		}
 		break;
 
 	case 3:
-		data = DACR;
+		data = _DACR;
 		break;
 	case 5:
-		data = FSR;
+		data = _FSR;
 		break;
 	case 6:
-		data = FAR;
+		data = _FAR;
 		break;
 	case 7:
 		data = 1 << 30;

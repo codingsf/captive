@@ -10,6 +10,8 @@
 
 #include <assert.h>
 
+#define packed __attribute__((packed))
+
 typedef unsigned long size_t;
 
 typedef unsigned char uint8_t;
