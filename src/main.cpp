@@ -12,7 +12,10 @@
 #include <devices/arm/sp810.h>
 #include <devices/arm/versatile-sic.h>
 
+#include <devices/timers/millisecond-tick-source.h>
+
 using namespace captive;
+using namespace captive::devices::timers;
 using namespace captive::engine;
 using namespace captive::loader;
 using namespace captive::hypervisor;
@@ -38,6 +41,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// Create the master tick source
+	MillisecondTickSource mts;
+
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
 	cfg.name = "linux";
@@ -59,10 +65,10 @@ int main(int argc, char **argv)
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, 0x1000, *sic));
 
-	devices::arm::SP804 *timer0 = new devices::arm::SP804();
+	devices::arm::SP804 *timer0 = new devices::arm::SP804(mts);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, 0x1000, *timer0));
 
-	devices::arm::SP804 *timer1 = new devices::arm::SP804();
+	devices::arm::SP804 *timer1 = new devices::arm::SP804(mts);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, 0x1000, *timer1));
 
 	// Create the engine.
@@ -134,6 +140,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// Start the tick source
+	mts.start();
+
 	if (!cpu->run()) {
 		delete cpu;
 		delete guest;
@@ -142,6 +151,9 @@ int main(int argc, char **argv)
 		ERROR << "Unable to run CPU";
 		return 1;
 	}
+
+	// Stop the tick source
+	mts.stop();
 
 	// Clean-up
 	delete cpu;

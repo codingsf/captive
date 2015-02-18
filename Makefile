@@ -15,10 +15,10 @@ dep := $(src:.cpp=.d)
 
 bios := $(bios-dir)/bios.bin.o
 
-common-cflags := -I$(inc-dir) -g -Wall -O0
+common-cflags := -I$(inc-dir) -g -Wall -O0 -pthread
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
-ldflags  :=
+ldflags  := -pthread -Wl,--no-as-needed
 
 cc  := gcc
 cxx := g++

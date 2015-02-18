@@ -9,20 +9,21 @@
 #define	SP804_H
 
 #include <devices/arm/primecell.h>
+#include <devices/timers/tick-source.h>
 
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class SP804 : public Primecell
+			class SP804 : public Primecell, public timers::TickSink
 			{
 			public:
-				SP804();
+				SP804(timers::TickSource& tick_source);
 				virtual ~SP804();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
-				void tick();
+				void tick(uint32_t period);
 
 				virtual std::string name() const override { return "sp804"; }
 			private:

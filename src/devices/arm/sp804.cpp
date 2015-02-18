@@ -2,10 +2,12 @@
 
 using namespace captive::devices::arm;
 
-SP804::SP804() : Primecell(0x00141804), ticks(1000)
+SP804::SP804(timers::TickSource& tick_source) : Primecell(0x00141804), ticks(1000)
 {
 	timers[0].owner(*this);
 	timers[1].owner(*this);
+
+	tick_source.add_sink(*this);
 }
 
 SP804::~SP804()
@@ -41,7 +43,7 @@ bool SP804::write(uint64_t off, uint8_t len, uint64_t data)
 	return false;
 }
 
-void SP804::tick()
+void SP804::tick(uint32_t period)
 {
 	if (timers[0].enabled()) timers[0].tick(ticks);
 	if (timers[1].enabled()) timers[1].tick(ticks);
@@ -49,10 +51,10 @@ void SP804::tick()
 
 void SP804::update_irq()
 {
-	printf("sp804: update-irq\n");
+	//
 }
 
-SP804::SP804Timer::SP804Timer() : load_value(0), current_value(0xffffffff), _enabled(false), isr(0)
+SP804::SP804Timer::SP804Timer() : _enabled(false), load_value(0), current_value(0xffffffff), isr(0)
 {
 	control_reg.value = 0x20;
 }
