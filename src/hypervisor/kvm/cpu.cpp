@@ -112,8 +112,11 @@ bool KVMCpu::run()
 				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
 				if (dev != NULL) {
-					run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct);
+					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct)))
+						DEBUG << "Device Access Failed";
 					break;
+				} else {
+					DEBUG << "Device Not Found: " << std::hex << converted_pa;
 				}
 			} else if (cpu_run_struct->mmio.phys_addr >= 0xfffff000 && cpu_run_struct->mmio.phys_addr < 0x100000000) {
 				bzero(cpu_run_struct->mmio.data, sizeof(cpu_run_struct->mmio.data));

@@ -9,6 +9,7 @@
 #define	CPU_H
 
 #include <define.h>
+#include <trace.h>
 
 namespace captive {
 	namespace arch {
@@ -35,12 +36,15 @@ namespace captive {
 
 			inline uint64_t get_insns_executed() const { return insns_executed; }
 
+			inline Trace& trace() { return _trace; }
+
 		protected:
 			inline void inc_insns_executed() {
 				insns_executed++;
 			}
 
 		private:
+			Trace _trace;
 			uint64_t insns_executed;
 			Environment& _env;
 		};

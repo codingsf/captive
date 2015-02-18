@@ -28,6 +28,8 @@ namespace captive {
 				typedef std::chrono::duration<uint32_t, std::ratio<1, 24000000> > tick_24MHz_t;
 
 				clock_t::time_point hr_begin;
+
+				uint32_t leds, lockval, colour_mode;
 			};
 		}
 	}

@@ -9,7 +9,6 @@
 #include "mmu.h"
 
 volatile uint32_t page_fault_code;
-volatile bool trace;
 
 extern captive::arch::Environment *create_environment();
 
@@ -20,7 +19,6 @@ extern "C" {
 		captive::arch::Environment *env = create_environment();
 
 		page_fault_code = 0;
-		trace = false;
 
 		if (!env) {
 			printf("error: unable to create environment\n");
@@ -63,7 +61,7 @@ extern "C" {
 
 	void handle_trap_gpf(uint64_t rip, uint64_t code)
 	{
-		printf("general protection fault\n");
+		printf("general protection fault: rip=%x\n", rip);
 		abort();
 	}
 

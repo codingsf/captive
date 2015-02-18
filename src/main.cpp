@@ -48,6 +48,7 @@ int main(int argc, char **argv)
 
 	devices::arm::SP810 *sysctl = new devices::arm::SP810();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, 0x1000, *sysctl));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, 0x1000, *sysctl));
 
 	// Create the engine.
 	Engine engine(argv[1]);

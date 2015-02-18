@@ -35,7 +35,6 @@ void ArmCPU::dump_state() const
 bool ArmCPU::run()
 {
 	ArmInterp interp(*this);
-	ArmDisasm disasm;
 
 	bool step_ok = true;
 
@@ -61,18 +60,14 @@ bool ArmCPU::run()
 			}
 		}
 
-		if (unlikely(trace)) {
-			printf("%d [%08x] %08x %30s ", get_insns_executed(), pc, insn->ir, disasm.disassemble(pc, *insn));
-		}
+		if (trace().enabled()) trace().start_record(get_insns_executed(), pc);
 
 		step_ok = interp.step_single(*insn);
 		inc_insns_executed();
 
-		if (unlikely(trace)) {
-			printf("\n");
-		}
+		if (trace().enabled()) trace().end_record();
 
-		if (get_insns_executed() == 95271287) trace = true;
+		//if (get_insns_executed() == 96271287) trace().enable();
 	} while(step_ok);
 
 	return true;

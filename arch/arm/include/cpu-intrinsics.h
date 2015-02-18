@@ -14,54 +14,41 @@
 #include <env.h>
 
 extern volatile uint32_t page_fault_code;
-extern volatile bool trace;
 
 #ifdef TRACE
 
-static inline uint32_t trace_read_reg(const char *id, uint32_t val)
+static inline uint32_t trace_read_reg(captive::arch::CPU& cpu, const char *id, uint32_t val)
 {
-	if (trace) {
-		printf("(R[%s] => %08x)", id, val);
-	}
-
+	if (cpu.trace().recording()) cpu.trace().add_reg_read(id, val);
 	return val;
 }
 
-static inline uint32_t trace_read_reg_bank(const char *bank, uint32_t idx, uint32_t val)
+static inline uint32_t trace_read_reg_bank(captive::arch::CPU& cpu, const char *bank, uint32_t idx, uint32_t val)
 {
-	if (trace) {
-		printf("(R[%s][%d] => %08x)", bank, idx, val);
-	}
-
+	if (cpu.trace().recording()) cpu.trace().add_reg_bank_read(bank, idx, val);
 	return val;
 }
 
-static inline uint32_t trace_write_reg(const char *id, uint32_t val)
+static inline uint32_t trace_write_reg(captive::arch::CPU& cpu, const char *id, uint32_t val)
 {
-	if (trace) {
-		printf("(R[%s] <= %08x)", id, val);
-	}
-
+	if (cpu.trace().recording()) cpu.trace().add_reg_write(id, val);
 	return val;
 }
 
-static inline uint32_t trace_write_reg_bank(const char *bank, uint32_t idx, uint32_t val)
+static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char *bank, uint32_t idx, uint32_t val)
 {
-	if (trace) {
-		printf("(R[%s][%d] <= %08x)", bank, idx, val);
-	}
-
+	if (cpu.trace().recording()) cpu.trace().add_reg_bank_write(bank, idx, val);
 	return val;
 }
 
-#define read_register(_id) (trace_read_reg(#_id, cpu.state.regs._id))
+#define read_register(_id) (trace_read_reg(cpu, #_id, cpu.state.regs._id))
 #define read_register_nt(_id) read_register(_id)
-#define read_register_bank(_bank, _id) (trace_read_reg_bank(#_bank, _id, cpu.state.regs._bank[_id]))
+#define read_register_bank(_bank, _id) (trace_read_reg_bank(cpu, #_bank, _id, cpu.state.regs._bank[_id]))
 #define read_register_bank_nt(_bank, _id) read_register_bank(_bank, _id)
 
-#define write_register(_id, _value) (trace_write_reg(#_id, cpu.state.regs._id = _value))
+#define write_register(_id, _value) (trace_write_reg(cpu, #_id, (cpu.state.regs._id = (_value))))
 #define write_register_nt(_id, _value) write_register(_id, _value)
-#define write_register_bank(_bank, _id, _value) (trace_write_reg_bank(#_bank, _id, cpu.state.regs._bank[_id] = _value))
+#define write_register_bank(_bank, _id, _value) (trace_write_reg_bank(cpu, #_bank, _id, (cpu.state.regs._bank[_id] = (_value))))
 #define write_register_bank_nt(_bank, _id, _value) write_register_bank(_bank, _id, _value)
 
 #else
@@ -102,19 +89,34 @@ static inline uint32_t trace_write_reg_bank(const char *bank, uint32_t idx, uint
 #define mem_read_32(_addr, _data) (_data = *((uint32_t*)((uint64_t)_addr)), page_fault_code)
 #define mem_read_64(_addr, _data) (_data = *((uint64_t*)((uint64_t)_addr)), page_fault_code)
 
-#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
-#define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), page_fault_code)
-
 static inline uint32_t mem_write_32x(captive::arch::CPU& cpu, uint32_t addr, uint32_t data)
 {
-	//if (data == 0x10000653) { printf("XXX:%d\n", cpu.get_insns_executed()); abort(); }
+	//if (addr == 0xef74b800 && data != 0) cpu.trace().enable();
 
 	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
 	return page_fault_code;
 }
+static inline uint32_t mem_write_16x(captive::arch::CPU& cpu, uint32_t addr, uint16_t data)
+{
+	//if ((addr & 0xffffff) == 0x3df01c && data != 0) cpu.trace().enable();
 
+	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
+	return page_fault_code;
+}
+static inline uint32_t mem_write_8x(captive::arch::CPU& cpu, uint32_t addr, uint8_t data)
+{
+	//if ((addr & 0xffffff) == 0x3df01c && data != 0) cpu.trace().enable();
+
+	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
+	return page_fault_code;
+}
+
+#define mem_write_8(_addr, _data) mem_write_8x(cpu, addr, data)
+#define mem_write_16(_addr, _data) mem_write_16x(cpu, addr, data)
 #define mem_write_32(_addr, _data) mem_write_32x(cpu, addr, data)
 
+//#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
+//#define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), page_fault_code)
 //#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
 #define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)
 

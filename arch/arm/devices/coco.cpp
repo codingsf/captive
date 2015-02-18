@@ -84,7 +84,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 
 	switch (rn) {
 	case 0: // System Information
-		switch (rm) {
+		switch (op2) {
 		case 0: // Read CPUID
 			data = 0x41069265;
 			break;
@@ -125,7 +125,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		//NIBBLE 3
 		data |= 1 << 12; //I L1 I$
 
-		data |= ((ArmCPU&)cpu).state.regs.cpV << 13; //V, exception vectors
+		data |= !!(((ArmCPU&)cpu).state.regs.cpV) << 13; //V, exception vectors
 
 		data |= 0 << 14; //RR
 		data |= 0 << 15; //L4
