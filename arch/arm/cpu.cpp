@@ -61,18 +61,18 @@ bool ArmCPU::run()
 			}
 		}
 
-		printf("%d [%08x] %08x %30s ", get_insns_executed(), pc, insn->ir, disasm.disassemble(pc, *insn));
-
 		if (unlikely(trace)) {
-			step_ok = interp.step_single_trace(*insn);
-		} else {
-			step_ok = interp.step_single(*insn);
+			printf("%d [%08x] %08x %30s ", get_insns_executed(), pc, insn->ir, disasm.disassemble(pc, *insn));
 		}
 
+		step_ok = interp.step_single(*insn);
 		inc_insns_executed();
 
-		if (trace)
+		if (unlikely(trace)) {
 			printf("\n");
+		}
+
+		if (get_insns_executed() == 95271287) trace = true;
 	} while(step_ok);
 
 	return true;

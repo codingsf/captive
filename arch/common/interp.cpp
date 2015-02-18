@@ -1,7 +1,5 @@
 #include <interp.h>
 
-#include "include/interp.h"
-
 using namespace captive::arch;
 
 template<class DecodeType>

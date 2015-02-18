@@ -12,6 +12,9 @@
 
 #define packed __attribute__((packed))
 
+#define likely(x) __builtin_expect((x), 1)
+#define unlikely(x) __builtin_expect((x), 0)
+
 typedef unsigned long size_t;
 
 typedef unsigned char uint8_t;
@@ -29,7 +32,11 @@ typedef uint32_t gva_t;
 
 #define NULL 0
 
-#define abort() asm volatile("out %0, $0xff\n" : : "a"(0x02))
+static inline __attribute__((noreturn)) void abort()
+{
+	asm volatile("out %0, $0xff\n" : : "a"(0x02));
+	for(;;);
+}
 
 #endif	/* DEFINE_H */
 

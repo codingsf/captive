@@ -8,8 +8,8 @@
 
 #include "mmu.h"
 
-uint32_t page_fault_code;
-bool trace;
+volatile uint32_t page_fault_code;
+volatile bool trace;
 
 extern captive::arch::Environment *create_environment();
 
@@ -20,6 +20,7 @@ extern "C" {
 		captive::arch::Environment *env = create_environment();
 
 		page_fault_code = 0;
+		trace = false;
 
 		if (!env) {
 			printf("error: unable to create environment\n");
@@ -34,7 +35,6 @@ extern "C" {
 		}
 
 		abort();
-		for(;;);
 	}
 
 	void handle_trap_unk()
