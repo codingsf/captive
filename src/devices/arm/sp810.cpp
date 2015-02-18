@@ -67,6 +67,9 @@ bool SP810::write(uint64_t off, uint8_t len, uint64_t data)
 		return true;
 
 	switch (off) {
+	case 0x00:
+		break;
+		
 	case 0x08:	// LEDs
 		leds = data;
 		break;

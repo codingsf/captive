@@ -130,6 +130,9 @@ bool PL190::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 	}
 
+	case 0x200 ... 0xfdf:
+		break;
+
 	default:
 		return false;
 	}

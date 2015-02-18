@@ -7,8 +7,9 @@
 #include <hypervisor/kvm/kvm.h>
 
 #include <devices/arm/pl011.h>
-#include <devices/arm/sp810.h>
 #include <devices/arm/pl190.h>
+#include <devices/arm/sp804.h>
+#include <devices/arm/sp810.h>
 #include <devices/arm/versatile-sic.h>
 
 using namespace captive;
@@ -57,6 +58,12 @@ int main(int argc, char **argv)
 
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, 0x1000, *sic));
+
+	devices::arm::SP804 *timer0 = new devices::arm::SP804();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, 0x1000, *timer0));
+
+	devices::arm::SP804 *timer1 = new devices::arm::SP804();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, 0x1000, *timer1));
 
 	// Create the engine.
 	Engine engine(argv[1]);

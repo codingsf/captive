@@ -9,6 +9,7 @@
 #define	DEVICE_H
 
 #include <define.h>
+#include <string>
 
 namespace captive {
 	namespace hypervisor {
@@ -32,6 +33,8 @@ namespace captive {
 
 			virtual bool read(uint64_t off, uint8_t len, uint64_t& data) = 0;
 			virtual bool write(uint64_t off, uint8_t len, uint64_t data) = 0;
+
+			virtual std::string name() const { return "(unknown)"; }
 
 		private:
 			hypervisor::Guest *_guest;
