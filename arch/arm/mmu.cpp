@@ -103,7 +103,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 	}
 
 	if (arm_fault == NONE) {
-		printf("l1: resolved va=%x pa=%x @ %d\n", va, pa, _cpu.get_insns_executed());
+		//printf("l1: resolved va=%x pa=%x @ %d\n", va, pa, _cpu.get_insns_executed());
 		return true;
 	}
 
@@ -143,9 +143,11 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1)
 {
 	uint16_t l2_idx = ((uint32_t)va >> 12) & 0xff;
-	l2_descriptor *l2 = &((l2_descriptor *)temp_map(L1_TEMP_BASE, l1->base_addr(), 1))[l2_idx];
 
-	printf("resolving coarse descriptor: va=%x, type=%d, base=%x, data=%x\n", va, l2->type(), l2->base_addr(), l2->data);
+	uint8_t *x = (uint8_t *)temp_map(L1_TEMP_BASE, l1->base_addr(), 1);
+	l2_descriptor *l2 = &((l2_descriptor *)(x + (l1->base_addr() & 0xfff)))[l2_idx];
+
+	//printf("resolving coarse descriptor: l1-base=%x l2-idx=%d va=%x, type=%d, base=%x, data=%x\n", l1->base_addr(), l2_idx, va, l2->type(), l2->base_addr(), l2->data);
 
 	uint32_t dacr = _coco.DACR();
 	dacr >>= l1->domain() * 2;
@@ -158,9 +160,10 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& faul
 		return true;
 
 	case 1:
-		printf("mmu: coarse: permission fail\n");
+		/*printf("mmu: coarse: permission fail\n");
 		fault = COARSE_PERMISSION;
-		return true;
+		return true;*/
+		break;
 
 	case 3:
 		break;
