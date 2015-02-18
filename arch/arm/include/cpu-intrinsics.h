@@ -21,6 +21,9 @@ extern bool trace;
 #define TRACE_RB_READ(_bank, _id) ((trace) ? (printf("(RB[%s][%d] => %08x)", #_bank, _id, cpu.state.regs._bank[_id])) : (0))
 #define TRACE_RB_WRITE(_bank, _id) ((trace) ? (printf("(RB[%s][%d] <= %08x)", #_bank, _id, cpu.state.regs._bank[_id])) : (0))
 
+#define TRACE_MEM_WRITE(_addr, _data) ((trace) ? (printf("([%08x] <= %08x)", _addr, _data)) : (0))
+#define TRACE_MEM_READ(_addr, _data) ((trace) ? (printf("([%08x] => %08x)", _addr, _data)) : (0))
+
 #ifdef TRACE
 
 #define read_register(_id) (TRACE_REG_READ(_id), cpu.state.regs._id)
@@ -73,7 +76,15 @@ extern bool trace;
 
 #define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
 #define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), page_fault_code)
-#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
+
+static inline uint32_t mem_write_32(uint32_t addr, uint32_t data)
+{
+	//if (data == 0x10000653) trace=true;
+	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
+	return page_fault_code;
+}
+
+//#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
 #define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)
 
 #define mem_read_8_user(_addr, _data) mem_read_8(_addr, _data)

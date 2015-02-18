@@ -129,6 +129,7 @@ namespace captive {
 				asm volatile("invlpg (%0)\n" :: "b"(addr) : "memory");
 			}
 
+		public:
 			static inline void flush_tlb() {
 				write_cr3(read_cr3());
 			}

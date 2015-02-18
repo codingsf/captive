@@ -54,12 +54,21 @@ bool ArmCPU::run()
 		state.last_exception_action = 0;
 
 		ArmDecode *insn = get_decode(pc);
-		if (pc == 0 || insn->pc != pc) insn->decode(ArmDecode::arm, pc);
+		if (pc == 0 || insn->pc != pc) {
+			if (insn->decode(ArmDecode::arm, pc)) {
+				printf("cpu: unhandled decode fault\n");
+				return false;
+			}
+		}
 
-		if (trace)
-			printf("%d [%08x] %08x %30s ", get_insns_executed(), pc, insn->ir, disasm.disassemble(pc, *insn));
+		printf("%d [%08x] %08x %30s ", get_insns_executed(), pc, insn->ir, disasm.disassemble(pc, *insn));
 
-		step_ok = interp.step_single(*insn);
+		if (unlikely(trace)) {
+			step_ok = interp.step_single_trace(*insn);
+		} else {
+			step_ok = interp.step_single(*insn);
+		}
+
 		inc_insns_executed();
 
 		if (trace)

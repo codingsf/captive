@@ -82,7 +82,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 	uint16_t l1_idx = va >> 20;
 	l1_descriptor *l1 = &((l1_descriptor *)temp_map(TTBR_TEMP_BASE, _coco.TTBR0(), 4))[l1_idx];
 
-	printf("l1: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, l1->type(), l1->base_addr(), l1->ap(), l1->domain());
+	//printf("l1: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, l1->type(), l1->base_addr(), l1->ap(), l1->domain());
 
 	switch (l1->type()) {
 	case l1_descriptor::TT_ENTRY_COARSE:
@@ -103,6 +103,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 	}
 
 	if (arm_fault == NONE) {
+		printf("l1: resolved va=%x pa=%x @ %d\n", va, pa, _cpu.get_insns_executed());
 		return true;
 	}
 
