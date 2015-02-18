@@ -8,6 +8,8 @@
 
 #include <devices/arm/pl011.h>
 #include <devices/arm/sp810.h>
+#include <devices/arm/pl190.h>
+#include <devices/arm/versatile-sic.h>
 
 using namespace captive;
 using namespace captive::engine;
@@ -49,6 +51,12 @@ int main(int argc, char **argv)
 	devices::arm::SP810 *sysctl = new devices::arm::SP810();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, 0x1000, *sysctl));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, 0x1000, *sysctl));
+
+	devices::arm::PL190 *vic = new devices::arm::PL190();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, 0x1000, *vic));
+
+	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, 0x1000, *sic));
 
 	// Create the engine.
 	Engine engine(argv[1]);

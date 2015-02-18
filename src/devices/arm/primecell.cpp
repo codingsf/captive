@@ -15,28 +15,28 @@ Primecell::~Primecell()
 bool Primecell::read(uint64_t off, uint8_t len, uint64_t& data)
 {
 	switch(off) {
-	case 0xfe0:
+	case 0xfec:
 		data = peripheral_id >> 24;
 		return true;
-	case 0xfe4:
+	case 0xfe8:
 		data = peripheral_id >> 16;
 		return true;
-	case 0xfe8:
+	case 0xfe4:
 		data = peripheral_id >> 8;
 		return true;
-	case 0xfec:
+	case 0xfe0:
 		data = peripheral_id;
 		return true;
-	case 0xff0:
+	case 0xffc:
 		data = primecell_id >> 24;
 		return true;
-	case 0xff4:
+	case 0xff8:
 		data = primecell_id >> 16;
 		return true;
-	case 0xff8:
+	case 0xff4:
 		data = primecell_id >> 8;
 		return true;
-	case 0xffc:
+	case 0xff0:
 		data = primecell_id;
 		return true;
 	}

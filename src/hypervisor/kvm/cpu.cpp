@@ -113,7 +113,7 @@ bool KVMCpu::run()
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
 				if (dev != NULL) {
 					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct)))
-						DEBUG << "Device Access Failed";
+						DEBUG << "Device " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
 					break;
 				} else {
 					DEBUG << "Device Not Found: " << std::hex << converted_pa;

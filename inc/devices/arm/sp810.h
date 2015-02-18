@@ -26,6 +26,7 @@ namespace captive {
 			private:
 				typedef std::chrono::high_resolution_clock clock_t;
 				typedef std::chrono::duration<uint32_t, std::ratio<1, 24000000> > tick_24MHz_t;
+				typedef std::chrono::duration<uint32_t, std::ratio<1, 100> > tick_100Hz_t;
 
 				clock_t::time_point hr_begin;
 
