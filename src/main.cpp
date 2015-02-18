@@ -6,6 +6,7 @@
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
 
+#include <devices/arm/cpu-irq.h>
 #include <devices/arm/pl011.h>
 #include <devices/arm/pl190.h>
 #include <devices/arm/sp804.h>
@@ -52,6 +53,8 @@ int main(int argc, char **argv)
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x40000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x80000000, 0x60000000));
 
+	devices::arm::ArmCpuIRQController *cpu_irq = new devices::arm::ArmCpuIRQController();
+
 	devices::arm::PL011 *uart = new devices::arm::PL011();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, 0x1000, *uart));
 
@@ -59,16 +62,16 @@ int main(int argc, char **argv)
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, 0x1000, *sysctl));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, 0x1000, *sysctl));
 
-	devices::arm::PL190 *vic = new devices::arm::PL190();
+	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(0), *cpu_irq->get_irq_line(1));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, 0x1000, *vic));
 
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, 0x1000, *sic));
 
-	devices::arm::SP804 *timer0 = new devices::arm::SP804(mts);
+	devices::arm::SP804 *timer0 = new devices::arm::SP804(mts, *vic->get_irq_line(4));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, 0x1000, *timer0));
 
-	devices::arm::SP804 *timer1 = new devices::arm::SP804(mts);
+	devices::arm::SP804 *timer1 = new devices::arm::SP804(mts, *vic->get_irq_line(5));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, 0x1000, *timer1));
 
 	// Create the engine.

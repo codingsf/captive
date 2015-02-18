@@ -2,9 +2,23 @@
 
 using namespace captive::devices::arm;
 
-PL190::PL190() : Primecell(0x00041190)
+PL190::PL190(irq::IRQLine& irq, irq::IRQLine& fiq) : Primecell(0x00041190), irq(irq), fiq(fiq)
 {
+	for(int i = 0; i < 16; ++i) {
+		vector_addrs[i] = 0;
+		vector_ctrls[i] = 0;
+	}
 
+	default_vector_address = 0;
+	prio_mask[17] = 0xffffffff;
+	priority = 17;
+
+	mask = 0;
+	soft_status = 0;
+	irq_status = 0;
+	fiq_select = 0;
+
+	update_vectors();
 }
 
 PL190::~PL190()
@@ -140,6 +154,22 @@ bool PL190::write(uint64_t off, uint8_t len, uint64_t data)
 	return true;
 }
 
+void PL190::irq_raised(irq::IRQLine& line)
+{
+	printf("pl190: irq raised: %d\n", line.index());
+
+	irq_status |= 1 << line.index();
+	update_lines();
+}
+
+void PL190::irq_rescinded(irq::IRQLine& line)
+{
+	printf("pl190: irq rescinded: %d\n", line.index());
+
+	irq_status &= ~(1 << line.index());
+	update_lines();
+}
+
 void PL190::update_vectors()
 {
 	uint32_t n, mask = 0;
@@ -159,15 +189,15 @@ void PL190::update_vectors()
 void PL190::update_lines()
 {
 	if (get_irq_status() & prio_mask[priority]) {
-		printf("ASSERT IRQ\n");
+		irq.raise();
 	} else {
-		printf("RESCIND IRQ\n");
+		irq.rescind();
 	}
 
 	if (get_fiq_status() & prio_mask[priority]) {
-		printf("ASSERT FIQ\n");
+		fiq.raise();
 	} else {
-		printf("RESCIND FIQ\n");
+		fiq.rescind();
 	}
 }
 

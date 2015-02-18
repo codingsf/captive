@@ -13,11 +13,15 @@
 
 namespace captive {
 	namespace devices {
+		namespace irq {
+			class IRQLine;
+		}
+
 		namespace arm {
 			class SP804 : public Primecell, public timers::TickSink
 			{
 			public:
-				SP804(timers::TickSource& tick_source);
+				SP804(timers::TickSource& tick_source, irq::IRQLine& irq);
 				virtual ~SP804();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -26,6 +30,7 @@ namespace captive {
 				void tick(uint32_t period);
 
 				virtual std::string name() const override { return "sp804"; }
+
 			private:
 				void update_irq();
 
@@ -38,18 +43,18 @@ namespace captive {
 					bool write(uint64_t off, uint8_t len, uint64_t data);
 
 					inline void owner(SP804& sp804) { _owner = &sp804; }
+					inline bool enabled() const { return _enabled; }
+					inline bool irq_enabled() const { return control_reg.bits.int_en; }
+					inline uint32_t isr() const { return _isr; }
 
 					void tick(uint32_t ticks);
-
-					inline bool enabled() const { return _enabled; }
-
 				private:
 					SP804 *_owner;
 					bool _enabled;
 
 					uint32_t load_value;
 					uint32_t current_value;
-					uint32_t isr;
+					uint32_t _isr;
 
 					union {
 						uint32_t value;
@@ -70,6 +75,7 @@ namespace captive {
 
 				SP804Timer timers[2];
 				uint32_t ticks;
+				irq::IRQLine& irq;
 			};
 		}
 	}

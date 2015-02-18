@@ -9,11 +9,12 @@
 #define	VERSATILE_SIC_H
 
 #include <devices/device.h>
+#include <devices/irq/irq-controller.h>
 
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class VersatileSIC : public Device
+			class VersatileSIC : public Device, public irq::IRQController<32u>
 			{
 			public:
 				VersatileSIC();

@@ -1,8 +1,9 @@
 #include <devices/arm/sp804.h>
+#include <devices/irq/irq-line.h>
 
 using namespace captive::devices::arm;
 
-SP804::SP804(timers::TickSource& tick_source) : Primecell(0x00141804), ticks(1000)
+SP804::SP804(timers::TickSource& tick_source, irq::IRQLine& irq) : Primecell(0x00141804), ticks(1000), irq(irq)
 {
 	timers[0].owner(*this);
 	timers[1].owner(*this);
@@ -51,10 +52,14 @@ void SP804::tick(uint32_t period)
 
 void SP804::update_irq()
 {
-	//
+	if ((timers[0].isr() && timers[0].irq_enabled()) || (timers[1].isr() && timers[1].irq_enabled())) {
+		irq.raise();
+	} else {
+		irq.rescind();
+	}
 }
 
-SP804::SP804Timer::SP804Timer() : _enabled(false), load_value(0), current_value(0xffffffff), isr(0)
+SP804::SP804Timer::SP804Timer() : _enabled(false), load_value(0), current_value(0xffffffff), _isr(0)
 {
 	control_reg.value = 0x20;
 }
@@ -75,11 +80,11 @@ bool SP804::SP804Timer::read(uint64_t off, uint8_t len, uint64_t& data)
 		break;
 
 	case 0x10:
-		data = isr;
+		data = _isr;
 		break;
 
 	case 0x14:
-		data = isr & control_reg.bits.int_en;
+		data = _isr & control_reg.bits.int_en;
 		break;
 
 	case 0x18:
@@ -110,7 +115,7 @@ bool SP804::SP804Timer::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 
 	case 0x0c:
-		isr = 0;
+		_isr = 0;
 		_owner->update_irq();
 		break;
 
@@ -130,7 +135,7 @@ void SP804::SP804Timer::tick(uint32_t ticks)
 	if (!_enabled) return;
 
 	if (current_value <= ticks) {
-		isr |= 1;
+		_isr |= 1;
 
 		if (control_reg.bits.int_en) _owner->update_irq();
 

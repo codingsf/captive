@@ -9,22 +9,31 @@
 #define	PL190_H
 
 #include <devices/arm/primecell.h>
+#include <devices/irq/irq-controller.h>
+#include <atomic>
 
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class PL190 : public Primecell
+			class PL190 : public Primecell, public irq::IRQController<32u>
 			{
 			public:
-				PL190();
+				PL190(irq::IRQLine& irq, irq::IRQLine& fiq);
 				virtual ~PL190();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
+			protected:
+				void irq_raised(irq::IRQLine& line) override;
+				void irq_rescinded(irq::IRQLine& line) override;
+
 			private:
-				uint32_t irq_status, soft_status, fiq_select;
-				uint32_t mask;
+				irq::IRQLine& irq;
+				irq::IRQLine& fiq;
+
+				std::atomic<uint32_t> irq_status, soft_status;
+				uint32_t mask, fiq_select;
 				uint32_t default_vector_address;
 
 				uint32_t priority, prev_priority[17], prio_mask[18];
