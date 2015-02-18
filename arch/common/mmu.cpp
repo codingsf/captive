@@ -22,9 +22,7 @@ bool MMU::clear_vma()
 	page_dir_entry_t *pd;
 	page_table_entry_t *pt;
 
-	printf("mmu: clearing vma\n");
 	Memory::get_va_table_entries(0, pm, pdp, pd, pt);
-	printf("mmu: clear vma: %p (%x) %p (%x) %p (%x) %p (%x)\n", pm, pm->data, pdp, pdp->data, pd, pd->data, pt, pt->data);
 
 	page_dir_ptr_t *pdp_base = (page_dir_ptr_t *)pdp;
 
