@@ -65,3 +65,4 @@ trap_macro dbg,0
 trap_macro nmi,0
 trap_macro pf,1
 trap_macro gpf,1
+trap_macro irq,0

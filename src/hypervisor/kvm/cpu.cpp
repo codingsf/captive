@@ -7,11 +7,14 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include "devices/device.h"
+#include <devices/device.h>
+#include <devices/irq/irq-controller.h>
+#include <sys/eventfd.h>
+#include <shmem.h>
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd) : CPU(owner, config), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
+KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irq_fd) : CPU(owner, config), _initialised(false), _id(id), fd(fd), irqfd(irq_fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
 {
 
 }
@@ -19,6 +22,7 @@ KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int
 KVMCpu::~KVMCpu()
 {
 	if (initialised()) {
+		close(irqfd);
 		munmap(cpu_run_struct, cpu_run_struct_size);
 	}
 
@@ -36,6 +40,9 @@ bool KVMCpu::init()
 	if (!CPU::init())
 		return false;
 
+	// Attach the CPU IRQ controller
+	owner().config().cpu_irq_controller->attach(*this);
+
 	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
 	if ((int)cpu_run_struct_size == -1) {
 		ERROR << "Unable to ascertain size of CPU run structure";
@@ -51,6 +58,25 @@ bool KVMCpu::init()
 
 	_initialised = true;
 	return true;
+}
+
+void KVMCpu::interrupt(uint32_t code)
+{
+	/*struct kvm_interrupt irq;
+	irq.irq = code + 32;
+
+	if (vmioctl(KVM_INTERRUPT, &irq)) {
+		WARNING << "Guest interrupt assertion failed";
+	}*/
+
+	DEBUG << "Asserting a KVM interrupt: fd=" << irqfd << ", code=" << std::hex << code;
+
+	/*uint64_t data = 1;
+	if (write(irqfd, &data, sizeof(data)) != 8) {
+		WARNING << "Unable to assert KVM interrupt, eventfd value not written";
+	}*/
+
+	((KVMGuest &)owner()).shmem_region()->asynchronous_action_pending = 1;
 }
 
 bool KVMCpu::run()

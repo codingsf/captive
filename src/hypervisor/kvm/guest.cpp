@@ -72,6 +72,9 @@ bool KVMGuest::init()
 		vm_mem_region_free.push_back(region);
 	}
 
+	if (!prepare_guest_irq())
+		return false;
+
 	if (!prepare_guest_memory())
 		return false;
 
@@ -115,7 +118,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd);
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd, irq_fd);
 	kvm_cpus.push_back(cpu);
 
 	return cpu;
@@ -149,42 +152,52 @@ captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 	return NULL;
 }
 
-bool KVMGuest::prepare_guest_memory()
+bool KVMGuest::prepare_guest_irq()
 {
-	/*unsigned int rc;
-
-	rc = vmioctl(KVM_CAP_CHECK_EXTENSION_VM, KVM_CAP_SET_IDENTITY_MAP_ADDR);
-	if (rc) {
-		if (!alloc_guest_memory(IDMAP_PHYS_ADDR, IDMAP_PHYS_SIZE)) {
-			ERROR << "Unable to allocate storage for IDMAP";
-			return false;
-		}
-
-		DEBUG << "Setting IDMAP to " << std::hex << IDMAP_PHYS_ADDR;
-		unsigned long idmap_addr = IDMAP_PHYS_ADDR;
-		rc = vmioctl(KVM_SET_IDENTITY_MAP_ADDR, &idmap_addr);
-		if (rc) {
-			ERROR << "Unable to set IDMAP address";
-			return false;
-		}
+	DEBUG << "Creating IRQ chip";
+	if (vmioctl(KVM_CREATE_IRQCHIP)) {
+		ERROR << "Unable to create IRQCHIP";
+		return false;
 	}
 
-	rc = vmioctl(KVM_CAP_CHECK_EXTENSION_VM, KVM_CAP_SET_TSS_ADDR);
-	if (rc) {
-		if (!alloc_guest_memory(TSS_PHYS_ADDR, TSS_PHYS_SIZE)) {
-			ERROR << "Unable to allocate storage for TSS";
-			return false;
-		}
+	struct kvm_irqchip irqchip;
+	bzero(&irqchip, sizeof(irqchip));
 
-		DEBUG << "Setting TSS to " << std::hex << TSS_PHYS_ADDR;
-		unsigned long tss_addr = TSS_PHYS_ADDR;
-		rc = vmioctl(KVM_SET_TSS_ADDR, tss_addr);
-		if (rc) {
-			ERROR << "Unable to set TSS address";
-			return false;
-		}
-	}*/
+	irqchip.chip_id = 2;
+	irqchip.chip.ioapic.base_address = 0x1000;
+	irqchip.chip.ioapic.id = 0;
+	irqchip.chip.ioapic.redirtbl[0].fields.vector = 0x10;
 
+	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
+		ERROR << "Unable to configure IRQCHIP";
+		return false;
+	}
+
+	DEBUG << "Creating IRQ eventfd";
+	irq_fd = eventfd(0, EFD_NONBLOCK);
+	if (irq_fd < 0) {
+		ERROR << "Unable to create IRQ fd";
+		return false;
+	}
+
+	struct kvm_irqfd irq;
+	irq.fd = irq_fd;
+	irq.flags = 0;
+	irq.gsi = 0;
+	irq.resamplefd = 0;
+
+	DEBUG << "Attaching IRQ eventfd";
+	if (vmioctl(KVM_IRQFD, &irq)) {
+		ERROR << "Unable to assign IRQ fd";
+		return false;
+	}
+
+	return true;
+}
+
+
+bool KVMGuest::prepare_guest_memory()
+{
 	// Allocate system memory
 	sys_mem_rgn = alloc_guest_memory(SYSTEM_MEMORY_PHYS_BASE, SYSTEM_MEMORY_PHYS_SIZE);
 	if (!sys_mem_rgn) {
@@ -205,6 +218,8 @@ bool KVMGuest::prepare_guest_memory()
 		ERROR << "Unable to allocate shared memory region";
 		return false;
 	}
+
+	_shmem = (shmem_data *)sh_mem_rgn->host_buffer;
 
 	// Install the bios into the correct location.
 	if (!install_bios()) {
@@ -259,7 +274,7 @@ bool KVMGuest::install_bios()
 
 bool KVMGuest::install_initial_pgt()
 {
-	next_page = 0x2000;
+	next_page = 0x3000;
 
 	for (uint64_t va = 0, pa = 0; va < 0x200000; va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
@@ -421,7 +436,7 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 	uint16_t pd_idx = BITS(va, 21, 29);
 	uint16_t pt_idx = BITS(va, 12, 20);
 
-	pm_t pm = (pm_t)&base[0x1000];
+	pm_t pm = (pm_t)&base[0x2000];
 	if (pm[pm_idx] == 0) {
 		uint64_t new_page = alloc_page();
 		bzero(&base[new_page], 0x1000);

@@ -13,7 +13,7 @@
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class ArmCpuIRQController : public irq::IRQController<2u>
+			class ArmCpuIRQController : public irq::IRQController<2u>, public irq::CPUIRQController
 			{
 			public:
 				void irq_raised(irq::IRQLine& line) override;

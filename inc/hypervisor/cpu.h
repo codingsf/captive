@@ -8,6 +8,8 @@
 #ifndef CPU_H
 #define	CPU_H
 
+#include <define.h>
+
 namespace captive {
 	namespace hypervisor {
 		class Guest;
@@ -24,6 +26,8 @@ namespace captive {
 
 			inline Guest& owner() const { return _owner; }
 			inline const GuestCPUConfiguration& config() const { return _config; }
+
+			virtual void interrupt(uint32_t code) = 0;
 
 		private:
 			Guest& _owner;

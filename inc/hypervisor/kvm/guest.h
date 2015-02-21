@@ -46,7 +46,7 @@ namespace captive {
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
-				int fd;
+				int fd, irq_fd;
 				int next_cpu_id;
 				int next_slot_idx;
 
@@ -75,6 +75,7 @@ namespace captive {
 
 				std::list<dev_desc> devices;
 
+				bool prepare_guest_irq();
 				bool prepare_guest_memory();
 				bool attach_guest_devices();
 				devices::Device *lookup_device(uint64_t addr);

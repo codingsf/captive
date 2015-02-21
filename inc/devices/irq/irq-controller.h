@@ -12,6 +12,10 @@
 #include <devices/irq/irq-line.h>
 
 namespace captive {
+	namespace hypervisor {
+		class CPU;
+	}
+
 	namespace devices {
 		namespace irq {
 			class IRQControllerBase
@@ -22,9 +26,24 @@ namespace captive {
 				IRQControllerBase();
 				virtual ~IRQControllerBase();
 
+				virtual bool have_raised_irqs() const = 0;
+
 			protected:
 				virtual void irq_raised(IRQLine& line);
 				virtual void irq_rescinded(IRQLine& line);
+			};
+
+			class CPUIRQController {
+			public:
+				inline void attach(hypervisor::CPU& cpu) {
+					_cpu = &cpu;
+				}
+
+			protected:
+				inline hypervisor::CPU& cpu() const { return *_cpu; }
+
+			private:
+				hypervisor::CPU *_cpu;
 			};
 
 			template<uint32_t nr_lines>
@@ -40,6 +59,8 @@ namespace captive {
 						return NULL;
 					}
 				}
+
+				virtual bool have_raised_irqs() const override;
 
 			private:
 				IRQLine lines[nr_lines];

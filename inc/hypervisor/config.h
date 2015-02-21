@@ -13,6 +13,10 @@
 namespace captive {
 	namespace devices {
 		class Device;
+
+		namespace irq {
+			class CPUIRQController;
+		}
 	}
 
 	namespace hypervisor {
@@ -60,6 +64,8 @@ namespace captive {
 			std::string name;
 			std::vector<GuestMemoryRegionConfiguration> memory_regions;
 			std::vector<GuestDeviceConfiguration> devices;
+
+			devices::irq::CPUIRQController *cpu_irq_controller;
 
 			inline bool have_memory_regions() const { return !memory_regions.empty(); }
 			inline bool have_devices() const { return !devices.empty(); }

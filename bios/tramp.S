@@ -18,7 +18,7 @@ entry16:
     mov %eax, %cr4
 
 	// Setup cr3 with the PML4
-    movl $0x1000, %eax
+    movl $0x2000, %eax
     movl %eax, %cr3
 
 	// Enable LME and NXE

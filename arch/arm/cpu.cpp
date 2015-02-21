@@ -6,12 +6,15 @@
 #include <arm-interp.h>
 #include <arm-disasm.h>
 #include <arm-mmu.h>
+#include <shmem.h>
 #include <new>
 
 #include <printf.h>
 #include <string.h>
 
 using namespace captive::arch::arm;
+
+extern captive::shmem_data *shmem;
 
 ArmCPU::ArmCPU(ArmEnvironment& env) : CPU(env)
 {
@@ -48,26 +51,42 @@ bool ArmCPU::run()
 	printf("starting cpu execution\n");
 
 	do {
-		uint32_t pc = state.regs.RB[15];
-
-		state.last_exception_action = 0;
-
-		ArmDecode *insn = get_decode(pc);
-		if (pc == 0 || insn->pc != pc) {
-			if (insn->decode(ArmDecode::arm, pc)) {
-				printf("cpu: unhandled decode fault\n");
-				return false;
-			}
+		// Check pending actions
+		if (shmem->asynchronous_action_pending) {
+			shmem->asynchronous_action_pending = 0;
+			printf("handling irq %x %d\n", state.regs.RB[15], state.regs.I);
+			interp.handle_irq(1);
+			//printf("handling irq %x\n", state.regs.RB[15]);
 		}
 
-		if (trace().enabled()) trace().start_record(get_insns_executed(), pc);
+		// Execute one block of instructions
+		ArmDecode *insn;
+		do {
+			// Reset CPU exception state
+			state.last_exception_action = 0;
 
-		step_ok = interp.step_single(*insn);
-		inc_insns_executed();
+			// Get the address of the next instruction to execute
+			uint32_t pc = state.regs.RB[15];
 
-		if (trace().enabled()) trace().end_record();
+			// Obtain a decode object for this PC, and see if it's
+			// been cached
+			insn = get_decode(pc);
+			if (1) { //pc == 0 || insn->pc != pc) {
+				if (insn->decode(ArmDecode::arm, pc)) {
+					printf("cpu: unhandled decode fault\n");
+					return false;
+				}
+			}
 
-		//if (get_insns_executed() == 96271287) trace().enable();
+			// Perhaps trace this instruction
+			if (trace().enabled()) trace().start_record(get_insns_executed(), pc);
+
+			// Execute the instruction
+			step_ok = interp.step_single(*insn);
+			inc_insns_executed();
+
+			if (trace().enabled()) trace().end_record();
+		} while(!insn->end_of_block && step_ok);
 	} while(step_ok);
 
 	return true;
@@ -96,6 +115,11 @@ bool ArmCPU::init(unsigned int ep)
 	state.regs.RB[15] = 0;			// Reset Vector
 
 	return true;
+}
+
+void ArmCPU::handle_pending_action()
+{
+	//
 }
 
 void ArmCPU::handle_angel_syscall()

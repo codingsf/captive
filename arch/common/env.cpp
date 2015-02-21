@@ -13,6 +13,7 @@ extern "C" void trap_dbg(void);
 extern "C" void trap_nmi(void);
 extern "C" void trap_pf(void);
 extern "C" void trap_gpf(void);
+extern "C" void trap_irq(void);
 
 static trap_fn_t trap_fns[] = {
 	trap_dbz,
@@ -47,6 +48,22 @@ static trap_fn_t trap_fns[] = {
 	trap_unk,
 	trap_unk,
 	trap_unk,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
+	trap_irq,
 };
 
 struct IDT {
@@ -101,7 +118,7 @@ bool Environment::init()
 		uint64_t base;
 	} packed IDTR;
 
-	IDTR.limit = sizeof(struct IDT) * 32;
+	IDTR.limit = sizeof(struct IDT) * (sizeof(trap_fns) / sizeof(trap_fns[0]));
 	IDTR.base = 0x200000030;
 
 	IDT *idt = (IDT *)0x200000030;

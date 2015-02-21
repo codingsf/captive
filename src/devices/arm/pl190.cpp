@@ -156,16 +156,12 @@ bool PL190::write(uint64_t off, uint8_t len, uint64_t data)
 
 void PL190::irq_raised(irq::IRQLine& line)
 {
-	printf("pl190: irq raised: %d\n", line.index());
-
 	irq_status |= 1 << line.index();
 	update_lines();
 }
 
 void PL190::irq_rescinded(irq::IRQLine& line)
 {
-	printf("pl190: irq rescinded: %d\n", line.index());
-
 	irq_status &= ~(1 << line.index());
 	update_lines();
 }

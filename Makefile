@@ -8,6 +8,8 @@ bin-dir := $(top-dir)/bin
 bios-dir := $(top-dir)/bios
 arch-dir := $(top-dir)/arch
 
+export shared-dir := $(top-dir)/shared
+
 out := $(bin-dir)/captive
 src := $(patsubst src/%,$(src-dir)/%,$(shell find src/ | grep -e "\.cpp"))
 obj := $(src:.cpp=.o)
@@ -15,7 +17,7 @@ dep := $(src:.cpp=.d)
 
 bios := $(bios-dir)/bios.bin.o
 
-common-cflags := -I$(inc-dir) -g -Wall -O0 -pthread
+common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O0 -pthread
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
 ldflags  := -pthread -Wl,--no-as-needed

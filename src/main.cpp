@@ -54,6 +54,7 @@ int main(int argc, char **argv)
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x80000000, 0x60000000));
 
 	devices::arm::ArmCpuIRQController *cpu_irq = new devices::arm::ArmCpuIRQController();
+	cfg.cpu_irq_controller = cpu_irq;
 
 	devices::arm::PL011 *uart = new devices::arm::PL011();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, 0x1000, *uart));

@@ -89,6 +89,8 @@ namespace captive {
 
 				unsigned int _ep;
 				cpu_state state;
+
+				void handle_pending_action();
 			};
 		}
 	}
