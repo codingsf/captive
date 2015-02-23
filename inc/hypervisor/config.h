@@ -45,11 +45,10 @@ namespace captive {
 		class GuestDeviceConfiguration
 		{
 		public:
-			explicit GuestDeviceConfiguration(uint64_t base_address, uint64_t size, devices::Device& dev)
-				: _base_address(base_address), _size(size), _dev(dev) { }
+			explicit GuestDeviceConfiguration(uint64_t base_address, devices::Device& dev)
+				: _base_address(base_address), _dev(dev) { }
 
 			inline uint64_t base_address() const { return _base_address; }
-			inline uint64_t size() const { return _size; }
 			inline devices::Device& device() const { return _dev; }
 
 		private:

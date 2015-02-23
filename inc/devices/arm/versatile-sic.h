@@ -23,6 +23,8 @@ namespace captive {
 				virtual bool read(uint64_t off, uint8_t len, uint64_t& data);
 				virtual bool write(uint64_t off, uint8_t len, uint64_t data);
 
+				virtual uint32_t size() const { return 0x1000; }
+
 			private:
 				uint32_t status;
 				uint32_t enable_mask;

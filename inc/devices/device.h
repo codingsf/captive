@@ -31,6 +31,8 @@ namespace captive {
 				return *_guest;
 			}
 
+			virtual uint32_t size() const = 0;
+
 			virtual bool read(uint64_t off, uint8_t len, uint64_t& data) = 0;
 			virtual bool write(uint64_t off, uint8_t len, uint64_t data) = 0;
 

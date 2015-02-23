@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-Primecell::Primecell(uint32_t peripheral_id) : peripheral_id(peripheral_id), primecell_id(0xb105f00d)
+Primecell::Primecell(uint32_t peripheral_id, uint32_t size) : peripheral_id(peripheral_id), primecell_id(0xb105f00d), _size(size)
 {
 
 }

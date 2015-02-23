@@ -144,7 +144,7 @@ bool KVMGuest::attach_guest_devices()
 captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 {
 	for (const auto& desc : devices) {
-		if (addr >= desc.cfg->base_address() && addr <= desc.cfg->base_address() + desc.cfg->size()) {
+		if (addr >= desc.cfg->base_address() && addr <= desc.cfg->base_address() + desc.dev->size()) {
 			return desc.dev;
 		}
 	}
@@ -318,7 +318,7 @@ bool KVMGuest::stage2_init()
 		uint64_t va = dev.cfg->base_address();
 		uint64_t pa = GUEST_PHYS_MEMORY_BASE + va;
 
-		for (int i = 0; i < dev.cfg->size() / 0x1000; i++) {
+		for (int i = 0; i < dev.dev->size() / 0x1000; i++) {
 			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 			va += 0x1000;
 			pa += 0x1000;

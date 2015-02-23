@@ -9,6 +9,7 @@
 #include <devices/arm/cpu-irq.h>
 #include <devices/arm/pl011.h>
 #include <devices/arm/pl080.h>
+#include <devices/arm/pl110.h>
 #include <devices/arm/pl190.h>
 #include <devices/arm/sp804.h>
 #include <devices/arm/sp810.h>
@@ -59,38 +60,41 @@ int main(int argc, char **argv)
 	cfg.cpu_irq_controller = cpu_irq;
 
 	devices::arm::PL011 *uart0 = new devices::arm::PL011();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, 0x1000, *uart0));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, *uart0));
 
 	devices::arm::PL011 *uart1 = new devices::arm::PL011();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x101f2000, 0x1000, *uart1));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101f2000, *uart1));
 
 	devices::arm::PL011 *uart2 = new devices::arm::PL011();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, 0x1000, *uart2));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, *uart2));
 
 	devices::arm::PL080 *dma = new devices::arm::PL080();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, 0x1000, *dma));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
+
+	devices::arm::PL110 *lcd = new devices::arm::PL110();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
 
 	devices::arm::SP810 *sysctl = new devices::arm::SP810();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, 0x1000, *sysctl));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, 0x1000, *sysctl));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *sysctl));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, *sysctl));
 
 	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(0), *cpu_irq->get_irq_line(1));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, 0x1000, *vic));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, *vic));
 
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, 0x1000, *sic));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
 	devices::arm::SP804 *timer0 = new devices::arm::SP804(mts, *vic->get_irq_line(4));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, 0x1000, *timer0));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, *timer0));
 
 	devices::arm::SP804 *timer1 = new devices::arm::SP804(mts, *vic->get_irq_line(5));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, 0x1000, *timer1));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, *timer1));
 
-	devices::arm::PrimecellStub *static_memory_controller = new devices::arm::PrimecellStub(0x00141093);
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, 0x10000, *static_memory_controller));
+	devices::arm::PrimecellStub *static_memory_controller = new devices::arm::PrimecellStub(0x00141093, 0x10000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *static_memory_controller));
 
-	devices::arm::PrimecellStub *mp_memory_controller = new devices::arm::PrimecellStub(0x47041175);
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10110000, 0x10000, *mp_memory_controller));
+	devices::arm::PrimecellStub *mp_memory_controller = new devices::arm::PrimecellStub(0x47041175, 0x10000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10110000, *mp_memory_controller));
 
 
 	// Create the engine.
