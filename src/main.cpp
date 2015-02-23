@@ -16,6 +16,8 @@
 #include <devices/arm/versatile-sic.h>
 #include <devices/arm/primecell-stub.h>
 
+#include <devices/gfx/null-virtual-screen.h>
+
 #include <devices/timers/millisecond-tick-source.h>
 
 using namespace captive;
@@ -71,7 +73,8 @@ int main(int argc, char **argv)
 	devices::arm::PL080 *dma = new devices::arm::PL080();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
 
-	devices::arm::PL110 *lcd = new devices::arm::PL110();
+	devices::gfx::NullVirtualScreen *vs = new devices::gfx::NullVirtualScreen();
+	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
 
 	devices::arm::SP810 *sysctl = new devices::arm::SP810();

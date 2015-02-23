@@ -69,7 +69,7 @@ void KVMCpu::interrupt(uint32_t code)
 		WARNING << "Guest interrupt assertion failed";
 	}*/
 
-	DEBUG << "Asserting a KVM interrupt: fd=" << irqfd << ", code=" << std::hex << code;
+	//DEBUG << "Asserting a KVM interrupt: fd=" << irqfd << ", code=" << std::hex << code;
 
 	/*uint64_t data = 1;
 	if (write(irqfd, &data, sizeof(data)) != 8) {

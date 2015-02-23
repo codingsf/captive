@@ -6,11 +6,11 @@ using namespace captive::devices::arm;
 
 void ArmCpuIRQController::irq_raised(IRQLine& line)
 {
-	printf("cpu: irq raised: %d\n", line.index());
+	//printf("cpu: irq raised: %d\n", line.index());
 	cpu().interrupt(1);
 }
 
 void ArmCpuIRQController::irq_rescinded(IRQLine& line)
 {
-	printf("cpu: irq rescinded: %d\n", line.index());
+	//printf("cpu: irq rescinded: %d\n", line.index());
 }

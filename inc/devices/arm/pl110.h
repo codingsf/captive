@@ -12,15 +12,24 @@
 
 namespace captive {
 	namespace devices {
+		namespace gfx {
+			class VirtualScreen;
+		}
+
 		namespace arm {
 			class PL110 : public Primecell
 			{
 			public:
-				PL110();
+				PL110(gfx::VirtualScreen& screen);
 				virtual ~PL110();
-				
+
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
+
+				inline gfx::VirtualScreen& screen() const { return _screen; }
+				
+			private:
+				gfx::VirtualScreen& _screen;
 			};
 		}
 	}
