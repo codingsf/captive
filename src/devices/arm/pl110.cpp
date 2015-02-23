@@ -2,6 +2,7 @@
 #include <devices/gfx/virtual-screen.h>
 #include <devices/irq/irq-line.h>
 #include <hypervisor/guest.h>
+#include <captive.h>
 
 using namespace captive::devices::arm;
 
@@ -129,6 +130,8 @@ bool PL110::write(uint64_t off, uint8_t len, uint64_t data)
 
 void PL110::update_control()
 {
+	DEBUG << CONTEXT(PL110) << "Update Control " << std::hex << control.data;
+
 	if (control.fields.en && !_screen.configured()) {
 		uint32_t ppl = 16 * (1 + ((lcd_timing[0] >> 2) & 0x3f));
 		uint32_t lines = (lcd_timing[1] & 0x3ff) + 1;

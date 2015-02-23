@@ -42,20 +42,20 @@ namespace captive {
 				union {
 					uint32_t data;
 					struct {
-						uint32_t rsvd0 : 15;
-						uint8_t watermark : 1;
-						uint8_t rsvd1 : 2;
-						uint8_t lcd_vcomp : 2;
-						uint8_t lcd_pwr : 1;
-						uint8_t bepo : 1;
-						uint8_t bebo : 1;
-						uint8_t bgr : 1;
-						uint8_t dual : 1;
-						uint8_t mono8 : 1;
-						uint8_t tft : 1;
-						uint8_t bw : 1;
-						uint8_t bpp : 3;
 						uint8_t en : 1;
+						uint8_t bpp : 3;
+						uint8_t bw : 1;
+						uint8_t tft : 1;
+						uint8_t mono8 : 1;
+						uint8_t dual : 1;
+						uint8_t bgr : 1;
+						uint8_t bebo : 1;
+						uint8_t bepo : 1;
+						uint8_t lcd_pwr : 1;
+						uint8_t lcd_vcomp : 2;
+						uint8_t rsvd1 : 2;
+						uint8_t watermark : 1;
+						uint32_t rsvd0 : 15;
 					} __attribute__((packed)) fields;
 				} control;
 

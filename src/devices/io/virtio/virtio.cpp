@@ -2,6 +2,7 @@
 #include <devices/io/virtio/virtqueue.h>
 #include <devices/irq/irq-line.h>
 #include <hypervisor/guest.h>
+#include <captive.h>
 
 #include <string.h>
 
@@ -125,8 +126,10 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 			VirtQueue *cq = current_queue();
 
 			void *queue_host_addr;
-			if (!guest().resolve_gpa(queue_phys_addr, queue_host_addr))
+			if (!guest().resolve_gpa(queue_phys_addr, queue_host_addr)) {
+				ERROR << "Unable to resolve GPA: " << std::hex << queue_phys_addr;
 				assert(false);
+			}
 
 			cq->SetBaseAddress(queue_phys_addr, queue_host_addr);
 		}

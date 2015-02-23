@@ -28,6 +28,7 @@ namespace captive {
 #define ERROR LOG() << "error: "
 #define WARNING LOG() << "warning: "
 #define LAST_ERROR_TEXT strerror(errno)
+#define CONTEXT(a) #a ": "
 
 #endif	/* CAPTIVE_H */
 

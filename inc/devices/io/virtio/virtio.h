@@ -83,9 +83,10 @@ namespace captive {
 
 					uint32_t host_features;
 
+					virtual void process_event(VirtIOQueueEvent& evt) = 0;
+
 				private:
 					void process_queue(VirtQueue *queue);
-					virtual void process_event(VirtIOQueueEvent& evt) = 0;
 
 					uint8_t guest_page_shift;
 
@@ -96,7 +97,7 @@ namespace captive {
 					uint32_t Version;
 					uint32_t DeviceID;
 					uint32_t VendorID;
-					
+
 					uint32_t HostFeaturesSel;
 
 					uint32_t GuestFeatures;

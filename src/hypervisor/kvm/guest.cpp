@@ -473,5 +473,12 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 
 bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 {
+	for (auto pmr : gpm) {
+		if (gpa >= pmr.cfg->base_address() && gpa <= (pmr.cfg->base_address() + pmr.cfg->size())) {
+			out_addr = pmr.vmr->host_buffer;
+			return true;
+		}
+	}
+
 	return false;
 }

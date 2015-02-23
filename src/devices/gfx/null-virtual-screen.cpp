@@ -18,13 +18,13 @@ bool NullVirtualScreen::initialise()
 	if (!configured())
 		return false;
 
-	DEBUG << "Initialising NULL virtual screen";
+	DEBUG << CONTEXT(NullVirtualScreen) << "Initialising NULL virtual screen";
 	return true;
 }
 
 bool NullVirtualScreen::activate_configuration(const VirtualScreenConfiguration& cfg)
 {
-	DEBUG << "Configuring NULL virtual screen: " << cfg.width() << "x" << cfg.height() << " @ " << cfg.mode() << ", fb=" << std::hex << (uint64_t)framebuffer();
+	DEBUG << CONTEXT(NullVirtualScreen) << "Configuring NULL virtual screen: " << cfg.width() << "x" << cfg.height() << " @ " << cfg.mode() << ", fb=" << std::hex << (uint64_t)framebuffer();
 	return true;
 }
 
