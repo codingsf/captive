@@ -53,9 +53,6 @@ bool SP810::read(uint64_t off, uint8_t len, uint64_t& data)
 	case 0x5c:
 		data = std::chrono::duration_cast<tick_24MHz_t>(clock_t::now() - hr_begin).count();
 		break;
-
-	default:
-		return false;
 	}
 
 	return true;
@@ -69,7 +66,7 @@ bool SP810::write(uint64_t off, uint8_t len, uint64_t data)
 	switch (off) {
 	case 0x00:
 		break;
-		
+
 	case 0x08:	// LEDs
 		leds = data;
 		break;
@@ -83,9 +80,6 @@ bool SP810::write(uint64_t off, uint8_t len, uint64_t data)
 		colour_mode &= 0x3f00;
 		colour_mode |= (data & ~0x3f00);
 		break;
-
-	default:
-		return false;
 	}
 
 	return true;

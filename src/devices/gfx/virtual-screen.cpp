@@ -2,7 +2,7 @@
 
 using namespace captive::devices::gfx;
 
-VirtualScreen::VirtualScreen() : _configured(false), _framebuffer(NULL), _palette(NULL)
+VirtualScreen::VirtualScreen() : _configured(false), _framebuffer(NULL), _palette(NULL), _kbd(NULL), _mse(NULL)
 {
 
 }

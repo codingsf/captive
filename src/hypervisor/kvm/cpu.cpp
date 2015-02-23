@@ -10,6 +10,7 @@
 #include <devices/device.h>
 #include <devices/irq/irq-controller.h>
 #include <sys/eventfd.h>
+#include <sys/signal.h>
 #include <shmem.h>
 
 using namespace captive::hypervisor::kvm;
@@ -79,6 +80,17 @@ void KVMCpu::interrupt(uint32_t code)
 	((KVMGuest &)owner()).shmem_region()->asynchronous_action_pending = 1;
 }
 
+static KVMCpu *signal_cpu;
+
+static void handle_signal(int signo)
+{
+	if (signo == SIGUSR1) {
+		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 2;
+	} else if (signo == SIGUSR2) {
+		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 3;
+	}
+}
+
 bool KVMCpu::run()
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
@@ -91,6 +103,10 @@ bool KVMCpu::run()
 		return false;
 	}
 
+	signal_cpu = this;
+	signal(SIGUSR1, handle_signal);
+	signal(SIGUSR2, handle_signal);
+
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
 	sregs.cs.base = 0xf0000;
@@ -100,6 +116,8 @@ bool KVMCpu::run()
 	do {
 		rc = vmioctl(KVM_RUN);
 		if (rc < 0) {
+			if (errno == EINTR) continue;
+
 			ERROR << "Unable to run VCPU: " << LAST_ERROR_TEXT;
 			return false;
 		}

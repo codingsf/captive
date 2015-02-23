@@ -8,6 +8,8 @@
 #ifndef INTERP_H
 #define	INTERP_H
 
+#include <define.h>
+
 namespace captive {
 	namespace arch {
 		template<class DecodeType>
@@ -18,9 +20,9 @@ namespace captive {
 			virtual ~Interpreter();
 
 			virtual bool step_single(DecodeType& insn) = 0;
-			bool step_single_trace(DecodeType& insn);
+			virtual bool handle_irq(uint32_t irq_line) = 0;
 
-			bool trace;
+			bool step_single_trace(DecodeType& insn);
 		};
 	}
 }

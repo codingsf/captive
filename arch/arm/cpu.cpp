@@ -53,10 +53,23 @@ bool ArmCPU::run()
 	do {
 		// Check pending actions
 		if (shmem->asynchronous_action_pending) {
-			shmem->asynchronous_action_pending = 0;
-			printf("handling irq %x %d\n", state.regs.RB[15], state.regs.I);
-			interp.handle_irq(1);
-			//printf("handling irq %x\n", state.regs.RB[15]);
+			switch (shmem->asynchronous_action_pending) {
+			case 1:
+				if (interp.handle_irq(1)) {
+					shmem->asynchronous_action_pending = 0;
+				}
+				break;
+
+			case 2:
+				printf("CPU: %08x\n", state.regs.RB[15]);
+				shmem->asynchronous_action_pending = 0;
+				break;
+
+			case 3:
+				trace().enable();
+				shmem->asynchronous_action_pending = 0;
+				break;
+			}
 		}
 
 		// Execute one block of instructions
@@ -73,7 +86,7 @@ bool ArmCPU::run()
 			insn = get_decode(pc);
 			if (1) { //pc == 0 || insn->pc != pc) {
 				if (insn->decode(ArmDecode::arm, pc)) {
-					printf("cpu: unhandled decode fault\n");
+					printf("cpu: unhandled decode fault @ %08x\n", pc);
 					return false;
 				}
 			}

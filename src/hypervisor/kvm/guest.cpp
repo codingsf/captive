@@ -127,7 +127,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 bool KVMGuest::attach_guest_devices()
 {
 	for (const auto& device : config().devices) {
-		DEBUG << "Attaching device @ " << std::hex << device.base_address();
+		DEBUG << "Attaching device " << device.device().name() << " @ " << std::hex << device.base_address();
 
 		device.device().attach(*this);
 

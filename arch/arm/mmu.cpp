@@ -66,7 +66,7 @@ va_t ArmMMU::temp_map(va_t base, gpa_t gpa, int n)
 #define TTBR_TEMP_BASE	(va_t)0x220000000
 #define L1_TEMP_BASE	(va_t)0x220005000
 
-bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
+bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault& fault)
 {
 	arm_resolution_fault arm_fault = NONE;
 	fault = arch::MMU::NONE;
@@ -77,7 +77,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault)
 		return true;
 	}
 
-	//printf("mmu: resolve va=%08x, ttbr0=%x\n", va, _coco.TTBR0());
+	//printf("mmu: resolve va=%08x, type=%d, ttbr0=%x\n", va, type, _coco.TTBR0());
 
 	uint16_t l1_idx = va >> 20;
 	l1_descriptor *l1 = &((l1_descriptor *)temp_map(TTBR_TEMP_BASE, _coco.TTBR0(), 4))[l1_idx];

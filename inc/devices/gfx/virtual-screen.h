@@ -13,6 +13,11 @@
 
 namespace captive {
 	namespace devices {
+		namespace io {
+			class Keyboard;
+			class Mouse;
+		}
+
 		namespace gfx {
 			class VirtualScreenConfiguration
 			{
@@ -50,6 +55,12 @@ namespace captive {
 				void framebuffer(uint8_t *fb) { _framebuffer = fb; }
 				void palette(uint8_t *pp) { _palette = pp; }
 
+				inline void keyboard(io::Keyboard& kbd) { _kbd = &kbd; }
+				inline io::Keyboard& keyboard() const { return *_kbd; }
+
+				inline void mouse(io::Mouse& mse) { _mse = &mse; }
+				inline io::Mouse& mouse() const { return *_mse; }
+
 				inline uint8_t *framebuffer() const { return _framebuffer; }
 				inline uint8_t *palette() const { return _palette; }
 
@@ -62,6 +73,9 @@ namespace captive {
 			private:
 				bool _configured;
 				uint8_t *_framebuffer, *_palette;
+
+				io::Keyboard *_kbd;
+				io::Mouse *_mse;
 			};
 		}
 	}

@@ -9,6 +9,7 @@
 #include <devices/arm/cpu-irq.h>
 #include <devices/arm/pl011.h>
 #include <devices/arm/pl031.h>
+#include <devices/arm/pl050.h>
 #include <devices/arm/pl061.h>
 #include <devices/arm/pl080.h>
 #include <devices/arm/pl110.h>
@@ -17,6 +18,10 @@
 #include <devices/arm/sp810.h>
 #include <devices/arm/versatile-sic.h>
 #include <devices/arm/primecell-stub.h>
+
+#include <devices/io/keyboard.h>
+#include <devices/io/mouse.h>
+#include <devices/io/ps2.h>
 
 #include <devices/gfx/null-virtual-screen.h>
 
@@ -81,10 +86,22 @@ int main(int argc, char **argv)
 	devices::arm::PL031 *rtc = new devices::arm::PL031();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e8000, *rtc));
 
+	devices::io::PS2KeyboardDevice *ps2kbd = new devices::io::PS2KeyboardDevice(*sic->get_irq_line(3));
+	devices::io::PS2MouseDevice *ps2mse = new devices::io::PS2MouseDevice(*sic->get_irq_line(4));
+
+	devices::arm::PL050 *kbd = new devices::arm::PL050(*ps2kbd);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10006000, *kbd));
+
+	devices::arm::PL050 *mse = new devices::arm::PL050(*ps2mse);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10007000, *mse));
+
 	devices::arm::PL080 *dma = new devices::arm::PL080();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
 
 	devices::gfx::NullVirtualScreen *vs = new devices::gfx::NullVirtualScreen();
+	vs->keyboard(*ps2kbd);
+	vs->mouse(*ps2mse);
+
 	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs, *vic->get_irq_line(16));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
 

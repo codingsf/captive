@@ -2,7 +2,7 @@
 #include <mm.h>
 #include <printf.h>
 
-extern uint32_t page_fault_code;
+extern volatile uint32_t page_fault_code, mem_access_type;
 
 using namespace captive::arch;
 
@@ -116,8 +116,10 @@ bool MMU::handle_fault(va_t va)
 	}
 
 	resolution_fault fault;
+	access_type type = (access_type)mem_access_type;
 	gpa_t pa;
-	if (!resolve_gpa((gva_t)(uint64_t)va, pa, fault)) {
+
+	if (!resolve_gpa((gva_t)(uint64_t)va, pa, type, fault)) {
 		return false;
 	}
 
@@ -129,7 +131,7 @@ bool MMU::handle_fault(va_t va)
 	} else {
 		pt->base_address(0x100000000 - 0x1000);
 
-		printf("fault %x\n", va);
+		printf("fault %d %d %x\n", type, fault, va);
 		page_fault_code = (uint32_t)fault;
 	}
 

@@ -13,7 +13,7 @@
 #include <printf.h>
 #include <env.h>
 
-extern volatile uint32_t page_fault_code;
+extern volatile uint32_t page_fault_code, mem_access_type;
 
 #ifdef TRACE
 
@@ -84,41 +84,71 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 #define flush_dtlb_entry(v)
 #define flush_itlb_entry(v)
 
-#define mem_read_8(_addr, _data) (_data = *((uint8_t*)((uint64_t)_addr)), page_fault_code)
+static inline uint32_t mem_read_8(uint32_t addr, uint32_t& data)
+{
+	page_fault_code = 0; mem_access_type = 0;
+	data = *((uint8_t*)((uint64_t)addr));
+	return page_fault_code;
+}
+
+static inline uint32_t mem_read_16(uint32_t addr, uint32_t& data)
+{
+	page_fault_code = 0; mem_access_type = 0;
+	data = *((uint16_t*)((uint64_t)addr));
+	return page_fault_code;
+}
+
+static inline uint32_t mem_read_32(uint32_t addr, uint32_t& data)
+{
+	page_fault_code = 0; mem_access_type = 0;
+	data = *((uint32_t*)((uint64_t)addr));
+	return page_fault_code;
+}
+
+static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
+{
+	page_fault_code = 0; mem_access_type = 0;
+	data = *((uint64_t*)((uint64_t)addr));
+	return page_fault_code;
+}
+
+/*#define mem_read_8(_addr, _data) (_data = *((uint8_t*)((uint64_t)_addr)), page_fault_code)
 #define mem_read_16(_addr, _data) (_data = *((uint16_t*)((uint64_t)_addr)), page_fault_code)
 #define mem_read_32(_addr, _data) (_data = *((uint32_t*)((uint64_t)_addr)), page_fault_code)
-#define mem_read_64(_addr, _data) (_data = *((uint64_t*)((uint64_t)_addr)), page_fault_code)
+#define mem_read_64(_addr, _data) (_data = *((uint64_t*)((uint64_t)_addr)), page_fault_code)*/
 
-static inline uint32_t mem_write_32x(captive::arch::CPU& cpu, uint32_t addr, uint32_t data)
+static inline uint32_t mem_write_64(uint32_t addr, uint64_t data)
 {
-	//if (addr == 0xef74b800 && data != 0) cpu.trace().enable();
+	page_fault_code = 0; mem_access_type = 1;
+	*((uint64_t*)((uint64_t)addr)) = ((uint64_t)data);
+	return page_fault_code;
+}
 
+static inline uint32_t mem_write_32(uint32_t addr, uint32_t data)
+{
+	page_fault_code = 0; mem_access_type = 1;
 	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
 	return page_fault_code;
 }
-static inline uint32_t mem_write_16x(captive::arch::CPU& cpu, uint32_t addr, uint16_t data)
-{
-	//if ((addr & 0xffffff) == 0x3df01c && data != 0) cpu.trace().enable();
 
+static inline uint32_t mem_write_16(uint32_t addr, uint16_t data)
+{
+	page_fault_code = 0; mem_access_type = 1;
 	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
 	return page_fault_code;
 }
-static inline uint32_t mem_write_8x(captive::arch::CPU& cpu, uint32_t addr, uint8_t data)
-{
-	//if ((addr & 0xffffff) == 0x3df01c && data != 0) cpu.trace().enable();
 
+static inline uint32_t mem_write_8(uint32_t addr, uint8_t data)
+{
+	page_fault_code = 0; mem_access_type = 1;
 	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
 	return page_fault_code;
 }
 
-#define mem_write_8(_addr, _data) mem_write_8x(cpu, addr, data)
-#define mem_write_16(_addr, _data) mem_write_16x(cpu, addr, data)
-#define mem_write_32(_addr, _data) mem_write_32x(cpu, addr, data)
-
-//#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
-//#define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), page_fault_code)
-//#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
-#define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)
+/*#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
+#define mem_write_16(_addr, _data) (*((uint16_t*)((uint64_t)_addr)) = ((uint16_t)_data), page_fault_code)
+#define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
+#define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)*/
 
 #define mem_read_8_user(_addr, _data) mem_read_8(_addr, _data)
 #define mem_read_16_user(_addr, _data) mem_read_16(_addr, _data)

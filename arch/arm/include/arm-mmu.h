@@ -35,7 +35,7 @@ namespace captive {
 				}
 
 			protected:
-				bool resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault) override;
+				bool resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault& fault) override;
 
 			private:
 				ArmCPU& _cpu;

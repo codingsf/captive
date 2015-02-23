@@ -48,7 +48,13 @@ namespace captive {
 				FAULT,
 			};
 
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, resolution_fault& fault) = 0;
+			enum access_type {
+				READ,
+				WRITE,
+				FETCH,
+			};
+
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault& fault) = 0;
 		};
 	}
 }
