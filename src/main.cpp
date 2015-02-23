@@ -22,6 +22,8 @@
 #include <devices/io/keyboard.h>
 #include <devices/io/mouse.h>
 #include <devices/io/ps2.h>
+#include <devices/io/file-backed-block-device.h>
+#include <devices/io/virtio/virtio-block-device.h>
 
 #include <devices/gfx/null-virtual-screen.h>
 
@@ -147,6 +149,16 @@ int main(int argc, char **argv)
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e5000, *gpio1));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e6000, *gpio2));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e7000, *gpio3));
+
+	devices::io::FileBackedBlockDevice *bdev = new devices::io::FileBackedBlockDevice();
+
+	if (!bdev->open_file("/tmp/zero")) {
+		ERROR << "Unable to open block device file";
+		return 1;
+	}
+
+	devices::io::virtio::VirtIOBlockDevice *vbd = new devices::io::virtio::VirtIOBlockDevice(*vic->get_irq_line(30), *bdev);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x11001000, *vbd));
 
 	// Create the engine.
 	Engine engine(argv[1]);
