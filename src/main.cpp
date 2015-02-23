@@ -61,6 +61,12 @@ int main(int argc, char **argv)
 	devices::arm::ArmCpuIRQController *cpu_irq = new devices::arm::ArmCpuIRQController();
 	cfg.cpu_irq_controller = cpu_irq;
 
+	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(0), *cpu_irq->get_irq_line(1));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, *vic));
+
+	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
+
 	devices::arm::PL011 *uart0 = new devices::arm::PL011();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, *uart0));
 
@@ -74,18 +80,12 @@ int main(int argc, char **argv)
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
 
 	devices::gfx::NullVirtualScreen *vs = new devices::gfx::NullVirtualScreen();
-	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs);
+	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs, *vic->get_irq_line(8));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
 
 	devices::arm::SP810 *sysctl = new devices::arm::SP810();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *sysctl));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, *sysctl));
-
-	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(0), *cpu_irq->get_irq_line(1));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, *vic));
-
-	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
 	devices::arm::SP804 *timer0 = new devices::arm::SP804(mts, *vic->get_irq_line(4));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, *timer0));

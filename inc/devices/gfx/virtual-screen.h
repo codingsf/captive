@@ -46,22 +46,20 @@ namespace captive {
 				bool reset();
 				bool configure(const VirtualScreenConfiguration& config);
 
-				inline const VirtualScreenConfiguration& config() const { return *_config; }
-
 				void framebuffer(uint8_t *fb) { _framebuffer = fb; }
 				void palette(uint8_t *pp) { _palette = pp; }
 
 				inline uint8_t *framebuffer() const { return _framebuffer; }
 				inline uint8_t *palette() const { return _palette; }
 
-				inline bool configured() const { return _config != NULL; }
+				inline bool configured() const { return _configured; }
 
 			protected:
 				virtual bool activate_configuration(const VirtualScreenConfiguration& cfg) = 0;
 				virtual bool reset_configuration() = 0;
 
 			private:
-				const VirtualScreenConfiguration *_config;
+				bool _configured;
 				uint8_t *_framebuffer, *_palette;
 			};
 		}

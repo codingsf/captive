@@ -2,7 +2,7 @@
 
 using namespace captive::devices::gfx;
 
-VirtualScreen::VirtualScreen() : _config(NULL), _framebuffer(NULL), _palette(NULL)
+VirtualScreen::VirtualScreen() : _configured(false), _framebuffer(NULL), _palette(NULL)
 {
 
 }
@@ -17,7 +17,7 @@ bool VirtualScreen::reset()
 	if (!reset_configuration())
 		return false;
 
-	_config = NULL;
+	_configured = false;
 	return true;
 }
 
@@ -26,6 +26,6 @@ bool VirtualScreen::configure(const VirtualScreenConfiguration& config)
 	if (!activate_configuration(config))
 		return false;
 
-	_config = &config;
+	_configured = true;
 	return true;
 }
