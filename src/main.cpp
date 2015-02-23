@@ -99,6 +99,8 @@ int main(int argc, char **argv)
 	devices::arm::PrimecellStub *mp_memory_controller = new devices::arm::PrimecellStub(0x47041175, 0x10000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10110000, *mp_memory_controller));
 
+	devices::arm::PrimecellStub *watchdog = new devices::arm::PrimecellStub(0x00141805, 0x1000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e1000, *watchdog));
 
 	// Create the engine.
 	Engine engine(argv[1]);

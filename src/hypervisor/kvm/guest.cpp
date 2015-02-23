@@ -470,3 +470,8 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 		<< ", PD[" << pdp[pdp_idx] << "]=" << (uint32_t)pd_idx
 		<< ", PT[" << pd[pd_idx] << "]=" << (uint32_t)pt_idx;*/
 }
+
+bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
+{
+	return false;
+}

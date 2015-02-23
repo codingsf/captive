@@ -9,6 +9,7 @@
 #define	VIRTUAL_SCREEN_H
 
 #include <define.h>
+#include <hypervisor/gpa-resolver.h>
 
 namespace captive {
 	namespace devices {

@@ -11,7 +11,8 @@
 #include <define.h>
 #include <vector>
 
-#include "config.h"
+#include <hypervisor/config.h>
+#include <hypervisor/gpa-resolver.h>
 
 namespace captive {
 	struct shmem_data;
@@ -31,7 +32,7 @@ namespace captive {
 		class GuestConfiguration;
 		class GuestCPUConfiguration;
 
-		class Guest
+		class Guest : public GPAResolver
 		{
 		public:
 			Guest(Hypervisor& owner, engine::Engine& engine, const GuestConfiguration& config);
@@ -51,6 +52,8 @@ namespace captive {
 			inline void guest_entrypoint(gpa_t ep) { _guest_entrypoint = ep; }
 
 			inline shmem_data *shmem_region() const { return _shmem; }
+
+			virtual bool resolve_gpa(gpa_t gpa, void*& out_addr) const = 0;
 
 		protected:
 			shmem_data *_shmem;

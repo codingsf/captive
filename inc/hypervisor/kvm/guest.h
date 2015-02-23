@@ -42,6 +42,7 @@ namespace captive {
 
 				uint64_t next_avail_phys_page() const { return next_page; }
 
+				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
 

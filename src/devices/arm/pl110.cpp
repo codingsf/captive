@@ -1,6 +1,7 @@
 #include <devices/arm/pl110.h>
 #include <devices/gfx/virtual-screen.h>
 #include <devices/irq/irq-line.h>
+#include <hypervisor/guest.h>
 
 using namespace captive::devices::arm;
 
@@ -90,6 +91,11 @@ bool PL110::write(uint64_t off, uint8_t len, uint64_t data)
 	case 0x10:
 	case 0x2c:
 		upper_fbbase = data;
+		void *gpa;
+		if (guest().resolve_gpa((gpa_t)upper_fbbase, gpa)) {
+			_screen.framebuffer((uint8_t *)gpa);
+		}
+
 		break;
 	case 0x14:
 	case 0x30:
@@ -132,7 +138,7 @@ void PL110::update_control()
 		case 3:
 			mode = gfx::VirtualScreenConfiguration::VS_8bpp;
 			break;
-			
+
 		case 4:
 			mode = gfx::VirtualScreenConfiguration::VS_16bpp;
 			break;
