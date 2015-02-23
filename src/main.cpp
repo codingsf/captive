@@ -8,6 +8,8 @@
 
 #include <devices/arm/cpu-irq.h>
 #include <devices/arm/pl011.h>
+#include <devices/arm/pl031.h>
+#include <devices/arm/pl061.h>
 #include <devices/arm/pl080.h>
 #include <devices/arm/pl110.h>
 #include <devices/arm/pl190.h>
@@ -64,7 +66,7 @@ int main(int argc, char **argv)
 	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(0), *cpu_irq->get_irq_line(1));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, *vic));
 
-	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC();
+	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC(*vic->get_irq_line(31));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
 	devices::arm::PL011 *uart0 = new devices::arm::PL011();
@@ -76,11 +78,14 @@ int main(int argc, char **argv)
 	devices::arm::PL011 *uart2 = new devices::arm::PL011();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, *uart2));
 
+	devices::arm::PL031 *rtc = new devices::arm::PL031();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e8000, *rtc));
+
 	devices::arm::PL080 *dma = new devices::arm::PL080();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
 
 	devices::gfx::NullVirtualScreen *vs = new devices::gfx::NullVirtualScreen();
-	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs, *vic->get_irq_line(8));
+	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs, *vic->get_irq_line(16));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
 
 	devices::arm::SP810 *sysctl = new devices::arm::SP810();
@@ -101,6 +106,30 @@ int main(int argc, char **argv)
 
 	devices::arm::PrimecellStub *watchdog = new devices::arm::PrimecellStub(0x00141805, 0x1000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e1000, *watchdog));
+
+	devices::arm::PrimecellStub *sci = new devices::arm::PrimecellStub(0x00041131, 0x1000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101f0000, *sci));
+
+	devices::arm::PrimecellStub *ssp = new devices::arm::PrimecellStub(0x00241022, 0x1000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101f4000, *ssp));
+
+	devices::arm::PrimecellStub *net = new devices::arm::PrimecellStub(0xf0f0f0f0, 0x10000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10010000, *net));
+
+	devices::arm::PrimecellStub *aaci = new devices::arm::PrimecellStub(0xf0f0f0f0, 0x1000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10004000, *aaci));
+
+	devices::arm::PrimecellStub *mci0 = new devices::arm::PrimecellStub(0xf0f0f0f0, 0x1000);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10005000, *mci0));
+
+	devices::arm::PL061 *gpio0 = new devices::arm::PL061(*vic->get_irq_line(6));
+	devices::arm::PL061 *gpio1 = new devices::arm::PL061(*vic->get_irq_line(7));
+	devices::arm::PL061 *gpio2 = new devices::arm::PL061(*vic->get_irq_line(8));
+	devices::arm::PL061 *gpio3 = new devices::arm::PL061(*vic->get_irq_line(9));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e4000, *gpio0));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e5000, *gpio1));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e6000, *gpio2));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x101e7000, *gpio3));
 
 	// Create the engine.
 	Engine engine(argv[1]);

@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-VersatileSIC::VersatileSIC()
+VersatileSIC::VersatileSIC(irq::IRQLine& irq) : _irq(irq)
 {
 
 }

@@ -17,7 +17,7 @@ namespace captive {
 			class VersatileSIC : public Device, public irq::IRQController<32u>
 			{
 			public:
-				VersatileSIC();
+				VersatileSIC(irq::IRQLine& irq);
 				virtual ~VersatileSIC();
 
 				virtual bool read(uint64_t off, uint8_t len, uint64_t& data);
@@ -26,6 +26,7 @@ namespace captive {
 				virtual uint32_t size() const { return 0x1000; }
 
 			private:
+				irq::IRQLine& _irq;
 				uint32_t status;
 				uint32_t enable_mask;
 			};
