@@ -60,7 +60,7 @@ namespace captive {
 				class VirtIO : public Device
 				{
 				public:
-					VirtIO(irq::IRQLine& irq, uint32_t size, uint32_t version, uint32_t device_id, uint8_t nr_queues);
+					VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues);
 					virtual ~VirtIO();
 
 					bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -93,24 +93,17 @@ namespace captive {
 
 					irq::IRQLine& _irq;
 
-					uint32_t MagicValue;
 					uint32_t Version;
 					uint32_t DeviceID;
 					uint32_t VendorID;
-
+					
 					uint32_t HostFeaturesSel;
 
 					uint32_t GuestFeatures;
 					uint32_t GuestFeaturesSel;
-					uint32_t GuestPageSize;
 
 					uint32_t QueueSel;
-					uint32_t QueueNumMax;
-					uint32_t QueueNum;
-					uint32_t QueueAlign;
-					uint32_t QueuePFN;
 
-					uint32_t QueueNotify;
 					uint32_t InterruptStatus;
 					uint32_t InterruptACK;
 					uint32_t Status;
