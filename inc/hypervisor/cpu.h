@@ -23,6 +23,7 @@ namespace captive {
 
 			virtual bool init();
 			virtual bool run() = 0;
+			virtual void stop() = 0;
 
 			inline Guest& owner() const { return _owner; }
 			inline const GuestCPUConfiguration& config() const { return _config; }

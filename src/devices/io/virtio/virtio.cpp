@@ -11,7 +11,18 @@ using namespace captive::devices::io::virtio;
 #define VIRTIO_CHAR_SHIFT(c, s) (((uint32_t)((uint8_t)c)) << (s))
 #define VIRTIO_MAGIC (VIRTIO_CHAR_SHIFT('v', 0) | VIRTIO_CHAR_SHIFT('i', 8) | VIRTIO_CHAR_SHIFT('r', 16) | VIRTIO_CHAR_SHIFT('t', 24))
 
-VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues) : _irq(irq), Version(version), DeviceID(device_id), VendorID(0x1af4)
+VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues)
+	: _irq(irq),
+	Version(version),
+	DeviceID(device_id),
+	VendorID(0x1af4),
+	HostFeaturesSel(0),
+	GuestFeatures(0),
+	GuestFeaturesSel(0),
+	QueueSel(0),
+	InterruptStatus(0),
+	Status(0),
+	guest_page_shift(0)
 {
 	for (uint8_t i = 0; i < nr_queues; i++) {
 		queues.push_back(new VirtQueue());
@@ -29,14 +40,14 @@ VirtIO::~VirtIO()
 
 bool VirtIO::read(uint64_t off, uint8_t len, uint64_t& data)
 {
-	if (off >= 0x100 && off <= (0x100 + config_area_size())) {
-		uint32_t config_area_offset = 0x100 + config_area_size();
+	if (off >= 0x100 && off < (0x100 + config_area_size())) {
+		uint32_t config_area_offset = off - 0x100;
 		if (len > (config_area_size() - config_area_offset))
 			return false;
 
-		uint8_t *config_area_data = config_area();
+		const uint8_t *config_area_data = config_area();
 		data = 0;
-		memcpy((void *)&data, config_area_data + config_area_offset, len);
+		memcpy((void *)&data, (const void *)(config_area_data + config_area_offset), len);
 		return true;
 	} else {
 		switch (off) {
@@ -127,7 +138,7 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 
 			void *queue_host_addr;
 			if (!guest().resolve_gpa(queue_phys_addr, queue_host_addr)) {
-				ERROR << "Unable to resolve GPA: " << std::hex << queue_phys_addr;
+				ERROR << CONTEXT(VirtIO) << "Unable to resolve GPA: " << std::hex << queue_phys_addr;
 				assert(false);
 			}
 

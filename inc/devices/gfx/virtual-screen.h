@@ -23,7 +23,7 @@ namespace captive {
 			{
 			public:
 				enum VirtualScreenMode {
-					VS_DUMMY,
+					VS_None,
 					VS_8bpp,
 					VS_16bpp,
 					VS_32bpp,
@@ -70,7 +70,11 @@ namespace captive {
 				virtual bool activate_configuration(const VirtualScreenConfiguration& cfg) = 0;
 				virtual bool reset_configuration() = 0;
 
+				inline const VirtualScreenConfiguration& config() { return _config; }
+
 			private:
+				VirtualScreenConfiguration _config;
+
 				bool _configured;
 				uint8_t *_framebuffer, *_palette;
 

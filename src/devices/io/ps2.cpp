@@ -37,17 +37,17 @@
 
 using namespace captive::devices::io;
 
-PS2Device::PS2Device(irq::IRQLine& irq) : _irq(irq)
+PS2Device::PS2Device(irq::IRQLine& irq) : _irq(irq), irq_enabled(false)
 {
 
 }
 
-PS2KeyboardDevice::PS2KeyboardDevice(irq::IRQLine& irq) : PS2Device(irq)
+PS2KeyboardDevice::PS2KeyboardDevice(irq::IRQLine& irq) : PS2Device(irq), last_command(0)
 {
 
 }
 
-PS2MouseDevice::PS2MouseDevice(irq::IRQLine& irq) : PS2Device(irq)
+PS2MouseDevice::PS2MouseDevice(irq::IRQLine& irq) : PS2Device(irq), last_command(0), status(0), resolution(0), sample_rate(0), last_x(0), last_y(0), button_state(0)
 {
 
 }

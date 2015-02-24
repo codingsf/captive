@@ -31,6 +31,7 @@ namespace captive {
 
 				bool init();
 				bool run() override;
+				void stop() override;
 				void interrupt(uint32_t code) override;
 
 				inline bool initialised() const { return _initialised; }

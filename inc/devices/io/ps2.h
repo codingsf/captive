@@ -83,7 +83,7 @@ namespace captive {
 				uint32_t status, resolution, sample_rate;
 
 				uint32_t last_x, last_y;
-				int button_state;
+				uint32_t button_state;
 			};
 		}
 	}

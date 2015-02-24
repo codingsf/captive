@@ -29,7 +29,7 @@ void VirtIOBlockDevice::process_event(VirtIOQueueEvent& evt)
 	}
 
 	if (evt.read_buffers.front().size < sizeof(struct virtio_blk_req)) {
-		WARNING << "Discarding event with invalid header";
+		WARNING << CONTEXT(VirtIOBlockDevice) << "Discarding event with invalid header";
 		return;
 	}
 
@@ -73,7 +73,7 @@ void VirtIOBlockDevice::process_event(VirtIOQueueEvent& evt)
 		break;
 	}
 	default:
-		WARNING << "Rejecting event with unsupported type " << (uint32_t)req->type;
+		WARNING << CONTEXT(VirtIOBlockDevice) << "Rejecting event with unsupported type " << (uint32_t)req->type;
 
 		*status = 2;
 		evt.response_size = 1;

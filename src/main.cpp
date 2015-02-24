@@ -178,6 +178,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	vs->guest(*guest);
+
 	// Initialise the guest
 	if (!guest->init()) {
 		delete guest;

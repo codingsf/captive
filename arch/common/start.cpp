@@ -57,6 +57,7 @@ extern "C" {
 			delete env;
 		}
 
+		printf("done\n");
 		abort();
 	}
 

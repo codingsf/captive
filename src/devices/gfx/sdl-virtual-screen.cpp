@@ -1,6 +1,8 @@
 #include <devices/gfx/sdl-virtual-screen.h>
 #include <devices/io/keyboard.h>
 #include <devices/io/mouse.h>
+#include <hypervisor/kvm/guest.h>
+#include <shmem.h>
 #include <captive.h>
 
 #include <unistd.h>
@@ -86,24 +88,30 @@ static const uint32_t sdl_scancode_map[] = {
 std::mutex SDLVirtualScreen::_sdl_lock;
 bool SDLVirtualScreen::_sdl_initialised = false;
 
-SDLVirtualScreen::SDLVirtualScreen() : hw_accelerated(false), terminate(false), _sdl_mode(0), window_thread(NULL)
+SDLVirtualScreen::SDLVirtualScreen() : _guest(NULL), hw_accelerated(false), terminate(false), _sdl_mode(0), window_thread(NULL)
 {
 
 }
 
 SDLVirtualScreen::~SDLVirtualScreen()
 {
-
+	if (window_thread) {
+		terminate = true;
+		window_thread->join();
+		window_thread = NULL;
+	}
 }
 
-void SDLVirtualScreen::window_thread_proc(SDLVirtualScreen *o)
+void SDLVirtualScreen::window_thread_proc_tramp(SDLVirtualScreen *o)
 {
-	devices::io::Keyboard& kbd = o->keyboard();
-	devices::io::Mouse& mse = o->mouse();
+	o->window_thread_proc();
+}
 
+void SDLVirtualScreen::window_thread_proc()
+{
 	DEBUG << CONTEXT(SDLVirtualScreen) << "Welp.  Here we go!";
 
-	while (!o->terminate) {
+	while (!terminate) {
 		// Stop the event queue from overflowing
 
 		SDL_Event e;
@@ -111,44 +119,49 @@ void SDLVirtualScreen::window_thread_proc(SDLVirtualScreen *o)
 			switch (e.type)	{
 			case SDL_KEYDOWN:
 				if (e.key.keysym.scancode >= SDL_SCANCODE_F1 && e.key.keysym.scancode <= SDL_SCANCODE_F12) {
-					kbd.key_down(sdl_scancode_map[SDL_SCANCODE_LCTRL]);
-					kbd.key_down(sdl_scancode_map[SDL_SCANCODE_LALT]);
+					keyboard().key_down(sdl_scancode_map[SDL_SCANCODE_LCTRL]);
+					keyboard().key_down(sdl_scancode_map[SDL_SCANCODE_LALT]);
 				}
 
-				kbd.key_down(sdl_scancode_map[e.key.keysym.scancode]);
+				keyboard().key_down(sdl_scancode_map[e.key.keysym.scancode]);
 
 				break;
 
 			case SDL_KEYUP:
-				kbd.key_up(sdl_scancode_map[e.key.keysym.scancode]);
+				keyboard().key_up(sdl_scancode_map[e.key.keysym.scancode]);
 
 				if (e.key.keysym.scancode >= SDL_SCANCODE_F1 && e.key.keysym.scancode <= SDL_SCANCODE_F12) {
-					kbd.key_up(sdl_scancode_map[SDL_SCANCODE_LCTRL]);
-					kbd.key_up(sdl_scancode_map[SDL_SCANCODE_LALT]);
+					keyboard().key_up(sdl_scancode_map[SDL_SCANCODE_LCTRL]);
+					keyboard().key_up(sdl_scancode_map[SDL_SCANCODE_LALT]);
 				}
 
 				break;
 
 			case SDL_MOUSEBUTTONDOWN:
-				mse.button_down(e.button.button);
+				mouse().button_down(e.button.button);
 				break;
 
 			case SDL_MOUSEBUTTONUP:
-				mse.button_up(e.button.button);
+				mouse().button_up(e.button.button);
 				break;
 
 			case SDL_MOUSEMOTION:
-				mse.mouse_move(e.motion.x, e.motion.y);
+				mouse().mouse_move(e.motion.x, e.motion.y);
 				break;
 
 			case SDL_QUIT:
-				// TODO
+				terminate = true;
+
+				if (_guest) {
+					((hypervisor::kvm::KVMGuest *)_guest)->shmem_region()->halt = true;
+				}
+
 				break;
 			}
 		}
 
 		// Draw a frame
-		o->draw_frame();
+		draw_frame();
 		usleep(20000);
 	}
 }
@@ -164,7 +177,7 @@ bool SDLVirtualScreen::initialise()
 	}
 	_sdl_lock.unlock();
 
-	window = SDL_CreateWindow("LCD", 0, 0, _width, _height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow("LCD", 0, 0, config().width(), config().height(), SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 	if (!window) {
 		ERROR << CONTEXT(SDLVirtualScreen) << "Could not create SDL window!";
 		return false;
@@ -190,14 +203,14 @@ bool SDLVirtualScreen::initialise()
 		}
 	}
 
-	window_texture = SDL_CreateTexture(renderer, _sdl_mode, SDL_TEXTUREACCESS_STREAMING, _width, _height);
+	window_texture = SDL_CreateTexture(renderer, _sdl_mode, SDL_TEXTUREACCESS_STREAMING, config().width(), config().height());
 	if(!window_texture) {
 		ERROR << CONTEXT(SDLVirtualScreen) << "Could not create window texture! Terminating.";
 		return false;
 	}
 
 	terminate = false;
-	window_thread = new std::thread(window_thread_proc, this);
+	window_thread = new std::thread(window_thread_proc_tramp, this);
 
 	return true;
 }
@@ -208,14 +221,17 @@ bool SDLVirtualScreen::activate_configuration(const VirtualScreenConfiguration& 
 	switch(cfg.mode()) {
 	case VirtualScreenConfiguration::VS_16bpp:
 		_sdl_mode = SDL_PIXELFORMAT_RGB565;
+		frame_drawer = &SDLVirtualScreen::draw_rgb;
 		break;
 
 	case VirtualScreenConfiguration::VS_8bpp:
 		_sdl_mode = SDL_PIXELFORMAT_RGB332;
+		frame_drawer = &SDLVirtualScreen::draw_rgb;
 		break;
 
 	case VirtualScreenConfiguration::VS_Doom:
 		_sdl_mode = SDL_PIXELFORMAT_RGB888;
+		frame_drawer = &SDLVirtualScreen::draw_doom;
 		break;
 
 	default:
@@ -223,8 +239,7 @@ bool SDLVirtualScreen::activate_configuration(const VirtualScreenConfiguration& 
 		return false;
 	}
 
-	_width = cfg.width();
-	_height = cfg.height();
+	pitch = cfg.width() * 2;
 
 	return true;
 }
@@ -238,7 +253,7 @@ void SDLVirtualScreen::draw_frame()
 {
 	SDL_RenderClear(renderer);
 
-	draw_rgb();
+	(this->*frame_drawer)();
 
 	SDL_RenderCopy(renderer, window_texture, NULL, NULL);
 	SDL_RenderPresent(renderer);
@@ -251,7 +266,5 @@ void SDLVirtualScreen::draw_doom()
 
 void SDLVirtualScreen::draw_rgb()
 {
-	int pitch = _width * 2;
-	//DEBUG << "Frame @ " << std::hex << (uint64_t)framebuffer();
 	SDL_UpdateTexture(window_texture, NULL, (void *)framebuffer(), pitch);
 }

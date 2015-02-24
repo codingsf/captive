@@ -199,11 +199,16 @@ bool KVMCpu::run()
 			DEBUG << "UNKNOWN: " << cpu_run_struct->exit_reason;
 			break;
 		}
-	} while (run_cpu);
+	} while (run_cpu && !kvm_guest.shmem_region()->halt);
 
 	dump_regs();
 
 	return true;
+}
+
+void KVMCpu::stop()
+{
+	((KVMGuest &)owner()).shmem_region()->halt = true;
 }
 
 bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run& rs)

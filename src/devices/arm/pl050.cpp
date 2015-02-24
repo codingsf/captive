@@ -9,6 +9,19 @@
 #define PL050_KMIC            (1 << 1)
 #define PL050_KMID            (1 << 0)
 
+#define FKMIC			(1 << 0)
+#define FKMID			(1 << 1)
+#define KMIEN			(1 << 2)
+#define KMITXINTREN		(1 << 3)
+#define KMIRXINTREN		(1 << 4)
+#define KMITYPE			(1 << 5)
+
+#define KMICR		0x00
+#define KMISTAT		0x04
+#define KMIDATA		0x08
+#define KMICLKDIV	0x0c
+#define KMIIR		0x10
+
 using namespace captive::devices::arm;
 
 PL050::PL050(io::PS2Device& ps2) : Primecell(0x00041050), _ps2(ps2), cr(0), clkdiv(0), last(0)
@@ -27,11 +40,11 @@ bool PL050::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 
 	switch (off) {
-	case 0x00:		// KMICR
+	case KMICR:
 		data = cr;
 		break;
 
-	case 0x04:		// KMISTAT
+	case KMISTAT:
 	{
 		uint8_t val;
 		uint32_t stat;
@@ -54,7 +67,7 @@ bool PL050::read(uint64_t off, uint8_t len, uint64_t& data)
 		break;
 	}
 
-	case 0x08:		// KMIDATA
+	case KMIDATA:
 		if (_ps2.data_pending()) {
 			last = _ps2.read();
 		}
@@ -62,11 +75,11 @@ bool PL050::read(uint64_t off, uint8_t len, uint64_t& data)
 		data = last;
 		break;
 
-	case 0x0c:
+	case KMICLKDIV:
 		data = clkdiv;
 		break;
 
-	case 0x10:
+	case KMIIR:
 		data = (_ps2.data_pending() ? 1 : 0) | 2;
 		break;
 
@@ -83,10 +96,10 @@ bool PL050::write(uint64_t off, uint8_t len, uint64_t data)
 		return true;
 
 	switch (off) {
-	case 0x00:
-		assert(!(data & 0x8));
+	case KMICR:
+		assert(!(data & KMITXINTREN));
 
-		if ((data & 0x10) == 0x10) {
+		if ((data & KMIRXINTREN) == KMIRXINTREN) {
 			_ps2.enable_irq();
 		} else {
 			_ps2.disable_irq();
@@ -95,11 +108,11 @@ bool PL050::write(uint64_t off, uint8_t len, uint64_t data)
 		cr = data;
 		break;
 
-	case 0x08:
+	case KMIDATA:
 		_ps2.send_command(data & 0xff);
 		break;
 
-	case 0x0c:
+	case KMICLKDIV:
 		clkdiv = data;
 		break;
 

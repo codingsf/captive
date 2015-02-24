@@ -24,7 +24,7 @@ namespace captive {
 
 				protected:
 					void reset() override;
-					uint8_t* config_area() const override { return (uint8_t *)&config; }
+					const uint8_t* config_area() const override { return (const uint8_t *)&config; }
 					uint32_t config_area_size() const override { return sizeof(config); }
 
 					void process_event(VirtIOQueueEvent& evt) override;
@@ -39,7 +39,7 @@ namespace captive {
 						uint32_t type;
 						uint32_t ioprio;
 						uint64_t sector;
-					};
+					} __attribute__((packed));
 
 					struct {
 						uint64_t capacity;
@@ -51,7 +51,7 @@ namespace captive {
 							uint8_t sectors;
 						} geometry;
 						uint32_t block_size;
-					} config;
+					} __attribute__((packed)) config;
 				};
 			}
 		}

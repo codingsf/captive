@@ -11,6 +11,7 @@
 namespace captive {
 	struct shmem_data {
 		unsigned int asynchronous_action_pending;
+		bool halt;
 	};
 }
 

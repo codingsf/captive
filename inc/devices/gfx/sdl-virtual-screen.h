@@ -15,6 +15,10 @@
 #include <SDL2/SDL.h>
 
 namespace captive {
+	namespace hypervisor {
+		class Guest;
+	}
+
 	namespace devices {
 		namespace gfx {
 			class SDLVirtualScreen : public VirtualScreen
@@ -25,6 +29,10 @@ namespace captive {
 
 				bool initialise() override;
 
+				inline void guest(hypervisor::Guest& guest) {
+					_guest = &guest;
+				}
+
 			protected:
 				bool activate_configuration(const VirtualScreenConfiguration& cfg) override;
 				bool reset_configuration() override;
@@ -33,15 +41,22 @@ namespace captive {
 				static std::mutex _sdl_lock;
 				static bool _sdl_initialised;
 
-				static void window_thread_proc(SDLVirtualScreen *o);
+				static void window_thread_proc_tramp(SDLVirtualScreen *o);
+				void window_thread_proc();
 				void draw_frame();
+
 				void draw_doom();
 				void draw_rgb();
+
+				typedef void (SDLVirtualScreen::*frame_drawer_fn_t)(void);
+				frame_drawer_fn_t frame_drawer;
+
+				hypervisor::Guest *_guest;
 
 				bool hw_accelerated, terminate;
 
 				int _sdl_mode;
-				uint32_t _width, _height;
+				uint32_t pitch;
 
 				SDL_Window *window;
 				SDL_Renderer *renderer;

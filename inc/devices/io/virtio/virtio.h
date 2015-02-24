@@ -71,7 +71,7 @@ namespace captive {
 				protected:
 					virtual void reset() = 0;
 
-					virtual uint8_t *config_area() const = 0;
+					virtual const uint8_t *config_area() const = 0;
 					virtual uint32_t config_area_size() const = 0;
 
 					inline VirtQueue *current_queue() const { return queue(QueueSel); }
@@ -88,10 +88,7 @@ namespace captive {
 				private:
 					void process_queue(VirtQueue *queue);
 
-					uint8_t guest_page_shift;
-
 					std::vector<VirtQueue *> queues;
-
 					irq::IRQLine& _irq;
 
 					uint32_t Version;
@@ -106,8 +103,9 @@ namespace captive {
 					uint32_t QueueSel;
 
 					uint32_t InterruptStatus;
-					uint32_t InterruptACK;
 					uint32_t Status;
+
+					uint8_t guest_page_shift;
 				};
 			}
 		}

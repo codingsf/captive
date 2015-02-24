@@ -150,7 +150,7 @@ void PL110::update_control()
 			break;
 
 		default:
-			mode = gfx::VirtualScreenConfiguration::VS_DUMMY;
+			mode = gfx::VirtualScreenConfiguration::VS_None;
 			break;
 		}
 
