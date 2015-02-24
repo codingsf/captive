@@ -12,8 +12,9 @@
 
 #include <printf.h>
 #include <env.h>
+#include <mmu.h>
 
-extern volatile uint32_t mem_access_type;
+extern volatile captive::arch::MMU::access_type mem_access_type;
 
 #ifdef TRACE
 
@@ -87,28 +88,28 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 
 static inline uint32_t mem_read_8(uint32_t addr, uint32_t& data)
 {
-	mem_access_type = 0;
+	mem_access_type = captive::arch::MMU::ACCESS_READ;
 	data = *((uint8_t*)((uint64_t)addr));
 	return 0;
 }
 
 static inline uint32_t mem_read_16(uint32_t addr, uint32_t& data)
 {
-	mem_access_type = 0;
+	mem_access_type = captive::arch::MMU::ACCESS_READ;
 	data = *((uint16_t*)((uint64_t)addr));
 	return 0;
 }
 
 static inline uint32_t mem_read_32(uint32_t addr, uint32_t& data)
 {
-	mem_access_type = 0;
+	mem_access_type = captive::arch::MMU::ACCESS_READ;
 	data = *((uint32_t*)((uint64_t)addr));
 	return 0;
 }
 
 static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
 {
-	mem_access_type = 0;
+	mem_access_type = captive::arch::MMU::ACCESS_READ;
 	data = *((uint64_t*)((uint64_t)addr));
 	return 0;
 }
@@ -120,28 +121,28 @@ static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
 
 static inline uint32_t mem_write_64(uint32_t addr, uint64_t data)
 {
-	mem_access_type = 1;
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE;
 	*((uint64_t*)((uint64_t)addr)) = ((uint64_t)data);
 	return 0;
 }
 
 static inline uint32_t mem_write_32(uint32_t addr, uint32_t data)
 {
-	mem_access_type = 1;
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE;
 	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
 	return 0;
 }
 
 static inline uint32_t mem_write_16(uint32_t addr, uint16_t data)
 {
-	mem_access_type = 1;
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE;
 	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
 	return 0;
 }
 
 static inline uint32_t mem_write_8(uint32_t addr, uint8_t data)
 {
-	mem_access_type = 1;
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE;
 	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
 	return 0;
 }

@@ -28,6 +28,11 @@ void Trace::start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode
 	memcpy((void *)&current_record.decode_data[0], (const void *)decode_data, sizeof(current_record.decode_data));
 }
 
+void Trace::abort_record()
+{
+	_building_record = false;
+}
+
 void Trace::end_record()
 {
 	if (!_building_record) return;

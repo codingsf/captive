@@ -53,8 +53,19 @@ bool ArmCPU::run()
 	printf("starting cpu execution\n");
 
 	int rc = record_safepoint(&cpu_safepoint);
-	if (rc == 1) {
-		interp.take_exception(7, state.regs.RB[15] + 8);
+	if (rc > 0) {
+		if (trace().enabled()) {
+			trace().add_str("memory exception taken");
+			trace().end_record();
+		}
+
+		if (rc == MMU::READ_FAULT || rc == MMU::WRITE_FAULT) {
+			interp.take_exception(7, state.regs.RB[15] + 8);
+		} else {
+			interp.take_exception(6, state.regs.RB[15] + 4);
+		}
+
+		__local_irq_enable();
 	}
 
 	do {
@@ -106,7 +117,10 @@ bool ArmCPU::run()
 			if (trace().enabled()) trace().start_record(get_insns_executed(), pc, (const uint8_t *)insn);
 
 			// Execute the instruction
+			__local_irq_disable();
 			step_ok = interp.step_single(*insn);
+			__local_irq_enable();
+
 			inc_insns_executed();
 
 			if (trace().enabled()) trace().end_record();

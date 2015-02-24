@@ -38,5 +38,15 @@ static inline __attribute__((noreturn)) void abort()
 	for(;;);
 }
 
+static inline void __local_irq_enable()
+{
+	asm volatile("sti\n");
+}
+
+static inline void __local_irq_disable()
+{
+	asm volatile("sti\n");
+}
+
 #endif	/* DEFINE_H */
 

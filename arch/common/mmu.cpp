@@ -2,9 +2,12 @@
 #include <mm.h>
 #include <printf.h>
 
-extern volatile uint32_t mem_access_type;
-
 using namespace captive::arch;
+
+static const char *mem_access_types[] = { "read", "write", "fetch" };
+static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
+
+extern volatile MMU::access_type mem_access_type;
 
 MMU::MMU(Environment& env) : _env(env)
 {
@@ -115,10 +118,9 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 		pd->present(true);
 	}
 
-	access_type type = (access_type)mem_access_type;
 	gpa_t pa;
 
-	if (!resolve_gpa((gva_t)(uint64_t)va, pa, type, fault)) {
+	if (!resolve_gpa((gva_t)(uint64_t)va, pa, mem_access_type, fault)) {
 		return false;
 	}
 
@@ -131,9 +133,10 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 		pt->present(true);
 		pt->writable(true);
 	} else {
-		printf("fault %d %d %x\n", type, fault, va);
+		printf("mmu: fault: va=%08x access-type=%s fault-type=%s\n", va, mem_access_types[mem_access_type], mem_fault_types[fault]);
 	}
 
 	Memory::flush_page(va);
 	return true;
 }
+

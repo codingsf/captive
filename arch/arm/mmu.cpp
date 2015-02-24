@@ -107,23 +107,41 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault
 		return true;
 	}
 
-	fault = FAULT;
+	switch (type) {
+	case MMU::ACCESS_READ:
+		fault = MMU::READ_FAULT;
+		break;
+	case MMU::ACCESS_WRITE:
+		fault = MMU::WRITE_FAULT;
+		break;
+	case MMU::ACCESS_FETCH:
+		fault = MMU::FETCH_FAULT;
+		break;
+	}
 
 	uint32_t fsr = (uint32_t)l1->domain() << 4;
 	switch (arm_fault) {
-	case SECTION_FAULT:
+	case ArmMMU::SECTION_FAULT:
 		fsr |= 0x5;
 		break;
 
-	case COARSE_FAULT:
+	case ArmMMU::COARSE_FAULT:
 		fsr |= 0x7;
 		break;
 
-	case SECTION_PERMISSION:
+	case ArmMMU::SECTION_DOMAIN:
+		fsr |= 0x9;
+		break;
+
+	case ArmMMU::COARSE_DOMAIN:
+		fsr |= 0xb;
+		break;
+
+	case ArmMMU::SECTION_PERMISSION:
 		fsr |= 0xd;
 		break;
 
-	case COARSE_PERMISSION:
+	case ArmMMU::COARSE_PERMISSION:
 		fsr |= 0xf;
 		break;
 
@@ -146,6 +164,11 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& faul
 
 	uint8_t *x = (uint8_t *)temp_map(L1_TEMP_BASE, l1->base_addr(), 1);
 	l2_descriptor *l2 = &((l2_descriptor *)(x + (l1->base_addr() & 0xfff)))[l2_idx];
+
+	if (l2->type() == l2_descriptor::TE_FAULT) {
+		fault = COARSE_FAULT;
+		return true;
+	}
 
 	//printf("resolving coarse descriptor: l1-base=%x l2-idx=%d va=%x, type=%d, base=%x, data=%x\n", l1->base_addr(), l2_idx, va, l2->type(), l2->base_addr(), l2->data);
 
@@ -170,9 +193,6 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& faul
 	}
 
 	switch(l2->type()) {
-	case l2_descriptor::TE_FAULT:
-		fault = COARSE_FAULT;
-		return true;
 	case l2_descriptor::TE_LARGE:
 		pa = (gpa_t)(l2->base_addr() | (((uint32_t)va) & 0xffff));
 		return true;
@@ -181,6 +201,9 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& faul
 		return true;
 	case l2_descriptor::TE_TINY:
 		printf("mmu: unsupported tiny page\n");
+		return false;
+	default:
+		printf("mmu: unsupported page type\n");
 		return false;
 	}
 

@@ -21,7 +21,7 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code)
 
 				// Return TRUE if we need to return to the safe-point, i.e. to do a side
 				// exit from the currently executing guest instruction.
-				return fault == captive::arch::MMU::NONE ? 0 : 1;
+				return (int)fault;
 			} else {
 				// If the core couldn't handle the fault, then we've got a serious problem.
 				printf("panic: unhandled page-fault: va=%x, code=%x, pc=%x\n", va, code, core->read_pc());
@@ -39,5 +39,5 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code)
 	}
 
 	// We can't ever get here - all other paths have an abort in them.
-	return 1;
+	return 0;
 }

@@ -21,7 +21,15 @@ namespace captive {
 		public:
 			enum resolution_fault {
 				NONE,
-				FAULT,
+				READ_FAULT,
+				WRITE_FAULT,
+				FETCH_FAULT
+			};
+
+			enum access_type {
+				ACCESS_READ,
+				ACCESS_WRITE,
+				ACCESS_FETCH,
 			};
 
 			MMU(Environment& env);
@@ -47,12 +55,6 @@ namespace captive {
 			void *map_guest_phys_page(gpa_t pa);
 			void *map_guest_phys_pages(gpa_t pa, int nr);
 			void unmap_phys_page(void *p);
-
-			enum access_type {
-				READ,
-				WRITE,
-				FETCH,
-			};
 
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault& fault) = 0;
 		};

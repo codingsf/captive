@@ -86,9 +86,18 @@ namespace captive {
 			} packed;
 
 			void start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode_data);
+			void abort_record();
 			void end_record();
 
 			void add_action(const trace_action& action);
+
+			inline void add_str(const char *str) {
+				trace_action action;
+				action.type = trace_action::MESSAGE;
+				action.message.msg = str;
+				
+				add_action(action);
+			}
 
 			inline void add_reg_read(const char *reg_id, uint32_t value) {
 				trace_action action;

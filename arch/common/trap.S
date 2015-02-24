@@ -84,7 +84,7 @@ trap_pf:
 	jz 1f
 
 	leaq cpu_safepoint, %rdi
-	mov $1, %rsi
+	mov %rax, %rsi
 	jmp interrupt_restore_safepoint
 
 1:
