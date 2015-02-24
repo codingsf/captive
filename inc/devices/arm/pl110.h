@@ -32,6 +32,8 @@ namespace captive {
 
 				inline gfx::VirtualScreen& screen() const { return _screen; }
 
+				virtual std::string name() const { return "pl110"; }
+
 			private:
 				void update_control();
 				void update_irq();

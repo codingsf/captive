@@ -26,12 +26,14 @@ namespace captive {
 
 				virtual uint32_t size() const { return 0x1000; }
 
+				virtual std::string name() const { return "sic"; }
+
 				void irq_raised(irq::IRQLine& line) override;
 				void irq_rescinded(irq::IRQLine& line) override;
 
 			private:
 				irq::IRQLine& _irq;
-				
+
 				std::atomic<uint32_t> status;
 				uint32_t enable_mask;
 			};

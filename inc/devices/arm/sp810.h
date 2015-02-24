@@ -23,6 +23,8 @@ namespace captive {
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
+				virtual std::string name() const { return "sp810"; }
+
 			private:
 				typedef std::chrono::high_resolution_clock clock_t;
 				typedef std::chrono::duration<uint32_t, std::ratio<1, 24000000> > tick_24MHz_t;

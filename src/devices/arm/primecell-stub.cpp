@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-PrimecellStub::PrimecellStub(uint32_t device_id, uint32_t size) : Primecell(device_id), _size(size)
+PrimecellStub::PrimecellStub(uint32_t device_id, std::string name, uint32_t size) : Primecell(device_id), _name(name), _size(size)
 {
 
 }

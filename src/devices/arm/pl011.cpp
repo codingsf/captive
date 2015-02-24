@@ -3,6 +3,14 @@
 
 using namespace captive::devices::arm;
 
+#define UARTDR		0x000
+#define UARTRSR		0x004
+#define UARTECR		0x004
+#define UARTFR		0x018
+#define UARTILPR	0x020
+#define UARTIBRD	0x024
+#define UARTFBRD	0x028
+
 PL011::PL011() : Primecell(0x00141011)
 {
 
@@ -51,6 +59,9 @@ bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 	case 0x030: // Control register
 		data = control_word;
 		break;
+	case 0x34:
+		data = 0;
+		break;
 	case 0x038:
 		data = irq_mask;
 		break;
@@ -98,6 +109,10 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 	case 0x030: // Control register
 		control_word = data;
 		break;
+
+	case 0x034:
+		break;
+
 	case 0x38:
 		irq_mask = data & 0x7ff;
 		//CheckIRQs();
