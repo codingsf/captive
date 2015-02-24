@@ -119,8 +119,11 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 	}
 
 	gpa_t pa;
-
-	if (!resolve_gpa((gva_t)(uint64_t)va, pa, mem_access_type, fault)) {
+	access_info info;
+	info.type = mem_access_type;
+	info.mode = ACCESS_KERNEL;
+	
+	if (!resolve_gpa((gva_t)(uint64_t)va, pa, info, fault)) {
 		return false;
 	}
 

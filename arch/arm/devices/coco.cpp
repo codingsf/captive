@@ -5,7 +5,7 @@
 
 using namespace captive::arch::arm::devices;
 
-CoCo::CoCo(Environment& env) : Coprocessor(env), S(false), R(false), M(false)
+CoCo::CoCo(Environment& env) : Coprocessor(env), _S(false), _R(false), M(false)
 {
 
 }
@@ -31,8 +31,8 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		I = (data & (1 << 12)) != 0;
 		Z = (data & (1 << 11)) != 0;
 		F = (data & (1 << 10)) != 0;
-		R = (data & (1 << 9)) != 0;
-		S = (data & (1 << 8)) != 0;
+		_R = (data & (1 << 9)) != 0;
+		_S = (data & (1 << 8)) != 0;
 		B = (data & (1 << 7)) != 0;
 		L = (data & (1 << 6)) != 0;
 		D = (data & (1 << 5)) != 0;
@@ -117,8 +117,8 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		data |= 0 << 7; //B (endianness)
 
 		//NIBBLE 2
-		data |= S << 8; //S (system protection)
-		data |= R << 9; //R (rom protect)
+		data |= _S << 8; //S (system protection)
+		data |= _R << 9; //R (rom protect)
 		data |= 0 << 10; //F (implementation defined)
 		data |= 0 << 11; //BPU
 

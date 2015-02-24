@@ -35,7 +35,7 @@ namespace captive {
 				}
 
 			protected:
-				bool resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault& fault) override;
+				bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) override;
 
 			private:
 				ArmCPU& _cpu;
@@ -112,6 +112,10 @@ namespace captive {
 							return data & ~0x3ffUL;
 						}
 					}
+
+					inline uint8_t ap0() const {
+						return (data & 0x30) >> 4;
+					}
 				} packed;
 
 				static_assert(sizeof(l1_descriptor) == 4, "L1 Descriptor Structure must be 32-bits");
@@ -130,9 +134,10 @@ namespace captive {
 					COARSE_PERMISSION,
 				};
 
-				bool resolve_coarse_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1);
-				bool resolve_fine_page(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1);
-				bool resolve_section(gva_t va, gpa_t& pa, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool check_access_perms(uint32_t ap, bool kernel_mode, bool is_write);
+				bool resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_fine_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
 
 				va_t temp_map(va_t base, gpa_t gpa, int n);
 			};

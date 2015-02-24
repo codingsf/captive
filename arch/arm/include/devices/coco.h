@@ -30,6 +30,9 @@ namespace captive {
 					inline uint32_t FAR() const { return _FAR; }
 					inline void FAR(uint32_t v) { _FAR = v; }
 
+					inline bool R() const { return _R; }
+					inline bool S() const { return _S; }
+
 				protected:
 					bool mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) override;
 					bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
@@ -46,8 +49,8 @@ namespace captive {
 					bool I;
 					bool Z;
 					bool F;
-					bool R;
-					bool S;
+					bool _R;
+					bool _S;
 					bool B;
 					bool L;
 					bool D;

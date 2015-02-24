@@ -32,6 +32,16 @@ namespace captive {
 				ACCESS_FETCH,
 			};
 
+			enum access_mode {
+				ACCESS_USER,
+				ACCESS_KERNEL,
+			};
+
+			struct access_info {
+				enum access_type type;
+				enum access_mode mode;
+			};
+
 			MMU(Environment& env);
 			virtual ~MMU();
 
@@ -56,7 +66,7 @@ namespace captive {
 			void *map_guest_phys_pages(gpa_t pa, int nr);
 			void unmap_phys_page(void *p);
 
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, access_type type, resolution_fault& fault) = 0;
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) = 0;
 		};
 	}
 }
