@@ -6,9 +6,10 @@
 
 using namespace captive::devices::arm;
 
-PL110::PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq) : Primecell(0x00041110, 0x10000), _screen(screen), _irq(irq)
+PL110::PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq)
+	: Primecell(0x00041110, 0x10000), _screen(screen), _irq(irq), lcd_timing { 0, 0, 0, 0 }, upper_fbbase(0), lower_fbbase(0), isr(0), irq_mask(0)
 {
-
+	control.data = 0;
 }
 
 PL110::~PL110()
@@ -90,16 +91,18 @@ bool PL110::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 
 	case 0x10:
-	case 0x2c:
 		upper_fbbase = data;
+
+		DEBUG << CONTEXT(PL110) << "Setting framebuffer to GPA=" << std::hex << data;
 		void *gpa;
 		if (guest().resolve_gpa((gpa_t)upper_fbbase, gpa)) {
+			DEBUG << CONTEXT(PL110) << "Framebuffer resolved to " << std::hex << gpa;
 			_screen.framebuffer((uint8_t *)gpa);
 		}
 
 		break;
+
 	case 0x14:
-	case 0x30:
 		lower_fbbase = data;
 		break;
 

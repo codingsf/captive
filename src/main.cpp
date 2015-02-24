@@ -25,7 +25,7 @@
 #include <devices/io/file-backed-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
 
-#include <devices/gfx/null-virtual-screen.h>
+#include <devices/gfx/sdl-virtual-screen.h>
 
 #include <devices/timers/millisecond-tick-source.h>
 
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 	devices::arm::PL080 *dma = new devices::arm::PL080();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
 
-	devices::gfx::NullVirtualScreen *vs = new devices::gfx::NullVirtualScreen();
+	devices::gfx::SDLVirtualScreen *vs = new devices::gfx::SDLVirtualScreen();
 	vs->keyboard(*ps2kbd);
 	vs->mouse(*ps2mse);
 

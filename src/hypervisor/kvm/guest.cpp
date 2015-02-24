@@ -475,7 +475,8 @@ bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 {
 	for (auto pmr : gpm) {
 		if (gpa >= pmr.cfg->base_address() && gpa <= (pmr.cfg->base_address() + pmr.cfg->size())) {
-			out_addr = pmr.vmr->host_buffer;
+			uint64_t offset = (uint64_t)gpa - (uint64_t)pmr.cfg->base_address();
+			out_addr = (void *)((uint64_t)pmr.vmr->host_buffer + offset);
 			return true;
 		}
 	}

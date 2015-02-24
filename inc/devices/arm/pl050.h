@@ -28,6 +28,8 @@ namespace captive {
 
 			private:
 				io::PS2Device& _ps2;
+				uint32_t cr, clkdiv;
+				uint32_t last;
 			};
 		}
 	}

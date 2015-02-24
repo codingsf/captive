@@ -20,7 +20,7 @@ bios := $(bios-dir)/bios.bin.o
 common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O0 -pthread
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
-ldflags  := -pthread -Wl,--no-as-needed
+ldflags  := -pthread -Wl,--no-as-needed -lSDL2
 
 cc  := gcc
 cxx := g++

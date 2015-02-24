@@ -29,6 +29,7 @@ namespace captive {
 #define WARNING LOG() << "warning: "
 #define LAST_ERROR_TEXT strerror(errno)
 #define CONTEXT(a) #a ": "
+#define WHERE(a) ""
 
 #endif	/* CAPTIVE_H */
 

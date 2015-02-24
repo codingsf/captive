@@ -10,6 +10,7 @@
 
 #include <devices/device.h>
 #include <devices/irq/irq-controller.h>
+#include <atomic>
 
 namespace captive {
 	namespace devices {
@@ -25,9 +26,13 @@ namespace captive {
 
 				virtual uint32_t size() const { return 0x1000; }
 
+				void irq_raised(irq::IRQLine& line) override;
+				void irq_rescinded(irq::IRQLine& line) override;
+
 			private:
 				irq::IRQLine& _irq;
-				uint32_t status;
+				
+				std::atomic<uint32_t> status;
 				uint32_t enable_mask;
 			};
 		}

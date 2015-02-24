@@ -8,6 +8,8 @@
 #ifndef IRQ_LINE_H
 #define	IRQ_LINE_H
 
+#include <atomic>
+
 namespace captive {
 	namespace devices {
 		namespace irq {
@@ -23,14 +25,14 @@ namespace captive {
 
 				inline bool raised() const { return _raised; }
 				inline uint32_t index() const { return _index; }
-				
+
 				inline void attach(IRQControllerBase& controller, uint32_t index) {
 					_controller = &controller;
 					_index = index;
 				}
 
 			private:
-				bool _raised;
+				std::atomic<bool> _raised;
 				uint32_t _index;
 				IRQControllerBase *_controller;
 			};

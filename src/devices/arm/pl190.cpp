@@ -1,4 +1,5 @@
 #include <devices/arm/pl190.h>
+#include <captive.h>
 
 using namespace captive::devices::arm;
 
@@ -156,12 +157,20 @@ bool PL190::write(uint64_t off, uint8_t len, uint64_t data)
 
 void PL190::irq_raised(irq::IRQLine& line)
 {
+	if (line.index() != 4) {
+		DEBUG << CONTEXT(PL190) << "IRQ Raised: " << line.index();
+	}
+
 	irq_status |= 1 << line.index();
 	update_lines();
 }
 
 void PL190::irq_rescinded(irq::IRQLine& line)
 {
+	if (line.index() != 4) {
+		DEBUG << CONTEXT(PL190) << "IRQ Rescinded: " << line.index();
+	}
+	
 	irq_status &= ~(1 << line.index());
 	update_lines();
 }

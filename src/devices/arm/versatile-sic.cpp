@@ -1,10 +1,10 @@
 #include <devices/arm/versatile-sic.h>
+#include <captive.h>
 
 using namespace captive::devices::arm;
 
 VersatileSIC::VersatileSIC(irq::IRQLine& irq) : _irq(irq)
 {
-
 }
 
 VersatileSIC::~VersatileSIC()
@@ -44,4 +44,22 @@ bool VersatileSIC::write(uint64_t off, uint8_t len, uint64_t data)
 	}
 
 	return true;
+}
+
+void VersatileSIC::irq_raised(irq::IRQLine& line)
+{
+	DEBUG << CONTEXT(VersatileSIC) << "IRQ Raised: " << line.index();
+
+	status |= 1 << line.index();
+	_irq.raise();
+}
+
+void VersatileSIC::irq_rescinded(irq::IRQLine& line)
+{
+	DEBUG << CONTEXT(VersatileSIC) << "IRQ Rescinded: " << line.index();
+
+	status &= ~(1 << line.index());
+	if (status == 0) {
+		_irq.rescind();
+	}
 }
