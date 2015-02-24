@@ -38,8 +38,8 @@ using namespace captive::hypervisor::kvm;
 
 int main(int argc, char **argv)
 {
-	if (argc != 4) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree>";
+	if (argc != 5) {
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs>";
 		return 1;
 	}
 
@@ -152,8 +152,8 @@ int main(int argc, char **argv)
 
 	devices::io::FileBackedBlockDevice *bdev = new devices::io::FileBackedBlockDevice();
 
-	if (!bdev->open_file("/tmp/zero")) {
-		ERROR << "Unable to open block device file";
+	if (!bdev->open_file(argv[4])) {
+		ERROR << "Unable to open block device file '" << argv[4] << "'";
 		return 1;
 	}
 
@@ -249,7 +249,7 @@ int main(int argc, char **argv)
 	delete guest;
 	delete hv;
 
-	DEBUG << "Complete";
+	DEBUG << CONTEXT(main) << "Complete";
 
 	return 0;
 }
