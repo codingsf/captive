@@ -1,4 +1,5 @@
 .code64
+.text
 
 .macro push_regs
 	pushf
@@ -63,6 +64,30 @@ trap_macro unk,0
 trap_macro dbz,0
 trap_macro dbg,0
 trap_macro nmi,0
-trap_macro pf,1
+//trap_macro pf,1
 trap_macro gpf,1
 trap_macro irq,0
+
+.global trap_pf
+.extern interrupt_restore_safepoint
+.extern cpu_safepoint
+
+trap_pf:
+	push_regs
+
+	mov %cr2, %rdi
+	movq (8 * 16)(%rsp), %rsi
+
+	call handle_pagefault
+
+	test %rax, %rax
+	jz 1f
+
+	leaq cpu_safepoint, %rdi
+	mov $1, %rsi
+	jmp interrupt_restore_safepoint
+
+1:
+	pop_regs
+	add $8, %rsp
+	iretq

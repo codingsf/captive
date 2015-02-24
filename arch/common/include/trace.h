@@ -15,10 +15,12 @@
 
 namespace captive {
 	namespace arch {
+		class Disasm;
+
 		class Trace
 		{
 		public:
-			Trace();
+			Trace(Disasm& disasm);
 			~Trace();
 
 			inline void enable() {
@@ -77,11 +79,13 @@ namespace captive {
 				uint64_t insn_count;
 				uint32_t pc;
 
+				uint8_t decode_data[128];
+
 				int nr_actions;
 				trace_action actions[MAX_RECORD_ACTIONS];
 			} packed;
 
-			void start_record(uint64_t insn_count, uint32_t pc);
+			void start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode_data);
 			void end_record();
 
 			void add_action(const trace_action& action);
@@ -125,6 +129,7 @@ namespace captive {
 			}
 
 		private:
+			Disasm& _disasm;
 			bool _enabled;
 			bool _building_record;
 			trace_record current_record;

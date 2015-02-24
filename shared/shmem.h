@@ -10,6 +10,7 @@
 
 namespace captive {
 	struct shmem_data {
+		uint32_t isr;
 		unsigned int asynchronous_action_pending;
 		bool halt;
 	};

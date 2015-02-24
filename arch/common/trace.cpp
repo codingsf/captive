@@ -1,9 +1,11 @@
 #include <trace.h>
+#include <disasm.h>
+#include <string.h>
 #include <printf.h>
 
 using namespace captive::arch;
 
-Trace::Trace() : _enabled(false), _building_record(false)
+Trace::Trace(Disasm& disasm) : _disasm(disasm), _enabled(false), _building_record(false)
 {
 
 }
@@ -13,7 +15,7 @@ Trace::~Trace()
 
 }
 
-void Trace::start_record(uint64_t insn_count, uint32_t pc)
+void Trace::start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode_data)
 {
 	if (!_enabled) return;
 	if (_building_record) return;
@@ -22,6 +24,8 @@ void Trace::start_record(uint64_t insn_count, uint32_t pc)
 	current_record.insn_count = insn_count;
 	current_record.pc = pc;
 	current_record.nr_actions = 0;
+
+	memcpy((void *)&current_record.decode_data[0], (const void *)decode_data, sizeof(current_record.decode_data));
 }
 
 void Trace::end_record()
@@ -30,6 +34,8 @@ void Trace::end_record()
 	_building_record = false;
 
 	printf("%d [%08x] ", current_record.insn_count, current_record.pc);
+	printf("%20s", _disasm.disassemble(current_record.pc, current_record.decode_data));
+
 	for (int i = 0; i < current_record.nr_actions; i++) {
 		const trace_action& action = current_record.actions[i];
 

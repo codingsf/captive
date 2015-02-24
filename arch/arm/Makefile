@@ -6,7 +6,7 @@ obj := $(src:.cpp=.o)
 dep := $(src:.cpp=.d)
 
 cflags := -I$(cmn-inc-dir) -I$(local-inc-dir) $(common-cflags)
-cxxflags := -I$(cmn-inc-dir) -I$(local-inc-dir) $(common-cflags) -fno-rtti -fno-exceptions -std=gnu++11 -fno-delete-null-pointer-checks
+cxxflags := -I$(cmn-inc-dir) -I$(local-inc-dir) $(common-cflags)
 
 all: $(arch-out)
 
@@ -16,7 +16,7 @@ clean:
 
 $(arch-out): $(obj) $(cmn-out)
 	@echo "  LD    $(notdir $@)"
-	$(q)$(ld) -o $@ -static -Ttext-segment 0x100000000 -nostdlib -e start $(obj) $(cmn-out)
+	$(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start $(obj) $(cmn-out)
 
 %.o: %.cpp
 	@echo "  C++   $(notdir $@)"

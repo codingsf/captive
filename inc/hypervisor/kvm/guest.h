@@ -38,7 +38,7 @@ namespace captive {
 
 				inline bool initialised() const { return _initialised; }
 
-				bool stage2_init();
+				bool stage2_init(uint64_t& stack);
 
 				uint64_t next_avail_phys_page() const { return next_page; }
 

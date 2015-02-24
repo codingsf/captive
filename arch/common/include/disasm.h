@@ -17,6 +17,9 @@ namespace captive
 	{
 		class Disasm
 		{
+		public:
+			virtual const char *disassemble(uint32_t pc, const uint8_t *data) = 0;
+
 		protected:
 			inline void append_str(const char *str) {
 				strcat(_buffer, str);

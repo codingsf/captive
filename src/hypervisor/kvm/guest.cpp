@@ -26,7 +26,7 @@ using namespace captive::hypervisor::kvm;
 #define SYSTEM_MEMORY_PHYS_SIZE		0x40000000ULL
 
 #define ENGINE_PHYS_BASE		(SYSTEM_MEMORY_PHYS_BASE + 0x10000000ULL)
-#define ENGINE_VIRT_BASE		0x100000000ULL
+#define ENGINE_VIRT_BASE		0xFFFFFFFF80000000ULL
 #define ENGINE_SIZE			(SYSTEM_MEMORY_PHYS_SIZE - ENGINE_PHYS_BASE)
 
 #define DATA_PHYS_BASE			SYSTEM_MEMORY_PHYS_BASE
@@ -283,14 +283,14 @@ bool KVMGuest::install_initial_pgt()
 	return true;
 }
 
-bool KVMGuest::stage2_init()
+bool KVMGuest::stage2_init(uint64_t& stack)
 {
 	// Map the ENGINE into memory
 	for (uint64_t va = ENGINE_VIRT_BASE, pa = ENGINE_PHYS_BASE; va < (ENGINE_VIRT_BASE + ENGINE_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
-	// Map the DATA area into memory
+	// Map the SYSTEM DATA area into memory
 	for (uint64_t va = DATA_VIRT_BASE, pa = DATA_PHYS_BASE; va < (DATA_VIRT_BASE + DATA_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
@@ -299,6 +299,8 @@ bool KVMGuest::stage2_init()
 	for (uint64_t va = SHMEM_VIRT_BASE, pa = SHMEM_PHYS_BASE; va < (SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
+
+	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE;
 
 	// Map ALL guest physical memory, but don't mark it as present.
 	for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {

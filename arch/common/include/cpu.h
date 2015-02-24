@@ -36,15 +36,16 @@ namespace captive {
 
 			inline uint64_t get_insns_executed() const { return insns_executed; }
 
-			inline Trace& trace() { return _trace; }
+			inline Trace& trace() { return *_trace; }
 
 		protected:
 			inline void inc_insns_executed() {
 				insns_executed++;
 			}
 
+			Trace *_trace;
+
 		private:
-			Trace _trace;
 			uint64_t insns_executed;
 			Environment& _env;
 		};

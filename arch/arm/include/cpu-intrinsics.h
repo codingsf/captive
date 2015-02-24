@@ -13,7 +13,7 @@
 #include <printf.h>
 #include <env.h>
 
-extern volatile uint32_t page_fault_code, mem_access_type;
+extern volatile uint32_t mem_access_type;
 
 #ifdef TRACE
 
@@ -87,30 +87,30 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 
 static inline uint32_t mem_read_8(uint32_t addr, uint32_t& data)
 {
-	page_fault_code = 0; mem_access_type = 0;
+	mem_access_type = 0;
 	data = *((uint8_t*)((uint64_t)addr));
-	return page_fault_code;
+	return 0;
 }
 
 static inline uint32_t mem_read_16(uint32_t addr, uint32_t& data)
 {
-	page_fault_code = 0; mem_access_type = 0;
+	mem_access_type = 0;
 	data = *((uint16_t*)((uint64_t)addr));
-	return page_fault_code;
+	return 0;
 }
 
 static inline uint32_t mem_read_32(uint32_t addr, uint32_t& data)
 {
-	page_fault_code = 0; mem_access_type = 0;
+	mem_access_type = 0;
 	data = *((uint32_t*)((uint64_t)addr));
-	return page_fault_code;
+	return 0;
 }
 
 static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
 {
-	page_fault_code = 0; mem_access_type = 0;
+	mem_access_type = 0;
 	data = *((uint64_t*)((uint64_t)addr));
-	return page_fault_code;
+	return 0;
 }
 
 /*#define mem_read_8(_addr, _data) (_data = *((uint8_t*)((uint64_t)_addr)), page_fault_code)
@@ -120,30 +120,30 @@ static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
 
 static inline uint32_t mem_write_64(uint32_t addr, uint64_t data)
 {
-	page_fault_code = 0; mem_access_type = 1;
+	mem_access_type = 1;
 	*((uint64_t*)((uint64_t)addr)) = ((uint64_t)data);
-	return page_fault_code;
+	return 0;
 }
 
 static inline uint32_t mem_write_32(uint32_t addr, uint32_t data)
 {
-	page_fault_code = 0; mem_access_type = 1;
+	mem_access_type = 1;
 	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
-	return page_fault_code;
+	return 0;
 }
 
 static inline uint32_t mem_write_16(uint32_t addr, uint16_t data)
 {
-	page_fault_code = 0; mem_access_type = 1;
+	mem_access_type = 1;
 	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
-	return page_fault_code;
+	return 0;
 }
 
 static inline uint32_t mem_write_8(uint32_t addr, uint8_t data)
 {
-	page_fault_code = 0; mem_access_type = 1;
+	mem_access_type = 1;
 	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
-	return page_fault_code;
+	return 0;
 }
 
 /*#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)

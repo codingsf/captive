@@ -4,12 +4,12 @@ top-dir := $(CURDIR)
 inc-dir := $(top-dir)/include
 
 src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
-obj := $(src:.cpp=.o) trap.o
+obj := $(src:.cpp=.o) trap.o safepoint.o
 dep := $(src:.cpp=.d)
 
 export cflags := -I$(inc-dir) $(common-cflags)
-export cxxflags := -I$(inc-dir) $(common-cflags) -fno-rtti -fno-exceptions -std=gnu++11 -fno-delete-null-pointer-checks
-export asflags := -nostdlib -g
+export cxxflags := -I$(inc-dir) $(common-cflags)
+export asflags := -nostdlib -g -mcmodel=large
 
 all: $(out)
 

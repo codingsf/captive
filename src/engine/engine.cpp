@@ -11,7 +11,7 @@
 using namespace captive;
 using namespace captive::engine;
 
-Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _entrypoint_offset(0)
+Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _entrypoint(0)
 {
 
 }
@@ -55,14 +55,14 @@ bool Engine::install(uint8_t* base)
 		DEBUG << "Program Header: type=" << phdr->p_type << ", flags=" << phdr->p_flags << ", file offset=" << phdr->p_offset << ", file size=" << phdr->p_filesz << ", paddr=" << std::hex << phdr->p_paddr << ", vaddr=" << phdr->p_vaddr;
 
 		if (phdr->p_type == PT_LOAD) {
-			uint64_t offset = phdr->p_vaddr - 0x100000000;
+			uint64_t offset = phdr->p_vaddr - 0xffffffff80000000ULL;
 
 			DEBUG << "Loading @ " << std::hex << offset;
 			memcpy(base + offset, lib + phdr->p_offset, phdr->p_filesz);
 		}
 	}
 
-	_entrypoint_offset = hdr->e_entry - 0x100000000;
+	_entrypoint = hdr->e_entry;
 
 	return true;
 }

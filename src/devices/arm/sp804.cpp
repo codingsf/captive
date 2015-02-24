@@ -1,5 +1,6 @@
 #include <devices/arm/sp804.h>
 #include <devices/irq/irq-line.h>
+#include <captive.h>
 
 using namespace captive::devices::arm;
 

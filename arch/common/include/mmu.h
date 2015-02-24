@@ -19,6 +19,11 @@ namespace captive {
 		class MMU
 		{
 		public:
+			enum resolution_fault {
+				NONE,
+				FAULT,
+			};
+
 			MMU(Environment& env);
 			virtual ~MMU();
 
@@ -28,7 +33,7 @@ namespace captive {
 
 			inline Environment& env() const { return _env; }
 
-			bool handle_fault(va_t va);
+			bool handle_fault(va_t va, resolution_fault& fault);
 
 			inline void flush() {
 				clear_vma();
@@ -42,11 +47,6 @@ namespace captive {
 			void *map_guest_phys_page(gpa_t pa);
 			void *map_guest_phys_pages(gpa_t pa, int nr);
 			void unmap_phys_page(void *p);
-
-			enum resolution_fault {
-				NONE,
-				FAULT,
-			};
 
 			enum access_type {
 				READ,

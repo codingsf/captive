@@ -1,7 +1,8 @@
 #include <define.h>
 #include <printf.h>
 
-static uint8_t *heap = (uint8_t *)0x110000000;
+static uint8_t heap[0x10000000];
+static uint8_t *heap_ptr = &heap[0];
 
 void *operator new(size_t size)
 {
@@ -9,8 +10,8 @@ void *operator new(size_t size)
 		size += 16 - (size % 16);
 	}
 
-	uint8_t *obj = heap;
-	heap += size;
+	uint8_t *obj = heap_ptr;
+	heap_ptr += size;
 
 	return (void *)obj;
 }

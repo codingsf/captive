@@ -2,7 +2,7 @@
 #include <mm.h>
 #include <printf.h>
 
-extern volatile uint32_t page_fault_code, mem_access_type;
+extern volatile uint32_t mem_access_type;
 
 using namespace captive::arch;
 
@@ -54,7 +54,7 @@ void MMU::unmap_phys_page(void* p)
 
 extern bool trace;
 
-bool MMU::handle_fault(va_t va)
+bool MMU::handle_fault(va_t va, resolution_fault& fault)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
@@ -115,7 +115,6 @@ bool MMU::handle_fault(va_t va)
 		pd->present(true);
 	}
 
-	resolution_fault fault;
 	access_type type = (access_type)mem_access_type;
 	gpa_t pa;
 
@@ -125,20 +124,16 @@ bool MMU::handle_fault(va_t va)
 
 	if (fault == NONE) {
 		// Update the corresponding page table address entry and mark it as
-		// present and writable.
+		// present and writable.  Note, assigning the base address will mask
+		// out the bottom twelve bits of the incoming address, to ensure it's
+		// a page-aligned value.
 		pt->base_address(0x100000000 | (uint64_t)pa);
-		page_fault_code = 0;
+		pt->present(true);
+		pt->writable(true);
 	} else {
-		pt->base_address(0x100000000 - 0x1000);
-
 		printf("fault %d %d %x\n", type, fault, va);
-		page_fault_code = (uint32_t)fault;
 	}
 
-	pt->present(true);
-	pt->writable(true);
-
 	Memory::flush_page(va);
-
 	return true;
 }

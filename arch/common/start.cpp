@@ -8,7 +8,7 @@
 #include <mmu.h>
 #include <shmem.h>
 
-volatile uint32_t page_fault_code, mem_access_type;
+volatile uint32_t mem_access_type;
 volatile captive::shmem_data *shmem;
 
 extern captive::arch::Environment *create_environment();
@@ -42,8 +42,6 @@ extern "C" {
 
 		captive::arch::Memory mm(first_phys_page);
 		captive::arch::Environment *env = create_environment();
-
-		page_fault_code = 0;
 
 		if (!env) {
 			printf("error: unable to create environment\n");
@@ -89,31 +87,6 @@ extern "C" {
 	{
 		printf("general protection fault: rip=%x\n", rip);
 		abort();
-	}
-
-	void handle_trap_pf(uint64_t rip, uint64_t code)
-	{
-		uint64_t va;
-		asm ("mov %%cr2, %0\n" : "=r"(va));
-
-		if (va < 0x100000000) {
-			captive::arch::CPU *core = captive::arch::active_cpu;
-			if (core) {
-				if (core->mmu().handle_fault((captive::arch::va_t)va)) {
-					//printf("trap: handled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
-					return;
-				} else {
-					printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, pc=%x\n", rip, va, code, core->read_pc());
-					abort();
-				}
-			} else {
-				printf("trap: unhandled page-fault: rip=%x va=%x, code=%x, (no cpu)\n", rip, va, code);
-				abort();
-			}
-		} else {
-			printf("trap: internal page-fault: rip=%x va=%x, code=%x\n", rip, va, code);
-			abort();
-		}
 	}
 
 	void handle_trap_irq()

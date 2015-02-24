@@ -1,16 +1,20 @@
 #include <devices/arm/cpu-irq.h>
 #include <hypervisor/cpu.h>
+#include <hypervisor/guest.h>
+#include <shmem.h>
+#include <captive.h>
 
 using namespace captive::devices::irq;
 using namespace captive::devices::arm;
 
 void ArmCpuIRQController::irq_raised(IRQLine& line)
 {
-	//printf("cpu: irq raised: %d\n", line.index());
-	cpu().interrupt(1);
+	// DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Raised: " << line.index();
+	cpu().owner().shmem_region()->isr |= (1 << line.index());
 }
 
 void ArmCpuIRQController::irq_rescinded(IRQLine& line)
 {
-	//printf("cpu: irq rescinded: %d\n", line.index());
+	//DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Rescinded: " << line.index();
+	cpu().owner().shmem_region()->isr &= ~(1 << line.index());
 }

@@ -6,6 +6,7 @@
 #include <arm-interp.h>
 #include <arm-disasm.h>
 #include <arm-mmu.h>
+#include <safepoint.h>
 #include <shmem.h>
 #include <new>
 
@@ -15,6 +16,7 @@
 using namespace captive::arch::arm;
 
 extern captive::shmem_data *shmem;
+safepoint_t cpu_safepoint;
 
 ArmCPU::ArmCPU(ArmEnvironment& env) : CPU(env)
 {
@@ -50,18 +52,27 @@ bool ArmCPU::run()
 
 	printf("starting cpu execution\n");
 
+	int rc = record_safepoint(&cpu_safepoint);
+	if (rc == 1) {
+		interp.take_exception(7, state.regs.RB[15] + 8);
+	}
+
 	do {
+		if (shmem->isr) {
+			if (shmem->isr & 1) {
+				interp.handle_irq(1);
+			}
+
+			if (shmem->isr & 2) {
+				interp.handle_irq(2);
+			}
+		}
+
 		// Check pending actions
 		if (shmem->asynchronous_action_pending) {
 			switch (shmem->asynchronous_action_pending) {
-			case 1:
-				if (interp.handle_irq(1)) {
-					shmem->asynchronous_action_pending = 0;
-				}
-				break;
-
 			case 2:
-				printf("CPU: %08x\n", state.regs.RB[15]);
+				dump_state();
 				shmem->asynchronous_action_pending = 0;
 				break;
 
@@ -92,7 +103,7 @@ bool ArmCPU::run()
 			}
 
 			// Perhaps trace this instruction
-			if (trace().enabled()) trace().start_record(get_insns_executed(), pc);
+			if (trace().enabled()) trace().start_record(get_insns_executed(), pc, (const uint8_t *)insn);
 
 			// Execute the instruction
 			step_ok = interp.step_single(*insn);
@@ -107,6 +118,8 @@ bool ArmCPU::run()
 
 bool ArmCPU::init(unsigned int ep)
 {
+	_trace = new Trace(*new ArmDisasm());
+
 	printf("cpu init @ %x\n", ep);
 
 	printf("creating mmu\n");

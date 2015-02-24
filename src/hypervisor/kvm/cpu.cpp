@@ -162,9 +162,6 @@ bool KVMCpu::run()
 				} else {
 					DEBUG << "Device Not Found: " << std::hex << converted_pa;
 				}
-			} else if (cpu_run_struct->mmio.phys_addr >= 0xfffff000 && cpu_run_struct->mmio.phys_addr < 0x100000000) {
-				bzero(cpu_run_struct->mmio.data, sizeof(cpu_run_struct->mmio.data));
-				break;
 			}
 
 			run_cpu = false;
@@ -231,15 +228,18 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 
 	switch(data) {
 	case 1:
-		if (kvm_guest.stage2_init()) {
+	{
+		uint64_t stack;
+
+		if (kvm_guest.stage2_init(stack)) {
 			struct kvm_regs regs;
 			vmioctl(KVM_GET_REGS, &regs);
 
 			// Entry Point
-			regs.rip = 0x100000000 + kvm_guest.engine().entrypoint_offset();
+			regs.rip = kvm_guest.engine().entrypoint();
 
 			// Stack + Base Pointer
-			regs.rsp = 0x110000000;
+			regs.rsp = stack;
 			regs.rbp = 0;
 
 			// Startup Arguments
@@ -265,6 +265,8 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		} else {
 			return false;
 		}
+	}
+
 	case 2:
 		DEBUG << "Abort Requested";
 		return false;
@@ -353,7 +355,4 @@ void KVMCpu::dump_regs()
 	KVMGuest& guest = (KVMGuest&)owner();
 
 	uint8_t *sys_mem = (uint8_t *)guest.sys_mem_rgn->host_buffer;
-
-	if (regs.rip > 0x100000000)
-		DEBUG << "DATA @ RIP: " << std::hex << (uint32_t)sys_mem[regs.rip-0xffa00000];
 }

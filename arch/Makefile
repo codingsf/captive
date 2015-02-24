@@ -18,7 +18,7 @@ archs := arm
 arch-outs := $(patsubst %,$(top-dir)/%.arch,$(archs))
 arch-cleans := $(patsubst %,$(top-dir)/%.arch.clean,$(archs))
 
-export common-cflags := -I$(shared-dir) -nostdlib -fPIC -g -fno-builtin -mno-sse -mno-mmx -mno-sse2 -O3
+export common-cflags := -I$(shared-dir) -nostdlib -g -fno-builtin -mno-sse -mno-mmx -mno-sse2 -O3 -mcmodel=kernel -fno-rtti -fno-exceptions -std=gnu++11 -fno-delete-null-pointer-checks
 
 all: $(arch-outs)
 
