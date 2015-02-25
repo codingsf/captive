@@ -35,7 +35,7 @@ namespace captive {
 				}
 
 			protected:
-				bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) override;
+				bool resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info, resolution_fault& fault) override;
 
 			private:
 				devices::CoCo& _coco;
@@ -134,11 +134,13 @@ namespace captive {
 				};
 
 				bool check_access_perms(uint32_t ap, bool kernel_mode, bool is_write);
-				bool resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
-				bool resolve_fine_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
-				bool resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_coarse_page(gva_t va, gpa_t& pa, bool& rw, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_fine_page(gva_t va, gpa_t& pa, bool& rw, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
+				bool resolve_section(gva_t va, gpa_t& pa, bool& rw, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1);
 
-				va_t temp_map(va_t base, gpa_t gpa, int n);
+				inline void *resolve_guest_phys(gpa_t gpa) {
+					return (void *)(0x100000000ULL + (uint64_t)gpa);
+				}
 			};
 		}
 	}

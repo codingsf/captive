@@ -13,6 +13,7 @@ namespace captive {
 		uint32_t isr;
 		unsigned int asynchronous_action_pending;
 		bool halt;
+		uint64_t insn_count;
 	};
 }
 

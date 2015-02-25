@@ -5,7 +5,7 @@
 
 using namespace captive::arch;
 
-static const char *mem_access_types[] = { "read", "write", "fetch" };
+static const char *mem_access_types[] = { "read", "write", "fetch", "read-user", "write-user" };
 static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
 extern volatile MMU::access_type mem_access_type;
@@ -120,11 +120,18 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 	}
 
 	gpa_t pa;
+	bool rw;
+
 	access_info info;
 	info.type = mem_access_type;
-	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+	
+	if (mem_access_type == ACCESS_READ_USER || mem_access_type == ACCESS_WRITE_USER) {
+		info.mode = ACCESS_USER;
+	} else {
+		info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+	}
 
-	if (!resolve_gpa((gva_t)(uint64_t)va, pa, info, fault)) {
+	if (!resolve_gpa((gva_t)(uint64_t)va, pa, rw, info, fault)) {
 		return false;
 	}
 
@@ -135,9 +142,14 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 		// a page-aligned value.
 		pt->base_address(0x100000000 | (uint64_t)pa);
 		pt->present(true);
-		pt->writable(true);
+		pt->writable(rw);
+
+		//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
 	} else {
-		printf("mmu: fault: va=%08x access-type=%s fault-type=%s\n", va, mem_access_types[mem_access_type], mem_fault_types[fault]);
+		pt->present(false);
+		printf("mmu: %08x fault: va=%08x access-type=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[mem_access_type], mem_fault_types[fault]);
+		if (_cpu.read_pc() == 0xc0018518)
+			_cpu.dump_state();
 	}
 
 	Memory::flush_page(va);

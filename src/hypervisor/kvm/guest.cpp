@@ -18,9 +18,10 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-#define GUEST_PHYS_MEMORY_BASE		0x100000000ULL
-#define GUEST_PHYS_MEMORY_VIRT_BASE	0ULL
-#define GUEST_PHYS_MEMORY_MAX_SIZE	0x100000000ULL
+#define GUEST_PHYS_MEMORY_BASE			0x100000000ULL
+#define GUEST_PHYS_MEMORY_VIRT_BASE		0ULL
+#define GUEST_PHYS_MEMORY_MAX_SIZE		0x100000000ULL
+#define GUEST_PHYS_MEMORY_COPY_VIRT_BASE	(GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE)
 
 #define SYSTEM_MEMORY_PHYS_BASE		0ULL
 #define SYSTEM_MEMORY_PHYS_SIZE		0x40000000ULL
@@ -305,6 +306,11 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	// Map ALL guest physical memory, but don't mark it as present.
 	for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, 0);
+	}
+
+	// Map ALL guest physical memory, and mark it as present and writable
+	for (uint64_t va = GUEST_PHYS_MEMORY_COPY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_COPY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
 	// Remap only the available physical memory.

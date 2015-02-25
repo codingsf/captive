@@ -25,7 +25,7 @@ VirtIOBlockDevice::~VirtIOBlockDevice()
 
 void VirtIOBlockDevice::process_event(VirtIOQueueEvent& evt)
 {
-	DEBUG << CONTEXT(VirtIOBlockDevice) << "Processing Event";
+	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Processing Event";
 
 	if (evt.read_buffers.size() == 0 && evt.write_buffers.size() == 0) {
 		return;
@@ -93,12 +93,12 @@ void VirtIOBlockDevice::reset()
 
 bool VirtIOBlockDevice::handle_read(uint64_t sector, uint8_t* buffer, uint32_t len)
 {
-	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Read: sector=" << sector << ", len=" << len;
+	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Read: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;
 	return _bdev.read_blocks(sector, len / _bdev.block_size(), buffer);
 }
 
 bool VirtIOBlockDevice::handle_write(uint64_t sector, uint8_t* buffer, uint32_t len)
 {
-	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write: sector=" << sector << ", len=" << len;
+	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;
 	return _bdev.write_blocks(sector, len / _bdev.block_size(), buffer);
 }

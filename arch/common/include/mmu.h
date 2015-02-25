@@ -30,6 +30,8 @@ namespace captive {
 				ACCESS_READ,
 				ACCESS_WRITE,
 				ACCESS_FETCH,
+				ACCESS_READ_USER,
+				ACCESS_WRITE_USER,
 			};
 
 			enum access_mode {
@@ -40,6 +42,8 @@ namespace captive {
 			struct access_info {
 				enum access_type type;
 				enum access_mode mode;
+
+				inline bool is_write() const { return type == ACCESS_WRITE || type == ACCESS_WRITE_USER; }
 			};
 
 			MMU(CPU& cpu);
@@ -66,7 +70,7 @@ namespace captive {
 			void *map_guest_phys_pages(gpa_t pa, int nr);
 			void unmap_phys_page(void *p);
 
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) = 0;
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info, resolution_fault& fault) = 0;
 		};
 	}
 }

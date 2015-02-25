@@ -91,12 +91,18 @@ bool ArmCPU::run()
 				trace().enable();
 				shmem->asynchronous_action_pending = 0;
 				break;
+
+			case 4:
+				shmem->insn_count = get_insns_executed();
+				shmem->asynchronous_action_pending = 0;
+				asm volatile("out %0, $0xff\n" :: "a"(4));
+				break;
 			}
 		}
 
 		// Execute one block of instructions
 		ArmDecode *insn;
-		do {
+		//do {
 			// Reset CPU exception state
 			state.last_exception_action = 0;
 
@@ -124,7 +130,7 @@ bool ArmCPU::run()
 			inc_insns_executed();
 
 			if (trace().enabled()) trace().end_record();
-		} while(!insn->end_of_block && step_ok);
+		//} while(!insn->end_of_block && step_ok);
 	} while(step_ok);
 
 	return true;

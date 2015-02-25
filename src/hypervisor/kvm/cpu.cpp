@@ -12,6 +12,7 @@
 #include <sys/eventfd.h>
 #include <sys/signal.h>
 #include <shmem.h>
+#include <chrono>
 
 using namespace captive::hypervisor::kvm;
 
@@ -87,9 +88,11 @@ static void handle_signal(int signo)
 	if (signo == SIGUSR1) {
 		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 2;
 	} else if (signo == SIGUSR2) {
-		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 3;
+		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 4;
 	}
 }
+
+static std::chrono::high_resolution_clock::time_point cpu_start_time;
 
 bool KVMCpu::run()
 {
@@ -111,6 +114,8 @@ bool KVMCpu::run()
 	vmioctl(KVM_GET_SREGS, &sregs);
 	sregs.cs.base = 0xf0000;
 	vmioctl(KVM_SET_SREGS, &sregs);
+
+	cpu_start_time = std::chrono::high_resolution_clock::now();
 
 	DEBUG << "Running CPU " << id();
 	do {
@@ -290,9 +295,14 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		dump_regs();
 		return true;
 
-	case 4:
-		//kvm_guest.map_page(0x10000, 0x100010000, 0);
+	case 4: {
+		std::chrono::high_resolution_clock::time_point then = std::chrono::high_resolution_clock::now();
+		std::chrono::seconds dur = std::chrono::duration_cast<std::chrono::seconds>(then - cpu_start_time);
+
+		DEBUG << "Instruction Count: " << kvm_guest.shmem_region()->insn_count;
+		DEBUG << "MIPS: " << ((kvm_guest.shmem_region()->insn_count * 1e-6) / dur.count());
 		return true;
+	}
 	}
 
 	return false;

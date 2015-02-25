@@ -29,7 +29,7 @@ entry16:
 
 	// Enable paging and protected mode
     mov %cr0, %eax
-    or $0x80000001, %eax
+    or $0x80010001, %eax
     mov %eax, %cr0
 
 	// Load the GDT

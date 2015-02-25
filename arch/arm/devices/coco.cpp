@@ -58,6 +58,9 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		case 1:
 			_TTBR1 = data;
 			break;
+		default:
+			assert(false);
+			return false;
 		}
 
 		cpu.mmu().flush();
@@ -73,6 +76,10 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	case 6:
 		_FAR = data;
 		break;
+	/*case 7:
+	case 8:
+		cpu.mmu().flush();
+		break;*/
 	}
 
 	return true;
@@ -157,6 +164,9 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		case 1:
 			data = _TTBR1;
 			break;
+		default:
+			assert(false);
+			return false;
 		}
 		break;
 
@@ -170,7 +180,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		data = _FAR;
 		break;
 	case 7:
-		data = 1 << 30;
+		if (rm == 14) data = 1 << 30;
 		break;
 	}
 

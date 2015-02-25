@@ -151,15 +151,71 @@ static inline uint32_t mem_write_8(uint32_t addr, uint8_t data)
 #define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
 #define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)*/
 
-#define mem_read_8_user(_addr, _data) mem_read_8(_addr, _data)
+static inline uint32_t mem_read_8_user(uint32_t addr, uint32_t& data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_READ_USER;
+	data = *((uint8_t*)((uint64_t)addr));
+	return 0;
+}
+
+static inline uint32_t mem_read_16_user(uint32_t addr, uint32_t& data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_READ_USER;
+	data = *((uint16_t*)((uint64_t)addr));
+	return 0;
+}
+
+static inline uint32_t mem_read_32_user(uint32_t addr, uint32_t& data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_READ_USER;
+	data = *((uint32_t*)((uint64_t)addr));
+	return 0;
+}
+
+static inline uint32_t mem_read_64_user(uint32_t addr, uint64_t& data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_READ_USER;
+	data = *((uint64_t*)((uint64_t)addr));
+	return 0;
+}
+
+/*#define mem_read_8_user(_addr, _data) mem_read_8(_addr, _data)
 #define mem_read_16_user(_addr, _data) mem_read_16(_addr, _data)
 #define mem_read_32_user(_addr, _data) mem_read_32(_addr, _data)
-#define mem_read_64_user(_addr, _data) mem_read_64(_addr, _data)
+#define mem_read_64_user(_addr, _data) mem_read_64(_addr, _data)*/
 
-#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)
+static inline uint32_t mem_write_64_user(uint32_t addr, uint64_t data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE_USER;
+	*((uint64_t*)((uint64_t)addr)) = ((uint64_t)data);
+	return 0;
+}
+
+static inline uint32_t mem_write_32_user(uint32_t addr, uint32_t data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE_USER;
+	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
+	return 0;
+}
+
+static inline uint32_t mem_write_16_user(uint32_t addr, uint16_t data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE_USER;
+	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
+	return 0;
+}
+
+static inline uint32_t mem_write_8_user(uint32_t addr, uint8_t data)
+{
+	mem_access_type = captive::arch::MMU::ACCESS_WRITE_USER;
+	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
+	return 0;
+}
+
+/*#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)
 #define mem_write_16_user(_addr, _data) mem_write_16(_addr, _data)
 #define mem_write_32_user(_addr, _data) mem_write_32(_addr, _data)
-#define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)
+#define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)*/
 
 #endif	/* CPU_INTRINSICS_H */
 
