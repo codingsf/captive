@@ -1,6 +1,9 @@
 #include <devices/gfx/null-virtual-screen.h>
 #include <captive.h>
 
+USE_CONTEXT(VirtualScreen);
+DECLARE_CHILD_CONTEXT(NullVirtualScreen, VirtualScreen);
+
 using namespace captive::devices::gfx;
 
 NullVirtualScreen::NullVirtualScreen()

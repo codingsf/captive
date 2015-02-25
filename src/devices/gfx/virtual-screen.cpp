@@ -1,4 +1,7 @@
 #include <devices/gfx/virtual-screen.h>
+#include <captive.h>
+
+DECLARE_CONTEXT(VirtualScreen);
 
 using namespace captive::devices::gfx;
 

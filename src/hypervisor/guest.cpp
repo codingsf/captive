@@ -2,6 +2,9 @@
 #include <hypervisor/config.h>
 #include <hypervisor/guest.h>
 
+USE_CONTEXT(Hypervisor)
+DECLARE_CHILD_CONTEXT(Guest, Hypervisor);
+
 #define MAX_PHYS_MEM_SIZE		0x100000000
 #define MIN_PHYS_MEM_SIZE		0
 

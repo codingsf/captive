@@ -4,6 +4,9 @@
 #include <hypervisor/guest.h>
 #include <captive.h>
 
+USE_CONTEXT(Primecell);
+DECLARE_CHILD_CONTEXT(PL110, Primecell);
+
 using namespace captive::devices::arm;
 
 PL110::PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq)

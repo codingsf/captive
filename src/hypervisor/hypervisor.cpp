@@ -1,4 +1,7 @@
 #include <hypervisor/hypervisor.h>
+#include <captive.h>
+
+DECLARE_CONTEXT(Hypervisor);
 
 using namespace captive::hypervisor;
 

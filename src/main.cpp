@@ -29,6 +29,8 @@
 
 #include <devices/timers/millisecond-tick-source.h>
 
+DECLARE_CONTEXT(Main);
+
 using namespace captive;
 using namespace captive::devices::timers;
 using namespace captive::engine;
@@ -251,7 +253,7 @@ int main(int argc, char **argv)
 	delete guest;
 	delete hv;
 
-	DEBUG << CONTEXT(main) << "Complete";
+	DEBUG << CONTEXT(Main) << "Complete";
 
 	return 0;
 }

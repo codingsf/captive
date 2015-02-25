@@ -6,6 +6,8 @@
 
 #include <string.h>
 
+DECLARE_CONTEXT(VirtIO);
+
 using namespace captive::devices::io::virtio;
 
 #define VIRTIO_CHAR_SHIFT(c, s) (((uint32_t)((uint8_t)c)) << (s))

@@ -1,4 +1,7 @@
 #include <devices/arm/primecell.h>
+#include <captive.h>
+
+DECLARE_CONTEXT(Primecell);
 
 using namespace captive::devices::arm;
 

@@ -4,6 +4,9 @@
 
 #include <string.h>
 
+USE_CONTEXT(VirtIO);
+DECLARE_CHILD_CONTEXT(VirtIOBlockDevice, VirtIO);
+
 using namespace captive::devices::io::virtio;
 
 VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, BlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
@@ -22,7 +25,7 @@ VirtIOBlockDevice::~VirtIOBlockDevice()
 
 void VirtIOBlockDevice::process_event(VirtIOQueueEvent& evt)
 {
-	//DEBUG << "Processing Event";
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Processing Event";
 
 	if (evt.read_buffers.size() == 0 && evt.write_buffers.size() == 0) {
 		return;
@@ -80,7 +83,7 @@ void VirtIOBlockDevice::process_event(VirtIOQueueEvent& evt)
 		break;
 	}
 
-	assert_interrupt(1);
+	assert_interrupt(0);
 }
 
 void VirtIOBlockDevice::reset()
@@ -90,10 +93,12 @@ void VirtIOBlockDevice::reset()
 
 bool VirtIOBlockDevice::handle_read(uint64_t sector, uint8_t* buffer, uint32_t len)
 {
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Read: sector=" << sector << ", len=" << len;
 	return _bdev.read_blocks(sector, len / _bdev.block_size(), buffer);
 }
 
 bool VirtIOBlockDevice::handle_write(uint64_t sector, uint8_t* buffer, uint32_t len)
 {
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write: sector=" << sector << ", len=" << len;
 	return _bdev.write_blocks(sector, len / _bdev.block_size(), buffer);
 }

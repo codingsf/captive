@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <thread>
 
+USE_CONTEXT(VirtualScreen);
+DECLARE_CHILD_CONTEXT(SDLVirtualScreen, VirtualScreen);
+
 using namespace captive::devices::gfx;
 
 static const uint32_t sdl_scancode_map[] = {

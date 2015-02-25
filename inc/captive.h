@@ -15,16 +15,29 @@
 #include <string.h>
 
 namespace captive {
+	namespace logging {
+		class LogContext
+		{
+		public:
+			explicit LogContext(std::string name) : _parent(NULL), _name(name) { }
 
-	class LogStream : public std::stringstream {
+			inline std::string name() const { return _name; }
+		private:
+			LogContext *_parent;
+			std::string _name;
+		};
+	}
+
+	class LogStream : public std::stringstream
+	{
 	public:
-		explicit LogStream() : _context_id("?")
+		explicit LogStream() : _ctx(NULL), _level(LL_DEBUG)
 		{
 		}
 
 		~LogStream()
 		{
-			std::cerr << level_text(_level) << ": " << _context_id << ": " << this->str() << std::endl;
+			std::cerr << level_text(_level) << ": " << (_ctx != NULL ? _ctx->name() : "?") << ": " << this->str() << std::endl;
 		}
 
 		enum log_level {
@@ -34,9 +47,9 @@ namespace captive {
 			LL_ERROR,
 		};
 
-		inline void context(std::string id)
+		inline void context(const logging::LogContext& ctx)
 		{
-			_context_id = id;
+			_ctx = &ctx;
 		}
 
 		inline void level(log_level new_level)
@@ -60,7 +73,7 @@ namespace captive {
 		}
 
 	private:
-		std::string _context_id;
+		const logging::LogContext *_ctx;
 		log_level _level;
 	};
 
@@ -82,19 +95,19 @@ namespace captive {
 	}
 
 	struct __set_context {
-		std::string context_id;
+		const logging::LogContext& ctx;
 	};
 
-	inline __set_context set_context(std::string id)
+	inline __set_context set_context(const logging::LogContext& ctx)
 	{
-		return { id };
+		return { ctx };
 	}
 
 	template<typename _CharT, typename _Traits>
 	inline std::basic_ostream<_CharT, _Traits>&
 	operator<<(std::basic_ostream<_CharT, _Traits>& __os, __set_context __f)
 	{
-		((LogStream&)__os).context(__f.context_id);
+		((LogStream&)__os).context(__f.ctx);
 		return __os;
 	}
 }
@@ -105,7 +118,11 @@ namespace captive {
 #define ERROR LOG() << captive::set_level(captive::LogStream::LL_ERROR)
 #define WARNING LOG() << captive::set_level(captive::LogStream::LL_WARNING)
 
-#define CONTEXT(a) captive::set_context(#a)
+#define CONTEXT(_ctx) captive::set_context(captive::logging::LogContext##_ctx)
+
+#define DECLARE_CONTEXT(_ctx) namespace captive { namespace logging { LogContext LogContext##_ctx(#_ctx); } }
+#define DECLARE_CHILD_CONTEXT(_child, _parent) DECLARE_CONTEXT(_child)
+#define USE_CONTEXT(_ctx) namespace captive { namespace logging { extern LogContext LogContext##_ctx; } }
 
 #define LAST_ERROR_TEXT strerror(errno)
 

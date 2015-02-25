@@ -1,6 +1,9 @@
 #include <captive.h>
 #include <hypervisor/config.h>
 
+USE_CONTEXT(Guest)
+DECLARE_CHILD_CONTEXT(Configuration, Guest);
+
 using namespace captive::hypervisor;
 
 bool GuestMemoryRegionConfiguration::validate() const
@@ -16,7 +19,7 @@ bool GuestCPUConfiguration::validate() const
 bool GuestConfiguration::validate() const
 {
 	if (!have_memory_regions()) {
-		ERROR << "Guest configuration doesn't define any memory regions";
+		ERROR << CONTEXT(Configuration) << "Guest configuration doesn't define any memory regions";
 		return false;
 	}
 
