@@ -10,6 +10,7 @@
 
 #include <devices/device.h>
 #include <vector>
+#include <atomic>
 
 namespace captive {
 	namespace devices {
@@ -74,38 +75,48 @@ namespace captive {
 					virtual const uint8_t *config_area() const = 0;
 					virtual uint32_t config_area_size() const = 0;
 
-					inline VirtQueue *current_queue() const { return queue(QueueSel); }
+					inline VirtQueue *current_queue() const { return queue(_queue_sel); }
 					inline VirtQueue *queue(uint8_t index) const { if (index > queues.size()) return NULL; else return queues[index]; }
-
-					inline void assert_interrupt(uint32_t i) {
-						InterruptStatus |= i;
-					}
-
-					uint32_t host_features;
 
 					virtual void process_event(VirtIOQueueEvent& evt) = 0;
 
+					inline void assert_interrupt(int idx) {
+						_isr |= 1 << idx;
+					}
+
+					inline void rescind_interrupt(int idx) {
+						_isr &= ~(1 << idx);
+					}
+
+					inline void set_host_feature(int idx) {
+						_host_features |= 1 << idx;
+					}
+
+					inline void clear_host_feature(int idx) {
+						_host_features &= ~(1 << idx);
+					}
+
 				private:
 					void process_queue(VirtQueue *queue);
+					void update_irq();
 
 					std::vector<VirtQueue *> queues;
 					irq::IRQLine& _irq;
 
-					uint32_t Version;
-					uint32_t DeviceID;
-					uint32_t VendorID;
+					std::atomic<uint32_t> _isr;
 
-					uint32_t HostFeaturesSel;
+					uint32_t _host_features, _guest_page_shift;
 
-					uint32_t GuestFeatures;
-					uint32_t GuestFeaturesSel;
+					uint32_t _version;
+					uint32_t _device_id;
+					uint32_t _vendor_id;
 
-					uint32_t QueueSel;
+					uint32_t _guest_features;
+					uint32_t _guest_features_sel;
 
-					uint32_t InterruptStatus;
-					uint32_t Status;
+					uint32_t _queue_sel;
 
-					uint8_t guest_page_shift;
+					uint32_t _status;
 				};
 			}
 		}

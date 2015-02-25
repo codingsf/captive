@@ -12,7 +12,7 @@ VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, BlockDevice& bdev) : Vir
 	config.capacity = bdev.blocks();
 	config.block_size = bdev.block_size();
 
-	host_features = 1 << 6;
+	set_host_feature(6);
 }
 
 VirtIOBlockDevice::~VirtIOBlockDevice()

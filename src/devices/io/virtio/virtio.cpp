@@ -11,18 +11,37 @@ using namespace captive::devices::io::virtio;
 #define VIRTIO_CHAR_SHIFT(c, s) (((uint32_t)((uint8_t)c)) << (s))
 #define VIRTIO_MAGIC (VIRTIO_CHAR_SHIFT('v', 0) | VIRTIO_CHAR_SHIFT('i', 8) | VIRTIO_CHAR_SHIFT('r', 16) | VIRTIO_CHAR_SHIFT('t', 24))
 
+#define VIRTIO_REG_MAGIC		0x00		// RO
+#define VIRTIO_REG_VERSION		0x04		// RO
+#define VIRTIO_REG_DEVICEID		0x08		// RO
+#define VIRTIO_REG_VENDORID		0x0c		// RO
+#define VIRTIO_REG_HOST_FEAT		0x10		// RO
+#define VIRTIO_REG_HOST_FEAT_SEL	0x14		// WO
+#define VIRTIO_REG_GUEST_FEAT		0x20		// WO
+#define VIRTIO_REG_GUEST_FEAT_SEL	0x24		// WO
+#define VIRTIO_REG_GUEST_PAGE_SIZE	0x28		// WO
+#define VIRTIO_REG_QUEUE_SEL		0x30		// WO
+#define VIRTIO_REG_QUEUE_NUM_MAX	0x34		// RO
+#define VIRTIO_REG_QUEUE_NUM		0x38		// WO
+#define VIRTIO_REG_QUEUE_ALIGN		0x3c		// WO
+#define VIRTIO_REG_QUEUE_PFN		0x40		// RW
+#define VIRTIO_REG_QUEUE_NOTIFY		0x50		// WO
+#define VIRTIO_REG_INTERRUPT_STATUS	0x60		// RO
+#define VIRTIO_REG_INTERRUPT_ACK	0x64		// WO
+#define VIRTIO_REG_STATUS		0x70		// RW
+
 VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues)
 	: _irq(irq),
-	Version(version),
-	DeviceID(device_id),
-	VendorID(0x1af4),
-	HostFeaturesSel(0),
-	GuestFeatures(0),
-	GuestFeaturesSel(0),
-	QueueSel(0),
-	InterruptStatus(0),
-	Status(0),
-	guest_page_shift(0)
+	_version(version),
+	_device_id(device_id),
+	_vendor_id(0x1af4),
+	_host_features(0),
+	_guest_page_shift(0),
+	_guest_features(0),
+	_guest_features_sel(0),
+	_queue_sel(0),
+	_status(0),
+	_isr(0)
 {
 	for (uint8_t i = 0; i < nr_queues; i++) {
 		queues.push_back(new VirtQueue());
@@ -51,40 +70,40 @@ bool VirtIO::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 	} else {
 		switch (off) {
-		case 0x00:
+		case VIRTIO_REG_MAGIC:
 			data = VIRTIO_MAGIC;
 			break;
 
-		case 0x04:
-			data = Version;
+		case VIRTIO_REG_VERSION:
+			data = _version;
 			break;
 
-		case 0x08:
-			data = DeviceID;
+		case VIRTIO_REG_DEVICEID:
+			data = _device_id;
 			break;
 
-		case 0x0c:
-			data = VendorID;
+		case VIRTIO_REG_VENDORID:
+			data = _vendor_id;
 			break;
 
-		case 0x10:
-			data = host_features;
+		case VIRTIO_REG_HOST_FEAT:
+			data = _host_features;
 			break;
 
-		case 0x34:
+		case VIRTIO_REG_QUEUE_NUM_MAX:
 			data = (current_queue()->GetPhysAddr() == 0) ? 0x1000 : 0;
 			break;
 
-		case 0x40:
-			data = current_queue()->GetPhysAddr() >> guest_page_shift;
+		case VIRTIO_REG_QUEUE_PFN:
+			data = current_queue()->GetPhysAddr() >> _guest_page_shift;
 			break;
 
-		case 0x60:
-			data = _irq.raised() ? 1 : 0;
+		case VIRTIO_REG_INTERRUPT_STATUS:
+			data = _isr;
 			break;
 
-		case 0x70:
-			data = Status;
+		case VIRTIO_REG_STATUS:
+			data = _status;
 			break;
 
 		default:
@@ -98,42 +117,41 @@ bool VirtIO::read(uint64_t off, uint8_t len, uint64_t& data)
 bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 {
 	switch (off) {
-	case 0x14: //host features sel
-		HostFeaturesSel = data;
+	case VIRTIO_REG_HOST_FEAT_SEL:
 		break;
 
-	case 0x20: //guest feat
-		GuestFeatures = data;
+	case VIRTIO_REG_GUEST_FEAT: //guest feat
+		_guest_features = data;
 		break;
 
-	case 0x24: //guest feat sel
-		GuestFeaturesSel = data;
+	case VIRTIO_REG_GUEST_FEAT_SEL:
+		_guest_features_sel = data;
 		break;
 
-	case 0x28: // guest page size
-		guest_page_shift = 31 - __builtin_clz(data);
+	case VIRTIO_REG_GUEST_PAGE_SIZE:
+		_guest_page_shift = 31 - __builtin_clz(data);
 		break;
 
-	case 0x30: //queue sel
-		QueueSel = data;
+	case VIRTIO_REG_QUEUE_SEL:
+		_queue_sel = data;
 		break;
 
-	case 0x38: //queue num
+	case VIRTIO_REG_QUEUE_NUM:
 		current_queue()->SetSize(data);
 		break;
 
-	case 0x3c: //queue align
+	case VIRTIO_REG_QUEUE_ALIGN:
 		current_queue()->SetAlign(data);
 		break;
 
-	case 0x40: //queue pfn
+	case VIRTIO_REG_QUEUE_PFN:
 		if (data == 0) {
-			HostFeaturesSel = 0;
-			GuestFeaturesSel = 0;
+			_guest_features_sel = 0;
+			_guest_features = 0;
 
 			reset();
 		} else {
-			gpa_t queue_phys_addr = data << guest_page_shift;
+			gpa_t queue_phys_addr = data << _guest_page_shift;
 			VirtQueue *cq = current_queue();
 
 			void *queue_host_addr;
@@ -143,25 +161,24 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 			}
 
 			DEBUG << CONTEXT(VirtIO) << "Resolved PFN from " << std::hex << queue_phys_addr << " to " << queue_host_addr;
-
 			cq->SetBaseAddress(queue_phys_addr, queue_host_addr);
 		}
 		break;
 
-	case 0x50: //queue notify
+	case VIRTIO_REG_QUEUE_NOTIFY:
 		process_queue(queue(data));
 		break;
 
-	case 0x64: // int ack
-		InterruptStatus &= ~data;
+	case VIRTIO_REG_INTERRUPT_ACK: // int ack
+		_isr &= ~data;
 		break;
 
 	case 0x70: //status
-		Status = data;
+		_status = data;
 
-		if (data == 0) {
-			HostFeaturesSel = 0;
-			GuestFeaturesSel = 0;
+		if (_status == 0) {
+			_guest_features_sel = 0;
+			_guest_features = 0;
 
 			reset();
 		}
@@ -172,18 +189,13 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 		return false;
 	}
 
-	if (InterruptStatus == 0) {
-		_irq.rescind();
-	} else {
-		_irq.raise();
-	}
-
+	update_irq();
 	return true;
 }
 
 void VirtIO::process_queue(VirtQueue* queue)
 {
-	assert(InterruptStatus == 0);
+	assert(_isr == 0);
 
 	// DEBUG << "[" << GetName() << "] Processing Queue";
 
@@ -222,5 +234,14 @@ void VirtIO::process_queue(VirtQueue* queue)
 
 		queue->Push(head_idx, evt.response_size);
 		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Pushed a descriptor chain head " << std::dec << head_idx << ", length=" << evt.response_size;
+	}
+}
+
+void VirtIO::update_irq()
+{
+	if (_isr) {
+		_irq.raise();
+	} else {
+		_irq.rescind();
 	}
 }
