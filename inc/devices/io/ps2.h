@@ -11,6 +11,7 @@
 #include <devices/io/keyboard.h>
 #include <devices/io/mouse.h>
 #include <devices/irq/irq-line.h>
+#include <captive.h>
 
 #include <queue>
 
@@ -21,6 +22,11 @@ namespace captive {
 			{
 			public:
 				PS2Device(irq::IRQLine& irq);
+
+				enum device_type {
+					PS2_KEYBOARD,
+					PS2_MOUSE
+				};
 
 				inline uint32_t read() const {
 					uint32_t v = data_queue.front();
@@ -35,6 +41,7 @@ namespace captive {
 				inline bool data_pending() const { return data_queue.size() > 0; }
 
 				virtual void send_command(uint32_t command) = 0;
+				virtual device_type type() const = 0;
 
 				inline void enable_irq() { irq_enabled = true; }
 				inline void disable_irq() { irq_enabled = false; }
@@ -59,6 +66,7 @@ namespace captive {
 				PS2KeyboardDevice(irq::IRQLine& irq);
 
 				void send_command(uint32_t command) override;
+				device_type type() const override { return PS2_KEYBOARD; }
 
 				void key_down(uint32_t keycode) override;
 				void key_up(uint32_t keycode) override;
@@ -71,7 +79,9 @@ namespace captive {
 			{
 			public:
 				PS2MouseDevice(irq::IRQLine& irq);
+
 				void send_command(uint32_t command) override;
+				device_type type() const override { return PS2_MOUSE; }
 
 				void button_down(uint32_t button_index) override;
 				void button_up(uint32_t button_index) override;

@@ -144,7 +144,7 @@ bool KVMGuest::attach_guest_devices()
 captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 {
 	for (const auto& desc : devices) {
-		if (addr >= desc.cfg->base_address() && addr <= desc.cfg->base_address() + desc.dev->size()) {
+		if (addr >= desc.cfg->base_address() && addr < desc.cfg->base_address() + desc.dev->size()) {
 			return desc.dev;
 		}
 	}

@@ -14,7 +14,7 @@
 
 namespace captive {
 	namespace arch {
-		class Environment;
+		class CPU;
 
 		class MMU
 		{
@@ -42,14 +42,14 @@ namespace captive {
 				enum access_mode mode;
 			};
 
-			MMU(Environment& env);
+			MMU(CPU& cpu);
 			virtual ~MMU();
 
 			virtual bool enable() = 0;
 			virtual bool disable() = 0;
 			virtual bool enabled() const = 0;
 
-			inline Environment& env() const { return _env; }
+			inline CPU& cpu() const { return _cpu; }
 
 			bool handle_fault(va_t va, resolution_fault& fault);
 
@@ -58,7 +58,7 @@ namespace captive {
 			}
 
 		private:
-			Environment& _env;
+			CPU& _cpu;
 
 		protected:
 			bool clear_vma();

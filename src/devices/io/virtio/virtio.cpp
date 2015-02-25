@@ -142,6 +142,8 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 				assert(false);
 			}
 
+			DEBUG << CONTEXT(VirtIO) << "Resolved PFN from " << std::hex << queue_phys_addr << " to " << queue_host_addr;
+
 			cq->SetBaseAddress(queue_phys_addr, queue_host_addr);
 		}
 		break;

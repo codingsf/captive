@@ -7,7 +7,20 @@
 using namespace captive::arch;
 using namespace captive::arch::arm;
 
-ArmMMU::ArmMMU(ArmCPU& cpu) : MMU(cpu.env()), _cpu(cpu), _coco((devices::CoCo&)*cpu.env().lookup_core_device(15))
+static const char *arm_faults[] = {
+	"none",
+	"other",
+
+	"section-fault",
+	"section-domain",
+	"section-permission",
+
+	"coarse-fault",
+	"coarse-domain",
+	"coarse-permission",
+};
+
+ArmMMU::ArmMMU(ArmCPU& cpu) : MMU(cpu), _coco((devices::CoCo&)*cpu.env().lookup_core_device(15))
 {
 
 }
@@ -103,7 +116,6 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 	}
 
 	if (arm_fault == NONE) {
-		//printf("l1: resolved va=%x pa=%x @ %d\n", va, pa, _cpu.get_insns_executed());
 		return true;
 	}
 
@@ -150,7 +162,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 		return false;
 	}
 
-	printf("mmu: fault: fsr=%x far=%x %d\n", fsr, va, arm_fault);
+	printf("mmu: fault: fsr=%x far=%x arm-fault=%s\n", fsr, va, arm_faults[arm_fault]);
 
 	_coco.FSR(fsr);
 	_coco.FAR(va);

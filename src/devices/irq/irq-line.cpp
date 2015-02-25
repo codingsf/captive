@@ -11,16 +11,16 @@ IRQLine::IRQLine() : _raised(false), _index(0)
 
 void IRQLine::raise()
 {
-	if (!_raised) {
-		_raised = true;
+	bool is_raised = false;
+	if (_raised.compare_exchange_strong(is_raised, true)) {
 		_controller->irq_raised(*this);
 	}
 }
 
 void IRQLine::rescind()
 {
-	if (_raised) {
-		_raised = false;
+	bool is_raised = true;
+	if (_raised.compare_exchange_strong(is_raised, false)) {
 		_controller->irq_rescinded(*this);
 	}
 }

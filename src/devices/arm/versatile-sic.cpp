@@ -48,7 +48,7 @@ bool VersatileSIC::write(uint64_t off, uint8_t len, uint64_t data)
 
 void VersatileSIC::irq_raised(irq::IRQLine& line)
 {
-	DEBUG << CONTEXT(VersatileSIC) << "IRQ Raised: " << line.index();
+	// DEBUG << CONTEXT(VersatileSIC) << "IRQ Raised: " << line.index();
 
 	status |= 1 << line.index();
 	_irq.raise();
@@ -56,7 +56,7 @@ void VersatileSIC::irq_raised(irq::IRQLine& line)
 
 void VersatileSIC::irq_rescinded(irq::IRQLine& line)
 {
-	DEBUG << CONTEXT(VersatileSIC) << "IRQ Rescinded: " << line.index();
+	// DEBUG << CONTEXT(VersatileSIC) << "IRQ Rescinded: " << line.index();
 
 	status &= ~(1 << line.index());
 	if (status == 0) {

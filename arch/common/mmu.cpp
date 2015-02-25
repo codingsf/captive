@@ -1,4 +1,5 @@
 #include <mmu.h>
+#include <cpu.h>
 #include <mm.h>
 #include <printf.h>
 
@@ -9,7 +10,7 @@ static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
 extern volatile MMU::access_type mem_access_type;
 
-MMU::MMU(Environment& env) : _env(env)
+MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
 }
 
@@ -121,8 +122,8 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 	gpa_t pa;
 	access_info info;
 	info.type = mem_access_type;
-	info.mode = ACCESS_KERNEL;
-	
+	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+
 	if (!resolve_gpa((gva_t)(uint64_t)va, pa, info, fault)) {
 		return false;
 	}

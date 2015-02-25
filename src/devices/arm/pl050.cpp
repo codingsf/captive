@@ -1,5 +1,6 @@
 #include <devices/arm/pl050.h>
 #include <devices/io/ps2.h>
+#include <captive.h>
 
 #define PL050_TXEMPTY         (1 << 6)
 #define PL050_TXBUSY          (1 << 5)

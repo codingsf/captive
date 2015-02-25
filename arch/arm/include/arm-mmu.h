@@ -38,7 +38,6 @@ namespace captive {
 				bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) override;
 
 			private:
-				ArmCPU& _cpu;
 				devices::CoCo& _coco;
 				bool _enabled;
 

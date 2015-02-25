@@ -38,6 +38,9 @@ namespace captive {
 
 			inline Trace& trace() { return *_trace; }
 
+			inline bool kernel_mode() const { return _kernel_mode; }
+			inline void kernel_mode(bool km) { _kernel_mode = km; }
+
 		protected:
 			inline void inc_insns_executed() {
 				insns_executed++;
@@ -46,6 +49,8 @@ namespace captive {
 			Trace *_trace;
 
 		private:
+			bool _kernel_mode;
+
 			uint64_t insns_executed;
 			Environment& _env;
 		};

@@ -1,4 +1,5 @@
 #include <devices/io/ps2.h>
+#include <captive.h>
 
 /* Keyboard Commands */
 #define KBD_CMD_SET_LEDS	0xED	/* Set keyboard leds */
