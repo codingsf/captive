@@ -55,7 +55,7 @@ namespace captive {
 
 			inline CPU& cpu() const { return _cpu; }
 
-			bool handle_fault(va_t va, resolution_fault& fault);
+			bool handle_fault(gva_t va, const access_info& info, resolution_fault& fault);
 
 			inline void flush() {
 				clear_vma();
@@ -64,13 +64,17 @@ namespace captive {
 		private:
 			CPU& _cpu;
 
+			inline pa_t gpa_to_hpa(gpa_t gpa) const {
+				return (pa_t)(0x100000000ULL | (uint64_t)gpa);
+			}
+
 		protected:
 			bool clear_vma();
 			void *map_guest_phys_page(gpa_t pa);
 			void *map_guest_phys_pages(gpa_t pa, int nr);
 			void unmap_phys_page(void *p);
 
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info, resolution_fault& fault) = 0;
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) = 0;
 		};
 	}
 }

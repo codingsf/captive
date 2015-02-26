@@ -77,6 +77,7 @@ trap_pf:
 
 	mov %cr2, %rdi
 	movq (8 * 16)(%rsp), %rsi
+	movq (8 * 17)(%rsp), %rdx
 
 	call handle_pagefault
 

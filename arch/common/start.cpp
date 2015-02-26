@@ -8,7 +8,6 @@
 #include <mmu.h>
 #include <shmem.h>
 
-volatile captive::arch::MMU::access_type mem_access_type;
 volatile captive::shmem_data *shmem;
 
 extern captive::arch::Environment *create_environment();

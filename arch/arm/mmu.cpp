@@ -20,7 +20,7 @@ static const char *arm_faults[] = {
 	"coarse-permission",
 };
 
-static const char *mem_access_types[] = { "read", "write", "fetch" };
+static const char *mem_access_types[] = { "read", "write", "fetch", "read-user", "write-user" };
 static const char *mem_access_modes[] = { "user", "kernel" };
 
 ArmMMU::ArmMMU(ArmCPU& cpu) : MMU(cpu), _coco((devices::CoCo&)*cpu.env().lookup_core_device(15))
@@ -40,7 +40,7 @@ bool ArmMMU::enable()
 	clear_vma();
 
 	_enabled = true;
-	printf("mmu: enabled\n");
+	//printf("mmu: enabled\n");
 	return true;
 }
 
@@ -51,11 +51,11 @@ bool ArmMMU::disable()
 	clear_vma();
 
 	_enabled = false;
-	printf("mmu: disabled\n");
+	//printf("mmu: disabled\n");
 	return true;
 }
 
-bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info, resolution_fault& fault)
+bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault)
 {
 	arm_resolution_fault arm_fault = NONE;
 	fault = arch::MMU::NONE;
@@ -63,7 +63,6 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info,
 
 	if (!_enabled) {
 		pa = va;
-		rw = true;
 		return true;
 	}
 
@@ -76,15 +75,15 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info,
 
 	switch (l1->type()) {
 	case l1_descriptor::TT_ENTRY_COARSE:
-		if (!resolve_coarse_page(va, pa, rw, info, arm_fault, l1))
+		if (!resolve_coarse_page(va, pa, info, arm_fault, l1))
 			return false;
 		break;
 	case l1_descriptor::TT_ENTRY_FINE:
-		if (!resolve_fine_page(va, pa, rw, info, arm_fault, l1))
+		if (!resolve_fine_page(va, pa, info, arm_fault, l1))
 			return false;
 		break;
 	case l1_descriptor::TT_ENTRY_SECTION:
-		if (!resolve_section(va, pa, rw, info, arm_fault, l1))
+		if (!resolve_section(va, pa, info, arm_fault, l1))
 			return false;
 		break;
 	case l1_descriptor::TT_ENTRY_FAULT:
@@ -93,7 +92,6 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info,
 	}
 
 	if (arm_fault == NONE) {
-		//printf("mmu: va=%08x pa=%08x mode=%d type=%d rw=%d\n", va, pa, info.mode, info.type, rw);
 		return true;
 	}
 
@@ -102,10 +100,12 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info,
 	case MMU::ACCESS_READ_USER:
 		fault = MMU::READ_FAULT;
 		break;
+
 	case MMU::ACCESS_WRITE:
 	case MMU::ACCESS_WRITE_USER:
 		fault = MMU::WRITE_FAULT;
 		break;
+
 	case MMU::ACCESS_FETCH:
 		fault = MMU::FETCH_FAULT;
 		break;
@@ -142,7 +142,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, bool& rw, const access_info& info,
 		return false;
 	}
 
-	printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
+	//printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
 
 	_coco.FSR(fsr);
 	_coco.FAR(va);
@@ -173,7 +173,7 @@ bool ArmMMU::check_access_perms(uint32_t ap, bool kernel_mode, bool is_write)
 	}
 }
 
-bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, bool& rw, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
+bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
 	l2_descriptor *coarse_table = (l2_descriptor *)resolve_guest_phys(l1->base_addr());
 	l2_descriptor *l2 = &coarse_table[((uint32_t)va >> 12) & 0xff];
@@ -191,12 +191,11 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, bool& rw, const access_inf
 
 	switch (dacr) {
 	case 0:
-		printf("mmu: coarse: domain fail\n");
 		fault = COARSE_DOMAIN;
 		return true;
 
 	case 1:
-		if (!check_access_perms(l2->ap0(), info.mode == ACCESS_KERNEL, info.type == ACCESS_WRITE || info.type == ACCESS_WRITE_USER)) {
+		if (!check_access_perms(l2->ap0(), info.mode == ACCESS_KERNEL, info.is_write())) {
 			fault = COARSE_PERMISSION;
 			return true;
 		}
@@ -207,7 +206,6 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, bool& rw, const access_inf
 		break;
 	}
 
-	rw = info.type == ACCESS_WRITE || info.type == ACCESS_WRITE_USER;
 	switch(l2->type()) {
 	case l2_descriptor::TE_LARGE:
 		pa = (gpa_t)(l2->base_addr() | (((uint32_t)va) & 0xffff));
@@ -226,13 +224,13 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, bool& rw, const access_inf
 	return false;
 }
 
-bool ArmMMU::resolve_fine_page(gva_t va, gpa_t& pa, bool& rw, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
+bool ArmMMU::resolve_fine_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
 	printf("mmu: unsupported fine page table\n");
 	return false;
 }
 
-bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, bool& rw, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
+bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
 	uint32_t dacr = _coco.DACR();
 	dacr >>= l1->domain() * 2;
@@ -244,7 +242,7 @@ bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, bool& rw, const access_info& i
 		return true;
 
 	case 1:
-		if (!check_access_perms(l1->ap(), info.mode == ACCESS_KERNEL, info.type == ACCESS_WRITE || info.type == ACCESS_WRITE_USER)) {
+		if (!check_access_perms(l1->ap(), info.mode == ACCESS_KERNEL, info.is_write())) {
 			fault = SECTION_PERMISSION;
 			return true;
 		}
@@ -255,7 +253,6 @@ bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, bool& rw, const access_info& i
 		break;
 	}
 
-	rw = info.type == ACCESS_WRITE || info.type == ACCESS_WRITE_USER;
 	pa = (gpa_t)(l1->base_addr() | (((uint64_t)va) & 0xfffff));
 	return true;
 }

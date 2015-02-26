@@ -4,7 +4,9 @@
 #include <cpu.h>
 #include <mmu.h>
 
-extern "C" int handle_pagefault(uint64_t va, uint64_t code)
+using namespace captive::arch;
+
+extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 {
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
@@ -13,10 +15,27 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code)
 		captive::arch::CPU *core = captive::arch::active_cpu;
 
 		if (core) {
-			captive::arch::MMU::resolution_fault fault;
+			MMU::resolution_fault fault;
+			MMU::access_info info;
+
+			// Prepare an access_info structure to describe the memory access
+			// to the MMU.
+			info.mode = core->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+
+			if (va == core->read_pc()) {
+				// Detect a fetch
+				info.type = MMU::ACCESS_FETCH;
+			} else {
+				// Detect a READ/WRITE
+				if (code & 2) {
+					info.type = MMU::ACCESS_WRITE;
+				} else {
+					info.type = MMU::ACCESS_READ;
+				}
+			}
 
 			// Get the core's MMU to handle the fault.
-			if (core->mmu().handle_fault((captive::arch::va_t)va, fault)) {
+			if (core->mmu().handle_fault((gva_t)va, info, fault)) {
 				// If we got this far, then the fault was handled by the core's logic.
 
 				// Return TRUE if we need to return to the safe-point, i.e. to do a side

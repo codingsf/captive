@@ -30,7 +30,7 @@ namespace captive {
 			uint64_t data;
 
 			inline uint64_t base_address() const { return data & ~0xfffULL; }
-			inline uint64_t base_address(uint64_t v) { data &= 0xfffULL; data |= v &~0xfffULL; }
+			inline void base_address(uint64_t v) { data &= 0xfffULL; data |= v &~0xfffULL; }
 
 			inline uint16_t flags() const { return data & 0xfffULL; }
 			inline void flags(uint16_t v) { data &= ~0xfffULL; data |= v & 0xfffULL;}
@@ -77,9 +77,6 @@ namespace captive {
 		static_assert(sizeof(page_table_t) == 0x1000, "x86 page table must be 4096 bytes");
 
 		typedef uint16_t table_idx_t;
-
-		typedef void *pa_t;
-		typedef void *va_t;
 
 		class Memory {
 			friend class MMU;

@@ -8,8 +8,6 @@ using namespace captive::arch;
 static const char *mem_access_types[] = { "read", "write", "fetch", "read-user", "write-user" };
 static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
-extern volatile MMU::access_type mem_access_type;
-
 MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
 }
@@ -56,16 +54,16 @@ void MMU::unmap_phys_page(void* p)
 	//
 }
 
-extern bool trace;
+extern uint64_t return_rip;
 
-bool MMU::handle_fault(va_t va, resolution_fault& fault)
+bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& fault)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
 	page_dir_entry_t *pd;
 	page_table_entry_t *pt;
 
-	Memory::get_va_table_entries((va_t)va, pm, pdp, pd, pt);
+	Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
 
 	//printf("mmu: handle fault: %x %p (%x) %p (%x) %p (%x) %p (%x)\n", va, pm, pm->data, pdp, pdp->data, pd, pd->data, pt, pt->data);
 
@@ -119,40 +117,35 @@ bool MMU::handle_fault(va_t va, resolution_fault& fault)
 		pd->present(true);
 	}
 
-	gpa_t pa;
-	bool rw;
+	if (!enabled()) {
+		fault = NONE;
 
-	access_info info;
-	info.type = mem_access_type;
-	
-	if (mem_access_type == ACCESS_READ_USER || mem_access_type == ACCESS_WRITE_USER) {
-		info.mode = ACCESS_USER;
-	} else {
-		info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
-	}
-
-	if (!resolve_gpa((gva_t)(uint64_t)va, pa, rw, info, fault)) {
-		return false;
-	}
-
-	if (fault == NONE) {
-		// Update the corresponding page table address entry and mark it as
-		// present and writable.  Note, assigning the base address will mask
-		// out the bottom twelve bits of the incoming address, to ensure it's
-		// a page-aligned value.
-		pt->base_address(0x100000000 | (uint64_t)pa);
+		pt->base_address((uint64_t)gpa_to_hpa((gpa_t)va));
 		pt->present(true);
-		pt->writable(rw);
-
-		//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
+		pt->writable(true);
 	} else {
-		pt->present(false);
-		printf("mmu: %08x fault: va=%08x access-type=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[mem_access_type], mem_fault_types[fault]);
-		if (_cpu.read_pc() == 0xc0018518)
-			_cpu.dump_state();
+		gpa_t pa;
+		if (!resolve_gpa(va, pa, info, fault)) {
+			return false;
+		}
+
+		if (fault == NONE) {
+			// Update the corresponding page table address entry and mark it as
+			// present and writable.  Note, assigning the base address will mask
+			// out the bottom twelve bits of the incoming address, to ensure it's
+			// a page-aligned value.
+			pt->base_address((uint64_t)gpa_to_hpa(pa));
+			pt->present(true);
+			pt->writable(info.is_write());
+
+			//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
+		} else {
+			pt->present(false);
+			//printf("mmu: %08x fault: va=%08x access-type=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[mem_access_type], mem_fault_types[fault]);
+		}
 	}
 
-	Memory::flush_page(va);
+	Memory::flush_page((va_t)(uint64_t)va);
 	return true;
 }
 
