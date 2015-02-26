@@ -123,6 +123,7 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 		pt->base_address((uint64_t)gpa_to_hpa((gpa_t)va));
 		pt->present(true);
 		pt->writable(true);
+		pt->allow_user(true);
 	} else {
 		gpa_t pa;
 		if (!resolve_gpa(va, pa, info, fault)) {
@@ -137,6 +138,7 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 			pt->base_address((uint64_t)gpa_to_hpa(pa));
 			pt->present(true);
 			pt->writable(info.is_write());
+			pt->allow_user(info.is_user());
 
 			//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
 		} else {

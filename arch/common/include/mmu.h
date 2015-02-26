@@ -44,6 +44,8 @@ namespace captive {
 				enum access_mode mode;
 
 				inline bool is_write() const { return type == ACCESS_WRITE || type == ACCESS_WRITE_USER; }
+				inline bool is_kernel() const { return mode == ACCESS_KERNEL; }
+				inline bool is_user() const { return mode == ACCESS_USER; }
 			};
 
 			MMU(CPU& cpu);

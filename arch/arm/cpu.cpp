@@ -102,7 +102,7 @@ bool ArmCPU::run()
 
 		// Execute one block of instructions
 		ArmDecode *insn;
-		//do {
+		do {
 			// Reset CPU exception state
 			state.last_exception_action = 0;
 
@@ -130,7 +130,7 @@ bool ArmCPU::run()
 			inc_insns_executed();
 
 			if (trace().enabled()) trace().end_record();
-		//} while(!insn->end_of_block && step_ok);
+		} while(!insn->end_of_block && step_ok);
 	} while(step_ok);
 
 	return true;
