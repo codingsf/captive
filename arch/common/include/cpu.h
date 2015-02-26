@@ -10,6 +10,7 @@
 
 #include <define.h>
 #include <trace.h>
+#include <mmu.h>
 
 namespace captive {
 	namespace arch {
@@ -39,7 +40,13 @@ namespace captive {
 			inline Trace& trace() { return *_trace; }
 
 			inline bool kernel_mode() const { return _kernel_mode; }
-			inline void kernel_mode(bool km) { _kernel_mode = km; }
+
+			inline void kernel_mode(bool km) {
+				if (_kernel_mode != km) {
+					_kernel_mode = km;
+					mmu().cpu_privilege_change(km);
+				}
+			}
 
 		protected:
 			inline void inc_insns_executed() {

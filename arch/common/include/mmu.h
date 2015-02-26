@@ -57,6 +57,8 @@ namespace captive {
 
 			inline CPU& cpu() const { return _cpu; }
 
+			void cpu_privilege_change(bool kernel_mode);
+
 			bool handle_fault(gva_t va, const access_info& info, resolution_fault& fault);
 
 			inline void flush() {
@@ -72,9 +74,6 @@ namespace captive {
 
 		protected:
 			bool clear_vma();
-			void *map_guest_phys_page(gpa_t pa);
-			void *map_guest_phys_pages(gpa_t pa, int nr);
-			void unmap_phys_page(void *p);
 
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) = 0;
 		};

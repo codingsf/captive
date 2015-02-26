@@ -317,10 +317,17 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
+	// For now, put the stack starting at the end of shared memory
 	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE;
 
+	// Map ALL guest physical memory, and mark it as present and writable for
+	// use by the engine.
+	for (uint64_t va = GUEST_PHYS_MEMORY_COPY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_COPY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+	}
+
 	// Map ALL guest physical memory, but don't mark it as present.
-	for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
+	/*for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, 0);
 	}
 
@@ -347,7 +354,7 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 			va += 0x1000;
 			pa += 0x1000;
 		}
-	}
+	}*/
 
 	return true;
 }

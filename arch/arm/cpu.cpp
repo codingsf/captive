@@ -100,13 +100,13 @@ bool ArmCPU::run()
 			}
 		}
 
-		if (kernel_mode() && current_ring() == 3) {
+		/*if (kernel_mode() && current_ring() == 3) {
 			printf("switching to ring0\n");
 			switch_to_ring0();
 		} else if (!kernel_mode() && current_ring() == 0) {
 			printf("switching to ring3\n");
 			switch_to_ring3();
-		}
+		}*/
 
 		// Execute one block of instructions
 		ArmDecode *insn;

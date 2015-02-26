@@ -157,12 +157,12 @@ bool Environment::run(unsigned int ep)
 		return false;
 	}
 
+	captive::arch::active_cpu = core;
+
 	if (!core->init(ep)) {
 		printf("error: unable to init core\n");
 		return false;
 	}
-
-	captive::arch::active_cpu = core;
 
 	bool result = core->run();
 	delete core;

@@ -10,6 +10,19 @@ static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
 MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
+	printf("mmu: allocating guest pdps\n");
+
+	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
+
+	for (int i = 0; i < 4; i++) {
+		pdp->entries[i].base_address((uint64_t)Memory::alloc_page().pa);
+		pdp->entries[i].flags(0);
+		pdp->entries[i].present(false);
+		pdp->entries[i].writable(true);
+	}
+
+	Memory::flush_tlb();
 }
 
 MMU::~MMU()
@@ -19,42 +32,23 @@ MMU::~MMU()
 
 bool MMU::clear_vma()
 {
-	page_map_entry_t *pm;
-	page_dir_ptr_entry_t *pdp;
-	page_dir_entry_t *pd;
-	page_table_entry_t *pt;
+	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
 
-	Memory::get_va_table_entries(0, pm, pdp, pd, pt);
-
-	page_dir_ptr_t *pdp_base = (page_dir_ptr_t *)pdp;
-
-	// Clear PRESENT flag on the 4G mapping.
-	for (int pdp_idx = 0; pdp_idx < 4; pdp_idx++) {
-		pdp_base->entries[pdp_idx].present(false);
+	// Clear the present map on the 4G mapping
+	for (int i = 0; i < 4; i++) {
+		pdp->entries[i].present(false);
 	}
 
 	// Flush the TLB
 	Memory::flush_tlb();
-
 	return true;
 }
 
-void* MMU::map_guest_phys_page(gpa_t pa)
+void MMU::cpu_privilege_change(bool kernel_mode)
 {
-	return NULL;
+	clear_vma();
 }
-
-void* MMU::map_guest_phys_pages(gpa_t pa, int nr)
-{
-	return NULL;
-}
-
-void MMU::unmap_phys_page(void* p)
-{
-	//
-}
-
-extern uint64_t return_rip;
 
 bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& fault)
 {
