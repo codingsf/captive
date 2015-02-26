@@ -177,6 +177,7 @@ namespace captive {
 					pm->base_address((uint64_t)page.pa);
 					pm->present(true);
 					pm->writable(true);
+					pm->allow_user(true);
 				}
 
 				// L3
@@ -187,6 +188,7 @@ namespace captive {
 					pdp->base_address((uint64_t)page.pa);
 					pdp->present(true);
 					pdp->writable(true);
+					pm->allow_user(true);
 				}
 
 				// L2
@@ -196,6 +198,7 @@ namespace captive {
 					pd->base_address((uint64_t)page.pa);
 					pd->present(true);
 					pd->writable(true);
+					pm->allow_user(true);
 				}
 
 				pt = &((page_table_t *)phys_to_virt((pa_t)(uint64_t)pd->base_address()))->entries[pt_idx];

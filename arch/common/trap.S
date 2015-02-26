@@ -91,4 +91,6 @@ trap_pf:
 1:
 	pop_regs
 	add $8, %rsp
+
 	iretq
+

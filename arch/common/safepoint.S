@@ -1,3 +1,6 @@
+.code64
+.text
+
 .globl record_safepoint
 record_safepoint:
 	pushf
@@ -36,3 +39,20 @@ interrupt_restore_safepoint:
 	push 56(%rdi)	// RIP
 
 	iretq
+
+.globl switch_to_ring3
+switch_to_ring3:
+	popq %rdx			// Load return address into RDX, and remove it from the stack
+	mov %rsp, %rcx		// Load stack pointer int RCX
+	rex.w sysexit		// Invoke SYSEXIT
+
+.globl switch_to_ring0
+switch_to_ring0:
+	pop %rsi			// Load return address into RSI
+	mov %rsp, %rdi		// Load stack pointer into RDI
+	rex.w sysenter		// Invoke SYSENTER
+
+.globl sysenter_entry
+sysenter_entry:
+	mov %rdi, %rsp		// Restore the stack pointer
+	jmp *%rsi			// Return

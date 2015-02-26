@@ -53,7 +53,7 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 		}
 	} else {
 		// This page-fault happened elsewhere - we can't do anything about it.
-		printf("panic: internal page-fault: va=%x, code=%x\n", va, code);
+		printf("panic: internal page-fault: rip=%x va=%x, code=%x\n", rip, va, code);
 		abort();
 	}
 

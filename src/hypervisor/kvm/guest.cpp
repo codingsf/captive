@@ -196,7 +196,6 @@ bool KVMGuest::prepare_guest_irq()
 	return true;
 }
 
-
 bool KVMGuest::prepare_guest_memory()
 {
 	// Allocate system memory
@@ -207,11 +206,27 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	// Hack in the GDT
-	uint64_t *gdt = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x10];
+	uint64_t *gdt = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x100];
 
-	*gdt++ = 0;
-	*gdt++ = 0x0020980000000000;
-	*gdt++ = 0x0000900000000000;
+	*gdt++ = 0;				// NULL
+	*gdt++ = 0x0020980000000000;		// KERNEL CS
+	*gdt++ = 0x0000900000000000;		// KERNEL DS
+	*gdt++ = 0x0020f80000000000;		// USER CS
+	*gdt++ = 0x0000f00000000000;		// USER DS
+	*gdt++ = 0x00408900020000d0;		// TSS
+	*gdt = 2;
+
+	// Hack in the TSS
+	uint64_t *tss = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x200];
+
+	tss[2] = 3;
+	tss[19] = 0x1b;		// CS
+	tss[20] = 0x23;		// SS
+	tss[21] = 0x23;		// DS
+	tss[22] = 0x23;		// FS
+	tss[23] = 0x23;		// GS
+
+	tss[25] = 208;
 
 	// Allocate shared memory
 	sh_mem_rgn = alloc_guest_memory(SHMEM_PHYS_BASE, SHMEM_PHYS_SIZE);
@@ -271,6 +286,7 @@ bool KVMGuest::install_bios()
 
 #define PT_PRESENT	(1ULL << 0)
 #define PT_WRITABLE	(1ULL << 1)
+#define PT_USER_ACCESS	(1ULL << 2)
 #define PT_NO_EXECUTE	(1ULL << 63)
 
 bool KVMGuest::install_initial_pgt()
@@ -278,7 +294,7 @@ bool KVMGuest::install_initial_pgt()
 	next_page = 0x3000;
 
 	for (uint64_t va = 0, pa = 0; va < 0x200000; va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	return true;
@@ -288,17 +304,17 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 {
 	// Map the ENGINE into memory
 	for (uint64_t va = ENGINE_VIRT_BASE, pa = ENGINE_PHYS_BASE; va < (ENGINE_VIRT_BASE + ENGINE_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	// Map the SYSTEM DATA area into memory
 	for (uint64_t va = DATA_VIRT_BASE, pa = DATA_PHYS_BASE; va < (DATA_VIRT_BASE + DATA_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	// Map the shared memory region into memory
 	for (uint64_t va = SHMEM_VIRT_BASE, pa = SHMEM_PHYS_BASE; va < (SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE;
@@ -449,7 +465,7 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 		uint64_t new_page = alloc_page();
 		bzero(&base[new_page], 0x1000);
 
-		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE;
+		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
 	pdp_t pdp = (pdp_t)&base[pm[pm_idx] & ADDR_MASK];
@@ -457,7 +473,7 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 		uint64_t new_page = alloc_page();
 		bzero(&base[new_page], 0x1000);
 
-		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE;
+		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
 	pd_t pd = (pd_t)&base[pdp[pdp_idx] & ADDR_MASK];
@@ -465,7 +481,7 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 		uint64_t new_page = alloc_page();
 		bzero(&base[new_page], 0x1000);
 
-		pd[pd_idx] = new_page | PT_PRESENT | PT_WRITABLE;
+		pd[pd_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
 	pt_t pt = (pt_t)&base[pd[pd_idx] & ADDR_MASK];

@@ -66,6 +66,9 @@ static trap_fn_t trap_fns[] = {
 	trap_irq,
 };
 
+static uint64_t temp_sysenter_stack[8];
+extern "C" void sysenter_entry(void);
+
 struct IDT {
 	uint16_t off_low;
 	uint16_t sel;
@@ -101,6 +104,14 @@ static void set_idt(IDT* idt, trap_fn_t fn)
 	idt->type = 0x8e;
 }
 
+static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
+{
+	uint32_t low = msr_value & 0xffffffff;
+	uint32_t high = (msr_value >> 32);
+
+	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
+}
+
 bool Environment::init()
 {
 	struct {
@@ -108,8 +119,8 @@ bool Environment::init()
 		uint64_t base;
 	} packed GDTR;
 
-	GDTR.limit = 8 * 3;
-	GDTR.base = 0x200000010;
+	GDTR.limit = 8 * 7;
+	GDTR.base = 0x200000100;
 
 	asm volatile("lgdt %0\n" :: "m"(GDTR));
 
@@ -119,15 +130,21 @@ bool Environment::init()
 	} packed IDTR;
 
 	IDTR.limit = sizeof(struct IDT) * (sizeof(trap_fns) / sizeof(trap_fns[0]));
-	IDTR.base = 0x200000030;
+	IDTR.base = 0x200000300;
 
-	IDT *idt = (IDT *)0x200000030;
+	IDT *idt = (IDT *)IDTR.base;
 
 	for (int i = 0; i < sizeof(trap_fns) / sizeof(trap_fns[0]); i++) {
 		set_idt(idt++, trap_fns[i]);
 	}
 
 	asm volatile("lidt %0\n" :: "m"(IDTR));
+
+	asm volatile("ltr %0\n" :: "a"((uint16_t)0x28));
+
+	wrmsr(0x174, 0x08);
+	wrmsr(0x175, (uint64_t)&temp_sysenter_stack);
+	wrmsr(0x176, (uint64_t)&sysenter_entry);
 
 	return true;
 }

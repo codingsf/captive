@@ -303,6 +303,11 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		DEBUG << "MIPS: " << ((kvm_guest.shmem_region()->insn_count * 1e-6) / dur.count());
 		return true;
 	}
+
+	case 5:
+		dump_regs();
+		fgetc(stdin);
+		return true;
 	}
 
 	return false;
@@ -352,7 +357,7 @@ void KVMCpu::dump_regs()
 	PREG(rflags)
 
 #undef PREG
-#define PSREG(rg) << #rg ": base=" << std::hex << sregs.rg.base << ", limit=" << std::hex << sregs.rg.limit << ", selector=" << std::hex << sregs.rg.selector << std::endl
+#define PSREG(rg) << #rg ": base=" << std::hex << sregs.rg.base << ", limit=" << std::hex << sregs.rg.limit << ", selector=" << std::hex << sregs.rg.selector << ", dpl=" << (uint32_t)sregs.rg.dpl << ", avl=" << (uint32_t)sregs.rg.avl << std::endl
 
 	PSREG(cs)
 	PSREG(ds)
@@ -360,6 +365,7 @@ void KVMCpu::dump_regs()
 	PSREG(fs)
 	PSREG(gs)
 	PSREG(ss)
+	PSREG(tr)
 
 #undef PSREG
 #define PCREG(rg) << #rg ": " << std::hex << sregs.rg << std::endl
@@ -374,6 +380,7 @@ void KVMCpu::dump_regs()
 
 	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl
 	<< "idt base=" << std::hex << sregs.idt.base << ", limit=" << std::hex << sregs.idt.limit << std::endl
+	<< "apic base=" << std::hex << sregs.apic_base << std::endl
 	<< "efer=" << std::hex << sregs.efer << std::endl;
 
 	// Instruction Data

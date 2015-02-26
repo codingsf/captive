@@ -83,28 +83,24 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 #define flush_dtlb_entry(v)
 #define flush_itlb_entry(v)
 
-static inline uint32_t mem_read_8(uint32_t addr, uint32_t& data)
+static inline uint8_t mem_read_8(uint32_t addr)
 {
-	data = *((uint8_t*)((uint64_t)addr));
-	return 0;
+	return *((uint8_t*)((uint64_t)addr));
 }
 
-static inline uint32_t mem_read_16(uint32_t addr, uint32_t& data)
+static inline uint16_t mem_read_16(uint32_t addr)
 {
-	data = *((uint16_t*)((uint64_t)addr));
-	return 0;
+	return *((uint16_t*)((uint64_t)addr));
 }
 
-static inline uint32_t mem_read_32(uint32_t addr, uint32_t& data)
+static inline uint32_t mem_read_32(uint32_t addr)
 {
-	data = *((uint32_t*)((uint64_t)addr));
-	return 0;
+	return *((uint32_t*)((uint64_t)addr));
 }
 
-static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
+static inline uint64_t mem_read_64(uint32_t addr)
 {
-	data = *((uint64_t*)((uint64_t)addr));
-	return 0;
+	return *((uint64_t*)((uint64_t)addr));
 }
 
 /*#define mem_read_8(_addr, _data) (_data = *((uint8_t*)((uint64_t)_addr)), page_fault_code)
@@ -112,28 +108,24 @@ static inline uint32_t mem_read_64(uint32_t addr, uint64_t& data)
 #define mem_read_32(_addr, _data) (_data = *((uint32_t*)((uint64_t)_addr)), page_fault_code)
 #define mem_read_64(_addr, _data) (_data = *((uint64_t*)((uint64_t)_addr)), page_fault_code)*/
 
-static inline uint32_t mem_write_64(uint32_t addr, uint64_t data)
+static inline void mem_write_64(uint32_t addr, uint64_t data)
 {
-	*((uint64_t*)((uint64_t)addr)) = ((uint64_t)data);
-	return 0;
+	*((uint64_t*)((uint64_t)addr)) = data;
 }
 
-static inline uint32_t mem_write_32(uint32_t addr, uint32_t data)
+static inline void mem_write_32(uint32_t addr, uint32_t data)
 {
-	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
-	return 0;
+	*((uint32_t*)((uint64_t)addr)) = data;
 }
 
-static inline uint32_t mem_write_16(uint32_t addr, uint16_t data)
+static inline void mem_write_16(uint32_t addr, uint16_t data)
 {
-	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
-	return 0;
+	*((uint16_t*)((uint64_t)addr)) = data;
 }
 
-static inline uint32_t mem_write_8(uint32_t addr, uint8_t data)
+static inline void mem_write_8(uint32_t addr, uint8_t data)
 {
-	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
-	return 0;
+	*((uint8_t*)((uint64_t)addr)) = data;
 }
 
 /*#define mem_write_8(_addr, _data) (*((uint8_t*)((uint64_t)_addr)) = ((uint8_t)_data), page_fault_code)
@@ -141,28 +133,24 @@ static inline uint32_t mem_write_8(uint32_t addr, uint8_t data)
 #define mem_write_32(_addr, _data) (*((uint32_t*)((uint64_t)_addr)) = ((uint32_t)_data), page_fault_code)
 #define mem_write_64(_addr, _data) (*((uint64_t*)((uint64_t)_addr)) = ((uint64_t)_data), page_fault_code)*/
 
-static inline uint32_t mem_read_8_user(uint32_t addr, uint32_t& data)
+static inline uint8_t mem_read_8_user(uint32_t addr)
 {
-	data = *((uint8_t*)((uint64_t)addr));
-	return 0;
+	return *((uint8_t*)((uint64_t)addr));
 }
 
-static inline uint32_t mem_read_16_user(uint32_t addr, uint32_t& data)
+static inline uint16_t mem_read_16_user(uint32_t addr)
 {
-	data = *((uint16_t*)((uint64_t)addr));
-	return 0;
+	return *((uint16_t*)((uint64_t)addr));
 }
 
-static inline uint32_t mem_read_32_user(uint32_t addr, uint32_t& data)
+static inline uint32_t mem_read_32_user(uint32_t addr)
 {
-	data = *((uint32_t*)((uint64_t)addr));
-	return 0;
+	return *((uint32_t*)((uint64_t)addr));
 }
 
-static inline uint32_t mem_read_64_user(uint32_t addr, uint64_t& data)
+static inline uint64_t mem_read_64_user(uint32_t addr)
 {
-	data = *((uint64_t*)((uint64_t)addr));
-	return 0;
+	return *((uint64_t*)((uint64_t)addr));
 }
 
 /*#define mem_read_8_user(_addr, _data) mem_read_8(_addr, _data)
@@ -170,28 +158,24 @@ static inline uint32_t mem_read_64_user(uint32_t addr, uint64_t& data)
 #define mem_read_32_user(_addr, _data) mem_read_32(_addr, _data)
 #define mem_read_64_user(_addr, _data) mem_read_64(_addr, _data)*/
 
-static inline uint32_t mem_write_64_user(uint32_t addr, uint64_t data)
+static inline void mem_write_64_user(uint32_t addr, uint64_t data)
 {
-	*((uint64_t*)((uint64_t)addr)) = ((uint64_t)data);
-	return 0;
+	*((uint64_t*)((uint64_t)addr)) = data;
 }
 
-static inline uint32_t mem_write_32_user(uint32_t addr, uint32_t data)
+static inline void mem_write_32_user(uint32_t addr, uint32_t data)
 {
-	*((uint32_t*)((uint64_t)addr)) = ((uint32_t)data);
-	return 0;
+	*((uint32_t*)((uint64_t)addr)) = data;
 }
 
-static inline uint32_t mem_write_16_user(uint32_t addr, uint16_t data)
+static inline void mem_write_16_user(uint32_t addr, uint16_t data)
 {
-	*((uint16_t*)((uint64_t)addr)) = ((uint16_t)data);
-	return 0;
+	*((uint16_t*)((uint64_t)addr)) = data;
 }
 
-static inline uint32_t mem_write_8_user(uint32_t addr, uint8_t data)
+static inline void mem_write_8_user(uint32_t addr, uint8_t data)
 {
-	*((uint8_t*)((uint64_t)addr)) = ((uint8_t)data);
-	return 0;
+	*((uint8_t*)((uint64_t)addr)) = data;
 }
 
 /*#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)

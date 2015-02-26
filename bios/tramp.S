@@ -24,7 +24,7 @@ entry16:
 	// Enable LME and NXE
     mov $0xc0000080, %ecx
     rdmsr
-    or $0x900, %eax
+    or $0x901, %eax
     wrmsr
 
 	// Enable paging and protected mode
@@ -61,6 +61,10 @@ entry64:
 	or $(3<<9), %rax
 	mov %rax, %cr4
 
+	// Load the TSS
+	mov $0x28, %eax
+	//ltr %ax
+
 	// Make a hypercall to instruct the hypervisor to restructure the
 	// page tables
 	movl $1, %eax
@@ -68,8 +72,8 @@ entry64:
 
 .align 4
 gdt_ptr:
-    .word 0x18
-	.long 0x10
+    .word 0x38
+	.long 0x100
 
 idt_ptr:
     .long 0
