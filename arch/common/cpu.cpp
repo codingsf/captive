@@ -15,13 +15,19 @@ extern captive::shmem_data *shmem;
 
 CPU::CPU(Environment& env) : _env(env), insns_executed(0)
 {
-	bzero(decode_cache, sizeof(decode_cache));
 	bzero(&local_state, sizeof(local_state));
+
+	flush_decode_cache();
 }
 
 CPU::~CPU()
 {
 
+}
+
+void CPU::flush_decode_cache()
+{
+	bzero(decode_cache, sizeof(decode_cache));
 }
 
 bool CPU::run()
@@ -106,6 +112,9 @@ bool CPU::run_interp()
 				trace().start_record(get_insns_executed(), pc, insn);
 			}
 
+			// Mark the page as has_been_executed
+			//mmu().set_page_executed(pc);
+
 			// Execute the instruction, with interrupts disabled.
 			__local_irq_disable();
 			step_ok = interpreter().step_single(insn);
@@ -122,4 +131,14 @@ bool CPU::run_interp()
 	} while(step_ok);
 
 	return true;
+}
+
+bool CPU::run_block_jit()
+{
+	return false;
+}
+
+bool CPU::run_region_jit()
+{
+	return false;
 }

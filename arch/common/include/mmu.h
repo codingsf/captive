@@ -43,7 +43,9 @@ namespace captive {
 				enum access_type type;
 				enum access_mode mode;
 
+				inline bool is_read() const { return type == ACCESS_READ || type == ACCESS_READ_USER; }
 				inline bool is_write() const { return type == ACCESS_WRITE || type == ACCESS_WRITE_USER; }
+				inline bool is_fetch() const { return type == ACCESS_FETCH; }
 				inline bool is_kernel() const { return mode == ACCESS_KERNEL; }
 				inline bool is_user() const { return mode == ACCESS_USER; }
 			};
@@ -58,6 +60,7 @@ namespace captive {
 			inline CPU& cpu() const { return _cpu; }
 
 			void cpu_privilege_change(bool kernel_mode);
+			void set_page_executed(uint32_t va);
 
 			bool handle_fault(gva_t va, const access_info& info, resolution_fault& fault);
 

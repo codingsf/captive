@@ -23,15 +23,19 @@ namespace captive {
 
 		struct entry_t {
 			enum entry_flags_t {
+				// PTE
 				PRESENT		= 1 << 0,
 				WRITABLE	= 1 << 1,
 				ALLOW_USER	= 1 << 2,
 				WRITE_THROUGH	= 1 << 3,
 				CACHE_DISABLED	= 1 << 4,
 				ACCESSED	= 1 << 5,
-				PAGE_SIZE	= 1 << 6,
 				DIRTY		= 1 << 6,
-				GLOBAL		= 1 << 7,
+				RESERVED	= 1 << 7,
+				GLOBAL		= 1 << 8,
+
+				// CUSTOM
+				EXECUTED	= 1 << 9
 			};
 
 			uint64_t data;
@@ -49,8 +53,20 @@ namespace captive {
 			inline bool allow_user() const { return (flags() & ALLOW_USER) == ALLOW_USER; }
 			inline bool allow_user(bool v) { if (v) flags(flags() | ALLOW_USER); else flags(flags() & ~ALLOW_USER); }
 
-			inline uint8_t custom() const { return (data >> 9) & 0x7; }
-			inline void custom(uint8_t v) { data |= (v & 0x7) << 9; }
+			inline bool executed() const { return get_flag(EXECUTED); }
+			inline void executed(bool v) { set_flag(EXECUTED, v); }
+
+			inline bool get_flag(entry_flags_t flag) const {
+				return (flags() & (uint16_t)flag) == (uint16_t)flag;
+			}
+
+			inline void set_flag(entry_flags_t flag, bool v) {
+				if (v) {
+					flags(flags() | (uint16_t)flag);
+				} else {
+					flags(flags() & ~(uint16_t)flag);
+				}
+			}
 
 			inline void dump() const {
 				printf("mm: entry: data=%x, addr=%x, flags=%x\n", data, base_address(), flags());

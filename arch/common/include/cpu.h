@@ -55,6 +55,11 @@ namespace captive {
 				}
 			}
 
+			void flush_decode_cache();
+			inline void schedule_decode_cache_flush() {
+				_should_flush_decode_cache = true;
+			}
+
 		protected:
 			virtual bool decode_instruction(uint32_t addr, Decode *insn) = 0;
 
@@ -71,6 +76,8 @@ namespace captive {
 
 		private:
 			uint64_t insns_executed;
+			bool _should_flush_decode_cache;
+			
 			Environment& _env;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];

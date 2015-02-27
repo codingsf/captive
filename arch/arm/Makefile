@@ -15,11 +15,11 @@ clean:
 	$(rm) -f $(obj)
 
 $(arch-out): $(obj) $(cmn-out)
-	@echo "  LD    $(notdir $@)"
+	@echo "  LD      $(notdir $@)"
 	$(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start $(obj) $(cmn-out)
 
 %.o: %.cpp
-	@echo "  C++   $(notdir $@)"
+	@echo "  C++     $(notdir $@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
 
 %.d: %.cpp

@@ -30,6 +30,25 @@ MMU::~MMU()
 
 }
 
+void MMU::set_page_executed(uint32_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
+
+	// Avoid a page flush for pages already marked as executed.
+	if (!pt->executed()) {
+		printf("mmu: setting page %08x as executed\n", va);
+		pt->executed(true);
+		//pt->writable(false);
+
+		Memory::flush_page((va_t)va);
+	}
+}
+
 bool MMU::clear_vma()
 {
 	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
@@ -105,10 +124,16 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
 			base->entries[i].present(false);
+			base->entries[i].executed(false);
 		}
 
 		// Set the PRESENT flag for the page table.
 		pd->present(true);
+	}
+
+	if (info.is_write() && pt->executed()) {
+		printf("mmu: write to executed page %08x\n", va);
+		pt->executed(false);
 	}
 
 	if (!enabled()) {
@@ -116,8 +141,8 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 
 		pt->base_address((uint64_t)gpa_to_hpa((gpa_t)va));
 		pt->present(true);
-		pt->writable(true);
 		pt->allow_user(true);
+		pt->writable(true);
 	} else {
 		gpa_t pa;
 		if (!resolve_gpa(va, pa, info, fault)) {
@@ -131,8 +156,8 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 			// a page-aligned value.
 			pt->base_address((uint64_t)gpa_to_hpa(pa));
 			pt->present(true);
-			pt->writable(info.is_write());
 			pt->allow_user(info.is_user());
+			pt->writable(info.is_write());
 
 			//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
 		} else {

@@ -18,19 +18,19 @@ clean: .FORCE
 	$(rm) -f $(obj)
 
 $(out): $(obj)
-	@echo "  AR    $(notdir $@)"
+	@echo "  AR      $(notdir $@)"
 	$(q)$(ar) r $@ $(obj)
 
 %.o: %.c
-	@echo "  CC    $(notdir $@)"
+	@echo "  CC      $(notdir $@)"
 	$(q)$(cc) -c -o $@ $(cflags) $<
 
 %.o: %.cpp
-	@echo "  C++   $(notdir $@)"
+	@echo "  C++     $(notdir $@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
 
 %.o: %.S
-	@echo "  AS    $(notdir $@)"
+	@echo "  AS      $(notdir $@)"
 	$(q)$(cxx) -c -o $@ $(asflags) $<
 
 %.d: %.cpp
