@@ -2,6 +2,12 @@
 
 using namespace captive::arch::jit;
 
+TranslationContext::TranslationContext()
+{
+
+}
+
+
 GuestBasicBlock::GuestBasicBlockFn TranslationContext::compile()
 {
 	return NULL;
