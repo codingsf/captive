@@ -12,10 +12,16 @@
 #include <trace.h>
 #include <mmu.h>
 
+#define DECODE_CACHE_SIZE	8192
+#define DECODE_OBJ_SIZE		128
+#define DECODE_CACHE_ENTRIES	(DECODE_CACHE_SIZE / DECODE_OBJ_SIZE)
+
 namespace captive {
 	namespace arch {
 		class Environment;
 		class MMU;
+		class Interpreter;
+		class Decode;
 
 		class CPU
 		{
@@ -24,7 +30,7 @@ namespace captive {
 			virtual ~CPU();
 
 			virtual bool init(unsigned int ep) = 0;
-			virtual bool run() = 0;
+			bool run();
 
 			virtual uint32_t read_pc() const = 0;
 			virtual uint32_t write_pc(uint32_t new_pc_val) = 0;
@@ -49,6 +55,8 @@ namespace captive {
 			}
 
 		protected:
+			virtual Interpreter& interpreter() const = 0;
+
 			inline void inc_insns_executed() {
 				insns_executed++;
 			}
@@ -56,10 +64,22 @@ namespace captive {
 			Trace *_trace;
 
 		private:
-			bool _kernel_mode;
-
 			uint64_t insns_executed;
 			Environment& _env;
+
+			struct {
+				bool _kernel_mode;
+				uint32_t last_exception_action;
+			} local_state;
+
+			uint8_t decode_cache[DECODE_CACHE_SIZE];
+			inline Decode *get_decode(uint32_t pc) const {
+				return (Decode *)&decode_cache[(pc % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
+			}
+
+			bool run_interp();
+			bool run_block_jit();
+			bool run_region_jit();
 		};
 
 		extern CPU *active_cpu;

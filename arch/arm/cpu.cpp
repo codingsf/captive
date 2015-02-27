@@ -100,14 +100,6 @@ bool ArmCPU::run()
 			}
 		}
 
-		/*if (kernel_mode() && current_ring() == 3) {
-			printf("switching to ring0\n");
-			switch_to_ring0();
-		} else if (!kernel_mode() && current_ring() == 0) {
-			printf("switching to ring3\n");
-			switch_to_ring3();
-		}*/
-
 		// Execute one block of instructions
 		ArmDecode *insn;
 		do {
@@ -169,14 +161,4 @@ bool ArmCPU::init(unsigned int ep)
 	state.regs.RB[15] = 0;			// Reset Vector
 
 	return true;
-}
-
-void ArmCPU::handle_pending_action()
-{
-	//
-}
-
-void ArmCPU::handle_angel_syscall()
-{
-	printf("ANGEL\n");
 }

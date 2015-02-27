@@ -9,23 +9,24 @@
 #define	INTERP_H
 
 #include <define.h>
+#include <mmu.h>
 
 namespace captive {
 	namespace arch {
-		template<class DecodeType>
+		class Decode;
+
 		class Interpreter
 		{
 		public:
 			Interpreter();
 			virtual ~Interpreter();
 
-			virtual bool step_single(DecodeType& insn) = 0;
-			virtual bool handle_irq(uint32_t irq_line) = 0;
+			virtual bool step_single(Decode& insn) = 0;
 
-			bool step_single_trace(DecodeType& insn);
+			virtual bool handle_irq(uint32_t irq_line) = 0;
+			virtual bool handle_memory_fault(MMU::resolution_fault fault) = 0;
 		};
 	}
 }
 
 #endif	/* INTERP_H */
-

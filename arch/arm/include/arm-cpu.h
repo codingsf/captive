@@ -11,10 +11,6 @@
 #include <define.h>
 #include <cpu.h>
 
-#define DECODE_CACHE_SIZE	8192
-#define DECODE_OBJ_SIZE		128
-#define DECODE_CACHE_ENTRIES	(DECODE_CACHE_SIZE / DECODE_OBJ_SIZE)
-
 namespace captive {
 	namespace arch {
 		namespace devices {
@@ -27,7 +23,7 @@ namespace captive {
 			class ArmDecode;
 			class ArmMMU;
 
-			class ArmCPU : public CPU
+			class ArmCPU : public CPU<ArmDecode>
 			{
 				friend class ArmInterp;
 				friend class ArmMMU;
@@ -38,7 +34,6 @@ namespace captive {
 				virtual ~ArmCPU();
 
 				bool init(unsigned int ep) override;
-				bool run() override;
 
 				uint32_t read_pc() const override { return state.regs.RB[15]; }
 
@@ -57,8 +52,8 @@ namespace captive {
 				void dump_state() const;
 
 				virtual MMU& mmu() const override { return (MMU&)*_mmu; }
+				virtual Interpreter<ArmDecode>& interpreter() const { return _interp; }
 
-				void handle_angel_syscall();
 
 				struct cpu_state {
 					uint32_t last_exception_action;
@@ -80,17 +75,10 @@ namespace captive {
 
 			private:
 				ArmMMU *_mmu;
-
-				char decode_cache[DECODE_CACHE_SIZE];
-
-				inline ArmDecode *get_decode(uint32_t pc) const {
-					return (ArmDecode *)&decode_cache[(pc % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
-				}
+				ArmInterp _interp;
 
 				unsigned int _ep;
 				cpu_state state;
-
-				void handle_pending_action();
 			};
 		}
 	}
