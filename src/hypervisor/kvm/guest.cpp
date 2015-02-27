@@ -4,6 +4,7 @@
 #include <hypervisor/config.h>
 #include <loader/loader.h>
 #include <engine/engine.h>
+#include <devices/device.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -12,7 +13,7 @@
 #include <sys/eventfd.h>
 #include <linux/kvm.h>
 
-#include "devices/device.h"
+USE_CONTEXT(Guest);
 
 using namespace captive::engine;
 using namespace captive::hypervisor;
@@ -128,7 +129,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 bool KVMGuest::attach_guest_devices()
 {
 	for (const auto& device : config().devices) {
-		DEBUG << "Attaching device " << device.device().name() << " @ " << std::hex << device.base_address();
+		DEBUG << CONTEXT(Guest) << "Attaching device " << device.device().name() << " @ " << std::hex << device.base_address();
 
 		device.device().attach(*this);
 
