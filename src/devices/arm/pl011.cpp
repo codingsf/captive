@@ -1,5 +1,6 @@
-#include <captive.h>
 #include <devices/arm/pl011.h>
+#include <devices/irq/irq-line.h>
+#include <captive.h>
 
 using namespace captive::devices::arm;
 
@@ -11,7 +12,10 @@ using namespace captive::devices::arm;
 #define UARTIBRD	0x024
 #define UARTFBRD	0x028
 
-PL011::PL011() : Primecell(0x00141011)
+#define IRQ_TXINTR (1 << 5)
+#define IRQ_RXINTR (1 << 4)
+
+PL011::PL011(irq::IRQLine& irq) : Primecell(0x00141011), _irq(irq)
 {
 
 }
@@ -23,8 +27,9 @@ PL011::~PL011()
 
 bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 {
-	if (Primecell::read(off, len, data))
+	if (Primecell::read(off, len, data)) {
 		return true;
+	}
 
 	switch (off) {
 	case 0x000: // Data register
@@ -34,43 +39,56 @@ bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 			data = fifo.front();
 			fifo.pop_front();
 			irq_status &= ~(IRQ_RXINTR);
-			// CheckIRQs();
+			update_irq();
 		}
 		break;
+
 	case 0x004: // RX status register
 		data = 0;
 		break;
+
 	case 0x018: // Flag register
 		data = 0;
+
 		if (fifo.empty()) {
 			data |= (1 << 4); //RXFE
 		}
+
 		data |= (1 << 7); //TXFE (always)
 		break;
+
 	case 0x024: //integer baud rate register
 		data = baud_rate;
 		break;
+
 	case 0x028: //fractional baud rate register
 		data = fractional_baud;
 		break;
+
 	case 0x02c: //line control register
 		data = line_control;
 		break;
+
 	case 0x030: // Control register
 		data = control_word;
 		break;
+
 	case 0x34:
 		data = 0;
 		break;
+
 	case 0x038:
 		data = irq_mask;
 		break;
+
 	case 0x03C:
 		data = irq_status;
 		break;
+
 	case 0x040:
 		data = irq_status & irq_mask;
 		break;
+
 	default:
 		return false;
 	}
@@ -80,8 +98,9 @@ bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 {
-	if (Primecell::write(off, len, data))
+	if (Primecell::write(off, len, data)) {
 		return true;
+	}
 
 	switch (off) {
 	case 0x000: // Data register
@@ -90,22 +109,29 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 		}*/
 		fprintf(stdout, "%c", (uint8_t)(data & 0xff));
 		fflush(stdout);
-		//RaiseTxIRQ();
+		
+		raise_tx_irq();
 		break;
+
 	case 0x004: // RX status register / clear error register
 		control_word = data;
 		break;
+
 	case 0x018: // Flag register
 		break;
+
 	case 0x024: // Integer baud rate register
 		baud_rate = data & 0xffff;
 		break;
+
 	case 0x028:
 		fractional_baud = data & 0x3f;
 		break;
+
 	case 0x02C:
 		line_control = data & 0xff;
 		break;
+
 	case 0x030: // Control register
 		control_word = data;
 		break;
@@ -115,18 +141,30 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 
 	case 0x38:
 		irq_mask = data & 0x7ff;
-		//CheckIRQs();
+		update_irq();
 		break;
+
 	case 0x044:
 		irq_status = irq_status & ~data;
-		//CheckIRQs();
+		update_irq();
 		break;
+
 	case 0x048:
 		WARNING << "Unimplemented DMA request";
 		return false;
+
 	default:
 		return false;
 	}
 
 	return true;
+}
+
+void PL011::update_irq()
+{
+	if(irq_status & irq_mask) {
+		_irq.raise();
+	} else {
+		_irq.rescind();
+	}
 }

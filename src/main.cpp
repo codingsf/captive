@@ -78,13 +78,13 @@ int main(int argc, char **argv)
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC(*vic->get_irq_line(31));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
-	devices::arm::PL011 *uart0 = new devices::arm::PL011();
+	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, *uart0));
 
-	devices::arm::PL011 *uart1 = new devices::arm::PL011();
+	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f2000, *uart1));
 
-	devices::arm::PL011 *uart2 = new devices::arm::PL011();
+	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, *uart2));
 
 	devices::arm::PL031 *rtc = new devices::arm::PL031();
