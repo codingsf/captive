@@ -4,6 +4,7 @@
 #include <arm-env.h>
 #include <arm-decode.h>
 #include <arm-interp.h>
+#include <arm-jit.h>
 #include <arm-disasm.h>
 #include <arm-mmu.h>
 
@@ -33,21 +34,22 @@ void ArmCPU::dump_state() const
 
 bool ArmCPU::init(unsigned int ep)
 {
-	printf("cpu init @ %x\n", ep);
+	//printf("cpu init @ %x\n", ep);
 
 	_trace = new Trace(*new ArmDisasm());
 	_interp = new ArmInterp(*this);
+	_jit = new ArmJIT();
 	_mmu = new ArmMMU(*this);
 
 	_ep = ep;
 
-	printf("installing 3-byte bootloader\n");
+	//printf("installing 3-byte bootloader\n");
 	volatile uint32_t *mem = (volatile uint32_t *)0;
 	*mem++ = 0xef000000;
 	*mem++ = 0xe1a00000;
 	*mem++ = 0xe12fff1c;
 
-	printf("clearing state\n");
+	//printf("clearing state\n");
 	bzero(&state, sizeof(state));
 
 	state.regs.RB[1] = 0x25e;		// Some sort of ID

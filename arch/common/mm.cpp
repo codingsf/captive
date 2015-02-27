@@ -10,7 +10,7 @@ uint64_t Memory::__force_order;
 Memory::Memory(uint64_t first_phys_page) : _next_phys_page((pa_t)first_phys_page), _data_base((va_t)0x200000000)
 {
 	mm = this;
-	printf("next avail phys page: %x, data area base: %x\n", _next_phys_page, _data_base);
+	//printf("next avail phys page: %x, data area base: %x\n", _next_phys_page, _data_base);
 }
 
 Memory::Page Memory::alloc_page()
@@ -27,13 +27,13 @@ Memory::Page Memory::alloc_page()
 	// TODO: Possibly zero out the page
 	// bzero(page.va, 0x1000);
 
-	printf("mm: alloc page pa=%x va=%x\n", page.pa, page.va);
+	//printf("mm: alloc page pa=%x va=%x\n", page.pa, page.va);
 	return page;
 }
 
 void Memory::free_page(Page& page)
 {
-	printf("mm: free page pa=%x va=%x\n", page.pa, page.va);
+	//printf("mm: free page pa=%x va=%x\n", page.pa, page.va);
 }
 
 void Memory::map_page(va_t va, Page& page)

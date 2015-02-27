@@ -21,6 +21,7 @@ namespace captive {
 			class ArmEnvironment;
 			class ArmInterp;
 			class ArmDecode;
+			class ArmJIT;
 			class ArmMMU;
 
 			class ArmCPU : public CPU
@@ -52,7 +53,8 @@ namespace captive {
 				void dump_state() const;
 
 				virtual MMU& mmu() const override { return (MMU&)*_mmu; }
-				virtual Interpreter& interpreter() const { return (Interpreter&)*_interp; }
+				virtual Interpreter& interpreter() const override { return (Interpreter&)*_interp; }
+				virtual JIT& jit() const override { return (JIT&)*_jit; }
 
 				struct cpu_state {
 					uint32_t isa_mode;
@@ -77,6 +79,7 @@ namespace captive {
 			private:
 				ArmMMU *_mmu;
 				ArmInterp *_interp;
+				ArmJIT *_jit;
 
 				unsigned int _ep;
 				cpu_state state;

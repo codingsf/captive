@@ -18,10 +18,15 @@
 
 namespace captive {
 	namespace arch {
+		namespace jit {
+			class GuestBasicBlock;
+		}
+
 		class Environment;
 		class MMU;
 		class Interpreter;
 		class Decode;
+		class JIT;
 
 		class CPU
 		{
@@ -34,6 +39,7 @@ namespace captive {
 
 			virtual MMU& mmu() const = 0;
 			virtual Interpreter& interpreter() const = 0;
+			virtual JIT& jit() const = 0;
 
 			inline Environment& env() const { return _env; }
 			inline Trace& trace() { return *_trace; }
@@ -77,7 +83,7 @@ namespace captive {
 		private:
 			uint64_t insns_executed;
 			bool _should_flush_decode_cache;
-			
+
 			Environment& _env;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
@@ -88,6 +94,11 @@ namespace captive {
 			bool run_interp();
 			bool run_block_jit();
 			bool run_region_jit();
+
+			const jit::GuestBasicBlock *get_basic_block(uint32_t block_addr);
+			bool compile_basic_block(uint32_t block_addr, jit::GuestBasicBlock *block);
+
+			bool handle_pending_action(uint32_t action);
 		};
 
 		extern CPU *active_cpu;

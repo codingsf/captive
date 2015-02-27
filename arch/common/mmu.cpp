@@ -10,7 +10,7 @@ static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
 MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
-	printf("mmu: allocating guest pdps\n");
+	//printf("mmu: allocating guest pdps\n");
 
 	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
@@ -169,4 +169,3 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 	Memory::flush_page((va_t)(uint64_t)va);
 	return true;
 }
-
