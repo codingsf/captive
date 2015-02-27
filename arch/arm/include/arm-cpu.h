@@ -23,7 +23,7 @@ namespace captive {
 			class ArmDecode;
 			class ArmMMU;
 
-			class ArmCPU : public CPU<ArmDecode>
+			class ArmCPU : public CPU
 			{
 				friend class ArmInterp;
 				friend class ArmMMU;
@@ -52,11 +52,9 @@ namespace captive {
 				void dump_state() const;
 
 				virtual MMU& mmu() const override { return (MMU&)*_mmu; }
-				virtual Interpreter<ArmDecode>& interpreter() const { return _interp; }
-
+				virtual Interpreter& interpreter() const { return (Interpreter&)*_interp; }
 
 				struct cpu_state {
-					uint32_t last_exception_action;
 					uint32_t isa_mode;
 
 					struct {
@@ -73,9 +71,12 @@ namespace captive {
 					} regs;
 				};
 
+			protected:
+				virtual bool decode_instruction(uint32_t addr, Decode* insn) override;
+
 			private:
 				ArmMMU *_mmu;
-				ArmInterp _interp;
+				ArmInterp *_interp;
 
 				unsigned int _ep;
 				cpu_state state;

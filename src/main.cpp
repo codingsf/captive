@@ -72,7 +72,7 @@ int main(int argc, char **argv)
 	devices::arm::ArmCpuIRQController *cpu_irq = new devices::arm::ArmCpuIRQController();
 	cfg.cpu_irq_controller = cpu_irq;
 
-	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(0), *cpu_irq->get_irq_line(1));
+	devices::arm::PL190 *vic = new devices::arm::PL190(*cpu_irq->get_irq_line(1), *cpu_irq->get_irq_line(0));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10140000, *vic));
 
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC(*vic->get_irq_line(31));

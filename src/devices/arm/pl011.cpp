@@ -88,7 +88,7 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 		/*if (serial) {
 			serial->WriteChar(data & 0xff);
 		}*/
-		fprintf(stdout, "%c", data & 0xff);
+		fprintf(stdout, "%c", (uint8_t)(data & 0xff));
 		fflush(stdout);
 		//RaiseTxIRQ();
 		break;

@@ -15,7 +15,7 @@ Trace::~Trace()
 
 }
 
-void Trace::start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode_data)
+void Trace::start_record(uint64_t insn_count, uint32_t pc, const Decode *decode_obj)
 {
 	if (!_enabled) return;
 	if (_building_record) return;
@@ -25,7 +25,7 @@ void Trace::start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode
 	current_record.pc = pc;
 	current_record.nr_actions = 0;
 
-	memcpy((void *)&current_record.decode_data[0], (const void *)decode_data, sizeof(current_record.decode_data));
+	memcpy((void *)&current_record.decode_data[0], (const void *)decode_obj, sizeof(current_record.decode_data));
 }
 
 void Trace::abort_record()

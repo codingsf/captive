@@ -16,7 +16,8 @@
 namespace captive {
 	namespace arch {
 		class Disasm;
-
+		class Decode;
+		
 		class Trace
 		{
 		public:
@@ -85,7 +86,7 @@ namespace captive {
 				trace_action actions[MAX_RECORD_ACTIONS];
 			} packed;
 
-			void start_record(uint64_t insn_count, uint32_t pc, const uint8_t *decode_data);
+			void start_record(uint64_t insn_count, uint32_t pc, const Decode *decode_data);
 			void abort_record();
 			void end_record();
 
@@ -95,7 +96,7 @@ namespace captive {
 				trace_action action;
 				action.type = trace_action::MESSAGE;
 				action.message.msg = str;
-				
+
 				add_action(action);
 			}
 

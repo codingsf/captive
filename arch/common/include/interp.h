@@ -21,9 +21,9 @@ namespace captive {
 			Interpreter();
 			virtual ~Interpreter();
 
-			virtual bool step_single(Decode& insn) = 0;
+			virtual bool step_single(const Decode *insn) = 0;
 
-			virtual bool handle_irq(uint32_t irq_line) = 0;
+			virtual bool handle_irq(uint32_t isr) = 0;
 			virtual bool handle_memory_fault(MMU::resolution_fault fault) = 0;
 		};
 	}
