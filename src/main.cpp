@@ -1,6 +1,6 @@
 #include <captive.h>
 #include <engine/engine.h>
-#include <jit/jit.h>
+#include <jit/llvm.h>
 #include <loader/zimage-loader.h>
 #include <loader/devtree-loader.h>
 #include <hypervisor/config.h>
@@ -174,13 +174,13 @@ int main(int argc, char **argv)
 	}
 
 	// Create the JIT
-	JIT jit;
+	LLVMJIT jit;
 	if (!jit.init()) {
 		ERROR << "Unable to initialise jit";
 		return 1;
 	}
 
-	Guest *guest = hv->create_guest(engine, jit, cfg);
+	Guest *guest = hv->create_guest(engine, (JIT&)jit, cfg);
 	if (!guest) {
 		delete hv;
 

@@ -20,6 +20,7 @@ namespace captive {
 
 				IROperandType type;
 				uint32_t value;
+				uint8_t size;
 			};
 
 			struct IRInstruction
@@ -39,6 +40,41 @@ namespace captive {
 
 			class IRInstructionBuilder {
 			public:
+				static IROperand create_constant(uint8_t size, uint32_t val)
+				{
+					IROperand oper;
+					oper.type = IROperand::CONSTANT;
+					oper.value = val;
+					oper.size = size;
+
+					return oper;
+				}
+
+				static IROperand create_constant32(uint32_t val)
+				{
+					return create_constant(4, val);
+				}
+
+				static IROperand create_constant16(uint32_t val)
+				{
+					return create_constant(2, val);
+				}
+
+				static IROperand create_constant8(uint32_t val)
+				{
+					return create_constant(1, val);
+				}
+
+				static IROperand create_vreg(uint32_t id)
+				{
+					IROperand oper;
+					oper.type = IROperand::VREG;
+					oper.value = id;
+					oper.size = 4;
+
+					return oper;
+				}
+
 				static IRInstruction create_nop()
 				{
 					IRInstruction insn;

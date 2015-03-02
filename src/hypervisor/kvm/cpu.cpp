@@ -314,7 +314,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
 
-		if (kvm_guest.jit().compile_block((void *)((uint64_t)kvm_guest.shmem_region() + regs.rdi), regs.rsi)) {
+		if (kvm_guest.jit().block_jit().compile_block((jit::RawBytecode *)((uint64_t)kvm_guest.shmem_region() + regs.rdi), regs.rsi)) {
 			regs.rax = 0;
 		} else {
 			regs.rax = 0;
