@@ -2,6 +2,7 @@
 #include <mmu.h>
 #include <decode.h>
 #include <interp.h>
+#include <disasm.h>
 #include <string.h>
 #include <safepoint.h>
 #include <jit.h>
@@ -228,6 +229,10 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 			printf("cpu: unhandled decode fault @ %08x\n", pc);
 			return false;
 		}
+
+		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+
+		ctx.add_instruction(jit::IRInstructionBuilder::create_nop());
 
 		if (!jit().translate(insn, ctx)) {
 			printf("jit: instruction translation failed\n");

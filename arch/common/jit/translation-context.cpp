@@ -8,6 +8,7 @@ using namespace captive::arch::jit;
 TranslationContext::TranslationContext(void *instruction_buffer)
 	: next_block_id(0),
 	current_block_id(0),
+	next_reg_id(0),
 	next_instruction(0),
 	instruction_buffer((instruction_entry *)instruction_buffer)
 {

@@ -16,11 +16,12 @@
 namespace captive {
 	namespace arch {
 		namespace jit {
+			typedef uint32_t block_id_t;
+			typedef uint32_t reg_id_t;
+
 			class TranslationContext
 			{
 			public:
-				typedef uint32_t block_id_t;
-
 				TranslationContext(void *instruction_buffer);
 
 				GuestBasicBlock::GuestBasicBlockFn compile();
@@ -39,9 +40,18 @@ namespace captive {
 				inline block_id_t current_block() const { return current_block_id; }
 				inline void current_block(block_id_t block_id) { current_block_id = block_id; }
 
+				inline block_id_t alloc_block() {
+					return next_block_id++;
+				}
+
+				inline reg_id_t alloc_reg(int size) {
+					return next_reg_id++;
+				}
+
 			private:
 				block_id_t next_block_id;
 				block_id_t current_block_id;
+				reg_id_t next_reg_id;
 				uint32_t next_instruction;
 
 				struct instruction_entry {

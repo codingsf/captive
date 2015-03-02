@@ -29,25 +29,70 @@ namespace captive {
 		struct RawOperand {
 			enum RawOperandType {
 				CONSTANT,
-				VREG
+				VREG,
+				BLOCK
 			};
 
 			RawOperandType type;
-			uint32_t val;
+			uint64_t val;
+			uint8_t size;
+
+			std::string render() const;
 		};
 
 		struct RawInstruction {
 			enum RawInstructionType {
-				NOP
+				NOP,
+				TRAP,
+
+				MOV,
+				CMOV,
+
+				ADD,
+				SUB,
+				MUL,
+				DIV,
+				MOD,
+
+				SHL,
+				SHR,
+				SAR,
+
+				AND,
+				OR,
+				XOR,
+
+				CMPEQ,
+				CMPNE,
+				CMPGT,
+				CMPGTE,
+				CMPLT,
+				CMPLTE,
+
+				SX,
+				ZX,
+
+				READ_REG,
+				WRITE_REG,
+				READ_MEM,
+				WRITE_MEM,
+
+				JMP,
+				BRANCH,
+				TAKE_EXCEPTION,
 			};
 
 			RawInstructionType type;
 			RawOperand operands[4];
+
+			std::string mnemonic() const;
 		};
 
 		struct RawBytecode {
 			uint32_t block_id;
 			RawInstruction insn;
+
+			void dump() const;
 		};
 
 		class BlockJIT

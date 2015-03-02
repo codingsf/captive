@@ -17,12 +17,14 @@ namespace captive {
 	namespace arch {
 		class Disasm;
 		class Decode;
-		
+
 		class Trace
 		{
 		public:
 			Trace(Disasm& disasm);
 			~Trace();
+
+			inline Disasm& disasm() const { return _disasm; }
 
 			inline void enable() {
 				_enabled = true;
