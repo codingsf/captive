@@ -31,10 +31,20 @@ static void init_ioapic()
 	printf("ioapic: %d\n", read_ioapic_register(APIC_BASE, 0));
 }
 
-extern "C" {
+typedef void (*func_ptr)(void);
 
+//extern func_ptr _init_array_start[0], _init_array_end[0];
+//extern func_ptr _fini_array_start[0], _fini_array_end[0];
+
+static void call_static_constructors()
+{
+	//
+}
+
+extern "C" {
 	void __attribute__((noreturn)) start(uint64_t first_phys_page, unsigned int ep)
 	{
+		call_static_constructors();
 		init_ioapic();
 
 		shmem = (captive::shmem_data *)0x210000000;

@@ -28,7 +28,7 @@ namespace captive {
 			class KVMGuest : public Guest {
 				friend class KVMCpu;
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;

@@ -11,30 +11,80 @@
 namespace captive {
 	namespace arch {
 		namespace jit {
-			class IRBlock;
+			struct IROperand
+			{
+				enum IROperandType {
+					CONSTANT,
+					VREG
+				};
 
-			class IRInstruction {
-			public:
+				IROperandType type;
+				uint32_t value;
+			};
+
+			struct IRInstruction
+			{
 				enum IRInstructionType {
+					NOP,
+
 					ADD,
 					SUB,
 					MUL,
 					DIV
 				};
 
-				inline void attach(IRBlock &parent) {
-					_parent = &parent;
-				}
-
-				virtual IRInstructionType type() const = 0;
-
-			private:
-				IRBlock *_parent;
+				IRInstructionType type;
+				IROperand operands[4];
 			};
 
-			class IRAddInstruction : public IRInstruction {
+			class IRInstructionBuilder {
 			public:
-				IRInstructionType type() const override { return ADD; }
+				static IRInstruction create_nop()
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::NOP;
+
+					return insn;
+				}
+
+				static IRInstruction create_unary(IRInstruction::IRInstructionType type, IROperand op)
+				{
+					IRInstruction insn;
+					insn.type = type;
+					insn.operands[0] = op;
+
+					return insn;
+				}
+
+				static IRInstruction create_binary(IRInstruction::IRInstructionType type, IROperand src, IROperand dst)
+				{
+					IRInstruction insn;
+					insn.type = type;
+					insn.operands[0] = src;
+					insn.operands[1] = dst;
+
+					return insn;
+				}
+
+				static IRInstruction create_add(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::ADD, src, dst);
+				}
+
+				static IRInstruction create_sub(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::SUB, src, dst);
+				}
+
+				static IRInstruction create_mul(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::MUL, src, dst);
+				}
+
+				static IRInstruction create_div(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::DIV, src, dst);
+				}
 			};
 		}
 	}

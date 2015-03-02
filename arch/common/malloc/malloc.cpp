@@ -8,8 +8,13 @@ static uint8_t *heap_ptr = &heap[0];
 
 void *captive::arch::malloc(size_t size)
 {
-	size += 16 + sizeof(struct malloc_unit);
-	size &= 0xf;
+	/*size += 16 + sizeof(struct malloc_unit);
+	size &= 0xf;*/
+
+	size += sizeof(struct malloc_unit);
+	if (size % 16) {
+		size += 16 - (size % 16);
+	}
 
 	struct malloc_unit *unit = (struct malloc_unit *)heap_ptr;
 	heap_ptr += size;
@@ -35,7 +40,7 @@ void *captive::arch::realloc(void *p, size_t size)
 	if (!newmem) {
 		return NULL;
 	}
-	
+
 	if (size < unit->size) {
 		memcpy(newmem, p, size);
 	} else {

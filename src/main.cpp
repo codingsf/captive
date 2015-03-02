@@ -1,5 +1,6 @@
 #include <captive.h>
 #include <engine/engine.h>
+#include <jit/jit.h>
 #include <loader/zimage-loader.h>
 #include <loader/devtree-loader.h>
 #include <hypervisor/config.h>
@@ -34,6 +35,7 @@ DECLARE_CONTEXT(Main);
 using namespace captive;
 using namespace captive::devices::timers;
 using namespace captive::engine;
+using namespace captive::jit;
 using namespace captive::loader;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
@@ -164,7 +166,6 @@ int main(int argc, char **argv)
 
 	// Create the engine.
 	Engine engine(argv[1]);
-
 	if (!engine.init()) {
 		delete hv;
 
@@ -172,7 +173,14 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	Guest *guest = hv->create_guest(engine, cfg);
+	// Create the JIT
+	JIT jit;
+	if (!jit.init()) {
+		ERROR << "Unable to initialise jit";
+		return 1;
+	}
+
+	Guest *guest = hv->create_guest(engine, jit, cfg);
 	if (!guest) {
 		delete hv;
 

@@ -218,7 +218,7 @@ const GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 
 bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 {
-	TranslationContext ctx;
+	TranslationContext ctx(&shmem->ir_buffer[0]);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 

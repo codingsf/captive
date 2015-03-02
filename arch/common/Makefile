@@ -16,6 +16,7 @@ all: $(out)
 clean: .FORCE
 	$(rm) -f $(out)
 	$(rm) -f $(obj)
+	$(rm) -f $(dep)
 
 $(out): $(obj)
 	@echo "  AR      $(notdir $@)"

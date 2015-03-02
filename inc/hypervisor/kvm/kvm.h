@@ -31,7 +31,7 @@ namespace captive {
 				virtual ~KVM();
 
 				bool init() override;
-				Guest *create_guest(engine::Engine& engine, const GuestConfiguration& config) override;
+				Guest *create_guest(engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config) override;
 
 				int version() const;
 

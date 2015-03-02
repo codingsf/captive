@@ -2,6 +2,7 @@
 #include <hypervisor/kvm/cpu.h>
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
+#include <jit/jit.h>
 
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -308,11 +309,25 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		dump_regs();
 		fgetc(stdin);
 		return true;
+
+	case 6: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
+		if (kvm_guest.jit().compile_block((void *)((uint64_t)kvm_guest.shmem_region() + regs.rdi), regs.rsi)) {
+			regs.rax = 0;
+		} else {
+			regs.rax = 0;
+		}
+
+		vmioctl(KVM_SET_REGS, &regs);
+		return true;
+	}
+
 	}
 
 	return false;
 }
-
 
 void KVMCpu::dump_regs()
 {

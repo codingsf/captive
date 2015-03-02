@@ -14,6 +14,8 @@ namespace captive {
 		unsigned int asynchronous_action_pending;
 		bool halt;
 		uint64_t insn_count;
+
+		uint8_t ir_buffer[4096];
 	};
 }
 

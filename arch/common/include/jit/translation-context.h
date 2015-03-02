@@ -11,7 +11,6 @@
 #include <define.h>
 #include <malloc.h>
 #include <jit/guest-basic-block.h>
-#include <jit/ir-block.h>
 #include <jit/ir-instruction.h>
 
 namespace captive {
@@ -20,44 +19,35 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext();
+				typedef uint32_t block_id_t;
+
+				TranslationContext(void *instruction_buffer);
 
 				GuestBasicBlock::GuestBasicBlockFn compile();
 
-				inline IRBlock *create_block() {
-					nr_blocks++;
-					blocks = (IRBlock **)captive::arch::realloc(blocks, sizeof(IRBlock *) * nr_blocks);
-
-					IRBlock *block = new IRBlock();
-
-					block->attach(*this);
-					blocks[nr_blocks-2] = block;
+				inline void add_instruction(const IRInstruction& instruction) {
+					add_instruction(current_block_id, instruction);
 				}
 
-				IRInstruction *create_instruction(IRInstruction::IRInstructionType type) {
-					assert(current_block);
+				inline void add_instruction(block_id_t block_id, const IRInstruction& instruction) {
+					instruction_buffer[next_instruction].block_id = block_id;
+					instruction_buffer[next_instruction].instruction = instruction;
 
-					IRInstruction *insn;
-					switch (type) {
-					case IRInstruction::ADD:
-						insn = new IRAddInstruction();
-						break;
-					default:
-						insn = NULL;
-						break;
-					}
-
-					if (!insn) {
-						return NULL;
-					}
-
-					current_block->add_instruction(*insn);
+					next_instruction++;
 				}
+
+				inline block_id_t current_block() const { return current_block_id; }
+				inline void current_block(block_id_t block_id) { current_block_id = block_id; }
 
 			private:
-				int nr_blocks;
-				IRBlock **blocks;
-				IRBlock *current_block;
+				block_id_t next_block_id;
+				block_id_t current_block_id;
+				uint32_t next_instruction;
+
+				struct instruction_entry {
+					block_id_t block_id;
+					IRInstruction instruction;
+				} *instruction_buffer;
 			};
 		}
 	}
