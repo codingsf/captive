@@ -16,9 +16,6 @@
 namespace captive {
 	namespace arch {
 		namespace jit {
-			typedef uint32_t block_id_t;
-			typedef uint32_t reg_id_t;
-
 			class TranslationContext
 			{
 			public:

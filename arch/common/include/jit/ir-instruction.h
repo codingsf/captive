@@ -11,6 +11,9 @@
 namespace captive {
 	namespace arch {
 		namespace jit {
+			typedef uint32_t block_id_t;
+			typedef uint32_t reg_id_t;
+
 			struct IROperand
 			{
 				enum IROperandType {
@@ -42,6 +45,7 @@ namespace captive {
 					SHL,
 					SHR,
 					SAR,
+					CLZ,
 
 					AND,
 					OR,
@@ -56,6 +60,7 @@ namespace captive {
 
 					SX,
 					ZX,
+					TRUNC,
 
 					READ_REG,
 					WRITE_REG,
@@ -66,6 +71,7 @@ namespace captive {
 					BRANCH,
 
 					TAKE_EXCEPTION,
+					SET_CPU_MODE,
 				};
 
 				IRInstructionType type;
@@ -104,7 +110,7 @@ namespace captive {
 					return create_constant(1, val);
 				}
 
-				static IROperand create_vreg(uint32_t id)
+				static IROperand create_vreg(reg_id_t id)
 				{
 					IROperand oper;
 					oper.type = IROperand::VREG;
@@ -114,7 +120,7 @@ namespace captive {
 					return oper;
 				}
 
-				static IROperand create_block_operand(uint32_t id)
+				static IROperand create_block_operand(block_id_t id)
 				{
 					IROperand oper;
 					oper.type = IROperand::BLOCK;
@@ -199,6 +205,11 @@ namespace captive {
 					return create_binary(IRInstruction::DIV, src, dst);
 				}
 
+				static IRInstruction create_mod(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::MOD, src, dst);
+				}
+
 				static IRInstruction create_shl(IROperand amt, IROperand dst)
 				{
 					return create_binary(IRInstruction::SHL, amt, dst);
@@ -214,6 +225,11 @@ namespace captive {
 					return create_binary(IRInstruction::SAR, amt, dst);
 				}
 
+				static IRInstruction create_clz(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::CLZ, src, dst);
+				}
+
 				static IRInstruction create_sx(IROperand src, IROperand dst)
 				{
 					return create_binary(IRInstruction::SX, src, dst);
@@ -222,6 +238,11 @@ namespace captive {
 				static IRInstruction create_zx(IROperand src, IROperand dst)
 				{
 					return create_binary(IRInstruction::ZX, src, dst);
+				}
+
+				static IRInstruction create_trunc(IROperand src, IROperand dst)
+				{
+					return create_binary(IRInstruction::TRUNC, src, dst);
 				}
 
 				static IRInstruction create_and(IROperand src, IROperand dst)
@@ -302,6 +323,11 @@ namespace captive {
 				static IRInstruction create_take_exception(IROperand code, IROperand data)
 				{
 					return create_binary(IRInstruction::TAKE_EXCEPTION, code, data);
+				}
+
+				static IRInstruction create_set_cpu_mode(IROperand mode)
+				{
+					return create_unary(IRInstruction::SET_CPU_MODE, mode);
 				}
 			};
 		}

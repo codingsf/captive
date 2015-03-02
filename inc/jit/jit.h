@@ -57,6 +57,7 @@ namespace captive {
 				SHL,
 				SHR,
 				SAR,
+				CLZ,
 
 				AND,
 				OR,
@@ -71,6 +72,7 @@ namespace captive {
 
 				SX,
 				ZX,
+				TRUNC,
 
 				READ_REG,
 				WRITE_REG,
@@ -79,7 +81,9 @@ namespace captive {
 
 				JMP,
 				BRANCH,
+
 				TAKE_EXCEPTION,
+				SET_CPU_MODE,
 			};
 
 			RawInstructionType type;

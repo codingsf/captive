@@ -34,6 +34,7 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::SHL: return "shl";
 	case RawInstruction::SHR: return "shr";
 	case RawInstruction::SAR: return "sar";
+	case RawInstruction::CLZ: return "clz";
 	case RawInstruction::AND: return "and";
 	case RawInstruction::OR: return "or";
 	case RawInstruction::XOR: return "xor";
@@ -45,6 +46,7 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::CMPGTE: return "cmp-gte";
 	case RawInstruction::SX: return "sx";
 	case RawInstruction::ZX: return "zx";
+	case RawInstruction::TRUNC: return "trunc";
 	case RawInstruction::READ_REG: return "ldreg";
 	case RawInstruction::WRITE_REG: return "streg";
 	case RawInstruction::READ_MEM: return "ldmem";
@@ -54,6 +56,7 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::NOP: return "nop";
 	case RawInstruction::TRAP: return "trap";
 	case RawInstruction::TAKE_EXCEPTION: return "take-exception";
+	case RawInstruction::SET_CPU_MODE: return "set-cpu-mode";
 	default:
 		return "???";
 	}
@@ -71,6 +74,7 @@ void RawBytecode::dump() const
 		break;
 
 	case RawInstruction::JMP:
+	case RawInstruction::SET_CPU_MODE:
 		str << insn.operands[0].render();
 		break;
 
@@ -83,6 +87,7 @@ void RawBytecode::dump() const
 	case RawInstruction::SHL:
 	case RawInstruction::SHR:
 	case RawInstruction::SAR:
+	case RawInstruction::CLZ:
 	case RawInstruction::AND:
 	case RawInstruction::OR:
 	case RawInstruction::XOR:
@@ -94,6 +99,7 @@ void RawBytecode::dump() const
 	case RawInstruction::CMPGTE:
 	case RawInstruction::SX:
 	case RawInstruction::ZX:
+	case RawInstruction::TRUNC:
 	case RawInstruction::READ_REG:
 	case RawInstruction::WRITE_REG:
 	case RawInstruction::READ_MEM:
