@@ -21,11 +21,15 @@ namespace captive {
 				typedef bool (*GuestBasicBlockFn)(void *cpu_state);
 
 				inline bool execute(void *cpu_state) const {
-					return fnp(cpu_state);
+					return _fnp(cpu_state);
 				}
 
 				inline void fnptr(GuestBasicBlockFn fnp) {
-					fnp = fnp;
+					_fnp = fnp;
+				}
+
+				inline GuestBasicBlockFn fnptr() const {
+					return _fnp;
 				}
 
 				inline uint32_t block_address() const {
@@ -38,7 +42,7 @@ namespace captive {
 
 			private:
 				uint32_t _block_address;
-				GuestBasicBlockFn fnp;
+				GuestBasicBlockFn _fnp;
 			};
 		}
 	}

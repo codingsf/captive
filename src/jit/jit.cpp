@@ -62,7 +62,7 @@ std::string RawInstruction::mnemonic() const
 	}
 }
 
-void RawBytecode::dump() const
+std::string RawBytecode::render() const
 {
 	std::stringstream str;
 
@@ -114,9 +114,13 @@ void RawBytecode::dump() const
 		break;
 	}
 
-	DEBUG << CONTEXT(JIT) << "Bytecode: " << str.str();
+	return str.str();
 }
 
+JIT::JIT() : _code_arena(NULL), _code_arena_size(0)
+{
+
+}
 
 JIT::~JIT()
 {

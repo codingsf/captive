@@ -15,18 +15,7 @@ namespace captive {
 		class BlockJIT;
 		class RegionJIT;
 
-		class JIT
-		{
-		public:
-			virtual ~JIT();
-
-			virtual bool init() = 0;
-
-			virtual BlockJIT& block_jit() = 0;
-			virtual RegionJIT& region_jit() = 0;
-		};
-
-		struct RawOperand {
+				struct RawOperand {
 			enum RawOperandType {
 				CONSTANT,
 				VREG,
@@ -96,21 +85,44 @@ namespace captive {
 			uint32_t block_id;
 			RawInstruction insn;
 
-			void dump() const;
+			std::string render() const;
+		};
+
+		class JIT
+		{
+		public:
+			JIT();
+			virtual ~JIT();
+
+			virtual bool init() = 0;
+
+			virtual BlockJIT& block_jit() = 0;
+			virtual RegionJIT& region_jit() = 0;
+
+			void set_code_arena(void *code_arena, uint64_t arena_size) {
+				_code_arena = code_arena;
+				_code_arena_size = arena_size;
+			}
+
+		//protected:
+		//	virtual bool generate_internal_bytecode(const RawBytecode *ir, uint32_t count);
+		protected:
+			void *_code_arena;
+			uint64_t _code_arena_size;
 		};
 
 		class BlockJIT
 		{
 		public:
 			virtual ~BlockJIT();
-			virtual uint64_t compile_block(const RawBytecode *ir, uint32_t count) = 0;
+			virtual void *compile_block(const RawBytecode *ir, uint32_t count) = 0;
 		};
 
 		class RegionJIT
 		{
 		public:
 			virtual ~RegionJIT();
-			virtual uint64_t compile_region(const RawBytecode *ir, uint32_t count) = 0;
+			virtual void *compile_region(const RawBytecode *ir, uint32_t count) = 0;
 		};
 	}
 }

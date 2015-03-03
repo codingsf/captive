@@ -2,6 +2,7 @@
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/cpu.h>
 #include <hypervisor/config.h>
+#include <jit/jit.h>
 #include <loader/loader.h>
 #include <engine/engine.h>
 #include <devices/device.h>
@@ -39,7 +40,25 @@ using namespace captive::hypervisor::kvm;
 #define SHMEM_VIRT_BASE			(DATA_VIRT_BASE + DATA_SIZE)
 #define SHMEM_PHYS_SIZE			0x10000000ULL
 
+#define JIT_PHYS_BASE			(SHMEM_PHYS_BASE + SHMEM_PHYS_SIZE)
+#define JIT_VIRT_BASE			(SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE)
+#define JIT_SIZE			0x10000000ULL
+
 #define BIOS_PHYS_BASE			0xf0000ULL
+
+struct {
+	std::string name;
+	uint64_t phys_base;
+	uint64_t virt_base;
+	uint64_t size;
+} guest_memory_regions[] = {
+	{ .name = "system-data", .phys_base = 0,              .virt_base = 0x200000000ULL,        .size = 0x010000000ULL },
+	{ .name = "engine",      .phys_base = 0x010000000ULL, .virt_base = 0xFFFFFFFF80000000ULL, .size = 0x030000000ULL },
+	{ .name = "shared-mem",  .phys_base = 0x040000000ULL, .virt_base = 0x210000000ULL,        .size = 0x010000000ULL },
+	{ .name = "jit-mem",     .phys_base = 0x050000000ULL, .virt_base = 0x220000000ULL,        .size = 0x010000000ULL },
+	{ .name = "gpm",         .phys_base = 0x100000000ULL, .virt_base = 0,                     .size = 0x100000000ULL },
+	{ .name = "gpm-copy",    .phys_base = 0x100000000ULL, .virt_base = 0x100000000ULL,        .size = 0x100000000ULL },
+};
 
 #define DEFAULT_NR_SLOTS		32
 
@@ -238,6 +257,15 @@ bool KVMGuest::prepare_guest_memory()
 
 	_shmem = (shmem_data *)sh_mem_rgn->host_buffer;
 
+	// Allocate JIT memory
+	jit_mem_rgn = alloc_guest_memory(JIT_PHYS_BASE, JIT_SIZE);
+	if (!jit_mem_rgn) {
+		ERROR << "Unable to allocate JIT memory region";
+		return false;
+	}
+
+	jit().set_code_arena(jit_mem_rgn->host_buffer, jit_mem_rgn->kvm.memory_size);
+
 	// Install the bios into the correct location.
 	if (!install_bios()) {
 		ERROR << "Unable to initialise bootstrap code";
@@ -321,41 +349,16 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	// For now, put the stack starting at the end of shared memory
 	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE;
 
+	// Map the JIT memory region into memory
+	for (uint64_t va = JIT_VIRT_BASE, pa = JIT_PHYS_BASE; va < (JIT_VIRT_BASE + JIT_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT);
+	}
+
 	// Map ALL guest physical memory, and mark it as present and writable for
 	// use by the engine.
 	for (uint64_t va = GUEST_PHYS_MEMORY_COPY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_COPY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
-
-	// Map ALL guest physical memory, but don't mark it as present.
-	/*for (uint64_t va = GUEST_PHYS_MEMORY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, 0);
-	}
-
-	// Map ALL guest physical memory, and mark it as present and writable
-	for (uint64_t va = GUEST_PHYS_MEMORY_COPY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_COPY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
-	}
-
-	// Remap only the available physical memory.
-	for (const auto& pmr : gpm) {
-		for (uint64_t va = pmr.cfg->base_address(), pa = pmr.vmr->kvm.guest_phys_addr; va < pmr.cfg->base_address() + pmr.cfg->size(); va += 0x1000, pa += 0x1000) {
-			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
-		}
-	}
-
-	// Remap devices - these haven't got backing userspace buffers because
-	// we need to do MMIO on them.
-	for (const auto& dev : devices) {
-		uint64_t va = dev.cfg->base_address();
-		uint64_t pa = GUEST_PHYS_MEMORY_BASE + va;
-
-		for (int i = 0; i < dev.dev->size() / 0x1000; i++) {
-			map_page(va, pa, PT_PRESENT | PT_WRITABLE);
-			va += 0x1000;
-			pa += 0x1000;
-		}
-	}*/
 
 	return true;
 }
