@@ -314,7 +314,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
 
-		void *block = kvm_guest.jit().block_jit().compile_block((jit::RawBytecode *)((uint64_t)kvm_guest.shmem_region() + regs.rdi), regs.rsi);
+		void *block = kvm_guest.jit().block_jit().compile_block((jit::RawBytecodeDescriptor *)((uint64_t)kvm_guest.shmem_region() + regs.rdi));
 
 		if (block) {
 			uint64_t offset = (uint64_t)block - (uint64_t)kvm_guest.jit_mem_rgn->host_buffer;

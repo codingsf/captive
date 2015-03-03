@@ -70,6 +70,7 @@ namespace captive {
 
 				JMP,
 				BRANCH,
+				RET,
 
 				TAKE_EXCEPTION,
 				SET_CPU_MODE,
@@ -86,6 +87,13 @@ namespace captive {
 			RawInstruction insn;
 
 			std::string render() const;
+		};
+
+		struct RawBytecodeDescriptor {
+			uint32_t block_count;
+			uint32_t vreg_count;
+			uint32_t bytecode_count;
+			RawBytecode bc[];
 		};
 
 		class JIT
@@ -115,14 +123,14 @@ namespace captive {
 		{
 		public:
 			virtual ~BlockJIT();
-			virtual void *compile_block(const RawBytecode *ir, uint32_t count) = 0;
+			virtual void *compile_block(const RawBytecodeDescriptor *bcd) = 0;
 		};
 
 		class RegionJIT
 		{
 		public:
 			virtual ~RegionJIT();
-			virtual void *compile_region(const RawBytecode *ir, uint32_t count) = 0;
+			virtual void *compile_region(const RawBytecodeDescriptor *bcd) = 0;
 		};
 	}
 }

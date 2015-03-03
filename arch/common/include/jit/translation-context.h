@@ -28,32 +28,36 @@ namespace captive {
 				}
 
 				inline void add_instruction(block_id_t block_id, const IRInstruction& instruction) {
-					instruction_buffer[next_instruction].block_id = block_id;
-					instruction_buffer[next_instruction].instruction = instruction;
+					instruction_buffer->entries[instruction_buffer->entry_count].block_id = block_id;
+					instruction_buffer->entries[instruction_buffer->entry_count].instruction = instruction;
 
-					next_instruction++;
+					instruction_buffer->entry_count++;
 				}
 
 				inline block_id_t current_block() const { return current_block_id; }
 				inline void current_block(block_id_t block_id) { current_block_id = block_id; }
 
 				inline block_id_t alloc_block() {
-					return next_block_id++;
+					return instruction_buffer->block_count++;
 				}
 
 				inline reg_id_t alloc_reg(int size) {
-					return next_reg_id++;
+					return instruction_buffer->vreg_count++;
 				}
 
 			private:
-				block_id_t next_block_id;
 				block_id_t current_block_id;
-				reg_id_t next_reg_id;
-				uint32_t next_instruction;
 
 				struct instruction_entry {
 					block_id_t block_id;
 					IRInstruction instruction;
+				};
+
+				struct bytecode_descriptor {
+					uint32_t block_count;
+					uint32_t vreg_count;
+					uint32_t entry_count;
+					struct instruction_entry entries[];
 				} *instruction_buffer;
 			};
 		}

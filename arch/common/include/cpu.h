@@ -68,6 +68,7 @@ namespace captive {
 
 		protected:
 			virtual bool decode_instruction(uint32_t addr, Decode *insn) = 0;
+			virtual void *reg_state() = 0;
 
 			inline void inc_insns_executed() {
 				insns_executed++;

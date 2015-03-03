@@ -190,7 +190,11 @@ bool CPU::run_block_jit()
 			step_ok = false;
 		} else {
 			__local_irq_disable();
-			step_ok = block->execute(NULL);
+			printf("BEFORE\n");
+			dump_state();
+			step_ok = block->execute(reg_state());
+			printf("AFTER\n");
+			dump_state();
 			__local_irq_enable();
 		}
 	} while(step_ok);
@@ -232,8 +236,6 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
-		ctx.add_instruction(jit::IRInstructionBuilder::create_nop());
-
 		if (!jit().translate(insn, ctx)) {
 			printf("jit: instruction translation failed\n");
 			return false;
@@ -241,6 +243,8 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 		pc += insn->length;
 	} while (!insn->end_of_block);
+
+	ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 
 	GuestBasicBlock::GuestBasicBlockFn fn = ctx.compile();
 

@@ -53,6 +53,7 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::WRITE_MEM: return "stmem";
 	case RawInstruction::CMOV: return "cmov";
 	case RawInstruction::BRANCH: return "branch";
+	case RawInstruction::RET: return "return";
 	case RawInstruction::NOP: return "nop";
 	case RawInstruction::TRAP: return "trap";
 	case RawInstruction::TAKE_EXCEPTION: return "take-exception";
@@ -71,6 +72,7 @@ std::string RawBytecode::render() const
 	switch (insn.type) {
 	case RawInstruction::TRAP:
 	case RawInstruction::NOP:
+	case RawInstruction::RET:
 		break;
 
 	case RawInstruction::JMP:

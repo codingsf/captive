@@ -74,7 +74,8 @@ namespace captive {
 				};
 
 			protected:
-				virtual bool decode_instruction(uint32_t addr, Decode* insn) override;
+				bool decode_instruction(uint32_t addr, Decode* insn) override;
+				void* reg_state() override;
 
 			private:
 				ArmMMU *_mmu;

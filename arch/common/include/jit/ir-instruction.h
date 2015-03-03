@@ -25,6 +25,10 @@ namespace captive {
 				IROperandType type;
 				uint64_t value;
 				uint8_t size;
+
+				inline bool constant() const { return type == CONSTANT; }
+				inline bool vreg() const { return type == VREG; }
+				inline bool block() const { return type == BLOCK; }
 			};
 
 			struct IRInstruction
@@ -69,6 +73,7 @@ namespace captive {
 
 					JMP,
 					BRANCH,
+					RET,
 
 					TAKE_EXCEPTION,
 					SET_CPU_MODE,
@@ -134,6 +139,14 @@ namespace captive {
 				{
 					IRInstruction insn;
 					insn.type = IRInstruction::NOP;
+
+					return insn;
+				}
+
+				static IRInstruction create_ret()
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::RET;
 
 					return insn;
 				}
