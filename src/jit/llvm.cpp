@@ -68,6 +68,7 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 	builder.SetInsertPoint(entry_block);
 
 	LoweringContext lc(builder);
+	lc.vtype = Type::getVoidTy(ctx);
 	lc.i8 = IntegerType::getInt8Ty(ctx); lc.pi8 = PointerType::get(lc.i8, 0);
 	lc.i16 = IntegerType::getInt16Ty(ctx); lc.pi16 = PointerType::get(lc.i16, 0);
 	lc.i32 = IntegerType::getInt32Ty(ctx); lc.pi32 = PointerType::get(lc.i32, 0);
@@ -389,7 +390,24 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	case RawInstruction::BRANCH: break;
 	case RawInstruction::NOP: break;
 	case RawInstruction::TRAP: break;
-	case RawInstruction::TAKE_EXCEPTION: break;
+	case RawInstruction::TAKE_EXCEPTION: {
+		std::vector<Type *> params;
+		params.push_back(ctx.i32);
+		params.push_back(ctx.i32);
+
+		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_take_exception", fntype);
+
+		assert(fn);
+
+		Value *v1 = value_for_operand(ctx, op0), *v2 = value_for_operand(ctx, op1);
+
+		assert(v1 && v2);
+
+		ctx.builder.CreateCall2(fn, v1, v2);
+		break;
+	}
+
 	case RawInstruction::SET_CPU_MODE: break;
 	}
 

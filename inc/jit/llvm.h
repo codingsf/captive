@@ -43,6 +43,7 @@ namespace captive {
 
 				llvm::Value *regs;
 
+				llvm::Type *vtype;
 				llvm::Type *i8, *pi8;
 				llvm::Type *i16, *pi16;
 				llvm::Type *i32, *pi32;

@@ -1,4 +1,5 @@
 #include <jit/llvm-mm.h>
+#include <captive.h>
 
 using namespace captive::jit;
 
@@ -25,4 +26,11 @@ uint8_t* LLVMJITMemoryManager::allocateDataSection(uintptr_t Size, unsigned Alig
 bool LLVMJITMemoryManager::finalizeMemory(std::string* ErrMsg)
 {
 	return true;
+}
+
+void* LLVMJITMemoryManager::getPointerToNamedFunction(const std::string& Name, bool AbortOnFailure)
+{
+	DEBUG << "Attempting to resolve function: " << Name;
+	if (AbortOnFailure) assert(false);
+	return NULL;
 }

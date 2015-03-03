@@ -23,6 +23,8 @@ namespace captive {
 
 			bool finalizeMemory(std::string *ErrMsg) override;
 
+			void *getPointerToNamedFunction(const std::string& Name, bool AbortOnFailure) override;
+
 		private:
 			void *arena, *next;
 			uint64_t size;
