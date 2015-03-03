@@ -11,13 +11,13 @@ std::string RawOperand::render() const
 {
 	switch(type) {
 	case CONSTANT:
-		return "#" + std::to_string(val);
+		return "i" + std::to_string(size) + " #" + std::to_string(val);
 	case VREG:
-		return "r" + std::to_string(val);
+		return "i" + std::to_string(size) + " r" + std::to_string(val);
 	case BLOCK:
 		return "b" + std::to_string(val);
 	default:
-		return "???";
+		return "i" + std::to_string(size) + " ?" + std::to_string(val);
 	}
 }
 

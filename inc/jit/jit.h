@@ -15,8 +15,9 @@ namespace captive {
 		class BlockJIT;
 		class RegionJIT;
 
-				struct RawOperand {
+		struct RawOperand {
 			enum RawOperandType {
+				NONE,
 				CONSTANT,
 				VREG,
 				BLOCK
@@ -31,6 +32,8 @@ namespace captive {
 
 		struct RawInstruction {
 			enum RawInstructionType {
+				INVALID,
+
 				NOP,
 				TRAP,
 
@@ -89,9 +92,14 @@ namespace captive {
 			std::string render() const;
 		};
 
+		struct RawVRegDescriptor {
+			uint8_t size;
+		};
+
 		struct RawBytecodeDescriptor {
 			uint32_t block_count;
 			uint32_t vreg_count;
+			RawVRegDescriptor vregs[1024];
 			uint32_t bytecode_count;
 			RawBytecode bc[];
 		};

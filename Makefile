@@ -43,7 +43,7 @@ $(bios): .FORCE
 
 $(out): $(dep) $(obj) $(bios)
 	@echo "  LD      $(patsubst $(bin-dir)/%,%,$@)"
-	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(bios) `llvm-config --libs engine x86 mcjit`
+	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(bios) `llvm-config --libs engine ipo x86 mcjit`
 
 %.o: %.cpp
 	@echo "  C++     $(patsubst $(src-dir)/%,%,$@)"

@@ -17,6 +17,7 @@ namespace captive {
 			struct IROperand
 			{
 				enum IROperandType {
+					NONE,
 					CONSTANT,
 					VREG,
 					BLOCK
@@ -34,6 +35,8 @@ namespace captive {
 			struct IRInstruction
 			{
 				enum IRInstructionType {
+					INVALID,
+
 					NOP,
 					TRAP,
 
@@ -81,6 +84,13 @@ namespace captive {
 
 				IRInstructionType type;
 				IROperand operands[4];
+
+				IRInstruction() : type(INVALID) {
+					operands[0].type = IROperand::NONE;
+					operands[1].type = IROperand::NONE;
+					operands[2].type = IROperand::NONE;
+					operands[3].type = IROperand::NONE;
+				}
 			};
 
 			class IRInstructionBuilder {
@@ -120,7 +130,7 @@ namespace captive {
 					IROperand oper;
 					oper.type = IROperand::VREG;
 					oper.value = id;
-					oper.size = 0;
+					oper.size = 4;
 
 					return oper;
 				}

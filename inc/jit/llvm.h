@@ -43,10 +43,10 @@ namespace captive {
 
 				llvm::Value *regs;
 
-				llvm::Type *i8;
-				llvm::Type *i16;
-				llvm::Type *i32;
-				llvm::Type *i64;
+				llvm::Type *i8, *pi8;
+				llvm::Type *i16, *pi16;
+				llvm::Type *i32, *pi32;
+				llvm::Type *i64, *pi64;
 
 				inline llvm::Value *const8(uint8_t v)
 				{
@@ -70,6 +70,7 @@ namespace captive {
 			};
 
 			llvm::Value *value_for_operand(LoweringContext& ctx, const RawOperand* oper);
+			llvm::Type *type_for_operand(LoweringContext& ctx, const RawOperand* oper, bool ptr = false);
 			llvm::Value *vreg_for_operand(LoweringContext& ctx, const RawOperand* oper);
 			llvm::BasicBlock *block_for_operand(LoweringContext& ctx, const RawOperand* oper);
 

@@ -31,6 +31,13 @@ namespace captive {
 					instruction_buffer->entries[instruction_buffer->entry_count].block_id = block_id;
 					instruction_buffer->entries[instruction_buffer->entry_count].instruction = instruction;
 
+					for (int i = 0; i < 4; i++) {
+						IROperand *oper = &instruction_buffer->entries[instruction_buffer->entry_count].instruction.operands[i];
+						if (oper->type == IROperand::VREG) {
+							oper->size = instruction_buffer->vregs[oper->value].size;
+						}
+					}
+
 					instruction_buffer->entry_count++;
 				}
 
@@ -41,7 +48,8 @@ namespace captive {
 					return instruction_buffer->block_count++;
 				}
 
-				inline reg_id_t alloc_reg(int size) {
+				inline reg_id_t alloc_reg(uint8_t size) {
+					instruction_buffer->vregs[instruction_buffer->vreg_count].size = size;
 					return instruction_buffer->vreg_count++;
 				}
 
@@ -53,9 +61,14 @@ namespace captive {
 					IRInstruction instruction;
 				};
 
+				struct vreg_entry {
+					uint8_t size;
+				};
+
 				struct bytecode_descriptor {
 					uint32_t block_count;
 					uint32_t vreg_count;
+					struct vreg_entry vregs[1024];
 					uint32_t entry_count;
 					struct instruction_entry entries[];
 				} *instruction_buffer;
