@@ -67,7 +67,7 @@ namespace captive {
 
 				inline llvm::Value *const64(uint64_t v)
 				{
-					return llvm::ConstantInt::get(i8, v);
+					return llvm::ConstantInt::get(i64, v);
 				}
 			};
 

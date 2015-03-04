@@ -77,7 +77,6 @@ namespace captive {
 				BRANCH,
 				RET,
 
-				TAKE_EXCEPTION,
 				SET_CPU_MODE,
 			};
 

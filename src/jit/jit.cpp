@@ -16,6 +16,12 @@ std::string RawOperand::render() const
 		return "i" + std::to_string(size) + " r" + std::to_string(val);
 	case BLOCK:
 		return "b" + std::to_string(val);
+	case FUNC:
+	{
+		std::stringstream x;
+		x << "f" << std::hex << val;
+		return x.str();
+	}
 	default:
 		return "i" + std::to_string(size) + " ?" + std::to_string(val);
 	}
@@ -57,8 +63,8 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::RET: return "return";
 	case RawInstruction::NOP: return "nop";
 	case RawInstruction::TRAP: return "trap";
-	case RawInstruction::TAKE_EXCEPTION: return "take-exception";
 	case RawInstruction::SET_CPU_MODE: return "set-cpu-mode";
+	case RawInstruction::INVALID: return "(invalid)";
 	default:
 		return "???";
 	}
@@ -74,6 +80,7 @@ std::string RawBytecode::render() const
 	case RawInstruction::TRAP:
 	case RawInstruction::NOP:
 	case RawInstruction::RET:
+	case RawInstruction::INVALID:
 		break;
 
 	case RawInstruction::JMP:
@@ -107,13 +114,24 @@ std::string RawBytecode::render() const
 	case RawInstruction::WRITE_REG:
 	case RawInstruction::READ_MEM:
 	case RawInstruction::WRITE_MEM:
-	case RawInstruction::TAKE_EXCEPTION:
 		str << insn.operands[0].render() << ", " << insn.operands[1].render();
 		break;
 
 	case RawInstruction::CMOV:
 	case RawInstruction::BRANCH:
 		str << insn.operands[0].render() << ", " << insn.operands[1].render() << ", " << insn.operands[2].render();
+		break;
+
+	case RawInstruction::CALL:
+		for (int i = 0; i < 4; i++) {
+			if (insn.operands[i].type == RawOperand::NONE)
+				continue;
+
+			if (i > 0)
+				str << ", ";
+
+			str << insn.operands[i].render();
+		}
 		break;
 	}
 

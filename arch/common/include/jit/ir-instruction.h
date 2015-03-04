@@ -80,7 +80,6 @@ namespace captive {
 					BRANCH,
 					RET,
 
-					TAKE_EXCEPTION,
 					SET_CPU_MODE,
 				};
 
@@ -147,11 +146,11 @@ namespace captive {
 					return oper;
 				}
 
-				static IROperand create_func(uint32_t id)
+				static IROperand create_func(void *addr)
 				{
 					IROperand oper;
 					oper.type = IROperand::FUNC;
-					oper.value = id;
+					oper.value = (uint64_t)addr;
 					oper.size = 0;
 
 					return oper;
@@ -414,11 +413,6 @@ namespace captive {
 					insn.operands[2] = arg1;
 					insn.operands[3] = arg2;
 					return insn;
-				}
-
-				static IRInstruction create_take_exception(IROperand code, IROperand data)
-				{
-					return create_binary(IRInstruction::TAKE_EXCEPTION, code, data);
 				}
 
 				static IRInstruction create_set_cpu_mode(IROperand mode)

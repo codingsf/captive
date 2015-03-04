@@ -68,9 +68,9 @@ extern "C" {
 		abort();
 	}
 
-	void handle_trap_unk()
+	void handle_trap_unk(uint64_t rip)
 	{
-		printf("IT'S A TRAP\n");
+		printf("IT'S A TRAP @ %x\n", rip);
 		abort();
 	}
 

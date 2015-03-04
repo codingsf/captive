@@ -109,7 +109,9 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 		BasicBlock *bb = lc.basic_blocks[bc->block_id];
 
 		builder.SetInsertPoint(bb);
-		lower_bytecode(lc, bc);
+		if (!lower_bytecode(lc, bc)) {
+			return NULL;
+		}
 	}
 
 	// Delete empty blocks
@@ -206,6 +208,8 @@ Value *LLVMJIT::value_for_operand(LoweringContext& ctx, const RawOperand* oper)
 		case 8: return ctx.const64(oper->val);
 		default: return NULL;
 		}
+	} else if (oper->type == RawOperand::FUNC) {
+		return ctx.const64(oper->val);
 	} else {
 		return NULL;
 	}
@@ -256,13 +260,47 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		assert(bb);
 		ctx.builder.CreateBr(bb);
-		break;
+		return true;
+	}
+
+	case RawInstruction::CALL:
+	{
+		std::vector<Type *> param_types;
+		param_types.push_back(ctx.pi8);
+
+		std::vector<Value *> param_vals;
+		param_vals.push_back(ctx.cpu_obj);
+
+		for (int i = 1; i < 4; i++) {
+			const RawOperand *oper = &bc->insn.operands[i];
+			if (oper->type == RawOperand::NONE) continue;
+
+			switch (oper->size) {
+			case 1: param_types.push_back(ctx.i8); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 2: param_types.push_back(ctx.i16); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 4: param_types.push_back(ctx.i32); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 8: param_types.push_back(ctx.i64); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			default: assert(false);
+			}
+		}
+
+		PointerType *fntype = FunctionType::get(ctx.vtype, param_types, false)->getPointerTo(0);
+		assert(fntype);
+
+		Value *fn = value_for_operand(ctx, op0);
+		assert(fn);
+
+		fn = ctx.builder.CreateIntToPtr(fn, fntype);
+		assert(fn);
+
+		ctx.builder.CreateCall(fn, param_vals);
+		return true;
 	}
 
 	case RawInstruction::RET:
 	{
 		ctx.builder.CreateRet(ctx.const32(1));
-		break;
+		return true;
 	}
 
 	case RawInstruction::MOV:
@@ -271,7 +309,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		assert(src && dst);
 		ctx.builder.CreateStore(src, dst);
-		break;
+		return true;
 	}
 
 	case RawInstruction::ADD:
@@ -310,7 +348,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		}
 
 		ctx.builder.CreateStore(result, dst);
-		break;
+		return true;
 	}
 
 	case RawInstruction::CLZ: break;
@@ -336,6 +374,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		}
 
 		ctx.builder.CreateStore(ctx.builder.CreateCast(op, src, type_for_operand(ctx, op1, false)), dst);
+		return true;
 	}
 
 	case RawInstruction::READ_REG:
@@ -349,7 +388,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op1, true));
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(regptr), dst);
 
-		break;
+		return true;
 	}
 
 	case RawInstruction::WRITE_REG:
@@ -363,7 +402,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(val, regptr);
 
-		break;
+		return true;
 	}
 
 	case RawInstruction::READ_MEM:
@@ -375,7 +414,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op1, true));
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr), dst);
 
-		break;
+		return true;
 	}
 
 	case RawInstruction::WRITE_MEM:
@@ -387,14 +426,15 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(src, memptr);
 
-		break;
+		return true;
 	}
 
 	case RawInstruction::CMOV: break;
 	case RawInstruction::BRANCH: break;
 	case RawInstruction::NOP: break;
 	case RawInstruction::TRAP: break;
-	case RawInstruction::TAKE_EXCEPTION: {
+
+	/*case RawInstruction::TAKE_EXCEPTION: {
 		std::vector<Type *> params;
 		params.push_back(ctx.pi8);
 		params.push_back(ctx.i32);
@@ -411,9 +451,26 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		ctx.builder.CreateCall3(fn, ctx.cpu_obj, v1, v2);
 		break;
+	}*/
+
+	case RawInstruction::SET_CPU_MODE: {
+		std::vector<Type *> params;
+		params.push_back(ctx.pi8);
+		params.push_back(ctx.i8);
+
+		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_set_mode", fntype);
+
+		assert(fn);
+
+		Value *v1 = value_for_operand(ctx, op0);
+		assert(v1);
+
+		ctx.builder.CreateCall2(fn, ctx.cpu_obj, v1);
+		break;
 	}
 
-	case RawInstruction::SET_CPU_MODE: break;
+	case RawInstruction::INVALID: return false;
 	}
 
 	return true;
