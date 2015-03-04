@@ -144,13 +144,13 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 	}
 
 	// Print out the module
-	{
+	/*{
 		raw_os_ostream str(std::cerr);
 
 		PassManager printManager;
 		printManager.add(createPrintModulePass(str, ""));
 		printManager.run(*block_module);
-	}
+	}*/
 
 	// If we haven't got a memory manager, create one now.
 	if (!mm) {
@@ -187,7 +187,7 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 		return NULL;
 	}
 
-	DEBUG << CONTEXT(LLVMBlockJIT) << "Compiled function to " << std::hex << (uint64_t)ptr << ", X=" << (uint32_t)*(uint8_t *)ptr;
+	//DEBUG << CONTEXT(LLVMBlockJIT) << "Compiled function to " << std::hex << (uint64_t)ptr << ", X=" << (uint32_t)*(uint8_t *)ptr;
 
 	return ptr;
 }
@@ -247,7 +247,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
+	//DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];

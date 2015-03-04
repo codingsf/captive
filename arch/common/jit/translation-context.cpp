@@ -13,6 +13,8 @@ TranslationContext::TranslationContext(void *_instruction_buffer)
 	instruction_buffer->block_count = 0;
 	instruction_buffer->entry_count = 0;
 	instruction_buffer->vreg_count = 0;
+
+	current_block(alloc_block());
 }
 
 GuestBasicBlock::GuestBasicBlockFn TranslationContext::compile()

@@ -139,7 +139,7 @@ bool KVMCpu::run()
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);
 
-				DEBUG << "Handling hypercall " << std::hex << regs.rax;
+				//DEBUG << "Handling hypercall " << std::hex << regs.rax;
 				run_cpu = handle_hypercall(regs.rax);
 				if (!run_cpu) {
 					ERROR << "Unhandled hypercall " << std::hex << regs.rax;
@@ -245,7 +245,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
 
-	DEBUG << "Hypercall " << data;
+	//DEBUG << "Hypercall " << data;
 
 	switch(data) {
 	case 1:
