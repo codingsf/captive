@@ -8,8 +8,12 @@
 #ifndef PRINTF_H
 #define	PRINTF_H
 
+#include <stdarg.h>
+
 extern int printf(const char *fmt, ...);
-extern void sprintf(char *dest, const char *fmt, ...);
+extern int sprintf(char *buffer, const char *fmt, ...);
+extern int snprintf(char *buffer, int size, const char *fmt, ...);
+extern int vsnprintf(char *buffer, int size, const char *fmt, va_list args);
 
 #endif	/* PRINTF_H */
 

@@ -42,7 +42,7 @@ static void call_static_constructors()
 }
 
 extern "C" {
-	void __attribute__((noreturn)) start(uint64_t first_phys_page, unsigned int ep)
+	void __attribute__((noreturn)) start_environment(uint64_t first_phys_page, unsigned int ep)
 	{
 		call_static_constructors();
 		init_ioapic();

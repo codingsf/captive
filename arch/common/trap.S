@@ -1,6 +1,13 @@
 .code64
 .text
 
+.globl start
+.extern start_environment
+start:
+	movq $0xdeadbabecafef00d, %rax
+	push %rax
+	jmp start_environment
+
 .macro push_regs
 	pushf
 	push %rax

@@ -129,12 +129,12 @@ namespace captive {
 					return create_constant(1, val);
 				}
 
-				static IROperand create_vreg(reg_id_t id)
+				static IROperand create_vreg(reg_id_t id, uint8_t size)
 				{
 					IROperand oper;
 					oper.type = IROperand::VREG;
 					oper.value = id;
-					oper.size = 4;
+					oper.size = size;
 
 					return oper;
 				}

@@ -8,9 +8,9 @@
 #ifndef ASSERT_H
 #define	ASSERT_H
 
-#include <printf.h>
+extern void __assertion_failure(const char *filename, int lineno, const char *expression);
 
-#define assert(_expr) do { if (!_expr) { printf("ABORT: " __FILE__ ": %d: " #_expr "\n", __LINE__); asm volatile("out %0, $0xff\n" :: "a"(3)); } } while(0)
+#define assert(_expr) do { if (!(_expr)) { __assertion_failure(__FILE__, __LINE__, #_expr); } } while(0)
 
 #endif	/* ASSERT_H */
 
