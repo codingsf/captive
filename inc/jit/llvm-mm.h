@@ -25,6 +25,8 @@ namespace captive {
 
 			void *getPointerToNamedFunction(const std::string& Name, bool AbortOnFailure) override;
 
+			uint64_t getSymbolAddress(const std::string& Name) override;
+
 		private:
 			void *arena, *next;
 			uint64_t size;

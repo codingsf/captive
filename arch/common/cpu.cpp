@@ -192,7 +192,7 @@ bool CPU::run_block_jit()
 			__local_irq_disable();
 			printf("BEFORE\n");
 			dump_state();
-			step_ok = block->execute(reg_state());
+			step_ok = block->execute(this, reg_state());
 			printf("AFTER\n");
 			dump_state();
 			__local_irq_enable();

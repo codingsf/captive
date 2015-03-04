@@ -24,6 +24,7 @@ std::string RawOperand::render() const
 std::string RawInstruction::mnemonic() const
 {
 	switch(type) {
+	case RawInstruction::CALL: return "call";
 	case RawInstruction::JMP: return "jump";
 	case RawInstruction::MOV: return "mov";
 	case RawInstruction::ADD: return "add";

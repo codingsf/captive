@@ -20,7 +20,8 @@ namespace captive {
 				NONE,
 				CONSTANT,
 				VREG,
-				BLOCK
+				BLOCK,
+				FUNC
 			};
 
 			RawOperandType type;
@@ -71,6 +72,7 @@ namespace captive {
 				READ_MEM,
 				WRITE_MEM,
 
+				CALL,
 				JMP,
 				BRANCH,
 				RET,

@@ -18,10 +18,10 @@ namespace captive {
 			class GuestBasicBlock
 			{
 			public:
-				typedef bool (*GuestBasicBlockFn)(void *cpu_state);
+				typedef bool (*GuestBasicBlockFn)(void *cpu, void *cpu_state);
 
-				inline bool execute(void *cpu_state) const {
-					return _fnp(cpu_state);
+				inline bool execute(void *cpu, void *cpu_state) const {
+					return _fnp(cpu, cpu_state);
 				}
 
 				inline void fnptr(GuestBasicBlockFn fnp) {

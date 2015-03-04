@@ -41,7 +41,8 @@ namespace captive {
 				std::map<uint32_t, llvm::BasicBlock *> basic_blocks;
 				std::map<uint32_t, llvm::Value *> vregs;
 
-				llvm::Value *regs;
+				llvm::Value *cpu_obj;
+				llvm::Value *reg_state;
 
 				llvm::Type *vtype;
 				llvm::Type *i8, *pi8;

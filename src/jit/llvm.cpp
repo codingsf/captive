@@ -59,6 +59,7 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 
 	std::vector<Type *> params;
 	params.push_back(IntegerType::getInt8PtrTy(ctx));
+	params.push_back(IntegerType::getInt8PtrTy(ctx));
 
 	FunctionType *fn = FunctionType::get(IntegerType::getInt32Ty(ctx), params, false);
 	Function *block_fn = Function::Create(fn, GlobalValue::ExternalLinkage, "block", block_module);
@@ -74,7 +75,10 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 	lc.i32 = IntegerType::getInt32Ty(ctx); lc.pi32 = PointerType::get(lc.i32, 0);
 	lc.i64 = IntegerType::getInt64Ty(ctx); lc.pi64 = PointerType::get(lc.i64, 0);
 
-	lc.regs = builder.CreatePtrToInt(&block_fn->getArgumentList().front(), lc.i64);
+	Function::ArgumentListType& args = block_fn->getArgumentList();
+
+	lc.cpu_obj = &args.front();
+	lc.reg_state = builder.CreatePtrToInt(args.getNext(&args.front()), lc.i64);
 
 	// Populate the basic-block map
 	for (uint32_t block_id = 0; block_id < bcd->block_count; block_id++) {
@@ -342,7 +346,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.i64);
 
-		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.regs, offset), type_for_operand(ctx, op1, true));
+		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op1, true));
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(regptr), dst);
 
 		break;
@@ -356,7 +360,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.i64);
 
-		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.regs, offset), type_for_operand(ctx, op0, true));
+		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(val, regptr);
 
 		break;
@@ -392,6 +396,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	case RawInstruction::TRAP: break;
 	case RawInstruction::TAKE_EXCEPTION: {
 		std::vector<Type *> params;
+		params.push_back(ctx.pi8);
 		params.push_back(ctx.i32);
 		params.push_back(ctx.i32);
 
@@ -404,7 +409,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		assert(v1 && v2);
 
-		ctx.builder.CreateCall2(fn, v1, v2);
+		ctx.builder.CreateCall3(fn, ctx.cpu_obj, v1, v2);
 		break;
 	}
 

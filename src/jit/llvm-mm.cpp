@@ -30,7 +30,11 @@ bool LLVMJITMemoryManager::finalizeMemory(std::string* ErrMsg)
 
 void* LLVMJITMemoryManager::getPointerToNamedFunction(const std::string& Name, bool AbortOnFailure)
 {
-	DEBUG << "Attempting to resolve function: " << Name;
-	if (AbortOnFailure) assert(false);
 	return NULL;
+}
+
+uint64_t LLVMJITMemoryManager::getSymbolAddress(const std::string& Name)
+{
+	DEBUG << "Attempting to resolve function: " << Name;
+	return 0;
 }

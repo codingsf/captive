@@ -20,7 +20,8 @@ namespace captive {
 					NONE,
 					CONSTANT,
 					VREG,
-					BLOCK
+					BLOCK,
+					FUNC
 				};
 
 				IROperandType type;
@@ -74,6 +75,7 @@ namespace captive {
 					READ_MEM,
 					WRITE_MEM,
 
+					CALL,
 					JMP,
 					BRANCH,
 					RET,
@@ -139,6 +141,16 @@ namespace captive {
 				{
 					IROperand oper;
 					oper.type = IROperand::BLOCK;
+					oper.value = id;
+					oper.size = 0;
+
+					return oper;
+				}
+
+				static IROperand create_func(uint32_t id)
+				{
+					IROperand oper;
+					oper.type = IROperand::FUNC;
 					oper.value = id;
 					oper.size = 0;
 
@@ -341,6 +353,67 @@ namespace captive {
 				static IRInstruction create_branch(IROperand cond, IROperand td, IROperand fd)
 				{
 					return create_ternary(IRInstruction::BRANCH, cond, td, fd);
+				}
+
+				static IRInstruction create_call0(IROperand fn)
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::CALL;
+					insn.operands[0] = fn;
+
+					return insn;
+				}
+
+				static IRInstruction create_call1(IROperand fn, IROperand arg0)
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::CALL;
+					insn.operands[0] = fn;
+					insn.operands[1] = arg0;
+					return insn;
+				}
+
+				static IRInstruction create_call2(IROperand fn, IROperand arg0, IROperand arg1)
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::CALL;
+					insn.operands[0] = fn;
+					insn.operands[1] = arg0;
+					insn.operands[2] = arg1;
+					return insn;
+				}
+
+				static IRInstruction create_call3(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2)
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::CALL;
+					insn.operands[0] = fn;
+					insn.operands[1] = arg0;
+					insn.operands[2] = arg1;
+					insn.operands[3] = arg2;
+					return insn;
+				}
+
+				static IRInstruction create_call4(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2, IROperand arg3)
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::CALL;
+					insn.operands[0] = fn;
+					insn.operands[1] = arg0;
+					insn.operands[2] = arg1;
+					insn.operands[3] = arg2;
+					return insn;
+				}
+
+				static IRInstruction create_call5(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2, IROperand arg3, IROperand arg4)
+				{
+					IRInstruction insn;
+					insn.type = IRInstruction::CALL;
+					insn.operands[0] = fn;
+					insn.operands[1] = arg0;
+					insn.operands[2] = arg1;
+					insn.operands[3] = arg2;
+					return insn;
 				}
 
 				static IRInstruction create_take_exception(IROperand code, IROperand data)
