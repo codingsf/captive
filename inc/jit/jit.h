@@ -29,7 +29,7 @@ namespace captive {
 			uint8_t size;
 
 			std::string render() const;
-		};
+		} __attribute__((packed));
 
 		struct RawInstruction {
 			enum RawInstructionType {
@@ -81,21 +81,21 @@ namespace captive {
 			};
 
 			RawInstructionType type;
-			RawOperand operands[4];
+			RawOperand operands[6];
 
 			std::string mnemonic() const;
-		};
+		} __attribute__((packed));
 
 		struct RawBytecode {
 			uint32_t block_id;
 			RawInstruction insn;
 
 			std::string render() const;
-		};
+		} __attribute__((packed));
 
 		struct RawVRegDescriptor {
 			uint8_t size;
-		};
+		} __attribute__((packed));
 
 		struct RawBytecodeDescriptor {
 			uint32_t block_count;
@@ -103,7 +103,7 @@ namespace captive {
 			RawVRegDescriptor vregs[1024];
 			uint32_t bytecode_count;
 			RawBytecode bc[];
-		};
+		} __attribute__((packed));
 
 		class JIT
 		{

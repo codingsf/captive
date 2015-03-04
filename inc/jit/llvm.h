@@ -15,12 +15,16 @@
 #include <map>
 
 namespace captive {
+	namespace engine {
+		class Engine;
+	}
+
 	namespace jit {
 		class LLVMJITMemoryManager;
 
 		class LLVMJIT : public JIT, public BlockJIT, public RegionJIT {
 		public:
-			LLVMJIT();
+			LLVMJIT(engine::Engine& engine);
 			virtual ~LLVMJIT();
 
 			virtual bool init() override;
@@ -32,6 +36,8 @@ namespace captive {
 			virtual void *compile_region(const RawBytecodeDescriptor* bcd) override;
 
 		private:
+			engine::Engine& _engine;
+
 			struct LoweringContext
 			{
 				LoweringContext(llvm::IRBuilder<>& _builder) : builder(_builder) { }
@@ -45,6 +51,7 @@ namespace captive {
 				llvm::Value *reg_state;
 
 				llvm::Type *vtype;
+				llvm::Type *i1;
 				llvm::Type *i8, *pi8;
 				llvm::Type *i16, *pi16;
 				llvm::Type *i32, *pi32;

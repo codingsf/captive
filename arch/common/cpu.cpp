@@ -211,12 +211,16 @@ static GuestBasicBlock basic_block_cache[1024];
 
 const GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 {
-	GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1024];
+	/*GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1024];
 	if (cache_slot->block_address() == 0 || cache_slot->block_address() != block_addr) {
 		if (!compile_basic_block(block_addr, cache_slot)) {
 			return NULL;
 		}
-	}
+	}*/
+
+	GuestBasicBlock *cache_slot = &basic_block_cache[0];
+	if (!compile_basic_block(block_addr, cache_slot))
+		return NULL;
 
 	return cache_slot;
 }

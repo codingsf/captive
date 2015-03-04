@@ -11,11 +11,15 @@
 #include <llvm/ExecutionEngine/RTDyldMemoryManager.h>
 
 namespace captive {
+	namespace engine {
+		class Engine;
+	}
+
 	namespace jit {
 		class LLVMJITMemoryManager : public llvm::RTDyldMemoryManager
 		{
 		public:
-			LLVMJITMemoryManager(void *arena, uint64_t size);
+			LLVMJITMemoryManager(engine::Engine& engine, void *arena, uint64_t size);
 			virtual ~LLVMJITMemoryManager();
 
 			uint8_t* allocateCodeSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName) override;
@@ -28,6 +32,8 @@ namespace captive {
 			uint64_t getSymbolAddress(const std::string& Name) override;
 
 		private:
+			engine::Engine& _engine;
+			
 			void *arena, *next;
 			uint64_t size;
 		};

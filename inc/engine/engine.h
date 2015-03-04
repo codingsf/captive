@@ -9,6 +9,7 @@
 #define	ENGINE_H
 
 #include <define.h>
+#include <map>
 
 namespace captive {
 	namespace engine {
@@ -23,6 +24,15 @@ namespace captive {
 
 			uint64_t entrypoint() const { return _entrypoint; }
 
+			inline bool lookup_symbol(std::string name, uint64_t& symbol) {
+				auto sym = symbols.find(name);
+				if (sym == symbols.end())
+					return false;
+
+				symbol = sym->second;
+				return true;
+			}
+
 		private:
 			bool load();
 			bool loaded;
@@ -32,6 +42,8 @@ namespace captive {
 			size_t lib_size;
 
 			uint64_t _entrypoint;
+
+			std::map<std::string, uint64_t> symbols;
 		};
 	}
 }

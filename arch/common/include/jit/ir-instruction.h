@@ -31,7 +31,8 @@ namespace captive {
 				inline bool constant() const { return type == CONSTANT; }
 				inline bool vreg() const { return type == VREG; }
 				inline bool block() const { return type == BLOCK; }
-			};
+				inline bool func() const { return type == FUNC; }
+			} packed;
 
 			struct IRInstruction
 			{
@@ -84,15 +85,17 @@ namespace captive {
 				};
 
 				IRInstructionType type;
-				IROperand operands[4];
+				IROperand operands[6];
 
 				IRInstruction() : type(INVALID) {
 					operands[0].type = IROperand::NONE;
 					operands[1].type = IROperand::NONE;
 					operands[2].type = IROperand::NONE;
 					operands[3].type = IROperand::NONE;
+					operands[4].type = IROperand::NONE;
+					operands[5].type = IROperand::NONE;
 				}
-			};
+			} packed;
 
 			class IRInstructionBuilder {
 			public:
@@ -211,51 +214,88 @@ namespace captive {
 
 				static IRInstruction create_mov(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::MOV, src, dst);
 				}
 
 				static IRInstruction create_cmov(IROperand cond, IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_ternary(IRInstruction::CMOV, cond, src, dst);
 				}
 
 				static IRInstruction create_add(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::ADD, src, dst);
 				}
 
 				static IRInstruction create_sub(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::SUB, src, dst);
 				}
 
 				static IRInstruction create_mul(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::MUL, src, dst);
 				}
 
 				static IRInstruction create_div(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::DIV, src, dst);
 				}
 
 				static IRInstruction create_mod(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::MOD, src, dst);
 				}
 
 				static IRInstruction create_shl(IROperand amt, IROperand dst)
 				{
+					assert(amt.constant() || amt.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::SHL, amt, dst);
 				}
 
 				static IRInstruction create_shr(IROperand amt, IROperand dst)
 				{
+					assert(amt.constant() || amt.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::SHR, amt, dst);
 				}
 
 				static IRInstruction create_sar(IROperand amt, IROperand dst)
 				{
+					assert(amt.constant() || amt.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::SAR, amt, dst);
 				}
 
@@ -266,96 +306,163 @@ namespace captive {
 
 				static IRInstruction create_sx(IROperand src, IROperand dst)
 				{
+					assert(dst.size > src.size);
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::SX, src, dst);
 				}
 
 				static IRInstruction create_zx(IROperand src, IROperand dst)
 				{
+					assert(dst.size > src.size);
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::ZX, src, dst);
 				}
 
 				static IRInstruction create_trunc(IROperand src, IROperand dst)
 				{
+					assert(dst.size < src.size);
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::TRUNC, src, dst);
 				}
 
 				static IRInstruction create_and(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::AND, src, dst);
 				}
 
 				static IRInstruction create_or(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::OR, src, dst);
 				}
 
 				static IRInstruction create_xor(IROperand src, IROperand dst)
 				{
+					assert(src.size == dst.size);
+					assert(src.constant() || src.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::XOR, src, dst);
 				}
 
-				static IRInstruction create_cmpeq(IROperand src, IROperand dst)
+				static IRInstruction create_cmpeq(IROperand lh, IROperand rh, IROperand dst)
 				{
-					return create_binary(IRInstruction::CMPEQ, src, dst);
+					assert(lh.size == rh.size);
+					assert(lh.constant() || lh.vreg());
+					assert(rh.constant() || rh.vreg());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::CMPEQ, lh, rh, dst);
 				}
 
-				static IRInstruction create_cmpne(IROperand src, IROperand dst)
+				static IRInstruction create_cmpne(IROperand lh, IROperand rh, IROperand dst)
 				{
-					return create_binary(IRInstruction::CMPNE, src, dst);
+					assert(lh.size == rh.size);
+					assert(lh.constant() || lh.vreg());
+					assert(rh.constant() || rh.vreg());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::CMPNE, lh, rh, dst);
 				}
 
-				static IRInstruction create_cmpgt(IROperand src, IROperand dst)
+				static IRInstruction create_cmpgt(IROperand lh, IROperand rh, IROperand dst)
 				{
-					return create_binary(IRInstruction::CMPGT, src, dst);
+					assert(lh.size == rh.size);
+					assert(lh.constant() || lh.vreg());
+					assert(rh.constant() || rh.vreg());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::CMPGT, lh, rh, dst);
 				}
 
-				static IRInstruction create_cmpgte(IROperand src, IROperand dst)
+				static IRInstruction create_cmpgte(IROperand lh, IROperand rh, IROperand dst)
 				{
-					return create_binary(IRInstruction::CMPGTE, src, dst);
+					assert(lh.size == rh.size);
+					assert(lh.constant() || lh.vreg());
+					assert(rh.constant() || rh.vreg());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::CMPGTE, lh, rh, dst);
 				}
 
-				static IRInstruction create_cmplt(IROperand src, IROperand dst)
+				static IRInstruction create_cmplt(IROperand lh, IROperand rh, IROperand dst)
 				{
-					return create_binary(IRInstruction::CMPLT, src, dst);
+					assert(lh.size == rh.size);
+					assert(lh.constant() || lh.vreg());
+					assert(rh.constant() || rh.vreg());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::CMPLT, lh, rh, dst);
 				}
 
-				static IRInstruction create_cmplte(IROperand src, IROperand dst)
+				static IRInstruction create_cmplte(IROperand lh, IROperand rh, IROperand dst)
 				{
-					return create_binary(IRInstruction::CMPLTE, src, dst);
+					assert(lh.size == rh.size);
+					assert(lh.constant() || lh.vreg());
+					assert(rh.constant() || rh.vreg());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::CMPLTE, lh, rh, dst);
 				}
 
 				static IRInstruction create_ldreg(IROperand loc, IROperand dst)
 				{
+					assert(loc.constant() || loc.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::READ_REG, loc, dst);
 				}
 
 				static IRInstruction create_streg(IROperand val, IROperand loc)
 				{
+					assert(val.constant() || val.vreg());
+					assert(loc.constant() || loc.vreg());
+
 					return create_binary(IRInstruction::WRITE_REG, val, loc);
 				}
 
 				static IRInstruction create_ldmem(IROperand loc, IROperand dst)
 				{
+					assert(loc.constant() || loc.vreg());
+					assert(dst.vreg());
+
 					return create_binary(IRInstruction::READ_MEM, loc, dst);
 				}
 
 				static IRInstruction create_stmem(IROperand val, IROperand loc)
 				{
+					assert(val.constant() || val.vreg());
+					assert(loc.constant() || loc.vreg());
+
 					return create_binary(IRInstruction::WRITE_MEM, val, loc);
 				}
 
 				static IRInstruction create_jump(IROperand dest)
 				{
+					assert(dest.block());
 					return create_unary(IRInstruction::JMP, dest);
 				}
 
 				static IRInstruction create_branch(IROperand cond, IROperand td, IROperand fd)
 				{
+					assert(td.block() && fd.block());
 					return create_ternary(IRInstruction::BRANCH, cond, td, fd);
 				}
 
 				static IRInstruction create_call0(IROperand fn)
 				{
+					assert(fn.func());
+
 					IRInstruction insn;
 					insn.type = IRInstruction::CALL;
 					insn.operands[0] = fn;
@@ -365,6 +472,8 @@ namespace captive {
 
 				static IRInstruction create_call1(IROperand fn, IROperand arg0)
 				{
+					assert(fn.func());
+
 					IRInstruction insn;
 					insn.type = IRInstruction::CALL;
 					insn.operands[0] = fn;
@@ -374,6 +483,8 @@ namespace captive {
 
 				static IRInstruction create_call2(IROperand fn, IROperand arg0, IROperand arg1)
 				{
+					assert(fn.func());
+
 					IRInstruction insn;
 					insn.type = IRInstruction::CALL;
 					insn.operands[0] = fn;
@@ -384,6 +495,8 @@ namespace captive {
 
 				static IRInstruction create_call3(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2)
 				{
+					assert(fn.func());
+
 					IRInstruction insn;
 					insn.type = IRInstruction::CALL;
 					insn.operands[0] = fn;
@@ -395,28 +508,38 @@ namespace captive {
 
 				static IRInstruction create_call4(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2, IROperand arg3)
 				{
+					assert(fn.func());
+
 					IRInstruction insn;
 					insn.type = IRInstruction::CALL;
 					insn.operands[0] = fn;
 					insn.operands[1] = arg0;
 					insn.operands[2] = arg1;
 					insn.operands[3] = arg2;
+					insn.operands[4] = arg3;
 					return insn;
 				}
 
 				static IRInstruction create_call5(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2, IROperand arg3, IROperand arg4)
 				{
+					assert(fn.func());
+
 					IRInstruction insn;
 					insn.type = IRInstruction::CALL;
 					insn.operands[0] = fn;
 					insn.operands[1] = arg0;
 					insn.operands[2] = arg1;
 					insn.operands[3] = arg2;
+					insn.operands[4] = arg3;
+					insn.operands[5] = arg4;
+
 					return insn;
 				}
 
 				static IRInstruction create_set_cpu_mode(IROperand mode)
 				{
+					assert(mode.vreg() || mode.constant());
+					assert(mode.size == 1);
 					return create_unary(IRInstruction::SET_CPU_MODE, mode);
 				}
 			};

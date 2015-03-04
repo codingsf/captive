@@ -174,7 +174,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the JIT
-	LLVMJIT jit;
+	LLVMJIT jit(engine);
 	if (!jit.init()) {
 		ERROR << "Unable to initialise jit";
 		return 1;

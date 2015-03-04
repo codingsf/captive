@@ -59,11 +59,11 @@ namespace captive {
 				struct instruction_entry {
 					block_id_t block_id;
 					IRInstruction instruction;
-				};
+				} packed;
 
 				struct vreg_entry {
 					uint8_t size;
-				};
+				} packed;
 
 				struct bytecode_descriptor {
 					uint32_t block_count;
@@ -71,7 +71,7 @@ namespace captive {
 					struct vreg_entry vregs[1024];
 					uint32_t entry_count;
 					struct instruction_entry entries[];
-				} *instruction_buffer;
+				} packed *instruction_buffer;
 			};
 		}
 	}

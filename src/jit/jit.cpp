@@ -101,12 +101,6 @@ std::string RawBytecode::render() const
 	case RawInstruction::AND:
 	case RawInstruction::OR:
 	case RawInstruction::XOR:
-	case RawInstruction::CMPEQ:
-	case RawInstruction::CMPNE:
-	case RawInstruction::CMPLT:
-	case RawInstruction::CMPLTE:
-	case RawInstruction::CMPGT:
-	case RawInstruction::CMPGTE:
 	case RawInstruction::SX:
 	case RawInstruction::ZX:
 	case RawInstruction::TRUNC:
@@ -117,6 +111,12 @@ std::string RawBytecode::render() const
 		str << insn.operands[0].render() << ", " << insn.operands[1].render();
 		break;
 
+	case RawInstruction::CMPEQ:
+	case RawInstruction::CMPNE:
+	case RawInstruction::CMPLT:
+	case RawInstruction::CMPLTE:
+	case RawInstruction::CMPGT:
+	case RawInstruction::CMPGTE:
 	case RawInstruction::CMOV:
 	case RawInstruction::BRANCH:
 		str << insn.operands[0].render() << ", " << insn.operands[1].render() << ", " << insn.operands[2].render();

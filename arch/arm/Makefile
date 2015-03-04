@@ -16,7 +16,7 @@ clean:
 
 $(arch-out): $(obj) $(cmn-out)
 	@echo "  LD      $(notdir $@)"
-	$(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start $(obj) $(cmn-out)
+	$(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start --export-dynamic --whole-archive $(obj) $(cmn-out)
 
 %.o: %.cpp
 	@echo "  C++     $(notdir $@)"

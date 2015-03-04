@@ -293,8 +293,9 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		return false;
 
 	case 3:
+		DEBUG << "Guest Assert Failure";
 		dump_regs();
-		return true;
+		return false;
 
 	case 4: {
 		std::chrono::high_resolution_clock::time_point then = std::chrono::high_resolution_clock::now();

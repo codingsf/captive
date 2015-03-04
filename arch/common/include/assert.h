@@ -8,7 +8,9 @@
 #ifndef ASSERT_H
 #define	ASSERT_H
 
-#define assert(_expr) if (!_expr) asm volatile("out %0, $0xff\n" :: "a"(3));
+#include <printf.h>
+
+#define assert(_expr) do { if (!_expr) { printf("ABORT: " __FILE__ ": %d: " #_expr "\n", __LINE__); asm volatile("out %0, $0xff\n" :: "a"(3)); } } while(0)
 
 #endif	/* ASSERT_H */
 

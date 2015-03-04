@@ -1,9 +1,11 @@
 #include <define.h>
-#include <cpu.h>
+#include <printf.h>
 
-using namespace captive::arch;
-
-extern "C" void cpu_take_exception(CPU *cpu, uint32_t code, uint32_t data)
+extern "C" void cpu_set_mode(void *cpu, uint8_t mode)
 {
-	//cpu->interpreter().
+}
+
+extern "C" void cpu_trap(void *cpu)
+{
+	assert(false);
 }
