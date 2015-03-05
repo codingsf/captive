@@ -192,10 +192,10 @@ bool CPU::run_block_jit()
 			__local_irq_disable();
 			//printf("BEFORE\n");
 			//dump_state();
-			printf("hello: %x\n", read_pc());
+			//printf("hello: %x\n", read_pc());
 			step_ok = block->execute(this, reg_state());
 			//printf("AFTER\n");
-			//dump_state();
+			dump_state();
 			__local_irq_enable();
 		}
 	} while(step_ok);
@@ -212,16 +212,16 @@ static GuestBasicBlock basic_block_cache[1024];
 
 const GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 {
-	/*GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1024];
+	GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1];
 	if (cache_slot->block_address() == 0 || cache_slot->block_address() != block_addr) {
 		if (!compile_basic_block(block_addr, cache_slot)) {
 			return NULL;
 		}
-	}*/
+	}
 
-	GuestBasicBlock *cache_slot = &basic_block_cache[0];
+	/*GuestBasicBlock *cache_slot = &basic_block_cache[0];
 	if (!compile_basic_block(block_addr, cache_slot))
-		return NULL;
+		return NULL;*/
 
 	return cache_slot;
 }
@@ -239,7 +239,7 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 			return false;
 		}
 
-		//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
 		if (!jit().translate(insn, ctx)) {
 			printf("jit: instruction translation failed\n");

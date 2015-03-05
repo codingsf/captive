@@ -144,13 +144,13 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 	}
 
 	// Print out the module
-	/*{
+	{
 		raw_os_ostream str(std::cerr);
 
 		PassManager printManager;
 		printManager.add(createPrintModulePass(str, ""));
 		printManager.run(*block_module);
-	}*/
+	}
 
 	// If we haven't got a memory manager, create one now.
 	if (!mm) {
@@ -247,7 +247,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	//DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
+	DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];
@@ -505,6 +505,52 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		assert(v1);
 
 		ctx.builder.CreateCall2(fn, ctx.cpu_obj, v1);
+		return true;
+	}
+
+	case RawInstruction::WRITE_DEVICE: {
+		std::vector<Type *> params;
+		params.push_back(ctx.pi8);
+		params.push_back(ctx.i32);
+		params.push_back(ctx.i32);
+		params.push_back(ctx.i32);
+
+		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_write_device", fntype);
+
+		assert(fn);
+
+		Value *v1 = value_for_operand(ctx, op0);
+		assert(v1);
+		Value *v2 = value_for_operand(ctx, op1);
+		assert(v2);
+		Value *v3 = value_for_operand(ctx, op2);
+		assert(v3);
+
+		ctx.builder.CreateCall4(fn, ctx.cpu_obj, v1, v2, v3);
+		return true;
+	}
+
+	case RawInstruction::READ_DEVICE: {
+		std::vector<Type *> params;
+		params.push_back(ctx.pi8);
+		params.push_back(ctx.i32);
+		params.push_back(ctx.i32);
+		params.push_back(ctx.pi32);
+
+		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_read_device", fntype);
+
+		assert(fn);
+
+		Value *v1 = value_for_operand(ctx, op0);
+		assert(v1);
+		Value *v2 = value_for_operand(ctx, op1);
+		assert(v2);
+		Value *v3 = vreg_for_operand(ctx, op2);
+		assert(v3);
+
+		ctx.builder.CreateCall4(fn, ctx.cpu_obj, v1, v2, v3);
 		return true;
 	}
 

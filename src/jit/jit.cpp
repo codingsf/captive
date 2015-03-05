@@ -64,6 +64,8 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::NOP: return "nop";
 	case RawInstruction::TRAP: return "trap";
 	case RawInstruction::SET_CPU_MODE: return "set-cpu-mode";
+	case RawInstruction::WRITE_DEVICE: return "write-device";
+	case RawInstruction::READ_DEVICE: return "read-device";
 	case RawInstruction::INVALID: return "(invalid)";
 	default:
 		return "???";
@@ -119,6 +121,8 @@ std::string RawBytecode::render() const
 	case RawInstruction::CMPGTE:
 	case RawInstruction::CMOV:
 	case RawInstruction::BRANCH:
+	case RawInstruction::WRITE_DEVICE:
+	case RawInstruction::READ_DEVICE:
 		str << insn.operands[0].render() << ", " << insn.operands[1].render() << ", " << insn.operands[2].render();
 		break;
 

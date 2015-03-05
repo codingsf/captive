@@ -78,6 +78,8 @@ namespace captive {
 				RET,
 
 				SET_CPU_MODE,
+				WRITE_DEVICE,
+				READ_DEVICE
 			};
 
 			RawInstructionType type;

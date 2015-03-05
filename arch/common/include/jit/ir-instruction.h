@@ -82,6 +82,8 @@ namespace captive {
 					RET,
 
 					SET_CPU_MODE,
+					WRITE_DEVICE,
+					READ_DEVICE,
 				};
 
 				IRInstructionType type;
@@ -541,6 +543,24 @@ namespace captive {
 					assert(mode.vreg() || mode.constant());
 					assert(mode.size == 1);
 					return create_unary(IRInstruction::SET_CPU_MODE, mode);
+				}
+
+				static IRInstruction create_write_device(IROperand dev, IROperand reg, IROperand val)
+				{
+					assert(dev.vreg() || dev.constant());
+					assert(reg.vreg() || reg.constant());
+					assert(val.vreg() || val.constant());
+
+					return create_ternary(IRInstruction::WRITE_DEVICE, dev, reg, val);
+				}
+
+				static IRInstruction create_read_device(IROperand dev, IROperand reg, IROperand dst)
+				{
+					assert(dev.vreg() || dev.constant());
+					assert(reg.vreg() || reg.constant());
+					assert(dst.vreg());
+
+					return create_ternary(IRInstruction::READ_DEVICE, dev, reg, dst);
 				}
 			};
 		}

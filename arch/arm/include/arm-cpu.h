@@ -68,8 +68,9 @@ namespace captive {
 						uint32_t RB_abt[17];
 						uint32_t RB_und[17];
 
-						uint8_t C, V, Z, N, X, M, F, I, cpV;
+						uint8_t C, V, Z, N, X;
 						uint32_t SPSR;
+						uint8_t M, F, I, cpV;
 					} regs;
 				};
 
