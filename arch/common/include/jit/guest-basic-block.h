@@ -20,7 +20,7 @@ namespace captive {
 			public:
 				typedef bool (*GuestBasicBlockFn)(void *cpu, void *cpu_state);
 
-				inline bool execute(void *cpu, void *cpu_state) const {
+				inline bool execute(void *cpu, void *cpu_state) {
 					return _fnp(cpu, cpu_state);
 				}
 

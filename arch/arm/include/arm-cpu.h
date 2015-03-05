@@ -59,6 +59,8 @@ namespace captive {
 				struct cpu_state {
 					uint32_t isa_mode;
 
+					uint8_t pad[16];
+
 					struct {
 						uint32_t RB[16];
 						uint32_t RB_usr[17];
@@ -71,7 +73,7 @@ namespace captive {
 						uint8_t C, V, Z, N, X;
 						uint32_t SPSR;
 						uint8_t M, F, I, cpV;
-					} regs;
+					} packed regs;
 				};
 
 			protected:
@@ -84,7 +86,7 @@ namespace captive {
 				ArmJIT *_jit;
 
 				unsigned int _ep;
-				cpu_state state;
+				cpu_state& state;
 			};
 		}
 	}

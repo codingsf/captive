@@ -221,6 +221,19 @@ namespace captive {
 			}
 
 			#undef BITS
+
+			static inline void set_va_flags(va_t va, uint32_t flags)
+			{
+				page_map_entry_t* pm;
+				page_dir_ptr_entry_t* pdp;
+				page_dir_entry_t* pd;
+				page_table_entry_t* pt;
+
+				get_va_table_entries(va, pm, pdp, pd, pt);
+				pt->flags(flags);
+
+				flush_page(va);
+			}
 		};
 	}
 }

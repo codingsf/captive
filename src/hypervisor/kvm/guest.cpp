@@ -347,7 +347,7 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	}
 
 	// For now, put the stack starting at the end of shared memory
-	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE;
+	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE - 0x100;
 
 	// Map the JIT memory region into memory
 	for (uint64_t va = JIT_VIRT_BASE, pa = JIT_PHYS_BASE; va < (JIT_VIRT_BASE + JIT_SIZE); va += 0x1000, pa += 0x1000) {

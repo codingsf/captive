@@ -96,7 +96,7 @@ namespace captive {
 			bool run_block_jit();
 			bool run_region_jit();
 
-			const jit::GuestBasicBlock *get_basic_block(uint32_t block_addr);
+			jit::GuestBasicBlock *get_basic_block(uint32_t block_addr);
 			bool compile_basic_block(uint32_t block_addr, jit::GuestBasicBlock *block);
 
 			bool handle_pending_action(uint32_t action);

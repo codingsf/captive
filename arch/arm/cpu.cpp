@@ -13,7 +13,7 @@
 
 using namespace captive::arch::arm;
 
-ArmCPU::ArmCPU(ArmEnvironment& env) : CPU(env)
+ArmCPU::ArmCPU(ArmEnvironment& env) : CPU(env), state(*(struct cpu_state *)0x211000000)
 {
 
 }
@@ -30,6 +30,13 @@ void ArmCPU::dump_state() const
 	for (int i = 0; i < 16; i++) {
 		printf("  r%d = %x (%d)\n", i, state.regs.RB[i], state.regs.RB[i]);
 	}
+	printf("  C = %d\n", state.regs.C);
+	printf("  V = %d\n", state.regs.V);
+	printf("  Z = %d\n", state.regs.Z);
+	printf("  N = %d\n", state.regs.N);
+	printf("  M = %d\n", state.regs.M);
+	printf("  F = %d\n", state.regs.F);
+	printf("  I = %d\n", state.regs.I);
 }
 
 bool ArmCPU::init(unsigned int ep)

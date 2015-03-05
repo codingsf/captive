@@ -21,3 +21,8 @@ extern "C" void cpu_read_device(captive::arch::CPU *cpu, uint32_t devid, uint32_
 {
 	cpu->env().read_core_device(*cpu, devid, reg, val);
 }
+
+extern "C" void trace_reg_write(captive::arch::CPU *cpu, uint64_t off, uint32_t val)
+{
+	printf("TRACE: REG-WRITE: off=%u, val=0x%x\n", (uint32_t)off, val);
+}

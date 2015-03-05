@@ -187,6 +187,15 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 		return NULL;
 	}
 
+	/*static int i = 0;
+
+	std::stringstream y;
+	y << "./code-" << i++ << ".bin";
+
+	FILE *x = fopen(y.str().c_str(), "wb");
+	fwrite(ptr, 0x1000, 1, x);
+	fclose(x);*/
+
 	//DEBUG << CONTEXT(LLVMBlockJIT) << "Compiled function to " << std::hex << (uint64_t)ptr << ", X=" << (uint32_t)*(uint8_t *)ptr;
 
 	return ptr;
@@ -430,8 +439,24 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.i64);
 
-		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op0, true));
+		Value *regptr = ctx.builder.CreateAdd(ctx.reg_state, offset);
+		regptr = ctx.builder.CreateIntToPtr(regptr, type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(val, regptr);
+
+		/*{
+			std::vector<Type *> params;
+			params.push_back(ctx.pi8);
+			params.push_back(ctx.i64);
+			params.push_back(ctx.i32);
+
+			FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+			Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("trace_reg_write", fntype);
+
+			assert(fn);
+
+			ctx.builder.CreateCall3(fn, ctx.cpu_obj, offset, ctx.builder.CreateCast(Instruction::ZExt, val, ctx.i32));
+			return true;
+		}*/
 
 		return true;
 	}

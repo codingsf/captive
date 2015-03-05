@@ -30,6 +30,7 @@ std::string RawOperand::render() const
 std::string RawInstruction::mnemonic() const
 {
 	switch(type) {
+	case RawInstruction::ALLOC: return "alloc";
 	case RawInstruction::CALL: return "call";
 	case RawInstruction::JMP: return "jump";
 	case RawInstruction::MOV: return "mov";
@@ -86,6 +87,7 @@ std::string RawBytecode::render() const
 		break;
 
 	case RawInstruction::JMP:
+	case RawInstruction::ALLOC:
 	case RawInstruction::SET_CPU_MODE:
 		str << insn.operands[0].render();
 		break;

@@ -39,6 +39,8 @@ namespace captive {
 				enum IRInstructionType {
 					INVALID,
 
+					ALLOC,
+
 					NOP,
 					TRAP,
 
@@ -212,6 +214,13 @@ namespace captive {
 					IRInstruction insn;
 					insn.type = IRInstruction::TRAP;
 					return insn;
+				}
+
+				static IRInstruction create_alloc(IROperand reg)
+				{
+					assert(reg.vreg());
+
+					return create_unary(IRInstruction::ALLOC, reg);
 				}
 
 				static IRInstruction create_mov(IROperand src, IROperand dst)
