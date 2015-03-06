@@ -22,9 +22,21 @@ namespace captive {
 	namespace hypervisor {
 		class GuestCPUConfiguration {
 		public:
-			explicit GuestCPUConfiguration() { }
+			enum CPUExecutionMode {
+				Interpreter,
+				BlockJIT,
+				RegionJIT,
+			};
+
+			explicit GuestCPUConfiguration(CPUExecutionMode exec_mode) : _exec_mode(exec_mode) { }
 
 			bool validate() const;
+
+			CPUExecutionMode execution_mode() const { return _exec_mode; }
+
+		private:
+			CPUExecutionMode _exec_mode;
+
 		};
 
 		class GuestMemoryRegionConfiguration

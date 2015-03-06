@@ -1,4 +1,5 @@
 #include <captive.h>
+#include <verify.h>
 #include <engine/engine.h>
 #include <jit/llvm.h>
 #include <loader/zimage-loader.h>
@@ -42,8 +43,8 @@ using namespace captive::hypervisor::kvm;
 
 int main(int argc, char **argv)
 {
-	if (argc != 5) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs>";
+	if (argc < 5 || argc > 7 || argc == 6) {
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
 		return 1;
 	}
 
@@ -51,6 +52,18 @@ int main(int argc, char **argv)
 	if (!KVM::supported()) {
 		ERROR << "KVM is not supported";
 		return 1;
+	}
+
+	if (argc == 7) {
+		if (strcmp(argv[5], "--verify")) {
+			ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
+			return 1;
+		}
+
+		if (verify_prepare(atoi(argv[6]))) {
+			ERROR << "Unable to prepare verification mode";
+			return 1;
+		}
 	}
 
 	// Create a new hypervisor.
@@ -221,7 +234,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	GuestCPUConfiguration cpu_cfg;
+	GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::Interpreter);
 
 	CPU *cpu = guest->create_cpu(cpu_cfg);
 	if (!cpu) {
@@ -245,12 +258,7 @@ int main(int argc, char **argv)
 	mts.start();
 
 	if (!cpu->run()) {
-		delete cpu;
-		delete guest;
-		delete hv;
-
 		ERROR << "Unable to run CPU";
-		return 1;
 	}
 
 	// Stop the tick source

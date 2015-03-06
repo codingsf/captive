@@ -39,7 +39,7 @@ namespace captive {
 				enum IRInstructionType {
 					INVALID,
 
-					ALLOC,
+					VERIFY,
 
 					NOP,
 					TRAP,
@@ -216,11 +216,12 @@ namespace captive {
 					return insn;
 				}
 
-				static IRInstruction create_alloc(IROperand reg)
+				static IRInstruction create_verify()
 				{
-					assert(reg.vreg());
-
-					return create_unary(IRInstruction::ALLOC, reg);
+					IRInstruction insn;
+					insn.type = IRInstruction::VERIFY;
+					
+					return insn;
 				}
 
 				static IRInstruction create_mov(IROperand src, IROperand dst)

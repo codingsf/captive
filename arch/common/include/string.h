@@ -12,6 +12,7 @@
 
 extern void *memset(void *, int, size_t);
 extern void *memcpy(void *, const void *, size_t);
+extern int memcmp(const void *, const void *, size_t);
 extern void *bzero(void *, size_t);
 
 extern int strlen(const char *);

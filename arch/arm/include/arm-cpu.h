@@ -78,7 +78,8 @@ namespace captive {
 
 			protected:
 				bool decode_instruction(uint32_t addr, Decode* insn) override;
-				void* reg_state() override;
+				void* reg_state() override { return &state.regs; }
+				uint32_t reg_state_size() override { return sizeof(state.regs); }
 
 			private:
 				ArmMMU *_mmu;

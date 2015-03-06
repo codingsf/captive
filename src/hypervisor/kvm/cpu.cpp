@@ -3,6 +3,7 @@
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
 #include <jit/jit.h>
+#include <verify.h>
 
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -403,9 +404,4 @@ void KVMCpu::dump_regs()
 	<< "idt base=" << std::hex << sregs.idt.base << ", limit=" << std::hex << sregs.idt.limit << std::endl
 	<< "apic base=" << std::hex << sregs.apic_base << std::endl
 	<< "efer=" << std::hex << sregs.efer << std::endl;
-
-	// Instruction Data
-	KVMGuest& guest = (KVMGuest&)owner();
-
-	uint8_t *sys_mem = (uint8_t *)guest.sys_mem_rgn->host_buffer;
 }

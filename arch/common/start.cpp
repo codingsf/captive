@@ -57,7 +57,7 @@ extern "C" {
 		} else {
 			if (!env->init()) {
 				printf("error: unable to initialise environment\n");
-			} else if (!env->run(ep)) {
+			} else if (!env->run(ep, shmem->options.mode)) {
 				printf("error: unable to launch environment\n");
 			}
 

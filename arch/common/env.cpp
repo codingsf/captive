@@ -149,7 +149,7 @@ bool Environment::init()
 	return true;
 }
 
-bool Environment::run(unsigned int ep)
+bool Environment::run(unsigned int ep, unsigned int mode)
 {
 	CPU *core = create_cpu();
 	if (!core) {
@@ -157,14 +157,14 @@ bool Environment::run(unsigned int ep)
 		return false;
 	}
 
-	captive::arch::active_cpu = core;
+	CPU::set_active_cpu(core);
 
 	if (!core->init(ep)) {
 		printf("error: unable to init core\n");
 		return false;
 	}
 
-	bool result = core->run();
+	bool result = core->run(mode);
 	delete core;
 
 	return result;

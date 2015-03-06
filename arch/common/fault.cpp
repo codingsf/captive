@@ -12,7 +12,7 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 	// instruction (or decode) taking a memory fault.
 	if (va < 0x100000000) {
 		// Obtain the core that is currently active.
-		captive::arch::CPU *core = captive::arch::active_cpu;
+		captive::arch::CPU *core = captive::arch::CPU::get_active_cpu();
 
 		if (core) {
 			MMU::resolution_fault fault;

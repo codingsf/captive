@@ -71,8 +71,3 @@ bool ArmCPU::decode_instruction(uint32_t addr, Decode* insn)
 {
 	return ((ArmDecode*)insn)->decode(ArmDecode::arm, addr);
 }
-
-void* ArmCPU::reg_state()
-{
-	return &state.regs;
-}

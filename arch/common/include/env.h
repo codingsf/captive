@@ -22,7 +22,7 @@ namespace captive {
 			virtual ~Environment();
 
 			virtual bool init();
-			bool run(unsigned int ep);
+			bool run(unsigned int ep, unsigned int mode);
 
 			virtual CPU *create_cpu() = 0;
 

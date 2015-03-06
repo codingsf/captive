@@ -259,7 +259,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	//DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
+	DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];
@@ -512,6 +512,19 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_trap", fntype);
+
+		assert(fn);
+
+		ctx.builder.CreateCall(fn, ctx.cpu_obj);
+		return true;
+	}
+
+	case RawInstruction::VERIFY: {
+		std::vector<Type *> params;
+		params.push_back(ctx.pi8);
+
+		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_verify", fntype);
 
 		assert(fn);
 

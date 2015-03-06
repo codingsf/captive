@@ -1,4 +1,5 @@
 #include <cpu.h>
+#include <barrier.h>
 #include <mmu.h>
 #include <decode.h>
 #include <interp.h>
@@ -13,10 +14,11 @@
 using namespace captive::arch;
 using namespace captive::arch::jit;
 
-CPU *captive::arch::active_cpu;
 safepoint_t cpu_safepoint;
 
 extern captive::shmem_data *shmem;
+
+CPU *CPU::current_cpu;
 
 CPU::CPU(Environment& env) : _env(env), insns_executed(0)
 {
@@ -57,10 +59,18 @@ bool CPU::handle_pending_action(uint32_t action)
 }
 
 
-bool CPU::run()
+bool CPU::run(unsigned int mode)
 {
-	return run_block_jit();
-	//return run_interp();
+	switch (mode) {
+	case 0:
+		return run_interp();
+	case 1:
+		return run_block_jit();
+	case 2:
+		return run_region_jit();
+	default:
+		return false;
+	}
 }
 
 bool CPU::run_interp()
@@ -126,6 +136,11 @@ bool CPU::run_interp()
 
 			// Mark the page as has_been_executed
 			//mmu().set_page_executed(pc);
+
+			if (!verify_check()) {
+				step_ok = false;
+				break;
+			}
 
 			// Execute the instruction, with interrupts disabled.
 			__local_irq_disable();
@@ -246,7 +261,8 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
-		ctx.add_instruction(jit::IRInstructionBuilder::create_nop());
+		ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_constant32(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
+		ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
 		if (!jit().translate(insn, ctx)) {
 			printf("jit: instruction translation failed\n");
 			return false;
@@ -265,5 +281,39 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 		return true;
 	} else {
 		return false;
+	}
+}
+
+bool CPU::verify_check()
+{
+	if (!shmem->options.verify) return true;
+
+	Barrier *enter = (Barrier *)shmem->verify_shm_data->barrier_enter;
+	Barrier *exit = (Barrier *)shmem->verify_shm_data->barrier_exit;
+
+	if (shmem->options.verify_id == 1) {
+		memcpy(shmem->verify_shm_data->data, reg_state(), reg_state_size());
+	}
+
+	enter->wait(shmem->options.verify_id);
+
+	if (shmem->options.verify_id == 0) {
+		if (memcmp(reg_state(), shmem->verify_shm_data->data, reg_state_size())) {
+			shmem->verify_shm_data->fail = 1;
+		} else {
+			shmem->verify_shm_data->fail = 0;
+		}
+
+	}
+
+	exit->wait(shmem->options.verify_id);
+
+	if (shmem->verify_shm_data->fail) {
+		printf("*** DIVERGENCE DETECTED ***\n");
+		dump_state();
+		return false;
+	} else {
+		//printf("OK\n");
+		return true;
 	}
 }

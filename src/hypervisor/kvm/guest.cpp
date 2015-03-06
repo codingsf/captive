@@ -6,6 +6,8 @@
 #include <loader/loader.h>
 #include <engine/engine.h>
 #include <devices/device.h>
+#include <shmem.h>
+#include <verify.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -257,6 +259,36 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	_shmem = (shmem_data *)sh_mem_rgn->host_buffer;
+	_shmem->options.mode = verify_get_tid();
+	_shmem->options.verify = 1;
+	_shmem->options.verify_id = verify_get_tid();
+
+	{
+		// Try to obtain a free memory region slot.
+		vm_mem_region *vrgn = get_mem_slot();
+		if (vrgn == NULL)
+			return NULL;
+
+		// Fill in the KVM memory structure.
+		vrgn->kvm.flags = 0;
+		vrgn->kvm.guest_phys_addr = 0x60000000;
+		vrgn->kvm.memory_size = 0x1000;
+
+		// Allocate a userspace buffer for the region.
+		vrgn->host_buffer = verify_get_shared_data();
+
+		// Store the buffer address in the KVM memory structure.
+		vrgn->kvm.userspace_addr = (uint64_t) vrgn->host_buffer;
+
+		// Install the memory region into the guest.
+		int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &vrgn->kvm);
+		if (rc) {
+			ERROR << "Unable to install verification memory";
+			return NULL;
+		}
+
+		_shmem->verify_shm_data = (shmem_data::verify_shm_t *)(JIT_VIRT_BASE + JIT_SIZE);
+	}
 
 	// Allocate JIT memory
 	jit_mem_rgn = alloc_guest_memory(JIT_PHYS_BASE, JIT_SIZE);
@@ -354,6 +386,9 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	for (uint64_t va = JIT_VIRT_BASE, pa = JIT_PHYS_BASE; va < (JIT_VIRT_BASE + JIT_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT);
 	}
+
+	// Map the verification page into memory
+	map_page(JIT_VIRT_BASE + JIT_SIZE, 0x60000000, PT_PRESENT | PT_WRITABLE);
 
 	// Map ALL guest physical memory, and mark it as present and writable for
 	// use by the engine.

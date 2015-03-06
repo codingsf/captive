@@ -26,3 +26,10 @@ extern "C" void trace_reg_write(captive::arch::CPU *cpu, uint64_t off, uint32_t 
 {
 	printf("TRACE: REG-WRITE: off=%u, val=0x%x\n", (uint32_t)off, val);
 }
+
+extern "C" void jit_verify(captive::arch::CPU *cpu)
+{
+	if (!cpu->verify_check()) {
+		abort();
+	}
+}

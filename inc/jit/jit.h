@@ -35,7 +35,7 @@ namespace captive {
 			enum RawInstructionType {
 				INVALID,
 
-				ALLOC,
+				VERIFY,
 				
 				NOP,
 				TRAP,

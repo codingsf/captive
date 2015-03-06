@@ -27,7 +27,7 @@ namespace captive {
 		class Interpreter;
 		class Decode;
 		class JIT;
-		
+
 		class CPU
 		{
 		public:
@@ -35,7 +35,7 @@ namespace captive {
 			virtual ~CPU();
 
 			virtual bool init(unsigned int ep) = 0;
-			bool run();
+			bool run(unsigned int mode);
 
 			virtual MMU& mmu() const = 0;
 			virtual Interpreter& interpreter() const = 0;
@@ -66,9 +66,20 @@ namespace captive {
 				_should_flush_decode_cache = true;
 			}
 
+			static inline CPU *get_active_cpu() {
+				return current_cpu;
+			}
+
+			static inline void set_active_cpu(CPU* cpu) {
+				current_cpu = cpu;
+			}
+
+			bool verify_check();
+
 		protected:
 			virtual bool decode_instruction(uint32_t addr, Decode *insn) = 0;
 			virtual void *reg_state() = 0;
+			virtual uint32_t reg_state_size() = 0;
 
 			inline void inc_insns_executed() {
 				insns_executed++;
@@ -82,6 +93,8 @@ namespace captive {
 			} local_state;
 
 		private:
+			static CPU *current_cpu;
+
 			uint64_t insns_executed;
 			bool _should_flush_decode_cache;
 
@@ -101,8 +114,6 @@ namespace captive {
 
 			bool handle_pending_action(uint32_t action);
 		};
-
-		extern CPU *active_cpu;
 	}
 }
 
