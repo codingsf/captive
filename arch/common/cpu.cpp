@@ -59,7 +59,6 @@ bool CPU::handle_pending_action(uint32_t action)
 
 bool CPU::run()
 {
-	//Memory::get_va_table_entries()
 	return run_block_jit();
 	//return run_interp();
 }
@@ -192,14 +191,12 @@ bool CPU::run_block_jit()
 			step_ok = false;
 		} else {
 			__local_irq_disable();
-			printf("BEFORE\n");
-			dump_state();
-			printf("hello: %x\n", read_pc());
-			Memory::set_va_flags((va_t)0x211000000, 3);
+//			printf("BEFORE\n");
+//			dump_state();
+//			printf("hello: %x\n", read_pc());
 			step_ok = block->execute(this, reg_state());
-			Memory::set_va_flags((va_t)0x211000000, 1);
-			printf("AFTER\n");
-			dump_state();
+//			printf("AFTER\n");
+//			dump_state();
 			__local_irq_enable();
 		}
 	} while(step_ok);
@@ -216,16 +213,16 @@ static GuestBasicBlock basic_block_cache[1024];
 
 GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 {
-	/*GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1];
+	GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1];
 	if (cache_slot->block_address() == 0 || cache_slot->block_address() != block_addr) {
 		if (!compile_basic_block(block_addr, cache_slot)) {
 			return NULL;
 		}
-	}*/
+	}
 
-	GuestBasicBlock *cache_slot = &basic_block_cache[0];
+	/*GuestBasicBlock *cache_slot = &basic_block_cache[0];
 	if (!compile_basic_block(block_addr, cache_slot))
-		return NULL;
+		return NULL;*/
 
 	return cache_slot;
 }

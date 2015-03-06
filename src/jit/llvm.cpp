@@ -63,6 +63,9 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 
 	FunctionType *fn = FunctionType::get(IntegerType::getInt32Ty(ctx), params, false);
 	Function *block_fn = Function::Create(fn, GlobalValue::ExternalLinkage, "block", block_module);
+
+	block_fn->addFnAttr(Attribute::NoRedZone);
+
 	BasicBlock *entry_block = BasicBlock::Create(ctx, "entry", block_fn);
 
 	IRBuilder<> builder(ctx);
@@ -144,13 +147,13 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 	}
 
 	// Print out the module
-	{
+	/*{
 		raw_os_ostream str(std::cerr);
 
 		PassManager printManager;
 		printManager.add(createPrintModulePass(str, ""));
 		printManager.run(*block_module);
-	}
+	}*/
 
 	// If we haven't got a memory manager, create one now.
 	if (!mm) {
@@ -256,7 +259,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
+	//DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];

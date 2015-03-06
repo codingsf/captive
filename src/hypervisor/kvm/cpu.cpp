@@ -149,6 +149,8 @@ bool KVMCpu::run()
 				vmioctl(KVM_GET_REGS, &regs);
 
 				fprintf(stderr, "%c", (char)regs.rax & 0xff);
+			} else if (cpu_run_struct->io.port == 0xfd) {
+				dump_regs();
 			} else {
 				run_cpu = false;
 				DEBUG << "EXIT IO "

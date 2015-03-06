@@ -239,7 +239,8 @@ bool KVMGuest::prepare_guest_memory()
 	// Hack in the TSS
 	uint64_t *tss = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x200];
 
-	tss[2] = 3;
+	tss[1] = 0xabcdef123456;
+	tss[2] = 0;
 	tss[19] = 0x1b;		// CS
 	tss[20] = 0x23;		// SS
 	tss[21] = 0x23;		// DS

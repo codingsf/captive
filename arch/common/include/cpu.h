@@ -27,7 +27,7 @@ namespace captive {
 		class Interpreter;
 		class Decode;
 		class JIT;
-
+		
 		class CPU
 		{
 		public:

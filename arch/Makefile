@@ -20,7 +20,7 @@ arch-cleans := $(patsubst %,$(top-dir)/%.arch.clean,$(archs))
 
 export common-cflags := -I$(shared-dir) -nostdlib -g -fno-builtin -fno-omit-frame-pointer -mno-sse
 export common-cflags += -mno-mmx -mno-sse2 -O3 -mcmodel=kernel -fno-rtti -fno-exceptions -std=gnu++11
-export common-cflags += -fno-delete-null-pointer-checks
+export common-cflags += -fno-delete-null-pointer-checks -mno-red-zone
 
 all: $(arch-outs)
 
