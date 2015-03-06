@@ -9,6 +9,7 @@
 #define	LLVM_MM_H
 
 #include <llvm/ExecutionEngine/RTDyldMemoryManager.h>
+#include <list>
 
 namespace captive {
 	namespace engine {
@@ -33,9 +34,20 @@ namespace captive {
 
 		private:
 			engine::Engine& _engine;
-			
+
 			void *arena, *next;
 			uint64_t size;
+
+			struct Zone
+			{
+				Zone(void *base, uint64_t size) : base(base), size(size) { }
+
+				void *base;
+				uint64_t size;
+			};
+
+			std::list<Zone> free_zones;
+			std::list<Zone> used_zones;
 		};
 	}
 }

@@ -40,6 +40,8 @@ namespace captive {
 					_block_address = addr;
 				}
 
+				inline void release_memory() { }
+
 			private:
 				uint32_t _block_address;
 				GuestBasicBlockFn _fnp;
