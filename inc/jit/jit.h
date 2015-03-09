@@ -36,7 +36,7 @@ namespace captive {
 				INVALID,
 
 				VERIFY,
-				
+
 				NOP,
 				TRAP,
 
@@ -104,7 +104,6 @@ namespace captive {
 		struct RawBytecodeDescriptor {
 			uint32_t block_count;
 			uint32_t vreg_count;
-			RawVRegDescriptor vregs[1024];
 			uint32_t bytecode_count;
 			RawBytecode bc[];
 		} __attribute__((packed));

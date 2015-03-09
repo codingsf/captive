@@ -44,6 +44,8 @@ namespace captive {
 
 				llvm::IRBuilder<>& builder;
 
+				llvm::BasicBlock *alloca_block;
+
 				std::map<uint32_t, llvm::BasicBlock *> basic_blocks;
 				std::map<uint32_t, llvm::Value *> vregs;
 
@@ -56,6 +58,11 @@ namespace captive {
 				llvm::Type *i16, *pi16;
 				llvm::Type *i32, *pi32;
 				llvm::Type *i64, *pi64;
+
+				inline llvm::Value *const1(uint8_t v)
+				{
+					return llvm::ConstantInt::get(i1, v);
+				}
 
 				inline llvm::Value *const8(uint8_t v)
 				{
@@ -78,6 +85,7 @@ namespace captive {
 				}
 			};
 
+			llvm::Value *insert_vreg(LoweringContext& ctx, uint32_t idx, uint8_t size);
 			llvm::Value *value_for_operand(LoweringContext& ctx, const RawOperand* oper);
 			llvm::Type *type_for_operand(LoweringContext& ctx, const RawOperand* oper, bool ptr = false);
 			llvm::Value *vreg_for_operand(LoweringContext& ctx, const RawOperand* oper);

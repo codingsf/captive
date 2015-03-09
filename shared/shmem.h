@@ -10,16 +10,16 @@
 
 namespace captive {
 	struct shmem_data {
-		struct {
-			uint32_t mode;
-			uint32_t verify;
-			uint32_t verify_id;
-		} options;
-
 		uint32_t isr;
-		unsigned int asynchronous_action_pending;
+		uint32_t asynchronous_action_pending;
 		bool halt;
 		uint64_t insn_count;
+
+		struct cpu_options_t {
+			uint32_t mode;
+			bool verify;
+			uint32_t verify_id;
+		} cpu_options;
 
 		struct verify_shm_t {
 			uint32_t fail;
@@ -28,7 +28,7 @@ namespace captive {
 			uint8_t data[256];
 		} *verify_shm_data;
 
-		uint8_t ir_buffer[8192];
+		uint8_t ir_buffer[16384];
 	};
 }
 

@@ -19,12 +19,16 @@ namespace captive {
 		class LogContext
 		{
 		public:
-			explicit LogContext(std::string name) : _parent(NULL), _name(name) { }
+			explicit LogContext(std::string name) : _parent(NULL), _name(name), _enabled(false) { }
 
 			inline std::string name() const { return _name; }
+			inline bool enabled() const { return _enabled; }
+			inline void enable() { _enabled = true; }
+			inline void disable() { _enabled = false; }
 		private:
 			LogContext *_parent;
 			std::string _name;
+			bool _enabled;
 		};
 	}
 
@@ -37,7 +41,9 @@ namespace captive {
 
 		~LogStream()
 		{
-			std::cerr << level_text(_level) << ": " << (_ctx != NULL ? _ctx->name() : "?") << ": " << this->str() << std::endl;
+			if (_level >= LL_ERROR || !_ctx || _ctx->enabled()) {
+				std::cerr << level_text(_level) << ": " << (_ctx != NULL ? _ctx->name() : "?") << ": " << this->str() << std::endl;
+			}
 		}
 
 		enum log_level {

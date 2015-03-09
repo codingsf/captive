@@ -26,7 +26,8 @@ void MillisecondTickSource::stop()
 	if (!tick_thread) return;
 
 	terminate = true;
-	tick_thread->join();
+	if (tick_thread->joinable())
+		tick_thread->join();
 	delete tick_thread;
 }
 

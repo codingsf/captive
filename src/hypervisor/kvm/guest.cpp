@@ -259,9 +259,11 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	_shmem = (shmem_data *)sh_mem_rgn->host_buffer;
-	_shmem->options.mode = verify_get_tid();
-	_shmem->options.verify = 1;
-	_shmem->options.verify_id = verify_get_tid();
+	_shmem->cpu_options.verify = verify_enabled();
+
+	if (_shmem->cpu_options.verify) {
+		_shmem->cpu_options.verify_id = verify_get_tid();
+	}
 
 	{
 		// Try to obtain a free memory region slot.

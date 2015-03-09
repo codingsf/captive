@@ -62,6 +62,8 @@ namespace captive {
 			}
 
 			void flush_decode_cache();
+			void flush_block_cache();
+			
 			inline void schedule_decode_cache_flush() {
 				_should_flush_decode_cache = true;
 			}
@@ -113,6 +115,7 @@ namespace captive {
 			bool compile_basic_block(uint32_t block_addr, jit::GuestBasicBlock *block);
 
 			bool handle_pending_action(uint32_t action);
+			bool interpret_block();
 		};
 	}
 }

@@ -34,7 +34,10 @@ CPU::~CPU()
 
 void CPU::flush_decode_cache()
 {
-	bzero(decode_cache, sizeof(decode_cache));
+	//bzero(decode_cache, sizeof(decode_cache));
+
+	memset(decode_cache, 0xff, sizeof(decode_cache));
+
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -110,55 +113,18 @@ bool CPU::run_interp()
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
 		if (shmem->asynchronous_action_pending) {
-			handle_pending_action(shmem->asynchronous_action_pending);
+			if (handle_pending_action(shmem->asynchronous_action_pending)) {
+				shmem->asynchronous_action_pending = 0;
+			}
 		}
 
-		// Now, execute one basic-block of instructions.
-		Decode *insn;
-		do {
-			// Reset CPU exception state
-			local_state.last_exception_action = 0;
-
-			// Get the address of the next instruction to execute
-			uint32_t pc = read_pc();
-
-			// Obtain a decode object for this PC, and perform the decode.
-			insn = get_decode(pc);
-			if (!decode_instruction(pc, insn)) {
-				printf("cpu: unhandled decode fault @ %08x\n", pc);
-				return false;
-			}
-
-			// Perhaps trace this instruction
-			if (trace().enabled()) {
-				trace().start_record(get_insns_executed(), pc, insn);
-			}
-
-			// Mark the page as has_been_executed
-			//mmu().set_page_executed(pc);
-
-			if (!verify_check()) {
-				step_ok = false;
-				break;
-			}
-
-			// Execute the instruction, with interrupts disabled.
-			__local_irq_disable();
-			step_ok = interpreter().step_single(insn);
-			__local_irq_enable();
-
-			// Increment the instruction counter.
-			inc_insns_executed();
-
-			// Perhaps finish tracing this instruction.
-			if (trace().enabled()) {
-				trace().end_record();
-			}
-		} while(!insn->end_of_block && step_ok);
+		step_ok = interpret_block();
 	} while(step_ok);
 
 	return true;
 }
+
+static int block_count[0x40000000];
 
 bool CPU::run_block_jit()
 {
@@ -197,22 +163,31 @@ bool CPU::run_block_jit()
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
 		if (shmem->asynchronous_action_pending) {
-			handle_pending_action(shmem->asynchronous_action_pending);
+			if (handle_pending_action(shmem->asynchronous_action_pending)) {
+				shmem->asynchronous_action_pending = 0;
+			}
 		}
 
-		jit::GuestBasicBlock *block = get_basic_block(read_pc());
-		if (!block) {
-			printf("jit: unable to get basic block @ %08x\n", read_pc());
-			step_ok = false;
+		if (block_count[read_pc() >> 2] < 10) {
+			printf("jit: interp block %08x\n", read_pc());
+			block_count[read_pc() >> 2]++;
+			if (!interpret_block())
+				return false;
 		} else {
-			__local_irq_disable();
-//			printf("BEFORE\n");
-//			dump_state();
-//			printf("hello: %x\n", read_pc());
-			step_ok = block->execute(this, reg_state());
-//			printf("AFTER\n");
-//			dump_state();
-			__local_irq_enable();
+			jit::GuestBasicBlock *block = get_basic_block(read_pc());
+			if (!block) {
+				printf("jit: unable to get basic block @ %08x\n", read_pc());
+				step_ok = false;
+			} else {
+				__local_irq_disable();
+	//			printf("BEFORE\n");
+	//			dump_state();
+	//			printf("hello: %x\n", read_pc());
+				step_ok = block->execute(this, reg_state());
+	//			printf("AFTER\n");
+	//			dump_state();
+				__local_irq_enable();
+			}
 		}
 	} while(step_ok);
 
@@ -224,13 +199,81 @@ bool CPU::run_region_jit()
 	return false;
 }
 
-static GuestBasicBlock basic_block_cache[1024];
+bool CPU::interpret_block()
+{
+	bool step_ok = false;
+	uint32_t prev_pc = 0x1;
+
+	// Now, execute one basic-block of instructions.
+	Decode *insn;
+	do {
+		// Reset CPU exception state
+		local_state.last_exception_action = 0;
+
+		// Get the address of the next instruction to execute
+		uint32_t pc = read_pc();
+
+		// Obtain a decode object for this PC, and perform the decode.
+		insn = get_decode(pc);
+		if (insn->pc != pc) {
+			if (!decode_instruction(pc, insn)) {
+				printf("cpu: unhandled decode fault @ %08x\n", pc);
+				return false;
+			}
+		}
+
+		// Perhaps trace this instruction
+		if (trace().enabled()) {
+			trace().start_record(get_insns_executed(), pc, insn);
+		}
+
+		if (prev_pc >> 12 != pc >> 12) {
+			// Mark the page as has_been_executed
+			mmu().set_page_executed(pc);
+			prev_pc = pc;
+		}
+
+		if (shmem->cpu_options.verify && !verify_check()) {
+			return false;
+		}
+
+		// Execute the instruction, with interrupts disabled.
+		__local_irq_disable();
+		step_ok = interpreter().step_single(insn);
+		__local_irq_enable();
+
+		// Increment the instruction counter.
+		inc_insns_executed();
+
+		// Perhaps finish tracing this instruction.
+		if (trace().enabled()) {
+			trace().end_record();
+		}
+	} while(!insn->end_of_block && step_ok);
+}
+
+
+#define BB_CACHE_SIZE 16384
+
+static struct basic_block_page_cache_entry {
+	GuestBasicBlock bb[1024];
+} basic_block_cache[BB_CACHE_SIZE];
+
+//static GuestBasicBlock basic_block_cache[BB_CACHE_SIZE];
+
+void CPU::flush_block_cache()
+{
+	//
+}
 
 GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 {
-	GuestBasicBlock *cache_slot = &basic_block_cache[block_addr % 1024];
+	basic_block_page_cache_entry *entry = &basic_block_cache[(block_addr >> 12) % BB_CACHE_SIZE];
+	GuestBasicBlock *cache_slot = &entry->bb[(block_addr & 0xfff) >> 2];
+
 	if (cache_slot->block_address() == 0 || cache_slot->block_address() != block_addr) {
 		if (cache_slot->block_address() != 0) {
+			printf("jit: evicting %x\n", cache_slot->block_address());
 			cache_slot->release_memory();
 		}
 
@@ -239,19 +282,23 @@ GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 		}
 	}
 
-	/*GuestBasicBlock *cache_slot = &basic_block_cache[0];
-	if (!compile_basic_block(block_addr, cache_slot))
-		return NULL;*/
+	/*GuestBasicBlock *cache_slot = &basic_block_cache[0].bb[0];
+	if (cache_slot->block_address() != block_addr) {
+		if (!compile_basic_block(block_addr, cache_slot)) {
+			return NULL;
+		}
+	}*/
 
 	return cache_slot;
 }
 
 bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 {
-	TranslationContext ctx(&shmem->ir_buffer[0]);
+	TranslationContext ctx(&shmem->ir_buffer[0], sizeof(shmem->ir_buffer));
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
+	printf("jit: translating block %08x\n", block_addr);
 	uint32_t pc = block_addr;
 	do {
 		if (!decode_instruction(pc, insn)) {
@@ -259,10 +306,13 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 			return false;
 		}
 
-		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+		//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
-		ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_constant32(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
-		ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
+		if (shmem->cpu_options.verify) {
+			ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_constant32(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
+			ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
+		}
+
 		if (!jit().translate(insn, ctx)) {
 			printf("jit: instruction translation failed\n");
 			return false;
@@ -276,6 +326,7 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 	GuestBasicBlock::GuestBasicBlockFn fn = ctx.compile();
 
 	if (fn) {
+		printf("jit: translated block %08x\n", block_addr);
 		block->fnptr(fn);
 		block->block_address(block_addr);
 		return true;
@@ -286,18 +337,18 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 bool CPU::verify_check()
 {
-	if (!shmem->options.verify) return true;
+	if (!shmem->cpu_options.verify) return true;
 
 	Barrier *enter = (Barrier *)shmem->verify_shm_data->barrier_enter;
 	Barrier *exit = (Barrier *)shmem->verify_shm_data->barrier_exit;
 
-	if (shmem->options.verify_id == 1) {
+	if (shmem->cpu_options.verify_id == 1) {
 		memcpy(shmem->verify_shm_data->data, reg_state(), reg_state_size());
 	}
 
-	enter->wait(shmem->options.verify_id);
+	enter->wait(shmem->cpu_options.verify_id);
 
-	if (shmem->options.verify_id == 0) {
+	if (shmem->cpu_options.verify_id == 0) {
 		if (memcmp(reg_state(), shmem->verify_shm_data->data, reg_state_size())) {
 			shmem->verify_shm_data->fail = 1;
 		} else {
@@ -306,7 +357,7 @@ bool CPU::verify_check()
 
 	}
 
-	exit->wait(shmem->options.verify_id);
+	exit->wait(shmem->cpu_options.verify_id);
 
 	if (shmem->verify_shm_data->fail) {
 		printf("*** DIVERGENCE DETECTED ***\n");

@@ -6,8 +6,9 @@ extern volatile captive::shmem_data *shmem;
 
 using namespace captive::arch::jit;
 
-TranslationContext::TranslationContext(void *_instruction_buffer)
+TranslationContext::TranslationContext(void *_instruction_buffer, uint64_t _instruction_buffer_size)
 	: current_block_id(0),
+	instruction_buffer_size(_instruction_buffer_size),
 	instruction_buffer((bytecode_descriptor *)_instruction_buffer)
 {
 	instruction_buffer->block_count = 0;

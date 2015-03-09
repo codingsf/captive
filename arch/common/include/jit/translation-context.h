@@ -19,7 +19,7 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext(void *instruction_buffer);
+				TranslationContext(void *instruction_buffer, uint64_t instruction_buffer_size);
 
 				GuestBasicBlock::GuestBasicBlockFn compile();
 
@@ -30,14 +30,6 @@ namespace captive {
 				inline void add_instruction(block_id_t block_id, const IRInstruction& instruction) {
 					instruction_buffer->entries[instruction_buffer->entry_count].block_id = block_id;
 					instruction_buffer->entries[instruction_buffer->entry_count].instruction = instruction;
-
-					for (int i = 0; i < 4; i++) {
-						IROperand *oper = &instruction_buffer->entries[instruction_buffer->entry_count].instruction.operands[i];
-						if (oper->type == IROperand::VREG) {
-							oper->size = instruction_buffer->vregs[oper->value].size;
-						}
-					}
-
 					instruction_buffer->entry_count++;
 				}
 
@@ -49,11 +41,11 @@ namespace captive {
 				}
 
 				inline reg_id_t alloc_reg(uint8_t size) {
-					instruction_buffer->vregs[instruction_buffer->vreg_count].size = size;
 					return instruction_buffer->vreg_count++;
 				}
 
 			private:
+				uint64_t instruction_buffer_size;
 				block_id_t current_block_id;
 
 				struct instruction_entry {
@@ -68,7 +60,6 @@ namespace captive {
 				struct bytecode_descriptor {
 					uint32_t block_count;
 					uint32_t vreg_count;
-					struct vreg_entry vregs[1024];
 					uint32_t entry_count;
 					struct instruction_entry entries[];
 				} packed *instruction_buffer;

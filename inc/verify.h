@@ -11,6 +11,7 @@
 extern int verify_prepare(int tid);
 extern void *verify_get_shared_data();
 extern int verify_get_tid();
+extern bool verify_enabled();
 
 #endif	/* VERIFY_H */
 

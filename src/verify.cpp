@@ -13,7 +13,8 @@ static struct verify_t {
 	uint8_t data[256];
 } *verify;
 
-static int verify_tid;
+static bool _verify_enabled;
+static int _verify_tid;
 
 int verify_prepare(int id)
 {
@@ -31,8 +32,9 @@ int verify_prepare(int id)
 	if (id == 0) {
 		bzero(verify, 0x1000);
 	}
-	
-	verify_tid = id;
+
+	_verify_tid = id;
+	_verify_enabled = true;
 
 	return 0;
 }
@@ -44,5 +46,10 @@ void *verify_get_shared_data()
 
 int verify_get_tid()
 {
-	return verify_tid;
+	return _verify_tid;
+}
+
+bool verify_enabled()
+{
+	return _verify_enabled;
 }

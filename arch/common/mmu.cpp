@@ -41,9 +41,9 @@ void MMU::set_page_executed(uint32_t va)
 
 	// Avoid a page flush for pages already marked as executed.
 	if (!pt->executed()) {
-		printf("mmu: setting page %08x as executed\n", va);
+		//printf("mmu: setting page %08x as executed\n", va);
 		pt->executed(true);
-		//pt->writable(false);
+		pt->writable(false);
 
 		Memory::flush_page((va_t)va);
 	}
@@ -132,8 +132,10 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 	}
 
 	if (info.is_write() && pt->executed()) {
-		printf("mmu: write to executed page %08x\n", va);
+		//printf("mmu: write to executed page %08x\n", va);
 		pt->executed(false);
+		_cpu.flush_decode_cache();
+		_cpu.flush_block_cache();
 	}
 
 	if (!enabled()) {

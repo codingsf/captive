@@ -89,23 +89,7 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 		lc.basic_blocks[block_id] = BasicBlock::Create(ctx, "bb", block_fn);
 	}
 
-	// Populate the vreg map
-	for (uint32_t reg_id = 0; reg_id < bcd->vreg_count; reg_id++) {
-		Type *vreg_type;
-		switch (bcd->vregs[reg_id].size) {
-		case 1: vreg_type = lc.i8; break;
-		case 2: vreg_type = lc.i16; break;
-		case 4: vreg_type = lc.i32; break;
-		case 8: vreg_type = lc.i64; break;
-		default: assert(false);
-		}
-
-		lc.vregs[reg_id] = builder.CreateAlloca(vreg_type, NULL, "r" + std::to_string(reg_id));
-	}
-
-	// Create a branch to the first block, from the entry block.
-	assert(blocks[0]);
-	builder.CreateBr(lc.basic_blocks[0]);
+	lc.alloca_block = entry_block;
 
 	// Lower all instructions
 	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
@@ -114,6 +98,7 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 
 		builder.SetInsertPoint(bb);
 		if (!lower_bytecode(lc, bc)) {
+			ERROR << CONTEXT(LLVMBlockJIT) << "Failed to lower byte-code: " << bc->render();
 			return NULL;
 		}
 	}
@@ -125,6 +110,11 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 		}
 	}
 
+	// Create a branch to the first block, from the entry block.
+	builder.SetInsertPoint(entry_block);
+	assert(blocks[0]);
+	builder.CreateBr(lc.basic_blocks[0]);
+
 	// Verify
 	{
 		PassManager verifyManager;
@@ -132,6 +122,15 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 		verifyManager.run(*block_module);
 
 	}
+
+	// Print out the module
+	/*{
+		raw_os_ostream str(std::cerr);
+
+		PassManager printManager;
+		printManager.add(createPrintModulePass(str, ""));
+		printManager.run(*block_module);
+	}*/
 
 	// Optimise
 	{
@@ -212,7 +211,7 @@ void *LLVMJIT::compile_region(const RawBytecodeDescriptor* bcd)
 Value *LLVMJIT::value_for_operand(LoweringContext& ctx, const RawOperand* oper)
 {
 	if (oper->type == RawOperand::VREG) {
-		return ctx.builder.CreateLoad(ctx.vregs[oper->val]);
+		return ctx.builder.CreateLoad(vreg_for_operand(ctx, oper));
 	} else if (oper->type == RawOperand::CONSTANT) {
 		switch(oper->size) {
 		case 1: return ctx.const8(oper->val);
@@ -235,14 +234,37 @@ Type *LLVMJIT::type_for_operand(LoweringContext& ctx, const RawOperand* oper, bo
 	case 2: return ptr ? ctx.pi16 : ctx.i16;
 	case 4: return ptr ? ctx.pi32 : ctx.i32;
 	case 8: return ptr ? ctx.pi64 : ctx.i64;
-	default: return NULL;
+	default: assert(false); return NULL;
 	}
+}
+
+Value *LLVMJIT::insert_vreg(LoweringContext& ctx, uint32_t idx, uint8_t size)
+{
+	IRBuilder<> alloca_block_builder(ctx.alloca_block);
+
+	Type *vreg_type = NULL;
+	switch (size) {
+	case 1: vreg_type = ctx.i8; break;
+	case 2: vreg_type = ctx.i16; break;
+	case 4: vreg_type = ctx.i32; break;
+	case 8: vreg_type = ctx.i64; break;
+	default: assert(false); return NULL;
+	}
+
+	Value *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "r" + std::to_string(idx));
+
+	ctx.vregs[idx] = vreg_alloc;
+	return vreg_alloc;
 }
 
 Value *LLVMJIT::vreg_for_operand(LoweringContext& ctx, const RawOperand* oper)
 {
 	if (oper->type == RawOperand::VREG) {
-		return ctx.vregs[oper->val];
+		if (ctx.vregs.find(oper->val) == ctx.vregs.end()) {
+			return insert_vreg(ctx, oper->val, oper->size);
+		} else {
+			return ctx.vregs[oper->val];
+		}
 	} else {
 		return NULL;
 	}
@@ -259,7 +281,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
+	// DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];
@@ -351,8 +373,8 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		case RawInstruction::ADD: result = ctx.builder.CreateAdd(lhs, rhs); break;
 		case RawInstruction::SUB: result = ctx.builder.CreateSub(lhs, rhs); break;
 		case RawInstruction::MUL: result = ctx.builder.CreateMul(lhs, rhs); break;
-		case RawInstruction::DIV: assert(false); break;
-		case RawInstruction::MOD: assert(false); break;
+		case RawInstruction::DIV: result = ctx.builder.CreateUDiv(lhs, rhs); break;
+		case RawInstruction::MOD: result = ctx.builder.CreateURem(lhs, rhs); break;
 
 		case RawInstruction::SHL: result = ctx.builder.CreateShl(lhs, rhs); break;
 		case RawInstruction::SHR: result = ctx.builder.CreateLShr(lhs, rhs); break;
@@ -401,7 +423,24 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		return true;
 	}
 
-	case RawInstruction::CLZ: return false;
+	case RawInstruction::CLZ:
+	{
+		std::vector<Type *> params;
+		params.push_back(ctx.i32);
+		params.push_back(ctx.i1);
+
+		FunctionType *fntype = FunctionType::get(ctx.i32, params, false);
+		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("llvm.ctlz.i32", fntype);
+		assert(fn);
+
+		Value *src = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
+		assert(src && dst);
+
+		Value *result = ctx.builder.CreateCall2(fn, src, ctx.const1(0));
+		ctx.builder.CreateStore(result, dst);
+
+		return true;
+	}
 
 	case RawInstruction::SX:
 	case RawInstruction::ZX:
@@ -468,9 +507,12 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	{
 		Value *addr = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
-		assert(offset && dst);
+		assert(addr && dst);
 
-		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op1, true));
+		Type *memptrtype = type_for_operand(ctx, op1, true);
+		assert(memptrtype);
+
+		Value *memptr = ctx.builder.CreateIntToPtr(addr, memptrtype);
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr, true), dst);
 
 		return true;
@@ -480,7 +522,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	{
 		Value *addr = value_for_operand(ctx, op1), *src = value_for_operand(ctx, op0);
 
-		assert(offset && dst);
+		assert(addr && dst);
 
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(src, memptr, true);
@@ -488,7 +530,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		return true;
 	}
 
-	case RawInstruction::CMOV: return false;
+	case RawInstruction::CMOV: assert(false && "Unsupported CMOV"); return false;
 
 	case RawInstruction::BRANCH:
 	{
@@ -595,7 +637,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		return true;
 	}
 
-	case RawInstruction::INVALID: return false;
-	default: return false;
+	case RawInstruction::INVALID: assert(false && "Invalid Instruction"); return false;
+	default: assert(false && "Unhandled Instruction"); return false;
 	}
 }

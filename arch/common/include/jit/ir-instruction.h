@@ -103,7 +103,7 @@ namespace captive {
 
 			class IRInstructionBuilder {
 			public:
-				static IROperand create_constant(uint8_t size, uint32_t val)
+				static IROperand create_constant(uint8_t size, uint64_t val)
 				{
 					IROperand oper;
 					oper.type = IROperand::CONSTANT;
@@ -220,7 +220,7 @@ namespace captive {
 				{
 					IRInstruction insn;
 					insn.type = IRInstruction::VERIFY;
-					
+
 					return insn;
 				}
 

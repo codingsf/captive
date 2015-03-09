@@ -41,7 +41,7 @@ uint8_t* LLVMJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alig
 		free_zones.push_back(free_zone);
 	}
 
-	//DEBUG << CONTEXT(LLVM) << "Allocated Zone: base=" << std::hex << (uint64_t)used_zone.base << ", size=" << used_zone.size;
+	DEBUG << CONTEXT(LLVM) << "Allocated Zone: base=" << std::hex << (uint64_t)used_zone.base << ", size=" << used_zone.size;
 
 	used_zones.push_back(used_zone);
 	return (uint8_t *)used_zone.base;

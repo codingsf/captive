@@ -112,6 +112,8 @@ bool KVMCpu::run()
 	signal(SIGUSR1, handle_signal);
 	signal(SIGUSR2, handle_signal);
 
+	kvm_guest.shmem_region()->cpu_options.mode = (uint32_t)config().execution_mode();
+
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
 	sregs.cs.base = 0xf0000;
