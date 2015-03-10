@@ -17,24 +17,18 @@ safepoint_t cpu_safepoint;
 
 CPU *CPU::current_cpu;
 
-CPU::CPU(Environment& env, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), block_interp_count(NULL)
+CPU::CPU(Environment& env, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data)
 {
+	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
 
-	flush_decode_cache();
-
-	//block_interp_count = (uint32_t *)malloc(sizeof(uint32_t) * 0x40000000);
-	//assert(block_interp_count);
+	// Initialise the decode cache
+	memset(decode_cache, 0xff, sizeof(decode_cache));
 }
 
 CPU::~CPU()
 {
 
-}
-
-void CPU::flush_decode_cache()
-{
-	memset(decode_cache, 0xff, sizeof(decode_cache));
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -163,25 +157,22 @@ bool CPU::run_block_jit()
 
 		uint32_t pc = read_pc();
 
-		if (block_interp_count[pc >> 2] < 10) {
-			printf("jit: interp block %08x\n", pc);
-			block_interp_count[pc >> 2]++;
-			if (!interpret_block())
-				return false;
-		} else {
-			jit::GuestBasicBlock *block = get_basic_block(pc);
-			if (!block) {
-				printf("jit: unable to get basic block @ %08x\n", pc);
-				step_ok = false;
-			} else {
-				mmu().set_page_executed(pc);
+		jit::GuestBasicBlock *block = get_block(pc);
+		if (pc == 0 || block->block_address() != pc) {
+			if (block->block_address() != 0) block->release_memory();
 
-				// Execute the block, with interrupts disabled.
-				__local_irq_disable();
-				step_ok = block->execute(this, reg_state());
-				__local_irq_enable();
+			if (!compile_basic_block(pc, block)) {
+				printf("jit: compilation of block %08x failed\n", pc);
+				abort();
 			}
 		}
+
+		mmu().set_page_executed(pc);
+
+		// Execute the block, with interrupts disabled.
+		__local_irq_disable();
+		step_ok = block->execute(this, reg_state());
+		__local_irq_enable();
 	} while(step_ok);
 
 	return true;
@@ -245,24 +236,31 @@ bool CPU::interpret_block()
 	} while(!insn->end_of_block && step_ok);
 }
 
-
-#define BB_CACHE_SIZE 16384
-
-static struct basic_block_page_cache_entry {
-	GuestBasicBlock bb[1024];
-} basic_block_cache[BB_CACHE_SIZE];
-
-//static GuestBasicBlock basic_block_cache[BB_CACHE_SIZE];
-
-void CPU::flush_block_cache()
+void CPU::invalidate_executed_page(va_t page_base_addr)
 {
-	//
+	if (page_base_addr > (va_t)0x100000000) return;
+
+	// Evict entries from the decode cache and block cache
+	uint32_t page_base = (uint32_t)(uint64_t)page_base_addr;
+	for (uint32_t pc = page_base; pc < page_base + 0x1000; pc += 4) {
+		Decode *decode = get_decode(pc);
+
+		if (decode->pc == pc) {
+			decode->pc = 0xffffffff;
+		}
+
+		GuestBasicBlock *block = get_block(pc);
+
+		if (block->block_address() == pc) {
+			if (block->block_address() != 0) block->release_memory();
+			block->invalidate();
+		}
+	}
 }
 
 GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 {
-	basic_block_page_cache_entry *entry = &basic_block_cache[(block_addr >> 12) % BB_CACHE_SIZE];
-	GuestBasicBlock *cache_slot = &entry->bb[(block_addr & 0xfff) >> 2];
+	GuestBasicBlock *cache_slot = get_block(block_addr);
 
 	if (cache_slot->block_address() == 0 || cache_slot->block_address() != block_addr) {
 		if (cache_slot->block_address() != 0) {
@@ -287,14 +285,11 @@ GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 
 bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 {
-	// TODO: FIXME
-	uint64_t ibo = (uint64_t)cpu_data().guest_data->ir_buffer, cbo = (uint64_t)0x230000000ULL;
-
-	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, ibo, cbo);
+	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
-	printf("jit: translating block %08x\n", block_addr);
+	//printf("jit: translating block %08x\n", block_addr);
 	uint32_t pc = block_addr;
 	do {
 		// Attempt to decode the current instruction.
@@ -331,11 +326,10 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 	// If compilation succeeded, update the GBB structure.
 	if (fn) {
-		printf("jit: translated block %08x\n", block_addr);
-		block->fnptr(fn);
-		block->block_address(block_addr);
+		block->update(block_addr, fn, 0);
 		return true;
 	} else {
+		block->invalidate();
 		return false;
 	}
 }

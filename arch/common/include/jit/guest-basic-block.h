@@ -24,8 +24,18 @@ namespace captive {
 					return _fnp(cpu, cpu_state);
 				}
 
-				inline void fnptr(GuestBasicBlockFn fnp) {
+				inline void invalidate()
+				{
+					_block_address = 0;
+					_fnp = NULL;
+					_fnp_offset = 0;
+				}
+
+				inline void update(uint32_t addr, GuestBasicBlockFn fnp, uint64_t off)
+				{
+					_block_address = addr;
 					_fnp = fnp;
+					_fnp_offset = off;
 				}
 
 				inline GuestBasicBlockFn fnptr() const {
@@ -36,16 +46,22 @@ namespace captive {
 					return _block_address;
 				}
 
-				inline void block_address(uint32_t addr) {
-					_block_address = addr;
+				inline uint64_t fnp_offset() const {
+					return _fnp_offset;
 				}
 
-				inline void release_memory() { }
+				inline void release_memory()
+				{
+					asm volatile("out %0, $0xff" :: "a"((uint8_t)7), "D"(_fnp_offset));
+				}
 
 			private:
 				uint32_t _block_address;
 				GuestBasicBlockFn _fnp;
-			};
+				uint64_t _fnp_offset;
+			} packed;
+
+			static_assert(sizeof(GuestBasicBlock) == 20, "GuestBasicBlock incorrect size");
 		}
 	}
 }

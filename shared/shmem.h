@@ -24,6 +24,12 @@ namespace captive {
 
 		void *ir_buffer;
 		uint64_t ir_buffer_size;
+
+		void *code_buffer;
+		uint64_t code_buffer_size;
+
+		void *printf_buffer;
+		uint64_t printf_buffer_size;
 	};
 
 	struct PerCPUData {
@@ -31,7 +37,7 @@ namespace captive {
 		VerificationData *verify_data;
 
 		bool halt;
-		
+
 		uint32_t isr;			// Interrupt Status Register
 		uint32_t async_action;		// Pending actions
 		uint64_t insns_executed;	// Number of instructions executed

@@ -9,10 +9,8 @@ static const char *resolve_symbol(uint64_t sym)
 	return "<???>";
 }
 
-void __assertion_failure(const char *filename, int lineno, const char *expression)
+void dump_stack()
 {
-	printf("ABORT: ASSERTION FAILED: <%s> in %s:%d\n", expression, filename, lineno);
-
 	printf("Stack Frame:\n");
 
 	uint64_t bp;
@@ -21,9 +19,15 @@ void __assertion_failure(const char *filename, int lineno, const char *expressio
 	int frame_idx = 0;
 	while (bp != 0) {
 		uint64_t *stack = (uint64_t *)bp;
-		printf("  %d: %x: %s\n", frame_idx++, stack[1], resolve_symbol(stack[1]));
+		printf("  %d: %lx: %s\n", frame_idx++, stack[1], resolve_symbol(stack[1]));
 		bp = stack[0];
 	}
+}
 
+void __assertion_failure(const char *filename, int lineno, const char *expression)
+{
+	printf("ABORT: ASSERTION FAILED: <%s> in %s:%d\n", expression, filename, lineno);
+
+	dump_stack();
 	asm volatile("out %0, $0xff\n" :: "a"(3));
 }

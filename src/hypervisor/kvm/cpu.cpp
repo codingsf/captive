@@ -142,7 +142,11 @@ bool KVMCpu::run()
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);
 
-				fprintf(stderr, "%c", (char)regs.rax & 0xff);
+				if (regs.rax == 0) {
+					kvm_guest.do_guest_printf();
+				} else {
+					fprintf(stderr, "%c", (char)regs.rax & 0xff);
+				}
 			} else if (cpu_run_struct->io.port == 0xfd) {
 				dump_regs();
 			} else {
@@ -317,6 +321,14 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		DEBUG << CONTEXT(CPU) << "Compiled Block, outgoing offset=" << regs.rax;
 
 		vmioctl(KVM_SET_REGS, &regs);
+		return true;
+	}
+
+	case 7: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
+		DEBUG << CONTEXT(CPU) << "Releasing Block, incoming offset=" << regs.rdi;
 		return true;
 	}
 

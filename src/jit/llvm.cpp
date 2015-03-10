@@ -1,5 +1,6 @@
 #include <jit/llvm.h>
 #include <jit/llvm-mm.h>
+#include <jit/allocator.h>
 #include <captive.h>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -29,14 +30,14 @@ DECLARE_CHILD_CONTEXT(LLVMBlockJIT, LLVM);
 using namespace captive::jit;
 using namespace llvm;
 
-LLVMJIT::LLVMJIT(engine::Engine& engine) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine), mm(NULL)
+LLVMJIT::LLVMJIT(engine::Engine& engine) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine), _allocator(NULL)
 {
 }
 
 LLVMJIT::~LLVMJIT()
 {
-	if (mm) {
-		delete mm;
+	if (_allocator) {
+		delete _allocator;
 	}
 }
 
@@ -85,8 +86,10 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 	lc.reg_state = builder.CreatePtrToInt(args.getNext(&args.front()), lc.i64);
 
 	// Populate the basic-block map
-	for (uint32_t block_id = 0; block_id < bcd->block_count; block_id++) {
-		lc.basic_blocks[block_id] = BasicBlock::Create(ctx, "bb", block_fn);
+	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
+		if (lc.basic_blocks[bcd->bc[idx].block_id] == NULL) {
+			lc.basic_blocks[bcd->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", block_fn);
+		}
 	}
 
 	lc.alloca_block = entry_block;
@@ -100,13 +103,6 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 		if (!lower_bytecode(lc, bc)) {
 			ERROR << CONTEXT(LLVMBlockJIT) << "Failed to lower byte-code: " << bc->render();
 			return NULL;
-		}
-	}
-
-	// Delete empty blocks
-	for (auto block : lc.basic_blocks) {
-		if (block.second->size() == 0) {
-			block.second->eraseFromParent();
 		}
 	}
 
@@ -154,9 +150,8 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 		printManager.run(*block_module);
 	}*/
 
-	// If we haven't got a memory manager, create one now.
-	if (!mm) {
-		mm = new LLVMJITMemoryManager(_engine, _code_arena, _code_arena_size);
+	if (_allocator == NULL) {
+		_allocator = new Allocator(_code_arena, _code_arena_size);
 	}
 
 	// Initialise a new MCJIT engine
@@ -168,8 +163,11 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 	target_opts.PrintMachineCode = false;
 
 	ExecutionEngine *engine = EngineBuilder(block_module)
+		.setEngineKind(EngineKind::JIT)
+		/*.setOptLevel(CodeGenOpt::Aggressive)
+		.setRelocationModel(Reloc::PIC_)*/
 		.setUseMCJIT(true)
-		.setMCJITMemoryManager(mm)
+		.setMCJITMemoryManager(new LLVMJITMemoryManager(_engine, *_allocator))
 		.setTargetOptions(target_opts)
 		.setAllocateGVsWithCode(true)
 		.create();
@@ -181,24 +179,17 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 
 	// We actually want compilation to happen.
 	engine->DisableLazyCompilation();
+	engine->finalizeObject();
 
 	// Compile the function!
-	void *ptr = (void *)engine->getFunctionAddress("block");
+	void *ptr = (void *)engine->getFunctionAddress(block_fn->getName());
 	if (!ptr) {
 		ERROR << CONTEXT(LLVMBlockJIT) << "Unable to compile function";
 		return NULL;
 	}
 
-	/*static int i = 0;
-
-	std::stringstream y;
-	y << "./code-" << i++ << ".bin";
-
-	FILE *x = fopen(y.str().c_str(), "wb");
-	fwrite(ptr, 0x1000, 1, x);
-	fclose(x);*/
-
-	//DEBUG << CONTEXT(LLVMBlockJIT) << "Compiled function to " << std::hex << (uint64_t)ptr << ", X=" << (uint32_t)*(uint8_t *)ptr;
+	block_fn->deleteBody();
+	delete engine;
 
 	return ptr;
 }
@@ -286,9 +277,9 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];
 	const RawOperand *op2 = &bc->insn.operands[2];
-	const RawOperand *op3 = &bc->insn.operands[3];
+	/*const RawOperand *op3 = &bc->insn.operands[3];
 	const RawOperand *op4 = &bc->insn.operands[4];
-	const RawOperand *op5 = &bc->insn.operands[5];
+	const RawOperand *op5 = &bc->insn.operands[5];*/
 
 	switch (bc->insn.type) {
 	case RawInstruction::JMP:
@@ -403,7 +394,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		assert(lh && rh && dst);
 
-		Value *result;
+		Value *result = NULL;
 		switch(bc->insn.type) {
 		case RawInstruction::CMPEQ: result = ctx.builder.CreateICmpEQ(lh, rh); break;
 		case RawInstruction::CMPNE: result = ctx.builder.CreateICmpNE(lh, rh); break;

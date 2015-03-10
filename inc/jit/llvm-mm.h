@@ -17,10 +17,13 @@ namespace captive {
 	}
 
 	namespace jit {
+		class Allocator;
+		class AllocationRegion;
+
 		class LLVMJITMemoryManager : public llvm::RTDyldMemoryManager
 		{
 		public:
-			LLVMJITMemoryManager(engine::Engine& engine, void *arena, uint64_t size);
+			LLVMJITMemoryManager(engine::Engine& engine, Allocator& allocator);
 			virtual ~LLVMJITMemoryManager();
 
 			uint8_t* allocateCodeSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName) override;
@@ -34,20 +37,9 @@ namespace captive {
 
 		private:
 			engine::Engine& _engine;
+			Allocator& _allocator;
 
-			void *arena, *next;
-			uint64_t size;
-
-			struct Zone
-			{
-				Zone(void *base, uint64_t size) : base(base), size(size) { }
-
-				void *base;
-				uint64_t size;
-			};
-
-			std::list<Zone> free_zones;
-			std::list<Zone> used_zones;
+			std::list<AllocationRegion *> _regions;
 		};
 	}
 }

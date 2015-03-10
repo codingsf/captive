@@ -17,6 +17,10 @@
 #define DECODE_OBJ_SIZE		128
 #define DECODE_CACHE_ENTRIES	(DECODE_CACHE_SIZE / DECODE_OBJ_SIZE)
 
+#define BLOCK_CACHE_SIZE	32768
+#define BLOCK_OBJ_SIZE		16
+#define BLOCK_CACHE_ENTRIES	(BLOCK_CACHE_SIZE / BLOCK_OBJ_SIZE)
+
 namespace captive {
 	namespace arch {
 		namespace jit {
@@ -63,8 +67,7 @@ namespace captive {
 				}
 			}
 
-			void flush_decode_cache();
-			void flush_block_cache();
+			void invalidate_executed_page(va_t page_base_addr);
 
 			inline void schedule_decode_cache_flush() {
 				_should_flush_decode_cache = true;
@@ -107,8 +110,14 @@ namespace captive {
 			PerCPUData *_per_cpu_data;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
+			uint8_t block_cache[BLOCK_CACHE_SIZE];
+
 			inline Decode *get_decode(uint32_t pc) const {
-				return (Decode *)&decode_cache[(pc % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
+				return (Decode *)&decode_cache[((pc >> 2) % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
+			}
+
+			inline jit::GuestBasicBlock *get_block(uint32_t pc) const {
+				return (jit::GuestBasicBlock *)&block_cache[((pc >> 2) % BLOCK_CACHE_ENTRIES) * BLOCK_OBJ_SIZE];
 			}
 
 			bool run_interp();

@@ -32,7 +32,7 @@ MMU::~MMU()
 
 void MMU::set_page_executed(uint32_t va)
 {
-	page_map_entry_t *pm;
+	/*page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
 	page_dir_entry_t *pd;
 	page_table_entry_t *pt;
@@ -46,7 +46,7 @@ void MMU::set_page_executed(uint32_t va)
 		pt->writable(false);
 
 		Memory::flush_page((va_t)(uint64_t)va);
-	}
+	}*/
 }
 
 bool MMU::clear_vma()
@@ -134,8 +134,7 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 	if (info.is_write() && pt->executed()) {
 		//printf("mmu: write to executed page %08x\n", va);
 		pt->executed(false);
-		_cpu.flush_decode_cache();
-		_cpu.flush_block_cache();
+		_cpu.invalidate_executed_page((va_t)((uint64_t)va & ~0xfffULL));
 	}
 
 	if (!enabled()) {

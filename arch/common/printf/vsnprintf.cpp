@@ -114,6 +114,7 @@ int vsnprintf(char *buffer_base, int size, const char *fmt_base, va_list args)
 		if (*fmt == '%') {
 			int pad_size = 0, rc;
 			char pad_char = ' ';
+			int number_size = 4;
 
 retry_format:
 			fmt++;
@@ -137,23 +138,51 @@ retry_format:
 
 			case 'd':
 			case 'u':
-				rc = append_num(buffer, size - 1 - count, va_arg(args, int), 10, *fmt == 'd', pad_size, pad_char);
+			{
+				long long int v;
+
+				if (number_size == 8) {
+					v = va_arg(args, long long int);
+				} else {
+					if (*fmt == 'u') {
+						v = (unsigned long long int)va_arg(args, int);
+					} else {
+						v = (long long int)va_arg(args, int);
+					}
+				}
+
+				rc = append_num(buffer, size - 1 - count, v, 10, *fmt == 'd', pad_size, pad_char);
 				count += rc;
 				buffer += rc;
 				break;
+			}
 
 			case 'x':
 			case 'p':
+			{
+				unsigned long long int v;
+
+				if (number_size == 8 || *fmt == 'p') {
+					v = va_arg(args, unsigned long long int);
+				} else {
+					v = (unsigned long long int)va_arg(args, unsigned int);
+				}
+
 				if (*fmt == 'p') {
 					rc = append_str(buffer, size - 1 - count, "0x", 0, ' ');
 					count += rc;
 					buffer += rc;
 				}
-				
-				rc = append_num(buffer, size - 1 - count, va_arg(args, int), 16, false, pad_size, pad_char);
+
+				rc = append_num(buffer, size - 1 - count, v, 16, false, pad_size, pad_char);
 				count += rc;
 				buffer += rc;
 				break;
+			}
+			
+			case 'l':
+				number_size = 8;
+				goto retry_format;
 
 			case 's':
 				rc = append_str(buffer, size - 1 - count, va_arg(args, const char *), pad_size, pad_char);
@@ -162,7 +191,7 @@ retry_format:
 				break;
 
 			case 'c':
-				*buffer = va_arg(args, char);
+				*buffer = va_arg(args, int);
 
 				buffer++;
 				count++;

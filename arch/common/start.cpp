@@ -43,9 +43,11 @@ extern "C" {
 		// Run the static constructors.
 		call_static_constructors();
 
+		// Initialise the printf() system.
+		printf_init((char *)cpu_data->guest_data->printf_buffer, cpu_data->guest_data->printf_buffer_size);
+
 		// Initialise the malloc() memory allocation system.
 		captive::arch::malloc_init(cpu_data->guest_data->heap, cpu_data->guest_data->heap_size);
-
 
 		// Initialise the memory manager, and create the environment.
 		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);

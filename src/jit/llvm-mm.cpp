@@ -1,4 +1,5 @@
 #include <jit/llvm-mm.h>
+#include <jit/allocator.h>
 #include <engine/engine.h>
 #include <captive.h>
 
@@ -6,50 +7,38 @@ USE_CONTEXT(LLVM);
 
 using namespace captive::jit;
 
-LLVMJITMemoryManager::LLVMJITMemoryManager(engine::Engine& engine, void *arena, uint64_t size) : _engine(engine), arena(arena), size(size)
+LLVMJITMemoryManager::LLVMJITMemoryManager(engine::Engine& engine, Allocator& allocator) : _engine(engine), _allocator(allocator)
 {
-	free_zones.push_back(Zone((void *)((uint8_t *)arena + 0x1000), size));
+	DEBUG << CONTEXT(LLVM) << "Creating LLVMJITMemoryManager";
 }
 
 LLVMJITMemoryManager::~LLVMJITMemoryManager()
 {
-
+	DEBUG << CONTEXT(LLVM) << "Destroying LLVMJITMemoryManager";
 }
 
 uint8_t* LLVMJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName)
 {
-	if (free_zones.size() == 0)
+	AllocationRegion *region = _allocator.allocate(Size);
+
+	if (!region) {
 		return NULL;
-
-	Zone free_zone = free_zones.front();
-	free_zones.pop_front();
-
-	uint64_t zone_size = Size;
-
-	if (zone_size % 4096) {
-		zone_size += 4096 - (zone_size % 4096);
+	} else {
+		_regions.push_back(region);
+		return (uint8_t *)region->base_address();
 	}
-
-	Zone used_zone = Zone(free_zone.base, zone_size);
-
-	free_zone.size -= used_zone.size;
-
-	if (free_zone.size < 0) {
-		return NULL;
-	} else if (free_zone.size > 0) {
-		free_zone.base = (void *)(((uint8_t *)used_zone.base) + used_zone.size);
-		free_zones.push_back(free_zone);
-	}
-
-	DEBUG << CONTEXT(LLVM) << "Allocated Zone: base=" << std::hex << (uint64_t)used_zone.base << ", size=" << used_zone.size;
-
-	used_zones.push_back(used_zone);
-	return (uint8_t *)used_zone.base;
 }
 
 uint8_t* LLVMJITMemoryManager::allocateDataSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName, bool IsReadOnly)
 {
-	return allocateCodeSection(Size, Alignment, SectionID, SectionName);
+	AllocationRegion *region = _allocator.allocate(Size);
+
+	if (!region) {
+		return NULL;
+	} else {
+		_regions.push_back(region);
+		return (uint8_t *)region->base_address();
+	}
 }
 
 bool LLVMJITMemoryManager::finalizeMemory(std::string* ErrMsg)
@@ -64,8 +53,6 @@ void* LLVMJITMemoryManager::getPointerToNamedFunction(const std::string& Name, b
 
 uint64_t LLVMJITMemoryManager::getSymbolAddress(const std::string& Name)
 {
-	//DEBUG << CONTEXT(LLVM) << "Attempting to resolve function: " << Name;
-
 	uint64_t value;
 	if (!_engine.lookup_symbol(Name, value))
 		return 0;

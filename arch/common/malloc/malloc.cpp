@@ -22,9 +22,6 @@ void captive::arch::malloc_init(void *arena, size_t size)
 
 void *captive::arch::malloc(size_t size)
 {
-	/*size += 16 + sizeof(struct malloc_unit);
-	size &= 0xf;*/
-
 	size += sizeof(struct malloc_unit);
 	if (size % 16) {
 		size += 16 - (size % 16);

@@ -42,6 +42,9 @@ namespace captive {
 				bool stage2_init(uint64_t& stack);
 
 				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
+
+				void do_guest_printf();
+				
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
 

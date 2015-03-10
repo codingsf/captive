@@ -10,6 +10,8 @@
 
 #include <stdarg.h>
 
+extern void printf_init(char *_fast_buffer, int _fast_buffer_size);
+
 extern int printf(const char *fmt, ...);
 extern int sprintf(char *buffer, const char *fmt, ...);
 extern int snprintf(char *buffer, int size, const char *fmt, ...);

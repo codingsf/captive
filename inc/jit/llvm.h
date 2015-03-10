@@ -21,6 +21,7 @@ namespace captive {
 
 	namespace jit {
 		class LLVMJITMemoryManager;
+		class Allocator;
 
 		class LLVMJIT : public JIT, public BlockJIT, public RegionJIT {
 		public:
@@ -38,6 +39,7 @@ namespace captive {
 
 		private:
 			engine::Engine& _engine;
+			Allocator *_allocator;
 
 			struct LoweringContext
 			{
@@ -93,8 +95,6 @@ namespace captive {
 			llvm::BasicBlock *block_for_operand(LoweringContext& ctx, const RawOperand* oper);
 
 			bool lower_bytecode(LoweringContext& ctx, const RawBytecode* bc);
-
-			LLVMJITMemoryManager *mm;
 		};
 	}
 }

@@ -22,35 +22,6 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-/*
-#define GUEST_PHYS_MEMORY_BASE			0x100000000ULL
-#define GUEST_PHYS_MEMORY_VIRT_BASE		0ULL
-#define GUEST_PHYS_MEMORY_MAX_SIZE		0x100000000ULL
-#define GUEST_PHYS_MEMORY_COPY_VIRT_BASE	(GUEST_PHYS_MEMORY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE)
-
-#define SYSTEM_MEMORY_PHYS_BASE		0ULL
-#define SYSTEM_MEMORY_PHYS_SIZE		0x40000000ULL
-
-#define ENGINE_PHYS_BASE		(SYSTEM_MEMORY_PHYS_BASE + 0x10000000ULL)
-#define ENGINE_VIRT_BASE		0xFFFFFFFF80000000ULL
-#define ENGINE_SIZE			(SYSTEM_MEMORY_PHYS_SIZE - ENGINE_PHYS_BASE)
-
-#define DATA_PHYS_BASE			SYSTEM_MEMORY_PHYS_BASE
-#define DATA_VIRT_BASE			0x200000000ULL
-#define DATA_SIZE			(ENGINE_PHYS_BASE - SYSTEM_MEMORY_PHYS_BASE)
-
-#define SHMEM_PHYS_BASE			(SYSTEM_MEMORY_PHYS_BASE + SYSTEM_MEMORY_PHYS_SIZE)
-#define SHMEM_VIRT_BASE			(DATA_VIRT_BASE + DATA_SIZE)
-#define SHMEM_PHYS_SIZE			0x10000000ULL
-
-#define JIT_PHYS_BASE			(SHMEM_PHYS_BASE + SHMEM_PHYS_SIZE)
-#define JIT_VIRT_BASE			(SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE)
-#define JIT_SIZE			0x10000000ULL
-
-#define PER_CPU_PHYS_BASE		(JIT_PHYS_BASE + JIT_SIZE)
-#define PER_CPU_PHYS_SIZE		0x10000
-*/
-
 #define PT_PRESENT	(1ULL << 0)
 #define PT_WRITABLE	(1ULL << 1)
 #define PT_USER_ACCESS	(1ULL << 2)
@@ -68,14 +39,14 @@ using namespace captive::hypervisor::kvm;
 
 #define ENGINE_HEAP_PHYS_BASE		0x040000000ULL
 #define ENGINE_HEAP_VIRT_BASE		0x210000000ULL
-#define ENGINE_HEAP_SIZE		0x010000000ULL
+#define ENGINE_HEAP_SIZE		0x050000000ULL
 
-#define SHARED_MEM_PHYS_BASE		0x050000000ULL
-#define SHARED_MEM_VIRT_BASE		0x220000000ULL
+#define SHARED_MEM_PHYS_BASE		0x090000000ULL
+#define SHARED_MEM_VIRT_BASE		0x260000000ULL
 #define SHARED_MEM_SIZE			0x010000000ULL
 
-#define JIT_PHYS_BASE			0x060000000ULL
-#define JIT_VIRT_BASE			0x230000000ULL
+#define JIT_PHYS_BASE			0x0a0000000ULL
+#define JIT_VIRT_BASE			0x270000000ULL
 #define JIT_SIZE			0x010000000ULL
 
 #define GPM_PHYS_BASE			0x100000000ULL
@@ -83,9 +54,15 @@ using namespace captive::hypervisor::kvm;
 #define GPM_COPY_VIRT_BASE		0x100000000ULL
 #define GPM_SIZE			0x100000000ULL
 
-#define VERIFY_PHYS_BASE		0x070000000ULL
-#define VERIFY_VIRT_BASE		0x240000000ULL
+#define VERIFY_PHYS_BASE		0x0b0000000ULL
+#define VERIFY_VIRT_BASE		0x280000000ULL
 #define VERIFY_SIZE			0x1000ULL
+
+#define IR_BUFFER_OFFSET		0x10000
+#define IR_BUFFER_SIZE			0x10000
+
+#define PRINTF_BUFFER_OFFSET		0x9000
+#define PRINTF_BUFFER_SIZE		0x1000
 
 struct {
 	std::string name;
@@ -182,8 +159,10 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
+	uint64_t per_cpu_offset = 0x1000 + (0x1000 * next_cpu_id);
+
 	// Locate the storage location for the Per-CPU data, and initialise the structure.
-	PerCPUData *per_cpu_data = (PerCPUData *)get_phys_buffer(SHARED_MEM_PHYS_BASE + 0x1000 + (0x1000 * next_cpu_id));
+	PerCPUData *per_cpu_data = (PerCPUData *)get_phys_buffer(SHARED_MEM_PHYS_BASE + per_cpu_offset);
 	per_cpu_data->async_action = 0;
 	per_cpu_data->execution_mode = (uint32_t)config.execution_mode();
 	per_cpu_data->guest_data = (PerGuestData *)SHARED_MEM_VIRT_BASE;
@@ -199,8 +178,8 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_enabled = false;
 		per_cpu_data->verify_tid = 0;
 	}
-	
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, *per_cpu_data, SHARED_MEM_VIRT_BASE + 0x1000 + (0x1000 * next_cpu_id));
+
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, *per_cpu_data, SHARED_MEM_VIRT_BASE + per_cpu_offset);
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
@@ -275,8 +254,12 @@ bool KVMGuest::prepare_guest_memory()
 
 	per_guest_data->heap = (void *)ENGINE_HEAP_VIRT_BASE;
 	per_guest_data->heap_size = ENGINE_HEAP_SIZE;
-	per_guest_data->ir_buffer = (void *)(SHARED_MEM_VIRT_BASE + 0x10000);
-	per_guest_data->ir_buffer_size = 0x10000;
+	per_guest_data->ir_buffer = (void *)(SHARED_MEM_VIRT_BASE + IR_BUFFER_OFFSET);
+	per_guest_data->ir_buffer_size = IR_BUFFER_SIZE;
+	per_guest_data->code_buffer = (void *)JIT_VIRT_BASE;
+	per_guest_data->code_buffer_size = JIT_SIZE;
+	per_guest_data->printf_buffer = (void *)(SHARED_MEM_VIRT_BASE + PRINTF_BUFFER_OFFSET);
+	per_guest_data->printf_buffer_size = PRINTF_BUFFER_SIZE;
 
 	if (!install_gdt()) {
 		ERROR << CONTEXT(Guest) << "Unable to install GDT";
@@ -420,8 +403,6 @@ bool KVMGuest::prepare_verification_memory()
 
 bool KVMGuest::stage2_init(uint64_t& stack)
 {
-	captive::logging::LogContextGuest.enable();
-
 	// Map defined memory regions
 	for (uint32_t i = 0; i < sizeof(guest_memory_regions) / sizeof(guest_memory_regions[0]); i++) {
 		DEBUG << CONTEXT(Guest) << "Mapping memory region: " << guest_memory_regions[i].name
@@ -617,4 +598,9 @@ bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 	}
 
 	return false;
+}
+
+void KVMGuest::do_guest_printf()
+{
+	fprintf(stderr, "%s", (char *)get_phys_buffer(SHARED_MEM_PHYS_BASE + PRINTF_BUFFER_OFFSET));
 }
