@@ -44,5 +44,6 @@ void* WSJ::internal_compile_region(const RawBytecodeDescriptor* bcd)
 
 bool WSJ::build(x86::X86Builder& builder, const RawBytecodeDescriptor* bcd)
 {
-	return false;
+	builder.ret();
+	return true;
 }
