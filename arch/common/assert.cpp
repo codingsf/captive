@@ -1,3 +1,5 @@
+#pragma GCC diagnostic ignored "-Wtrigraphs"
+
 #include <define.h>
 #include <assert.h>
 #include <printf.h>

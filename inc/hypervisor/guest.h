@@ -56,12 +56,7 @@ namespace captive {
 			inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
 			inline void guest_entrypoint(gpa_t ep) { _guest_entrypoint = ep; }
 
-			inline shmem_data *shmem_region() const { return _shmem; }
-
 			virtual bool resolve_gpa(gpa_t gpa, void*& out_addr) const = 0;
-
-		protected:
-			shmem_data *_shmem;
 
 		private:
 			Hypervisor& _owner;

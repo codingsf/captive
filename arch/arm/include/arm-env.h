@@ -16,7 +16,7 @@ namespace captive {
 			class ArmEnvironment : public Environment
 			{
 			public:
-				ArmEnvironment();
+				ArmEnvironment(captive::PerCPUData *per_cpu_data);
 				virtual ~ArmEnvironment();
 
 				CPU *create_cpu() override;

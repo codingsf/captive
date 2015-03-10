@@ -15,7 +15,7 @@ namespace captive {
 		class Barrier
 		{
 		public:
-			Barrier() : _b{0,0}, _ctr(0), _interrupt(0) {}
+			Barrier() : _ctr(0), _b{0,0}, _interrupt(0) {}
 
 			inline void wait(uint32_t my_tid)
 			{

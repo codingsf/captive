@@ -10,11 +10,11 @@ using namespace captive::devices::arm;
 void ArmCpuIRQController::irq_raised(IRQLine& line)
 {
 	// DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Raised: " << line.index();
-	cpu().owner().shmem_region()->isr |= (1 << line.index());
+	cpu().per_cpu_data().isr |= (1 << line.index());
 }
 
 void ArmCpuIRQController::irq_rescinded(IRQLine& line)
 {
 	//DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Rescinded: " << line.index();
-	cpu().owner().shmem_region()->isr &= ~(1 << line.index());
+	cpu().per_cpu_data().isr &= ~(1 << line.index());
 }

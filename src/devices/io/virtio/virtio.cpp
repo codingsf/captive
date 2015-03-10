@@ -34,16 +34,16 @@ using namespace captive::devices::io::virtio;
 
 VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues)
 	: _irq(irq),
+	_isr(0),
+	_host_features(0),
+	_guest_page_shift(0),
 	_version(version),
 	_device_id(device_id),
 	_vendor_id(0x1af4),
-	_host_features(0),
-	_guest_page_shift(0),
 	_guest_features(0),
 	_guest_features_sel(0),
 	_queue_sel(0),
-	_status(0),
-	_isr(0)
+	_status(0)
 {
 	for (uint8_t i = 0; i < nr_queues; i++) {
 		queues.push_back(new VirtQueue());

@@ -1,8 +1,7 @@
 #include <devices/gfx/sdl-virtual-screen.h>
 #include <devices/io/keyboard.h>
 #include <devices/io/mouse.h>
-#include <hypervisor/kvm/guest.h>
-#include <shmem.h>
+#include <hypervisor/kvm/cpu.h>
 #include <captive.h>
 
 #include <unistd.h>
@@ -91,7 +90,7 @@ static const uint32_t sdl_scancode_map[] = {
 std::mutex SDLVirtualScreen::_sdl_lock;
 bool SDLVirtualScreen::_sdl_initialised = false;
 
-SDLVirtualScreen::SDLVirtualScreen() : _guest(NULL), hw_accelerated(false), terminate(false), _sdl_mode(0), window_thread(NULL)
+SDLVirtualScreen::SDLVirtualScreen() : _cpu(NULL), hw_accelerated(false), terminate(false), _sdl_mode(0), window_thread(NULL)
 {
 
 }
@@ -155,8 +154,8 @@ void SDLVirtualScreen::window_thread_proc()
 			case SDL_QUIT:
 				terminate = true;
 
-				if (_guest) {
-					((hypervisor::kvm::KVMGuest *)_guest)->shmem_region()->halt = true;
+				if (_cpu) {
+					_cpu->stop();
 				}
 
 				break;

@@ -124,25 +124,57 @@ namespace captive {
 				_code_arena_size = arena_size;
 			}
 
-		//protected:
-		//	virtual bool generate_internal_bytecode(const RawBytecode *ir, uint32_t count);
+			void set_ir_buffer(void *ir_buffer, uint64_t ir_buffer_size) {
+				_ir_buffer = ir_buffer;
+				_ir_buffer_size = ir_buffer_size;
+			}
+
+			void *get_code_arena() const { return _code_arena; }
+			uint64_t get_code_arena_size() const { return _code_arena_size; }
+
+			void *get_ir_buffer() const { return _ir_buffer; }
+			uint64_t get_ir_buffer_size() const { return _ir_buffer_size; }
+
 		protected:
 			void *_code_arena;
 			uint64_t _code_arena_size;
+
+			void *_ir_buffer;
+			uint64_t _ir_buffer_size;
 		};
 
-		class BlockJIT
+		class JITStrategy
 		{
 		public:
+			JITStrategy(JIT& owner);
+			virtual ~JITStrategy();
+
+			inline JIT& owner() const { return _owner; }
+
+		private:
+			JIT& _owner;
+		};
+
+		class BlockJIT : public JITStrategy
+		{
+		public:
+			BlockJIT(JIT& owner);
 			virtual ~BlockJIT();
-			virtual void *compile_block(const RawBytecodeDescriptor *bcd) = 0;
+			uint64_t compile_block(uint64_t ir_offset);
+
+		protected:
+			virtual void *internal_compile_block(const RawBytecodeDescriptor *ir) = 0;
 		};
 
-		class RegionJIT
+		class RegionJIT : public JITStrategy
 		{
 		public:
+			RegionJIT(JIT& owner);
 			virtual ~RegionJIT();
-			virtual void *compile_region(const RawBytecodeDescriptor *bcd) = 0;
+			uint64_t compile_region(uint64_t ir_offset);
+
+		protected:
+			virtual void *internal_compile_region(const RawBytecodeDescriptor *ir) = 0;
 		};
 	}
 }

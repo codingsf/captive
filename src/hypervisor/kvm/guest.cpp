@@ -22,6 +22,7 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
+/*
 #define GUEST_PHYS_MEMORY_BASE			0x100000000ULL
 #define GUEST_PHYS_MEMORY_VIRT_BASE		0ULL
 #define GUEST_PHYS_MEMORY_MAX_SIZE		0x100000000ULL
@@ -48,22 +49,58 @@ using namespace captive::hypervisor::kvm;
 
 #define PER_CPU_PHYS_BASE		(JIT_PHYS_BASE + JIT_SIZE)
 #define PER_CPU_PHYS_SIZE		0x10000
+*/
+
+#define PT_PRESENT	(1ULL << 0)
+#define PT_WRITABLE	(1ULL << 1)
+#define PT_USER_ACCESS	(1ULL << 2)
+#define PT_NO_EXECUTE	(1ULL << 63)
 
 #define BIOS_PHYS_BASE			0xf0000ULL
+
+#define SYSTEM_DATA_PHYS_BASE		0x000000000ULL
+#define SYSTEM_DATA_VIRT_BASE		0x200000000ULL
+#define SYSTEM_DATA_SIZE		0x010000000ULL
+
+#define ENGINE_PHYS_BASE		0x010000000ULL
+#define ENGINE_VIRT_BASE		0xFFFFFFFF80000000ULL
+#define ENGINE_SIZE			0x030000000ULL
+
+#define ENGINE_HEAP_PHYS_BASE		0x040000000ULL
+#define ENGINE_HEAP_VIRT_BASE		0x210000000ULL
+#define ENGINE_HEAP_SIZE		0x010000000ULL
+
+#define SHARED_MEM_PHYS_BASE		0x050000000ULL
+#define SHARED_MEM_VIRT_BASE		0x220000000ULL
+#define SHARED_MEM_SIZE			0x010000000ULL
+
+#define JIT_PHYS_BASE			0x060000000ULL
+#define JIT_VIRT_BASE			0x230000000ULL
+#define JIT_SIZE			0x010000000ULL
+
+#define GPM_PHYS_BASE			0x100000000ULL
+#define GPM_VIRT_BASE			0x000000000ULL
+#define GPM_COPY_VIRT_BASE		0x100000000ULL
+#define GPM_SIZE			0x100000000ULL
+
+#define VERIFY_PHYS_BASE		0x070000000ULL
+#define VERIFY_VIRT_BASE		0x240000000ULL
+#define VERIFY_SIZE			0x1000ULL
 
 struct {
 	std::string name;
 	uint64_t phys_base;
 	uint64_t virt_base;
 	uint64_t size;
+	uint32_t prot_flags;
 } guest_memory_regions[] = {
-	{ .name = "system-data", .phys_base = 0,              .virt_base = 0x200000000ULL,        .size = 0x010000000ULL },
-	{ .name = "engine",      .phys_base = 0x010000000ULL, .virt_base = 0xFFFFFFFF80000000ULL, .size = 0x030000000ULL },
-	{ .name = "shared-mem",  .phys_base = 0x040000000ULL, .virt_base = 0x210000000ULL,        .size = 0x010000000ULL },
-	{ .name = "jit-mem",     .phys_base = 0x050000000ULL, .virt_base = 0x220000000ULL,        .size = 0x010000000ULL },
-	{ .name = "per-cpu-mem", .phys_base = 0x060000000ULL, .virt_base = 0x230000000ULL,        .size = 0x000010000ULL },
-	{ .name = "gpm",         .phys_base = 0x100000000ULL, .virt_base = 0,                     .size = 0x100000000ULL },
-	{ .name = "gpm-copy",    .phys_base = 0x100000000ULL, .virt_base = 0x100000000ULL,        .size = 0x100000000ULL },
+	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE },
+	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE, .prot_flags = PT_WRITABLE },
+	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE },
+	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE, .prot_flags = PT_WRITABLE },
+	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE, .prot_flags = 0 },
+	/*{ .name = "gpm",         .phys_base = GPM_PHYS_BASE,         .virt_base = GPM_VIRT_BASE,         .size = GPM_SIZE },
+	{ .name = "gpm-copy",    .phys_base = GPM_PHYS_BASE,         .virt_base = GPM_COPY_VIRT_BASE,    .size = GPM_SIZE },*/
 };
 
 #define DEFAULT_NR_SLOTS		32
@@ -145,12 +182,28 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
-	// Allocate storage for the per-cpu data structure
-	vm_mem_region *per_cpu = alloc_guest_memory(PER_CPU_PHYS_BASE + (0x1000 * next_cpu_id), 0x1000, 0);
+	// Locate the storage location for the Per-CPU data, and initialise the structure.
+	PerCPUData *per_cpu_data = (PerCPUData *)get_phys_buffer(SHARED_MEM_PHYS_BASE + 0x1000 + (0x1000 * next_cpu_id));
+	per_cpu_data->async_action = 0;
+	per_cpu_data->execution_mode = (uint32_t)config.execution_mode();
+	per_cpu_data->guest_data = (PerGuestData *)SHARED_MEM_VIRT_BASE;
+	per_cpu_data->insns_executed = 0;
+	per_cpu_data->isr = 0;
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd, per_cpu->host_buffer);
+	if (verify_enabled()) {
+		per_cpu_data->verify_data = (VerificationData *)VERIFY_VIRT_BASE;
+		per_cpu_data->verify_enabled = true;
+		per_cpu_data->verify_tid = verify_get_tid();
+	} else {
+		per_cpu_data->verify_data = NULL;
+		per_cpu_data->verify_enabled = false;
+		per_cpu_data->verify_tid = 0;
+	}
+	
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, *per_cpu_data, SHARED_MEM_VIRT_BASE + 0x1000 + (0x1000 * next_cpu_id));
 	kvm_cpus.push_back(cpu);
 
+	next_cpu_id++;
 	return cpu;
 }
 
@@ -184,7 +237,7 @@ captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 
 bool KVMGuest::prepare_guest_irq()
 {
-	DEBUG << "Creating IRQ chip";
+	/*DEBUG << "Creating IRQ chip";
 	if (vmioctl(KVM_CREATE_IRQCHIP)) {
 		ERROR << "Unable to create IRQCHIP";
 		return false;
@@ -201,112 +254,44 @@ bool KVMGuest::prepare_guest_irq()
 	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
 		ERROR << "Unable to configure IRQCHIP";
 		return false;
-	}
-
-	DEBUG << "Creating IRQ eventfd";
-	irq_fd = eventfd(0, EFD_NONBLOCK);
-	if (irq_fd < 0) {
-		ERROR << "Unable to create IRQ fd";
-		return false;
-	}
-
-	struct kvm_irqfd irq;
-	irq.fd = irq_fd;
-	irq.flags = 0;
-	irq.gsi = 0;
-	irq.resamplefd = 0;
-
-	DEBUG << "Attaching IRQ eventfd";
-	if (vmioctl(KVM_IRQFD, &irq)) {
-		ERROR << "Unable to assign IRQ fd";
-		return false;
-	}
+	}*/
 
 	return true;
 }
 
 bool KVMGuest::prepare_guest_memory()
 {
-	// Allocate system memory
-	sys_mem_rgn = alloc_guest_memory(SYSTEM_MEMORY_PHYS_BASE, SYSTEM_MEMORY_PHYS_SIZE);
-	if (!sys_mem_rgn) {
-		ERROR << "Unable to allocate system memory region";
+	// Allocate defined memory regions
+	for (uint32_t i = 0; i < sizeof(guest_memory_regions) / sizeof(guest_memory_regions[0]); i++) {
+		DEBUG << CONTEXT(Guest) << "Allocating memory region: " << guest_memory_regions[i].name
+			<< ", phys-base=" << std::hex << guest_memory_regions[i].phys_base
+			<< ", size=" << std::hex << guest_memory_regions[i].size;
+
+		alloc_guest_memory(guest_memory_regions[i].phys_base, guest_memory_regions[i].size);
+	}
+
+	per_guest_data = (PerGuestData *)get_phys_buffer(SHARED_MEM_PHYS_BASE);
+	assert(per_guest_data);
+
+	per_guest_data->heap = (void *)ENGINE_HEAP_VIRT_BASE;
+	per_guest_data->heap_size = ENGINE_HEAP_SIZE;
+	per_guest_data->ir_buffer = (void *)(SHARED_MEM_VIRT_BASE + 0x10000);
+	per_guest_data->ir_buffer_size = 0x10000;
+
+	if (!install_gdt()) {
+		ERROR << CONTEXT(Guest) << "Unable to install GDT";
 		return false;
 	}
 
-	// Hack in the GDT
-	uint64_t *gdt = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x100];
-
-	*gdt++ = 0;				// NULL
-	*gdt++ = 0x0020980000000000;		// KERNEL CS
-	*gdt++ = 0x0000900000000000;		// KERNEL DS
-	*gdt++ = 0x0020f80000000000;		// USER CS
-	*gdt++ = 0x0000f00000000000;		// USER DS
-	*gdt++ = 0x00408900020000d0;		// TSS
-	*gdt = 2;
-
-	// Hack in the TSS
-	uint64_t *tss = (uint64_t *)&((uint8_t *)sys_mem_rgn->host_buffer)[0x200];
-
-	tss[1] = 0xabcdef123456;
-	tss[2] = 0;
-	tss[19] = 0x1b;		// CS
-	tss[20] = 0x23;		// SS
-	tss[21] = 0x23;		// DS
-	tss[22] = 0x23;		// FS
-	tss[23] = 0x23;		// GS
-
-	tss[25] = 208;
-
-	// Allocate shared memory
-	sh_mem_rgn = alloc_guest_memory(SHMEM_PHYS_BASE, SHMEM_PHYS_SIZE);
-	if (!sh_mem_rgn) {
-		ERROR << "Unable to allocate shared memory region";
+	if (!install_tss()) {
+		ERROR << CONTEXT(Guest) << "Unable to install TSS";
 		return false;
 	}
 
-	_shmem = (shmem_data *)sh_mem_rgn->host_buffer;
-	_shmem->cpu_options.verify = verify_enabled();
-
-	if (_shmem->cpu_options.verify) {
-		_shmem->cpu_options.verify_id = verify_get_tid();
-	}
-
-	{
-		// Try to obtain a free memory region slot.
-		vm_mem_region *vrgn = get_mem_slot();
-		if (vrgn == NULL)
-			return NULL;
-
-		// Fill in the KVM memory structure.
-		vrgn->kvm.flags = 0;
-		vrgn->kvm.guest_phys_addr = 0x60000000;
-		vrgn->kvm.memory_size = 0x1000;
-
-		// Allocate a userspace buffer for the region.
-		vrgn->host_buffer = verify_get_shared_data();
-
-		// Store the buffer address in the KVM memory structure.
-		vrgn->kvm.userspace_addr = (uint64_t) vrgn->host_buffer;
-
-		// Install the memory region into the guest.
-		int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &vrgn->kvm);
-		if (rc) {
-			ERROR << "Unable to install verification memory";
-			return NULL;
-		}
-
-		_shmem->verify_shm_data = (shmem_data::verify_shm_t *)(JIT_VIRT_BASE + JIT_SIZE);
-	}
-
-	// Allocate JIT memory
-	jit_mem_rgn = alloc_guest_memory(JIT_PHYS_BASE, JIT_SIZE);
-	if (!jit_mem_rgn) {
-		ERROR << "Unable to allocate JIT memory region";
+	if (verify_enabled() && !prepare_verification_memory()) {
+		ERROR << CONTEXT(Guest) << "Unable to prepare verification memory";
 		return false;
 	}
-
-	jit().set_code_arena(jit_mem_rgn->host_buffer, jit_mem_rgn->kvm.memory_size);
 
 	// Install the bios into the correct location.
 	if (!install_bios()) {
@@ -321,14 +306,18 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	// Install the engine code
-	if (!engine().install(&((uint8_t *)sys_mem_rgn->host_buffer)[ENGINE_PHYS_BASE])) {
+	if (!engine().install((uint8_t *)get_phys_buffer(ENGINE_PHYS_BASE))) {
 		ERROR << "Unable to install execution engine";
 		return false;
 	}
 
-	DEBUG << "Installing guest memory regions";
+	// Notify the JIT where the arena for generated code is.
+	jit().set_code_arena(get_phys_buffer(JIT_PHYS_BASE), JIT_SIZE);
+	jit().set_ir_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + 0x10000), per_guest_data->ir_buffer_size);
+
+	DEBUG << CONTEXT(Guest) << "Installing guest memory regions";
 	for (auto& region : config().memory_regions) {
-		struct vm_mem_region *vm_region = alloc_guest_memory(GUEST_PHYS_MEMORY_BASE + region.base_address(), region.size());
+		struct vm_mem_region *vm_region = alloc_guest_memory(GPM_PHYS_BASE + region.base_address(), region.size());
 		if (!vm_region) {
 			release_all_guest_memory();
 			ERROR << "Unable to allocate guest memory region";
@@ -347,7 +336,7 @@ bool KVMGuest::prepare_guest_memory()
 
 bool KVMGuest::install_bios()
 {
-	uint8_t *base = &((uint8_t *)sys_mem_rgn->host_buffer)[BIOS_PHYS_BASE];
+	uint8_t *base = (uint8_t *) get_phys_buffer(BIOS_PHYS_BASE);
 
 	unsigned int bios_size = &__bios_bin_end - &__bios_bin_start;
 	memcpy(base, &__bios_bin_start, bios_size);
@@ -355,14 +344,9 @@ bool KVMGuest::install_bios()
 	return true;
 }
 
-#define PT_PRESENT	(1ULL << 0)
-#define PT_WRITABLE	(1ULL << 1)
-#define PT_USER_ACCESS	(1ULL << 2)
-#define PT_NO_EXECUTE	(1ULL << 63)
-
 bool KVMGuest::install_initial_pgt()
 {
-	next_page = 0x3000;
+	per_guest_data->next_phys_page = 0x3000;
 
 	for (uint64_t va = 0, pa = 0; va < 0x200000; va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
@@ -371,37 +355,96 @@ bool KVMGuest::install_initial_pgt()
 	return true;
 }
 
+bool KVMGuest::install_gdt()
+{
+	// Hack in the GDT
+	uint64_t *gdt = (uint64_t *)get_phys_buffer(0x100);
+
+	*gdt++ = 0;				// NULL
+	*gdt++ = 0x0020980000000000;		// KERNEL CS
+	*gdt++ = 0x0000900000000000;		// KERNEL DS
+	*gdt++ = 0x0020f80000000000;		// USER CS
+	*gdt++ = 0x0000f00000000000;		// USER DS
+	*gdt++ = 0x00408900020000d0;		// TSS
+	*gdt = 2;
+
+	return true;
+}
+
+bool KVMGuest::install_tss()
+{
+	// Hack in the TSS
+	uint64_t *tss = (uint64_t *)get_phys_buffer(0x200);
+
+	tss[1] = 0xabcdef123456;
+	tss[2] = 0;
+	tss[19] = 0x1b;		// CS
+	tss[20] = 0x23;		// SS
+	tss[21] = 0x23;		// DS
+	tss[22] = 0x23;		// FS
+	tss[23] = 0x23;		// GS
+
+	tss[25] = 208;
+
+	return true;
+}
+
+bool KVMGuest::prepare_verification_memory()
+{
+	// Try to obtain a free memory region slot.
+	vm_mem_region *vrgn = get_mem_slot();
+	if (vrgn == NULL)
+		return false;
+
+	// Fill in the KVM memory structure.
+	vrgn->kvm.flags = 0;
+	vrgn->kvm.guest_phys_addr = VERIFY_PHYS_BASE;
+	vrgn->kvm.memory_size = VERIFY_SIZE;
+
+	// Use the verification memory buffer for this region
+	vrgn->host_buffer = verify_get_shared_data();
+
+	// Store the buffer address in the KVM memory structure.
+	vrgn->kvm.userspace_addr = (uint64_t) vrgn->host_buffer;
+
+	// Install the memory region into the guest.
+	int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &vrgn->kvm);
+	if (rc) {
+		ERROR << "Unable to install verification memory";
+		return NULL;
+	}
+
+	return true;
+}
+
+
 bool KVMGuest::stage2_init(uint64_t& stack)
 {
-	// Map the ENGINE into memory
-	for (uint64_t va = ENGINE_VIRT_BASE, pa = ENGINE_PHYS_BASE; va < (ENGINE_VIRT_BASE + ENGINE_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
-	}
+	captive::logging::LogContextGuest.enable();
 
-	// Map the SYSTEM DATA area into memory
-	for (uint64_t va = DATA_VIRT_BASE, pa = DATA_PHYS_BASE; va < (DATA_VIRT_BASE + DATA_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
-	}
+	// Map defined memory regions
+	for (uint32_t i = 0; i < sizeof(guest_memory_regions) / sizeof(guest_memory_regions[0]); i++) {
+		DEBUG << CONTEXT(Guest) << "Mapping memory region: " << guest_memory_regions[i].name
+			<< ", phys-base=" << std::hex << guest_memory_regions[i].phys_base
+			<< ", virt-base=" << std::hex << guest_memory_regions[i].virt_base
+			<< ", size=" << std::hex << guest_memory_regions[i].size;
 
-	// Map the shared memory region into memory
-	for (uint64_t va = SHMEM_VIRT_BASE, pa = SHMEM_PHYS_BASE; va < (SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
+		for (uint64_t va = guest_memory_regions[i].virt_base, pa = guest_memory_regions[i].phys_base; va < (guest_memory_regions[i].virt_base + guest_memory_regions[i].size); va += 0x1000, pa += 0x1000) {
+			map_page(va, pa, PT_PRESENT | guest_memory_regions[i].prot_flags);
+		}
 	}
 
 	// For now, put the stack starting at the end of shared memory
-	stack = SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE - 0x100;
+	stack = SHARED_MEM_VIRT_BASE + SHARED_MEM_SIZE;
 
-	// Map the JIT memory region into memory
-	for (uint64_t va = JIT_VIRT_BASE, pa = JIT_PHYS_BASE; va < (JIT_VIRT_BASE + JIT_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT);
+	// Map the verification region (if enabled)
+	if (verify_enabled()) {
+		map_page(VERIFY_VIRT_BASE, VERIFY_PHYS_BASE, PT_PRESENT | PT_WRITABLE);
 	}
-
-	// Map the verification page into memory
-	map_page(JIT_VIRT_BASE + JIT_SIZE, 0x60000000, PT_PRESENT | PT_WRITABLE);
 
 	// Map ALL guest physical memory, and mark it as present and writable for
 	// use by the engine.
-	for (uint64_t va = GUEST_PHYS_MEMORY_COPY_VIRT_BASE, pa = GUEST_PHYS_MEMORY_BASE; va < (GUEST_PHYS_MEMORY_COPY_VIRT_BASE + GUEST_PHYS_MEMORY_MAX_SIZE); va += 0x1000, pa += 0x1000) {
+	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x1000, pa += 0x1000) {
 		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
 	}
 
@@ -466,9 +509,23 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 		return NULL;
 	}
 
-	DEBUG << "Allocated guest memory, gpa=" << std::hex << rgn->kvm.guest_phys_addr << ", size=" << std::hex << rgn->kvm.memory_size << ", hva=" << std::hex << rgn->host_buffer;
+	DEBUG << CONTEXT(Guest) << "Allocated guest memory, gpa=" << std::hex << rgn->kvm.guest_phys_addr << ", size=" << std::hex << rgn->kvm.memory_size << ", hva=" << std::hex << rgn->host_buffer;
 	return rgn;
 }
+
+void* KVMGuest::get_phys_buffer(uint64_t gpa)
+{
+	for (auto rgn : vm_mem_region_used) {
+		if (gpa >= rgn->kvm.guest_phys_addr && gpa < (rgn->kvm.guest_phys_addr + rgn->kvm.memory_size)) {
+			uint64_t offset = gpa - rgn->kvm.guest_phys_addr;
+
+			return (void *)((uint64_t)rgn->host_buffer + offset);
+		}
+	}
+
+	return NULL;
+}
+
 
 void KVMGuest::release_guest_memory(vm_mem_region *region)
 {
@@ -509,38 +566,36 @@ void KVMGuest::release_all_guest_memory()
 
 void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 {
-	uint8_t *base = (uint8_t *)sys_mem_rgn->host_buffer;
-
 	uint16_t pm_idx = BITS(va, 39, 47);
 	uint16_t pdp_idx = BITS(va, 30, 38);
 	uint16_t pd_idx = BITS(va, 21, 29);
 	uint16_t pt_idx = BITS(va, 12, 20);
 
-	pm_t pm = (pm_t)&base[0x2000];
+	pm_t pm = (pm_t)get_phys_buffer(0x2000);
 	if (pm[pm_idx] == 0) {
 		uint64_t new_page = alloc_page();
-		bzero(&base[new_page], 0x1000);
+		bzero(get_phys_buffer(new_page), 0x1000);
 
 		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pdp_t pdp = (pdp_t)&base[pm[pm_idx] & ADDR_MASK];
+	pdp_t pdp = (pdp_t)get_phys_buffer(pm[pm_idx] & ADDR_MASK);
 	if (pdp[pdp_idx] == 0) {
 		uint64_t new_page = alloc_page();
-		bzero(&base[new_page], 0x1000);
+		bzero(get_phys_buffer(new_page), 0x1000);
 
 		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pd_t pd = (pd_t)&base[pdp[pdp_idx] & ADDR_MASK];
+	pd_t pd = (pd_t)get_phys_buffer(pdp[pdp_idx] & ADDR_MASK);
 	if (pd[pd_idx] == 0) {
 		uint64_t new_page = alloc_page();
-		bzero(&base[new_page], 0x1000);
+		bzero(get_phys_buffer(new_page), 0x1000);
 
 		pd[pd_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pt_t pt = (pt_t)&base[pd[pd_idx] & ADDR_MASK];
+	pt_t pt = (pt_t)get_phys_buffer(pd[pd_idx] & ADDR_MASK);
 	pt[pt_idx] = (pa & ADDR_MASK) | (flags & FLAGS_MASK);
 
 	/*DEBUG << "Map Page VA=" << std::hex << va

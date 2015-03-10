@@ -31,10 +31,10 @@ namespace captive {
 				friend class devices::CoCo;
 
 			public:
-				ArmCPU(ArmEnvironment& env);
+				ArmCPU(ArmEnvironment& env, PerCPUData *per_cpu_data);
 				virtual ~ArmCPU();
 
-				bool init(unsigned int ep) override;
+				bool init() override;
 
 				uint32_t read_pc() const override { return state.regs.RB[15]; }
 
@@ -86,7 +86,6 @@ namespace captive {
 				ArmInterp *_interp;
 				ArmJIT *_jit;
 
-				unsigned int _ep;
 				cpu_state& state;
 			};
 		}

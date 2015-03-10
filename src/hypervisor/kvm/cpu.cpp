@@ -13,12 +13,20 @@
 #include <devices/irq/irq-controller.h>
 #include <sys/eventfd.h>
 #include <sys/signal.h>
-#include <shmem.h>
 #include <chrono>
+
+USE_CONTEXT(CPU);
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, void *per_cpu_data) : CPU(owner, config), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0), per_cpu_data(per_cpu_data)
+KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, PerCPUData& per_cpu_data, uint64_t per_cpu_virt_addr)
+	: CPU(owner, config, per_cpu_data),
+	_initialised(false),
+	_id(id),
+	fd(fd),
+	cpu_run_struct(NULL),
+	cpu_run_struct_size(0),
+	per_cpu_virt_addr(per_cpu_virt_addr)
 {
 
 }
@@ -29,14 +37,14 @@ KVMCpu::~KVMCpu()
 		munmap(cpu_run_struct, cpu_run_struct_size);
 	}
 
-	DEBUG << "Closing KVM VCPU fd";
+	DEBUG << CONTEXT(CPU) << "Closing KVM VCPU fd";
 	close(fd);
 }
 
 bool KVMCpu::init()
 {
 	if (initialised()) {
-		ERROR << "KVM CPU already initialised";
+		ERROR << CONTEXT(CPU) << "KVM CPU already initialised";
 		return false;
 	}
 
@@ -48,24 +56,16 @@ bool KVMCpu::init()
 
 	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
 	if ((int)cpu_run_struct_size == -1) {
-		ERROR << "Unable to ascertain size of CPU run structure";
+		ERROR << CONTEXT(CPU) << "Unable to ascertain size of CPU run structure";
 		return false;
 	}
 
-	DEBUG << "Mapping CPU run structure size=" << std::hex << cpu_run_struct_size;
+	DEBUG << CONTEXT(CPU) << "Mapping CPU run structure size=" << std::hex << cpu_run_struct_size;
 	cpu_run_struct = (struct kvm_run *)mmap(NULL, cpu_run_struct_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (cpu_run_struct == MAP_FAILED) {
-		ERROR << "Unable to mmap CPU run struct";
+		ERROR << CONTEXT(CPU) << "Unable to mmap CPU run struct";
 		return false;
 	}
-
-	// Initialise the Per-CPU data structure
-	struct per_cpu_data *data = (struct per_cpu_data *)per_cpu_data;
-	data->first_avail_phys_page = 0;
-	data->guest_entrypoint = 0;
-	data->heap = 0;
-	data->heap_size = 0;
-	data->shmem_area = 0;
 
 	_initialised = true;
 	return true;
@@ -73,7 +73,7 @@ bool KVMCpu::init()
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	((KVMGuest &)owner()).shmem_region()->asynchronous_action_pending = 1;
+	per_cpu_data().async_action = 1;
 }
 
 static KVMCpu *signal_cpu;
@@ -81,9 +81,9 @@ static KVMCpu *signal_cpu;
 static void handle_signal(int signo)
 {
 	if (signo == SIGUSR1) {
-		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 2;
+		signal_cpu->per_cpu_data().async_action = 2;
 	} else if (signo == SIGUSR2) {
-		((KVMGuest &)signal_cpu->owner()).shmem_region()->asynchronous_action_pending = 4;
+		signal_cpu->per_cpu_data().async_action = 4;
 	}
 }
 
@@ -97,15 +97,13 @@ bool KVMCpu::run()
 	int rc;
 
 	if (!initialised()) {
-		ERROR << "CPU not initialised";
+		ERROR << CONTEXT(CPU) << "CPU not initialised";
 		return false;
 	}
 
 	signal_cpu = this;
 	signal(SIGUSR1, handle_signal);
 	signal(SIGUSR2, handle_signal);
-
-	kvm_guest.shmem_region()->cpu_options.mode = (uint32_t)config().execution_mode();
 
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
@@ -114,19 +112,19 @@ bool KVMCpu::run()
 
 	cpu_start_time = std::chrono::high_resolution_clock::now();
 
-	DEBUG << "Running CPU " << id();
+	DEBUG << CONTEXT(CPU) << "Running CPU " << id();
 	do {
 		rc = vmioctl(KVM_RUN);
 		if (rc < 0) {
 			if (errno == EINTR) continue;
 
-			ERROR << "Unable to run VCPU: " << LAST_ERROR_TEXT;
+			ERROR << CONTEXT(CPU) << "Unable to run VCPU: " << LAST_ERROR_TEXT;
 			return false;
 		}
 
 		switch (cpu_run_struct->exit_reason) {
 		case KVM_EXIT_DEBUG:
-			DEBUG << "DEBUG";
+			DEBUG << CONTEXT(CPU) << "DEBUG";
 			dump_regs();
 			break;
 
@@ -138,7 +136,7 @@ bool KVMCpu::run()
 				//DEBUG << "Handling hypercall " << std::hex << regs.rax;
 				run_cpu = handle_hypercall(regs.rax);
 				if (!run_cpu) {
-					ERROR << "Unhandled hypercall " << std::hex << regs.rax;
+					ERROR << CONTEXT(CPU) << "Unhandled hypercall " << std::hex << regs.rax;
 				}
 			} else if (cpu_run_struct->io.port == 0xfe) {
 				struct kvm_regs regs;
@@ -149,7 +147,7 @@ bool KVMCpu::run()
 				dump_regs();
 			} else {
 				run_cpu = false;
-				DEBUG << "EXIT IO "
+				DEBUG << CONTEXT(CPU) << "EXIT IO "
 					"port=" << std::hex << cpu_run_struct->io.port << ", "
 					"data offset=" << std::hex << cpu_run_struct->io.data_offset << ", "
 					"count=" << std::hex << cpu_run_struct->io.count;
@@ -161,46 +159,46 @@ bool KVMCpu::run()
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
 				if (dev != NULL) {
 					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct)))
-						DEBUG << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
+						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
 					break;
 				} else {
-					ERROR << "Device Not Found: " << std::hex << converted_pa;
+					ERROR << CONTEXT(CPU) << "Device Not Found: " << std::hex << converted_pa;
 				}
 			}
 
 			run_cpu = false;
-			DEBUG << "EXIT MMIO, pa=" << std::hex << cpu_run_struct->mmio.phys_addr << ", size=" << std::hex << cpu_run_struct->mmio.len;
+			ERROR << CONTEXT(CPU) << "EXIT MMIO, pa=" << std::hex << cpu_run_struct->mmio.phys_addr << ", size=" << std::hex << cpu_run_struct->mmio.len;
 
 			break;
 		case KVM_EXIT_UNKNOWN:
 			run_cpu = false;
-			DEBUG << "EXIT UNKNOWN, reason=" << cpu_run_struct->hw.hardware_exit_reason;
+			ERROR << CONTEXT(CPU) << "EXIT UNKNOWN, reason=" << cpu_run_struct->hw.hardware_exit_reason;
 			break;
 		case KVM_EXIT_INTERNAL_ERROR:
 			run_cpu = false;
-			DEBUG << "EXIT INTERNAL ERROR, error=" << cpu_run_struct->internal.suberror;
+			ERROR << CONTEXT(CPU) << "EXIT INTERNAL ERROR, error=" << cpu_run_struct->internal.suberror;
 			for (uint32_t i = 0; i < cpu_run_struct->internal.ndata; i++) {
-				DEBUG << "DATA: " << std::hex << cpu_run_struct->internal.data[i];
+				ERROR << "DATA: " << std::hex << cpu_run_struct->internal.data[i];
 			}
 			break;
 		case KVM_EXIT_FAIL_ENTRY:
 			run_cpu = false;
-			DEBUG << "EXIT FAIL ENTRY, error=" << cpu_run_struct->fail_entry.hardware_entry_failure_reason;
+			ERROR << CONTEXT(CPU) << "EXIT FAIL ENTRY, error=" << cpu_run_struct->fail_entry.hardware_entry_failure_reason;
 			break;
 		case KVM_EXIT_SHUTDOWN:
 			run_cpu = false;
-			DEBUG << "EXIT SHUTDOWN";
+			ERROR << CONTEXT(CPU) << "EXIT SHUTDOWN";
 			break;
 		case KVM_EXIT_HYPERCALL:
 			run_cpu = false;
-			DEBUG << "EXIT HYPERCALL";
+			ERROR << CONTEXT(CPU) << "EXIT HYPERCALL";
 			break;
 		default:
 			run_cpu = false;
-			DEBUG << "UNKNOWN: " << cpu_run_struct->exit_reason;
+			ERROR << CONTEXT(CPU) << "UNKNOWN: " << cpu_run_struct->exit_reason;
 			break;
 		}
-	} while (run_cpu && !kvm_guest.shmem_region()->halt);
+	} while (run_cpu && !per_cpu_data().halt);
 
 	dump_regs();
 
@@ -209,13 +207,13 @@ bool KVMCpu::run()
 
 void KVMCpu::stop()
 {
-	((KVMGuest &)owner()).shmem_region()->halt = true;
+	per_cpu_data().halt = true;
 }
 
 bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run& rs)
 {
 	uint64_t offset = pa & (device->size() - 1);
-	//DEBUG << "Handling Device Access: is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
+	//DEBUG << CONTEXT(CPU) << "Handling Device Access: is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
 
 	if (rs.mmio.is_write) {
 		uint64_t masked_data = *(uint64_t *)&rs.mmio.data[0];
@@ -243,7 +241,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
 
-	//DEBUG << "Hypercall " << data;
+	//DEBUG << CONTEXT(CPU) << "Hypercall " << data;
 
 	switch(data) {
 	case 1:
@@ -262,9 +260,9 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			regs.rbp = 0;
 
 			// Startup Arguments
-			// TODO XXX
-			regs.rdi = kvm_guest.next_avail_phys_page();
-			regs.rsi = kvm_guest.guest_entrypoint();
+			regs.rdi = per_cpu_virt_addr;
+
+			per_cpu_data().entrypoint = kvm_guest.guest_entrypoint();
 
 			vmioctl(KVM_SET_REGS, &regs);
 
@@ -288,11 +286,11 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	}
 
 	case 2:
-		DEBUG << "Abort Requested";
+		DEBUG << CONTEXT(CPU) << "Abort Requested";
 		return false;
 
 	case 3:
-		DEBUG << "Guest Assert Failure";
+		DEBUG << CONTEXT(CPU) << "Guest Assert Failure";
 		dump_regs();
 		return false;
 
@@ -300,8 +298,8 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		std::chrono::high_resolution_clock::time_point then = std::chrono::high_resolution_clock::now();
 		std::chrono::seconds dur = std::chrono::duration_cast<std::chrono::seconds>(then - cpu_start_time);
 
-		DEBUG << "Instruction Count: " << kvm_guest.shmem_region()->insn_count;
-		DEBUG << "MIPS: " << ((kvm_guest.shmem_region()->insn_count * 1e-6) / dur.count());
+		DEBUG << "Instruction Count: " << per_cpu_data().insns_executed;
+		DEBUG << "MIPS: " << ((per_cpu_data().insns_executed * 1e-6) / dur.count());
 		return true;
 	}
 
@@ -310,18 +308,13 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		fgetc(stdin);
 		return true;
 
-	case 6: {
+	case 6: {	// COMPILE
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
 
-		void *block = kvm_guest.jit().block_jit().compile_block((jit::RawBytecodeDescriptor *)((uint64_t)kvm_guest.shmem_region() + regs.rdi));
-
-		if (block) {
-			uint64_t offset = (uint64_t)block - (uint64_t)kvm_guest.jit_mem_rgn->host_buffer;
-			regs.rax = offset;
-		} else {
-			regs.rax = 0;
-		}
+		DEBUG << CONTEXT(CPU) << "Compiling Block, incoming offset=" << regs.rdi;
+		regs.rax = kvm_guest.jit().block_jit().compile_block(regs.rdi);
+		DEBUG << CONTEXT(CPU) << "Compiled Block, outgoing offset=" << regs.rax;
 
 		vmioctl(KVM_SET_REGS, &regs);
 		return true;

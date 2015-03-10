@@ -201,8 +201,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	vs->guest(*guest);
-
 	// Initialise the guest
 	if (!guest->init()) {
 		delete guest;
@@ -234,7 +232,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::BlockJIT); //(verify_enabled() && verify_get_tid() == 0) ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::BlockJIT);
+	GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::Interpreter); //(verify_enabled() && verify_get_tid() == 0) ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::BlockJIT);
 
 	CPU *cpu = guest->create_cpu(cpu_cfg);
 	if (!cpu) {
@@ -253,6 +251,8 @@ int main(int argc, char **argv)
 		ERROR << "Unable to initialise CPU";
 		return 1;
 	}
+
+	vs->cpu(*cpu);
 
 	// Start the tick source
 	mts.start();

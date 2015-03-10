@@ -9,9 +9,7 @@
 #include <malloc.h>
 #include <shmem.h>
 
-volatile captive::shmem_data *shmem;
-
-extern captive::arch::Environment *create_environment();
+extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
 
 static void call_static_constructors()
 {
@@ -37,32 +35,28 @@ static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
 #define GET_PER_CPU_DATA(_member) __GET_PER_CPU_DATA(_member, offsetof(struct captive::per_cpu_data, _member))
 
 extern "C" {
-	void __attribute__((noreturn)) start_environment(captive::per_cpu_data *i_cpu_data)
+	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{
 		// Populate the FS register with the address of the Per-CPU data structure.
-		wrmsr(0xc0000100, (uint64_t)i_cpu_data);
-
-		volatile captive::per_cpu_data *cpu_data asm ("%gs:0") = i_cpu_data;
+		wrmsr(0xc0000100, (uint64_t)cpu_data);
 
 		// Run the static constructors.
 		call_static_constructors();
 
 		// Initialise the malloc() memory allocation system.
-		captive::arch::malloc_init(cpu_data->heap, cpu_data->heap_size);
+		captive::arch::malloc_init(cpu_data->guest_data->heap, cpu_data->guest_data->heap_size);
 
-		// Store a pointer to the global shared memory area.
-		shmem = cpu_data->shmem_area;
 
 		// Initialise the memory manager, and create the environment.
-		captive::arch::Memory mm(cpu_data->first_avail_phys_page);
-		captive::arch::Environment *env = create_environment();
+		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
+		captive::arch::Environment *env = create_environment(cpu_data);
 
 		if (!env) {
 			printf("error: unable to create environment\n");
 		} else {
 			if (!env->init()) {
 				printf("error: unable to initialise environment\n");
-			} else if (!env->run(cpu_data->guest_entrypoint, shmem->cpu_options.mode)) {
+			} else if (!env->run()) {
 				printf("error: unable to launch environment\n");
 			}
 

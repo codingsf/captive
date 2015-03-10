@@ -32,8 +32,9 @@ namespace captive {
 			virtual BlockJIT& block_jit() override { return *this; }
 			virtual RegionJIT& region_jit() override { return *this; }
 
-			virtual void *compile_block(const RawBytecodeDescriptor* bcd) override;
-			virtual void *compile_region(const RawBytecodeDescriptor* bcd) override;
+		protected:
+			void *internal_compile_block(const RawBytecodeDescriptor* bcd) override;
+			void *internal_compile_region(const RawBytecodeDescriptor* bcd) override;
 
 		private:
 			engine::Engine& _engine;

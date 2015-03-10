@@ -9,6 +9,7 @@
 #define	ENV_H
 
 #include <define.h>
+#include <shmem.h>
 
 namespace captive {
 	namespace arch {
@@ -18,11 +19,11 @@ namespace captive {
 		class Environment
 		{
 		public:
-			Environment();
+			Environment(PerCPUData *per_cpu_data);
 			virtual ~Environment();
 
 			virtual bool init();
-			bool run(unsigned int ep, unsigned int mode);
+			bool run();
 
 			virtual CPU *create_cpu() = 0;
 
@@ -51,6 +52,9 @@ namespace captive {
 
 		private:
 			CoreDevice *devices[16];
+
+		protected:
+			PerCPUData *per_cpu_data;
 		};
 	}
 }

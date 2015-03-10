@@ -13,7 +13,7 @@
 
 using namespace captive::arch::arm;
 
-ArmCPU::ArmCPU(ArmEnvironment& env) : CPU(env), state(*(struct cpu_state *)0x211000000)
+ArmCPU::ArmCPU(ArmEnvironment& env, captive::PerCPUData *per_cpu_data) : CPU(env, per_cpu_data), state(*(struct cpu_state *)0x211000000)
 {
 
 }
@@ -39,7 +39,7 @@ void ArmCPU::dump_state() const
 	printf("  I = %d\n", state.regs.I);
 }
 
-bool ArmCPU::init(unsigned int ep)
+bool ArmCPU::init()
 {
 	//printf("cpu init @ %x\n", ep);
 
@@ -47,8 +47,6 @@ bool ArmCPU::init(unsigned int ep)
 	_interp = new ArmInterp(*this);
 	_jit = new ArmJIT();
 	_mmu = new ArmMMU(*this);
-
-	_ep = ep;
 
 	//printf("installing 3-byte bootloader\n");
 	volatile uint32_t *mem = (volatile uint32_t *)0;
@@ -59,10 +57,10 @@ bool ArmCPU::init(unsigned int ep)
 	//printf("clearing state\n");
 	bzero(&state, sizeof(state));
 
-	state.regs.RB[1] = 0x25e;		// Some sort of ID
-	state.regs.RB[2] = 0x1000;		// Device-tree location
-	state.regs.RB[12] = ep;			// Kernel entry-point
-	state.regs.RB[15] = 0;			// Reset Vector
+	state.regs.RB[1] = 0x25e;			// Some sort of ID
+	state.regs.RB[2] = 0x1000;			// Device-tree location
+	state.regs.RB[12] = cpu_data().entrypoint;	// Kernel entry-point
+	state.regs.RB[15] = 0;				// Reset Vector
 
 	return true;
 }

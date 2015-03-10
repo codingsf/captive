@@ -79,9 +79,10 @@ struct IDT {
 	uint32_t zero1;
 } packed;
 
+using namespace captive;
 using namespace captive::arch;
 
-Environment::Environment()
+Environment::Environment(PerCPUData *per_cpu_data) : per_cpu_data(per_cpu_data)
 {
 	bzero(devices, sizeof(devices));
 }
@@ -134,7 +135,7 @@ bool Environment::init()
 
 	IDT *idt = (IDT *)IDTR.base;
 
-	for (int i = 0; i < sizeof(trap_fns) / sizeof(trap_fns[0]); i++) {
+	for (uint32_t i = 0; i < sizeof(trap_fns) / sizeof(trap_fns[0]); i++) {
 		set_idt(idt++, trap_fns[i]);
 	}
 
@@ -149,7 +150,7 @@ bool Environment::init()
 	return true;
 }
 
-bool Environment::run(unsigned int ep, unsigned int mode)
+bool Environment::run()
 {
 	CPU *core = create_cpu();
 	if (!core) {
@@ -159,12 +160,12 @@ bool Environment::run(unsigned int ep, unsigned int mode)
 
 	CPU::set_active_cpu(core);
 
-	if (!core->init(ep)) {
+	if (!core->init()) {
 		printf("error: unable to init core\n");
 		return false;
 	}
 
-	bool result = core->run(mode);
+	bool result = core->run();
 	delete core;
 
 	return result;

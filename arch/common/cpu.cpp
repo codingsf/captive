@@ -9,27 +9,22 @@
 #include <jit.h>
 #include <jit/guest-basic-block.h>
 #include <jit/translation-context.h>
-#include <shmem.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
 
 safepoint_t cpu_safepoint;
 
-extern captive::shmem_data *shmem;
-
 CPU *CPU::current_cpu;
 
-static int *block_count;
-
-CPU::CPU(Environment& env) : _env(env), insns_executed(0)
+CPU::CPU(Environment& env, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), block_interp_count(NULL)
 {
 	bzero(&local_state, sizeof(local_state));
 
 	flush_decode_cache();
 
-	block_count = (int *)malloc(sizeof(int) * 0x40000000);
-	assert(block_count);
+	//block_interp_count = (uint32_t *)malloc(sizeof(uint32_t) * 0x40000000);
+	//assert(block_interp_count);
 }
 
 CPU::~CPU()
@@ -54,9 +49,7 @@ bool CPU::handle_pending_action(uint32_t action)
 		return true;
 
 	case 4:
-		shmem->insn_count = get_insns_executed();
 		asm volatile("out %0, $0xff\n" :: "a"(4));
-
 		return true;
 	}
 
@@ -64,9 +57,9 @@ bool CPU::handle_pending_action(uint32_t action)
 }
 
 
-bool CPU::run(unsigned int mode)
+bool CPU::run()
 {
-	switch (mode) {
+	switch (_per_cpu_data->execution_mode) {
 	case 0:
 		return run_interp();
 	case 1:
@@ -92,7 +85,7 @@ bool CPU::run_interp()
 
 		// If we're tracing, add a descriptive message, and close the
 		// trace packet.
-		if (trace().enabled()) {
+		if (unlikely(trace().enabled())) {
 			trace().add_str("memory exception taken");
 			trace().end_record();
 		}
@@ -108,15 +101,15 @@ bool CPU::run_interp()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		if (shmem->isr) {
-			interpreter().handle_irq(shmem->isr);
+		if (unlikely(cpu_data().isr)) {
+			interpreter().handle_irq(cpu_data().isr);
 		}
 
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
-		if (shmem->asynchronous_action_pending) {
-			if (handle_pending_action(shmem->asynchronous_action_pending)) {
-				shmem->asynchronous_action_pending = 0;
+		if (unlikely(cpu_data().async_action)) {
+			if (handle_pending_action(cpu_data().async_action)) {
+				cpu_data().async_action = 0;
 			}
 		}
 
@@ -140,7 +133,7 @@ bool CPU::run_block_jit()
 
 		// If we're tracing, add a descriptive message, and close the
 		// trace packet.
-		if (trace().enabled()) {
+		if (unlikely(trace().enabled())) {
 			trace().add_str("memory exception taken");
 			trace().end_record();
 		}
@@ -156,23 +149,23 @@ bool CPU::run_block_jit()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		if (unlikely(shmem->isr)) {
-			interpreter().handle_irq(shmem->isr);
+		if (unlikely(cpu_data().isr)) {
+			interpreter().handle_irq(cpu_data().isr);
 		}
 
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
-		if (unlikely(shmem->asynchronous_action_pending)) {
-			if (handle_pending_action(shmem->asynchronous_action_pending)) {
-				shmem->asynchronous_action_pending = 0;
+		if (unlikely(cpu_data().async_action)) {
+			if (handle_pending_action(cpu_data().async_action)) {
+				cpu_data().async_action = 0;
 			}
 		}
 
 		uint32_t pc = read_pc();
 
-		if (block_count[pc >> 2] < 10) {
+		if (block_interp_count[pc >> 2] < 10) {
 			printf("jit: interp block %08x\n", pc);
-			block_count[pc >> 2]++;
+			block_interp_count[pc >> 2]++;
 			if (!interpret_block())
 				return false;
 		} else {
@@ -233,7 +226,7 @@ bool CPU::interpret_block()
 			prev_pc = pc;
 		}
 
-		if (shmem->cpu_options.verify && !verify_check()) {
+		if (unlikely(cpu_data().verify_enabled) && !verify_check()) {
 			return false;
 		}
 
@@ -294,13 +287,17 @@ GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 
 bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 {
-	TranslationContext ctx(&shmem->ir_buffer[0], sizeof(shmem->ir_buffer));
+	// TODO: FIXME
+	uint64_t ibo = (uint64_t)cpu_data().guest_data->ir_buffer, cbo = (uint64_t)0x230000000ULL;
+
+	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, ibo, cbo);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
 	printf("jit: translating block %08x\n", block_addr);
 	uint32_t pc = block_addr;
 	do {
+		// Attempt to decode the current instruction.
 		if (!decode_instruction(pc, insn)) {
 			printf("cpu: unhandled decode fault @ %08x\n", pc);
 			return false;
@@ -308,11 +305,14 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 		//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
-		if (shmem->cpu_options.verify) {
+		// If verification is enabled, emit a PC update and a VERIFY
+		// opcode.
+		if (unlikely(cpu_data().verify_enabled)) {
 			ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_constant32(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
 			ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
 		}
 
+		// Translate this instruction into the context.
 		if (!jit().translate(insn, ctx)) {
 			printf("jit: instruction translation failed\n");
 			return false;
@@ -321,10 +321,15 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 		pc += insn->length;
 	} while (!insn->end_of_block);
 
+	// Finish off with a RET.
 	ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 
+	// TODO: Thread jumps.
+
+	// Compile the translation context, and retrieve a function pointer.
 	GuestBasicBlock::GuestBasicBlockFn fn = ctx.compile();
 
+	// If compilation succeeded, update the GBB structure.
 	if (fn) {
 		printf("jit: translated block %08x\n", block_addr);
 		block->fnptr(fn);
@@ -337,34 +342,37 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 
 bool CPU::verify_check()
 {
-	if (!shmem->cpu_options.verify) return true;
+	Barrier *enter = (Barrier *)cpu_data().verify_data->barrier_enter;
+	Barrier *exit = (Barrier *)cpu_data().verify_data->barrier_exit;
 
-	Barrier *enter = (Barrier *)shmem->verify_shm_data->barrier_enter;
-	Barrier *exit = (Barrier *)shmem->verify_shm_data->barrier_exit;
-
-	if (shmem->cpu_options.verify_id == 1) {
-		memcpy(shmem->verify_shm_data->data, reg_state(), reg_state_size());
+	// If we're not the primary CPU, copy our state into the shared memory region.
+	if (cpu_data().verify_tid > 0) {
+		memcpy((void *)cpu_data().verify_data->cpu_data, (const void *)reg_state(), reg_state_size());
 	}
 
-	enter->wait(shmem->cpu_options.verify_id);
+	// Wait on the entry barrier
+	enter->wait(cpu_data().verify_tid);
 
-	if (shmem->cpu_options.verify_id == 0) {
-		if (memcmp(reg_state(), shmem->verify_shm_data->data, reg_state_size())) {
-			shmem->verify_shm_data->fail = 1;
+	// If we're the primary CPU, perform verification.
+	if (cpu_data().verify_tid == 0) {
+		// Compare OUR register state to the other CPU's.
+		if (memcmp((const void *)reg_state(), (const void *)cpu_data().verify_data->cpu_data, reg_state_size())) {
+			cpu_data().verify_data->verify_failed = true;
 		} else {
-			shmem->verify_shm_data->fail = 0;
+			cpu_data().verify_data->verify_failed = false;
 		}
 
 	}
 
-	exit->wait(shmem->cpu_options.verify_id);
+	// Wait on the exit barrier
+	exit->wait(cpu_data().verify_tid);
 
-	if (shmem->verify_shm_data->fail) {
+	// Check to see if we failed, and if so, dump our state and return a failure code.
+	if (cpu_data().verify_data->verify_failed) {
 		printf("*** DIVERGENCE DETECTED ***\n");
 		dump_state();
 		return false;
 	} else {
-		//printf("OK\n");
 		return true;
 	}
 }

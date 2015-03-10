@@ -144,7 +144,7 @@ std::string RawBytecode::render() const
 	return str.str();
 }
 
-JIT::JIT() : _code_arena(NULL), _code_arena_size(0)
+JIT::JIT() : _code_arena(NULL), _code_arena_size(0), _ir_buffer(NULL), _ir_buffer_size(0)
 {
 
 }
@@ -154,7 +154,28 @@ JIT::~JIT()
 
 }
 
+JITStrategy::JITStrategy(JIT& owner) : _owner(owner)
+{
+
+}
+
+JITStrategy::~JITStrategy()
+{
+
+}
+
+BlockJIT::BlockJIT(JIT& owner) : JITStrategy(owner)
+{
+
+}
+
+
 BlockJIT::~BlockJIT()
+{
+
+}
+
+RegionJIT::RegionJIT(JIT& owner) : JITStrategy(owner)
 {
 
 }
@@ -162,4 +183,26 @@ BlockJIT::~BlockJIT()
 RegionJIT::~RegionJIT()
 {
 
+}
+
+uint64_t BlockJIT::compile_block(uint64_t ir_offset)
+{
+	assert(ir_offset < owner().get_ir_buffer_size());
+
+	const RawBytecodeDescriptor *ir = (const RawBytecodeDescriptor *)((uint64_t)owner().get_ir_buffer() + ir_offset);
+
+	void *rc = internal_compile_block(ir);
+	if (!rc) {
+		return 0;
+	}
+
+	assert((uint8_t *)rc > (uint8_t *)owner().get_code_arena());
+	assert((uint8_t *)rc >= ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
+
+	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
+}
+
+uint64_t RegionJIT::compile_region(uint64_t ir_offset)
+{
+	return 0;
 }

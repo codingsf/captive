@@ -12,6 +12,7 @@
 
 #include <sys/ioctl.h>
 
+#include <shmem.h>
 #include <hypervisor/guest.h>
 #include <linux/kvm.h>
 
@@ -40,14 +41,12 @@ namespace captive {
 
 				bool stage2_init(uint64_t& stack);
 
-				uint64_t next_avail_phys_page() const { return next_page; }
-
 				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
-				int fd, irq_fd;
+				int fd;
 				int next_cpu_id;
 				int next_slot_idx;
 
@@ -56,9 +55,7 @@ namespace captive {
 					void *host_buffer;
 				};
 
-				vm_mem_region *sys_mem_rgn;
-				vm_mem_region *sh_mem_rgn;
-				vm_mem_region *jit_mem_rgn;
+				PerGuestData *per_guest_data;
 
 				std::list<vm_mem_region *> vm_mem_region_free;
 				std::list<vm_mem_region *> vm_mem_region_used;
@@ -84,6 +81,11 @@ namespace captive {
 
 				bool install_bios();
 				bool install_initial_pgt();
+				bool install_gdt();
+				bool install_tss();
+				bool prepare_verification_memory();
+
+				void *get_phys_buffer(uint64_t gpa);
 
 				vm_mem_region *get_mem_slot();
 				void put_mem_slot(vm_mem_region *region);
@@ -98,12 +100,10 @@ namespace captive {
 				typedef pte_t *pd_t;
 				typedef pte_t *pt_t;
 
-				uint64_t next_page;
-
 				inline uint64_t alloc_page()
 				{
-					uint64_t page = next_page;
-					next_page += 0x1000;
+					uint64_t page = per_guest_data->next_phys_page;
+					per_guest_data->next_phys_page += 0x1000;
 					return page;
 				}
 

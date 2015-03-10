@@ -11,6 +11,7 @@
 #include <define.h>
 #include <trace.h>
 #include <mmu.h>
+#include <shmem.h>
 
 #define DECODE_CACHE_SIZE	8192
 #define DECODE_OBJ_SIZE		128
@@ -31,18 +32,19 @@ namespace captive {
 		class CPU
 		{
 		public:
-			CPU(Environment& env);
+			CPU(Environment& env, PerCPUData *per_cpu_data);
 			virtual ~CPU();
 
-			virtual bool init(unsigned int ep) = 0;
-			bool run(unsigned int mode);
+			virtual bool init() = 0;
+			bool run();
 
 			virtual MMU& mmu() const = 0;
 			virtual Interpreter& interpreter() const = 0;
 			virtual JIT& jit() const = 0;
 
 			inline Environment& env() const { return _env; }
-			inline Trace& trace() { return *_trace; }
+			inline Trace& trace() const { return *_trace; }
+			inline PerCPUData& cpu_data() const { return *_per_cpu_data; }
 
 			virtual uint32_t read_pc() const = 0;
 			virtual uint32_t write_pc(uint32_t new_pc_val) = 0;
@@ -50,7 +52,7 @@ namespace captive {
 
 			virtual void dump_state() const = 0;
 
-			inline uint64_t get_insns_executed() const { return insns_executed; }
+			inline uint64_t get_insns_executed() const { return cpu_data().insns_executed; }
 
 			inline bool kernel_mode() const { return local_state._kernel_mode; }
 
@@ -63,7 +65,7 @@ namespace captive {
 
 			void flush_decode_cache();
 			void flush_block_cache();
-			
+
 			inline void schedule_decode_cache_flush() {
 				_should_flush_decode_cache = true;
 			}
@@ -84,7 +86,7 @@ namespace captive {
 			virtual uint32_t reg_state_size() = 0;
 
 			inline void inc_insns_executed() {
-				insns_executed++;
+				cpu_data().insns_executed++;
 			}
 
 			Trace *_trace;
@@ -97,10 +99,12 @@ namespace captive {
 		private:
 			static CPU *current_cpu;
 
-			uint64_t insns_executed;
+			uint32_t *block_interp_count;
+
 			bool _should_flush_decode_cache;
 
 			Environment& _env;
+			PerCPUData *_per_cpu_data;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
 			inline Decode *get_decode(uint32_t pc) const {

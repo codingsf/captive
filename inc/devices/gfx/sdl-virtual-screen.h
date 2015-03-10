@@ -16,7 +16,7 @@
 
 namespace captive {
 	namespace hypervisor {
-		class Guest;
+		class CPU;
 	}
 
 	namespace devices {
@@ -29,8 +29,8 @@ namespace captive {
 
 				bool initialise() override;
 
-				inline void guest(hypervisor::Guest& guest) {
-					_guest = &guest;
+				inline void cpu(hypervisor::CPU& cpu) {
+					_cpu = &cpu;
 				}
 
 			protected:
@@ -51,7 +51,7 @@ namespace captive {
 				typedef void (SDLVirtualScreen::*frame_drawer_fn_t)(void);
 				frame_drawer_fn_t frame_drawer;
 
-				hypervisor::Guest *_guest;
+				hypervisor::CPU *_cpu;
 
 				bool hw_accelerated, terminate;
 

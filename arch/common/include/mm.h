@@ -47,11 +47,11 @@ namespace captive {
 			inline void flags(uint16_t v) { data &= ~0xfffULL; data |= v & 0xfffULL;}
 
 			inline bool present() const { return (flags() & PRESENT) == PRESENT; }
-			inline bool present(bool v) { if (v) flags(flags() | PRESENT); else flags(flags() & ~PRESENT); }
+			inline void present(bool v) { if (v) flags(flags() | PRESENT); else flags(flags() & ~PRESENT); }
 			inline bool writable() const { return (flags() & WRITABLE) == WRITABLE; }
-			inline bool writable(bool v) { if (v) flags(flags() | WRITABLE); else flags(flags() & ~WRITABLE); }
+			inline void writable(bool v) { if (v) flags(flags() | WRITABLE); else flags(flags() & ~WRITABLE); }
 			inline bool allow_user() const { return (flags() & ALLOW_USER) == ALLOW_USER; }
-			inline bool allow_user(bool v) { if (v) flags(flags() | ALLOW_USER); else flags(flags() & ~ALLOW_USER); }
+			inline void allow_user(bool v) { if (v) flags(flags() | ALLOW_USER); else flags(flags() & ~ALLOW_USER); }
 
 			inline bool executed() const { return get_flag(EXECUTED); }
 			inline void executed(bool v) { set_flag(EXECUTED, v); }

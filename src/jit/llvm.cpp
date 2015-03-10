@@ -29,7 +29,7 @@ DECLARE_CHILD_CONTEXT(LLVMBlockJIT, LLVM);
 using namespace captive::jit;
 using namespace llvm;
 
-LLVMJIT::LLVMJIT(engine::Engine& engine) : _engine(engine), mm(NULL)
+LLVMJIT::LLVMJIT(engine::Engine& engine) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine), mm(NULL)
 {
 }
 
@@ -49,7 +49,7 @@ bool LLVMJIT::init()
 	return true;
 }
 
-void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
+void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 {
 	if (bcd->bytecode_count == 0)
 		return NULL;
@@ -203,7 +203,7 @@ void *LLVMJIT::compile_block(const RawBytecodeDescriptor* bcd)
 	return ptr;
 }
 
-void *LLVMJIT::compile_region(const RawBytecodeDescriptor* bcd)
+void *LLVMJIT::internal_compile_region(const RawBytecodeDescriptor* bcd)
 {
 	return 0;
 }
