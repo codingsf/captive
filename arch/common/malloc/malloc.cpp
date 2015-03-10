@@ -3,8 +3,20 @@
 
 using namespace captive::arch;
 
-static uint8_t heap[0x10000000];
-static uint8_t *heap_ptr = &heap[0];
+static uint8_t *heap;
+static size_t heap_size;
+
+static uint8_t *heap_free_ptr;
+static uint8_t *heap_end_ptr;
+
+void captive::arch::malloc_init(void *arena, size_t size)
+{
+	heap = (uint8_t *)arena;
+	heap_size = size;
+
+	heap_free_ptr = heap;
+	heap_end_ptr = heap + heap_size;
+}
 
 void *captive::arch::malloc(size_t size)
 {
@@ -16,8 +28,12 @@ void *captive::arch::malloc(size_t size)
 		size += 16 - (size % 16);
 	}
 
-	struct malloc_unit *unit = (struct malloc_unit *)heap_ptr;
-	heap_ptr += size;
+	if (heap_free_ptr > (heap_end_ptr - size)) {
+		return NULL;
+	}
+
+	struct malloc_unit *unit = (struct malloc_unit *)heap_free_ptr;
+	heap_free_ptr += size;
 
 	unit->size = size;
 

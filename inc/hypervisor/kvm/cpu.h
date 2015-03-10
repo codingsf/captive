@@ -26,7 +26,7 @@ namespace captive {
 
 			class KVMCpu : public CPU {
 			public:
-				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd);
+				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, void *per_cpu_data);
 				~KVMCpu();
 
 				bool init();
@@ -42,9 +42,9 @@ namespace captive {
 				bool _initialised;
 				int _id;
 				int fd;
-				int irqfd;
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;
+				void *per_cpu_data;
 
 				inline int vmioctl(unsigned long int req) const {
 					return vmioctl(req, (unsigned long int)0);

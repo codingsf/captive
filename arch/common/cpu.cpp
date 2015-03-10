@@ -20,11 +20,16 @@ extern captive::shmem_data *shmem;
 
 CPU *CPU::current_cpu;
 
+static int *block_count;
+
 CPU::CPU(Environment& env) : _env(env), insns_executed(0)
 {
 	bzero(&local_state, sizeof(local_state));
 
 	flush_decode_cache();
+
+	block_count = (int *)malloc(sizeof(int) * 0x40000000);
+	assert(block_count);
 }
 
 CPU::~CPU()
@@ -34,10 +39,7 @@ CPU::~CPU()
 
 void CPU::flush_decode_cache()
 {
-	//bzero(decode_cache, sizeof(decode_cache));
-
 	memset(decode_cache, 0xff, sizeof(decode_cache));
-
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -124,8 +126,6 @@ bool CPU::run_interp()
 	return true;
 }
 
-static int block_count[0x40000000];
-
 bool CPU::run_block_jit()
 {
 	bool step_ok = true;
@@ -156,36 +156,36 @@ bool CPU::run_block_jit()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		if (shmem->isr) {
+		if (unlikely(shmem->isr)) {
 			interpreter().handle_irq(shmem->isr);
 		}
 
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
-		if (shmem->asynchronous_action_pending) {
+		if (unlikely(shmem->asynchronous_action_pending)) {
 			if (handle_pending_action(shmem->asynchronous_action_pending)) {
 				shmem->asynchronous_action_pending = 0;
 			}
 		}
 
-		if (block_count[read_pc() >> 2] < 10) {
-			printf("jit: interp block %08x\n", read_pc());
-			block_count[read_pc() >> 2]++;
+		uint32_t pc = read_pc();
+
+		if (block_count[pc >> 2] < 10) {
+			printf("jit: interp block %08x\n", pc);
+			block_count[pc >> 2]++;
 			if (!interpret_block())
 				return false;
 		} else {
-			jit::GuestBasicBlock *block = get_basic_block(read_pc());
+			jit::GuestBasicBlock *block = get_basic_block(pc);
 			if (!block) {
-				printf("jit: unable to get basic block @ %08x\n", read_pc());
+				printf("jit: unable to get basic block @ %08x\n", pc);
 				step_ok = false;
 			} else {
+				mmu().set_page_executed(pc);
+
+				// Execute the block, with interrupts disabled.
 				__local_irq_disable();
-	//			printf("BEFORE\n");
-	//			dump_state();
-	//			printf("hello: %x\n", read_pc());
 				step_ok = block->execute(this, reg_state());
-	//			printf("AFTER\n");
-	//			dump_state();
 				__local_irq_enable();
 			}
 		}
@@ -216,18 +216,18 @@ bool CPU::interpret_block()
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);
 		if (insn->pc != pc) {
-			if (!decode_instruction(pc, insn)) {
+			if (unlikely(!decode_instruction(pc, insn))) {
 				printf("cpu: unhandled decode fault @ %08x\n", pc);
 				return false;
 			}
 		}
 
 		// Perhaps trace this instruction
-		if (trace().enabled()) {
+		if (unlikely(trace().enabled())) {
 			trace().start_record(get_insns_executed(), pc, insn);
 		}
 
-		if (prev_pc >> 12 != pc >> 12) {
+		if (unlikely(prev_pc >> 12 != pc >> 12)) {
 			// Mark the page as has_been_executed
 			mmu().set_page_executed(pc);
 			prev_pc = pc;
@@ -246,7 +246,7 @@ bool CPU::interpret_block()
 		inc_insns_executed();
 
 		// Perhaps finish tracing this instruction.
-		if (trace().enabled()) {
+		if (unlikely(trace().enabled())) {
 			trace().end_record();
 		}
 	} while(!insn->end_of_block && step_ok);

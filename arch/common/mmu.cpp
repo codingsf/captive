@@ -45,7 +45,7 @@ void MMU::set_page_executed(uint32_t va)
 		pt->executed(true);
 		pt->writable(false);
 
-		Memory::flush_page((va_t)va);
+		Memory::flush_page((va_t)(uint64_t)va);
 	}
 }
 

@@ -18,7 +18,7 @@
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irq_fd) : CPU(owner, config), _initialised(false), _id(id), fd(fd), irqfd(irq_fd), cpu_run_struct(NULL), cpu_run_struct_size(0)
+KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, void *per_cpu_data) : CPU(owner, config), _initialised(false), _id(id), fd(fd), cpu_run_struct(NULL), cpu_run_struct_size(0), per_cpu_data(per_cpu_data)
 {
 
 }
@@ -26,7 +26,6 @@ KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int
 KVMCpu::~KVMCpu()
 {
 	if (initialised()) {
-		close(irqfd);
 		munmap(cpu_run_struct, cpu_run_struct_size);
 	}
 
@@ -60,26 +59,20 @@ bool KVMCpu::init()
 		return false;
 	}
 
+	// Initialise the Per-CPU data structure
+	struct per_cpu_data *data = (struct per_cpu_data *)per_cpu_data;
+	data->first_avail_phys_page = 0;
+	data->guest_entrypoint = 0;
+	data->heap = 0;
+	data->heap_size = 0;
+	data->shmem_area = 0;
+
 	_initialised = true;
 	return true;
 }
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	/*struct kvm_interrupt irq;
-	irq.irq = code + 32;
-
-	if (vmioctl(KVM_INTERRUPT, &irq)) {
-		WARNING << "Guest interrupt assertion failed";
-	}*/
-
-	//DEBUG << "Asserting a KVM interrupt: fd=" << irqfd << ", code=" << std::hex << code;
-
-	/*uint64_t data = 1;
-	if (write(irqfd, &data, sizeof(data)) != 8) {
-		WARNING << "Unable to assert KVM interrupt, eventfd value not written";
-	}*/
-
 	((KVMGuest &)owner()).shmem_region()->asynchronous_action_pending = 1;
 }
 
@@ -269,6 +262,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			regs.rbp = 0;
 
 			// Startup Arguments
+			// TODO XXX
 			regs.rdi = kvm_guest.next_avail_phys_page();
 			regs.rsi = kvm_guest.guest_entrypoint();
 

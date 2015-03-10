@@ -30,6 +30,14 @@ namespace captive {
 
 		uint8_t ir_buffer[16384];
 	};
+
+	struct per_cpu_data {
+		struct shmem_data *shmem_area;
+		uint64_t first_avail_phys_page;
+		uint32_t guest_entrypoint;
+		void *heap;
+		uint64_t heap_size;
+	};
 }
 
 #endif	/* SHMEM_H */

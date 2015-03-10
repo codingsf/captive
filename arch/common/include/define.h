@@ -43,12 +43,12 @@ static inline __attribute__((noreturn)) void abort()
 
 static inline void __local_irq_enable()
 {
-	asm volatile("sti\n");
+	//asm volatile("sti\n");
 }
 
 static inline void __local_irq_disable()
 {
-	asm volatile("cli\n");
+	//asm volatile("cli\n");
 }
 
 #endif	/* DEFINE_H */

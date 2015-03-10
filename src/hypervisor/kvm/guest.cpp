@@ -46,6 +46,9 @@ using namespace captive::hypervisor::kvm;
 #define JIT_VIRT_BASE			(SHMEM_VIRT_BASE + SHMEM_PHYS_SIZE)
 #define JIT_SIZE			0x10000000ULL
 
+#define PER_CPU_PHYS_BASE		(JIT_PHYS_BASE + JIT_SIZE)
+#define PER_CPU_PHYS_SIZE		0x10000
+
 #define BIOS_PHYS_BASE			0xf0000ULL
 
 struct {
@@ -58,6 +61,7 @@ struct {
 	{ .name = "engine",      .phys_base = 0x010000000ULL, .virt_base = 0xFFFFFFFF80000000ULL, .size = 0x030000000ULL },
 	{ .name = "shared-mem",  .phys_base = 0x040000000ULL, .virt_base = 0x210000000ULL,        .size = 0x010000000ULL },
 	{ .name = "jit-mem",     .phys_base = 0x050000000ULL, .virt_base = 0x220000000ULL,        .size = 0x010000000ULL },
+	{ .name = "per-cpu-mem", .phys_base = 0x060000000ULL, .virt_base = 0x230000000ULL,        .size = 0x000010000ULL },
 	{ .name = "gpm",         .phys_base = 0x100000000ULL, .virt_base = 0,                     .size = 0x100000000ULL },
 	{ .name = "gpm-copy",    .phys_base = 0x100000000ULL, .virt_base = 0x100000000ULL,        .size = 0x100000000ULL },
 };
@@ -141,7 +145,10 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd, irq_fd);
+	// Allocate storage for the per-cpu data structure
+	vm_mem_region *per_cpu = alloc_guest_memory(PER_CPU_PHYS_BASE + (0x1000 * next_cpu_id), 0x1000, 0);
+
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id++, cpu_fd, per_cpu->host_buffer);
 	kvm_cpus.push_back(cpu);
 
 	return cpu;

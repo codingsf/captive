@@ -6,6 +6,8 @@
 start:
 	movq $0xdeadbabecafef00d, %rax
 	push %rax
+	push %rax
+
 	jmp start_environment
 
 .macro push_regs
