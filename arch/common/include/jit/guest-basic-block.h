@@ -26,7 +26,7 @@ namespace captive {
 
 				inline void invalidate()
 				{
-					_block_address = 0;
+					_block_address = 0xffffffff;
 					_fnp = NULL;
 					_fnp_offset = 0;
 				}
@@ -48,6 +48,10 @@ namespace captive {
 
 				inline uint64_t fnp_offset() const {
 					return _fnp_offset;
+				}
+
+				inline bool valid() const {
+					return _block_address != 0xffffffff;
 				}
 
 				inline void release_memory()

@@ -24,16 +24,6 @@ static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
 	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
 }
 
-/*static inline rdpcpu(uint32_t offset)
-{
-
-	asm volatile("mov %fs:0, %0" : "=r"(val));
-}*/
-
-#define offsetof(st, m) __builtin_offsetof(st, m)
-#define __GET_PER_CPU_DATA(_member, _offset) asm volatile("mov %%fs:%1, %0" : "=r"(val) : "i"(_offset))
-#define GET_PER_CPU_DATA(_member) __GET_PER_CPU_DATA(_member, offsetof(struct captive::per_cpu_data, _member))
-
 extern "C" {
 	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{

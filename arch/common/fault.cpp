@@ -43,17 +43,17 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 				return (int)fault;
 			} else {
 				// If the core couldn't handle the fault, then we've got a serious problem.
-				printf("panic: unhandled page-fault: va=%x, code=%x, pc=%x\n", va, code, core->read_pc());
+				printf("panic: unhandled page-fault: va=%lx, code=%x, pc=%x\n", va, code, core->read_pc());
 				abort();
 			}
 		} else {
 			// We can't handle this page fault if we haven't got an active core.
-			printf("panic: unhandled page-fault: va=%x, code=%x, (no cpu)\n", va, code);
+			printf("panic: unhandled page-fault: va=%lx, code=%x, (no cpu)\n", va, code);
 			abort();
 		}
 	} else {
 		// This page-fault happened elsewhere - we can't do anything about it.
-		printf("panic: internal page-fault: rip=%x va=%x, code=%x\n", rip, va, code);
+		printf("panic: internal page-fault: rip=%lx va=%lx, code=%x\n", rip, va, code);
 		assert(false);
 	}
 

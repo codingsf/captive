@@ -52,6 +52,7 @@ namespace captive {
 				};
 			};
 
+			class X86Builder;
 			class X86Instruction
 			{
 			public:
@@ -60,10 +61,15 @@ namespace captive {
 					RET = 0xc3
 				};
 
-				X86Instruction(X86InstructionOpcode opcode) : opcode(opcode), operands(4) { }
+				X86Instruction(X86InstructionOpcode opcode) : opcode(opcode) { }
+
+				inline void add_operand(X86Operand op)
+				{
+					operands.push_back(op);
+				}
 
 				X86InstructionOpcode opcode;
-				std::vector<X86Operand> operands;
+				std::list<X86Operand> operands;
 			};
 
 			class X86Builder
@@ -80,7 +86,7 @@ namespace captive {
 			private:
 				std::list<X86Instruction> instructions;
 
-				inline void add_instruction(X86Instruction& insn)
+				inline void add_instruction(X86Instruction insn)
 				{
 					instructions.push_back(insn);
 				}

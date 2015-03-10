@@ -24,6 +24,9 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(
 
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
+
+	// Initialise the block cache
+	memset(block_cache, 0xff, sizeof(block_cache));
 }
 
 CPU::~CPU()
@@ -158,9 +161,10 @@ bool CPU::run_block_jit()
 		uint32_t pc = read_pc();
 
 		jit::GuestBasicBlock *block = get_block(pc);
-		if (pc == 0 || block->block_address() != pc) {
-			if (block->block_address() != 0) block->release_memory();
+		if (block->block_address() != pc) {
+			if (block->valid()) block->release_memory();
 
+			printf("jit: compiling at %x\n", pc);
 			if (!compile_basic_block(pc, block)) {
 				printf("jit: compilation of block %08x failed\n", pc);
 				abort();
@@ -252,7 +256,10 @@ void CPU::invalidate_executed_page(va_t page_base_addr)
 		GuestBasicBlock *block = get_block(pc);
 
 		if (block->block_address() == pc) {
-			if (block->block_address() != 0) block->release_memory();
+			if (block->valid()) {
+				block->release_memory();
+			}
+
 			block->invalidate();
 		}
 	}
