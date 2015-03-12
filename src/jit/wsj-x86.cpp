@@ -1,27 +1,43 @@
 #include <jit/wsj-x86.h>
+#include <captive.h>
 
 using namespace captive::jit::x86;
+
+static bool emit_ret(X86OutputBuffer& buffer, X86Instruction& insn)
+{
+	buffer.emit(0xc3);
+	return true;
+}
+
+static bool emit_mov(X86OutputBuffer& buffer, X86Instruction& insn)
+{
+	return false;
+}
+
+X86Builder::emitter_fn_t X86Builder::emitter_functions[] = {
+	emit_ret,
+	emit_mov,
+};
 
 X86Builder::X86Builder()
 {
 
 }
 
-bool X86Builder::generate(void* buffer, uint64_t& size)
+bool X86Builder::generate(void* raw_buffer, uint64_t& size)
 {
-	uint64_t emitted_size = 0;
-
-	uint8_t *p = (uint8_t *)buffer;
+	X86OutputBuffer buffer(raw_buffer, size);
 	for (auto insn : instructions) {
-		if (insn.opcode > 0x100) {
-			*p++ = 0xf0;
-			emitted_size++;
+		if (insn.opcode < sizeof(emitter_functions) / sizeof(emitter_functions[0])) {
+			if (!emitter_functions[insn.opcode](buffer, insn)) {
+				return false;
+			}
+		} else {
+			assert(false);
+			return false;
 		}
-
-		*p++ = (uint8_t)insn.opcode;
-		emitted_size++;
 	}
 
-	size = emitted_size++;
+	size = buffer.used_size();
 	return true;
 }

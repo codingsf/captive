@@ -16,10 +16,16 @@ namespace captive {
 	}
 
 	namespace jit {
+		class IRContext;
+
 		namespace x86 {
 			class X86Builder;
 		}
-		
+
+		namespace ir {
+			class IRBlock;
+		}
+
 		class Allocator;
 
 		class WSJ : public JIT, public BlockJIT, public RegionJIT
@@ -42,6 +48,7 @@ namespace captive {
 			Allocator *_allocator;
 
 			bool build(x86::X86Builder& builder, const RawBytecodeDescriptor* bcd);
+			bool lower_block(x86::X86Builder& builder, IRContext& ctx, ir::IRBlock& block);
 		};
 	}
 }

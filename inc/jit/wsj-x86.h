@@ -37,6 +37,7 @@ namespace captive {
 				};
 
 				X86Operand(X86OperandType type) : type(type) { }
+				X86Operand(X86Register reg) : type(REGISTER), reg(reg) { }
 
 				X86OperandType type;
 
@@ -58,7 +59,8 @@ namespace captive {
 			public:
 				enum X86InstructionOpcode
 				{
-					RET = 0xc3
+					RET,
+					MOV,
 				};
 
 				X86Instruction(X86InstructionOpcode opcode) : opcode(opcode) { }
@@ -72,6 +74,24 @@ namespace captive {
 				std::list<X86Operand> operands;
 			};
 
+			class X86OutputBuffer
+			{
+			public:
+				X86OutputBuffer(void *raw_buffer, uint64_t size) : _raw_buffer((uint8_t *)raw_buffer), _size(size), _used_size(0) { }
+
+				inline uint64_t used_size() const { return _used_size; }
+
+				inline void emit(uint8_t b)
+				{
+					assert(_used_size < _size);
+					_raw_buffer[_used_size++] = b;
+				}
+			private:
+				uint8_t *_raw_buffer;
+				uint64_t _size;
+				uint64_t _used_size;
+			};
+
 			class X86Builder
 			{
 			public:
@@ -83,7 +103,19 @@ namespace captive {
 					add_instruction(X86Instruction(X86Instruction::RET));
 				}
 
+				inline void mov(X86Operand src, X86Operand dst) {
+					X86Instruction insn(X86Instruction::MOV);
+					insn.add_operand(src);
+					insn.add_operand(dst);
+
+					add_instruction(insn);
+				}
+
 			private:
+				typedef bool (*emitter_fn_t)(X86OutputBuffer& buffer, X86Instruction& insn);
+
+				static emitter_fn_t emitter_functions[];
+
 				std::list<X86Instruction> instructions;
 
 				inline void add_instruction(X86Instruction insn)
