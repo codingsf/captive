@@ -61,10 +61,6 @@ entry64:
 	or $(3<<9), %rax
 	mov %rax, %cr4
 
-	// Load the TSS
-	mov $0x28, %eax
-	//ltr %ax
-
 	// Make a hypercall to instruct the hypervisor to restructure the
 	// page tables
 	movl $1, %eax

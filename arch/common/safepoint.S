@@ -42,17 +42,28 @@ interrupt_restore_safepoint:
 
 .globl switch_to_ring3
 switch_to_ring3:
-	popq %rdx			// Load return address into RDX, and remove it from the stack
-	mov %rsp, %rcx		// Load stack pointer int RCX
-	rex.w sysexit		// Invoke SYSEXIT
+	pop %rcx
+
+	mov $0x23, %eax
+	mov %ax, %ds
+	mov %ax, %es
+
+	mov %rsp, %rax
+
+	push $0x23
+	push %rax
+	pushf
+	push $0x1b
+	push %rcx
+
+	iretq
 
 .globl switch_to_ring0
 switch_to_ring0:
-	pop %rsi			// Load return address into RSI
-	mov %rsp, %rdi		// Load stack pointer into RDI
-	rex.w sysenter		// Invoke SYSENTER
+	int $0x80
 
-.globl sysenter_entry
-sysenter_entry:
-	mov %rdi, %rsp		// Restore the stack pointer
-	jmp *%rsi			// Return
+.globl int80_handler
+int80_handler:
+	mov 24(%rsp), %rsp
+
+	ret

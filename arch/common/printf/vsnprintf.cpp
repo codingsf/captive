@@ -157,6 +157,7 @@ retry_format:
 				break;
 			}
 
+			case 'b':
 			case 'x':
 			case 'p':
 			{
@@ -174,12 +175,12 @@ retry_format:
 					buffer += rc;
 				}
 
-				rc = append_num(buffer, size - 1 - count, v, 16, false, pad_size, pad_char);
+				rc = append_num(buffer, size - 1 - count, v, (*fmt == 'b' ? 2 : 16), false, pad_size, pad_char);
 				count += rc;
 				buffer += rc;
 				break;
 			}
-			
+
 			case 'l':
 				number_size = 8;
 				goto retry_format;

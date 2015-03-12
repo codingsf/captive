@@ -8,66 +8,12 @@
 typedef void (*trap_fn_t)(void);
 
 extern "C" void trap_unk(void);
-extern "C" void trap_dbz(void);
-extern "C" void trap_dbg(void);
-extern "C" void trap_nmi(void);
+extern "C" void trap_unk_arg(void);
+
 extern "C" void trap_pf(void);
 extern "C" void trap_gpf(void);
-extern "C" void trap_irq(void);
 
-static trap_fn_t trap_fns[] = {
-	trap_dbz,
-	trap_dbg,
-	trap_nmi,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_gpf,
-	trap_pf,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_unk,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-	trap_irq,
-};
-
-static uint64_t temp_sysenter_stack[8];
-extern "C" void sysenter_entry(void);
+extern "C" void int80_handler(void);
 
 struct IDT {
 	uint16_t off_low;
@@ -92,7 +38,7 @@ Environment::~Environment()
 
 }
 
-static void set_idt(IDT* idt, trap_fn_t fn)
+static void set_idt(IDT* idt, trap_fn_t fn, bool allow_user = false)
 {
 	idt->zero0 = 0;
 	idt->zero1 = 0;
@@ -102,7 +48,7 @@ static void set_idt(IDT* idt, trap_fn_t fn)
 	idt->off_high = (((uint64_t)fn) >> 32);
 
 	idt->sel = 0x8;
-	idt->type = 0x8e;
+	idt->type = 0x8e | (allow_user ? 0x60 : 0);
 }
 
 static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
@@ -113,7 +59,7 @@ static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
 	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
 }
 
-bool Environment::init()
+void Environment::install_gdt()
 {
 	struct {
 		uint16_t limit;
@@ -124,28 +70,53 @@ bool Environment::init()
 	GDTR.base = 0x200000100;
 
 	asm volatile("lgdt %0\n" :: "m"(GDTR));
+}
 
+void Environment::install_idt()
+{
 	struct {
 		uint16_t limit;
 		uint64_t base;
 	} packed IDTR;
 
-	IDTR.limit = sizeof(struct IDT) * (sizeof(trap_fns) / sizeof(trap_fns[0]));
+	IDTR.limit = sizeof(struct IDT) * 0x100;
 	IDTR.base = 0x200000300;
 
 	IDT *idt = (IDT *)IDTR.base;
 
-	for (uint32_t i = 0; i < sizeof(trap_fns) / sizeof(trap_fns[0]); i++) {
-		set_idt(idt++, trap_fns[i]);
+	// Initialise the table with unknowns
+	for (int i = 0; i < 0x100; i++) {
+		set_idt(&idt[i], trap_unk);
 	}
 
+	// Exceptions with arguments
+	set_idt(&idt[0x08], trap_unk_arg);
+	set_idt(&idt[0x0a], trap_unk_arg);
+	set_idt(&idt[0x0b], trap_unk_arg);
+	set_idt(&idt[0x0c], trap_unk_arg);
+	set_idt(&idt[0x11], trap_unk_arg);
+	set_idt(&idt[0x1e], trap_unk_arg);
+
+	// Fault Handlers
+	set_idt(&idt[0x0d], trap_gpf);
+	set_idt(&idt[0x0e], trap_pf);
+
+	set_idt(&idt[0x80], int80_handler, true);
+
 	asm volatile("lidt %0\n" :: "m"(IDTR));
+}
 
-	asm volatile("ltr %0\n" :: "a"((uint16_t)0x28));
+void Environment::install_tss()
+{
+	printf("moo\n");
+	asm volatile("ltr %0\n" :: "a"((uint16_t)0x2b));
+}
 
-	wrmsr(0x174, 0x08);
-	wrmsr(0x175, (uint64_t)&temp_sysenter_stack);
-	wrmsr(0x176, (uint64_t)&sysenter_entry);
+bool Environment::init()
+{
+	install_gdt();
+	install_idt();
+	install_tss();
 
 	return true;
 }

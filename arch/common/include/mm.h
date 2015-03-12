@@ -50,8 +50,8 @@ namespace captive {
 			inline void present(bool v) { if (v) flags(flags() | PRESENT); else flags(flags() & ~PRESENT); }
 			inline bool writable() const { return (flags() & WRITABLE) == WRITABLE; }
 			inline void writable(bool v) { if (v) flags(flags() | WRITABLE); else flags(flags() & ~WRITABLE); }
-			inline bool allow_user() const { return (flags() & ALLOW_USER) == ALLOW_USER; }
-			inline void allow_user(bool v) { if (v) flags(flags() | ALLOW_USER); else flags(flags() & ~ALLOW_USER); }
+			inline bool allow_user() const { return get_flag(ALLOW_USER); }
+			inline void allow_user(bool v) { set_flag(ALLOW_USER, v); }
 
 			inline bool executed() const { return get_flag(EXECUTED); }
 			inline void executed(bool v) { set_flag(EXECUTED, v); }
@@ -69,7 +69,7 @@ namespace captive {
 			}
 
 			inline void dump() const {
-				printf("mm: entry: data=%x, addr=%x, flags=%x\n", data, base_address(), flags());
+				printf("mm: entry: data=%016lx, addr=%lx, flags=%x\n", data, base_address(), flags());
 			}
 		} packed;
 
@@ -151,7 +151,7 @@ namespace captive {
 			}
 
 			static inline void flush_page(va_t addr) {
-				asm volatile("invlpg (%0)\n" :: "p"((uint64_t)addr) : "memory");
+				asm volatile("invlpg (%0)\n" :: "r"((uint64_t)addr) : "memory");
 			}
 
 		public:
@@ -199,12 +199,11 @@ namespace captive {
 				// L3
 				pdp = &((page_dir_ptr_t *)phys_to_virt((pa_t)(uint64_t)pm->base_address()))->entries[pdp_idx];
 				if (pdp->base_address() == 0) {
-					printf("%x\n", pm->base_address());
 					auto page = Memory::alloc_page();
 					pdp->base_address((uint64_t)page.pa);
 					pdp->present(true);
 					pdp->writable(true);
-					pm->allow_user(true);
+					pdp->allow_user(true);
 				}
 
 				// L2
@@ -214,7 +213,7 @@ namespace captive {
 					pd->base_address((uint64_t)page.pa);
 					pd->present(true);
 					pd->writable(true);
-					pm->allow_user(true);
+					pd->allow_user(true);
 				}
 
 				pt = &((page_table_t *)phys_to_virt((pa_t)(uint64_t)pd->base_address()))->entries[pt_idx];

@@ -44,7 +44,7 @@ namespace captive {
 				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
 
 				void do_guest_printf();
-				
+
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
 
@@ -107,6 +107,7 @@ namespace captive {
 				{
 					uint64_t page = per_guest_data->next_phys_page;
 					per_guest_data->next_phys_page += 0x1000;
+
 					return page;
 				}
 

@@ -190,7 +190,7 @@ bool CPU::run_region_jit()
 bool CPU::interpret_block()
 {
 	bool step_ok = false;
-	uint32_t prev_pc = 0x1;
+	uint32_t prev_pc = 0xffffffff;
 
 	// Now, execute one basic-block of instructions.
 	Decode *insn;
@@ -223,6 +223,14 @@ bool CPU::interpret_block()
 
 		if (unlikely(cpu_data().verify_enabled) && !verify_check()) {
 			return false;
+		}
+
+		if (kernel_mode() && current_ring() != 0) {
+			printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
+			switch_to_ring0();
+		} else if (!kernel_mode() && current_ring() != 3) {
+			printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
+			switch_to_ring3();
 		}
 
 		// Execute the instruction, with interrupts disabled.

@@ -61,37 +61,19 @@ extern "C" {
 
 	void handle_trap_unk(uint64_t rip)
 	{
-		printf("IT'S A TRAP @ %x\n", rip);
+		printf("IT'S A TRAP @ %lx\n", rip);
 		abort();
 	}
 
-	void handle_trap_dbz()
+	void handle_trap_unk_arg(uint64_t rip, uint64_t code)
 	{
-		printf("trap: divide-by-zero\n");
-		abort();
-	}
-
-	void handle_trap_dbg()
-	{
-		printf("trap: debug\n");
-		abort();
-	}
-
-	void handle_trap_nmi()
-	{
-		printf("trap: nmi\n");
+		printf("IT'S A TRAP @ %lx code=%lx\n", rip, code);
 		abort();
 	}
 
 	void handle_trap_gpf(uint64_t rip, uint64_t code)
 	{
-		printf("general protection fault: rip=%x\n", rip);
-		abort();
-	}
-
-	void handle_trap_irq()
-	{
-		printf("trap: irq\n");
+		printf("general protection fault: rip=0x%lx, code=0x%x\n", rip, code);
 		abort();
 	}
 }

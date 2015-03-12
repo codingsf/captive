@@ -20,6 +20,7 @@ MMU::MMU(CPU& cpu) : _cpu(cpu)
 		pdp->entries[i].flags(0);
 		pdp->entries[i].present(false);
 		pdp->entries[i].writable(true);
+		pdp->entries[i].allow_user(true);
 	}
 
 	Memory::flush_tlb();
@@ -66,7 +67,7 @@ bool MMU::clear_vma()
 
 void MMU::cpu_privilege_change(bool kernel_mode)
 {
-	clear_vma();
+	//clear_vma();
 }
 
 bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& fault)

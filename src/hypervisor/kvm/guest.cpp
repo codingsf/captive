@@ -22,10 +22,9 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-#define PT_PRESENT	(1ULL << 0)
-#define PT_WRITABLE	(1ULL << 1)
-#define PT_USER_ACCESS	(1ULL << 2)
-#define PT_NO_EXECUTE	(1ULL << 63)
+#define PT_PRESENT	(1 << 0)
+#define PT_WRITABLE	(1 << 1)
+#define PT_USER_ACCESS	(1 << 2)
 
 #define BIOS_PHYS_BASE			0xf0000ULL
 
@@ -71,11 +70,11 @@ struct {
 	uint64_t size;
 	uint32_t prot_flags;
 } guest_memory_regions[] = {
-	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE },
-	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE, .prot_flags = PT_WRITABLE },
-	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE },
-	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE, .prot_flags = PT_WRITABLE },
-	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE, .prot_flags = 0 },
+	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
+	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
+	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
+	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
+	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE, .prot_flags = PT_USER_ACCESS },
 	/*{ .name = "gpm",         .phys_base = GPM_PHYS_BASE,         .virt_base = GPM_VIRT_BASE,         .size = GPM_SIZE },
 	{ .name = "gpm-copy",    .phys_base = GPM_PHYS_BASE,         .virt_base = GPM_COPY_VIRT_BASE,    .size = GPM_SIZE },*/
 };
@@ -345,10 +344,10 @@ bool KVMGuest::install_gdt()
 
 	*gdt++ = 0;				// NULL
 	*gdt++ = 0x0020980000000000;		// KERNEL CS
-	*gdt++ = 0x0000900000000000;		// KERNEL DS
+	*gdt++ = 0x0000920000000000;		// KERNEL DS
 	*gdt++ = 0x0020f80000000000;		// USER CS
-	*gdt++ = 0x0000f00000000000;		// USER DS
-	*gdt++ = 0x00408900020000d0;		// TSS
+	*gdt++ = 0x0000f20000000000;		// USER DS
+	*gdt++ = 0x00408900130000d0;		// TSS
 	*gdt = 2;
 
 	return true;
@@ -357,17 +356,9 @@ bool KVMGuest::install_gdt()
 bool KVMGuest::install_tss()
 {
 	// Hack in the TSS
-	uint64_t *tss = (uint64_t *)get_phys_buffer(0x200);
+	uint64_t *tss = (uint64_t *)get_phys_buffer(0x1304);
 
-	tss[1] = 0xabcdef123456;
-	tss[2] = 0;
-	tss[19] = 0x1b;		// CS
-	tss[20] = 0x23;		// SS
-	tss[21] = 0x23;		// DS
-	tss[22] = 0x23;		// FS
-	tss[23] = 0x23;		// GS
-
-	tss[25] = 208;
+	tss[0] = 0x210000000;
 
 	return true;
 }
@@ -420,13 +411,13 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 
 	// Map the verification region (if enabled)
 	if (verify_enabled()) {
-		map_page(VERIFY_VIRT_BASE, VERIFY_PHYS_BASE, PT_PRESENT | PT_WRITABLE);
+		map_page(VERIFY_VIRT_BASE, VERIFY_PHYS_BASE, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	// Map ALL guest physical memory, and mark it as present and writable for
 	// use by the engine.
 	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE);
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	return true;
@@ -540,8 +531,8 @@ void KVMGuest::release_all_guest_memory()
 	gpm.clear();
 }
 
-#define ADDR_MASK (uint64_t)~((uint64_t)(0xfff))
-#define FLAGS_MASK (uint64_t)((uint64_t)(0xfff))
+#define ADDR_MASK (~0xfffULL)
+#define FLAGS_MASK (0xfffULL)
 
 #define BITS(val, start, end) ((val >> start) & (((1 << (end - start + 1)) - 1)))
 
@@ -577,11 +568,11 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 	}
 
 	pt_t pt = (pt_t)get_phys_buffer(pd[pd_idx] & ADDR_MASK);
-	pt[pt_idx] = (pa & ADDR_MASK) | (flags & FLAGS_MASK);
+	pt[pt_idx] = (pa & ADDR_MASK) | ((uint64_t)flags & FLAGS_MASK);
 
 	/*DEBUG << "Map Page VA=" << std::hex << va
 		<< ", PA=" << pa
-		<< ", PM[1000]=" << (uint32_t)pm_idx
+		<< ", PM[2000]=" << (uint32_t)pm_idx
 		<< ", PDP[" << pm[pm_idx] << "]=" << (uint32_t)pdp_idx
 		<< ", PD[" << pdp[pdp_idx] << "]=" << (uint32_t)pd_idx
 		<< ", PT[" << pd[pd_idx] << "]=" << (uint32_t)pt_idx;*/
