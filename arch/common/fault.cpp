@@ -24,7 +24,8 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 
 			// Prepare an access_info structure to describe the memory access
 			// to the MMU.
-			info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
+			// info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
+			info.mode = core->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 
 			if (va == core->read_pc() && !(code & PF_WRITE)) {
 				// Detect a fetch

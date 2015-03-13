@@ -108,7 +108,6 @@ void Environment::install_idt()
 
 void Environment::install_tss()
 {
-	printf("moo\n");
 	asm volatile("ltr %0\n" :: "a"((uint16_t)0x2b));
 }
 
