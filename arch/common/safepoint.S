@@ -32,6 +32,7 @@ interrupt_restore_safepoint:
 	movq 40(%rdi), %r14
 	movq 48(%rdi), %r15
 
+	// We should return into ring0
 	push $0			// SS
 	push 8(%rdi)	// RSP
 	push 64(%rdi)	// RFLAGS
@@ -43,10 +44,6 @@ interrupt_restore_safepoint:
 .globl switch_to_ring3
 switch_to_ring3:
 	pop %rcx
-
-	mov $0x23, %eax
-	mov %ax, %ds
-	mov %ax, %es
 
 	mov %rsp, %rax
 
@@ -65,5 +62,4 @@ switch_to_ring0:
 .globl int80_handler
 int80_handler:
 	mov 24(%rsp), %rsp
-
 	ret

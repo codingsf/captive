@@ -55,7 +55,7 @@ bool ArmMMU::disable()
 	return true;
 }
 
-bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault)
+bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects)
 {
 	arm_resolution_fault arm_fault = NONE;
 	fault = arch::MMU::NONE;
@@ -144,9 +144,11 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 
 	//printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
 
-	_coco.FSR(fsr);
-	_coco.FAR(va);
-
+	if (likely(have_side_effects)) {
+		_coco.FSR(fsr);
+		_coco.FAR(va);
+	}
+	
 	return true;
 }
 

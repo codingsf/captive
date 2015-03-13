@@ -67,7 +67,7 @@ bool MMU::clear_vma()
 
 void MMU::cpu_privilege_change(bool kernel_mode)
 {
-	//clear_vma();
+	clear_vma();
 }
 
 bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& fault)
@@ -126,6 +126,7 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 		for (int i = 0; i < 0x200; i++) {
 			base->entries[i].present(false);
 			base->entries[i].executed(false);
+			base->entries[i].allow_user(false);
 		}
 
 		// Set the PRESENT flag for the page table.

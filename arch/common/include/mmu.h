@@ -78,7 +78,7 @@ namespace captive {
 		protected:
 			bool clear_vma();
 
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault) = 0;
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 		};
 	}
 }

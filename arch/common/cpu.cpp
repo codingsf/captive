@@ -105,6 +105,7 @@ bool CPU::run_interp()
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
 		if (unlikely(cpu_data().async_action)) {
+			switch_to_ring0();
 			if (handle_pending_action(cpu_data().async_action)) {
 				cpu_data().async_action = 0;
 			}
@@ -195,15 +196,21 @@ bool CPU::interpret_block()
 	// Now, execute one basic-block of instructions.
 	Decode *insn;
 	do {
-		// Reset CPU exception state
-		local_state.last_exception_action = 0;
-
 		// Get the address of the next instruction to execute
 		uint32_t pc = read_pc();
 
+		// Switch x86 privilege mode, to match the mode of the emulated processor
+		/*if (kernel_mode() && current_ring() != 0) {
+			//printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
+			switch_to_ring0();
+		} else if (!kernel_mode() && current_ring() != 3) {
+			//printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
+			switch_to_ring3();
+		}*/
+
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);
-		if (insn->pc != pc) {
+		if (1) { //insn->pc != pc) {
 			if (unlikely(!decode_instruction(pc, insn))) {
 				printf("cpu: unhandled decode fault @ %08x\n", pc);
 				return false;
@@ -223,14 +230,6 @@ bool CPU::interpret_block()
 
 		if (unlikely(cpu_data().verify_enabled) && !verify_check()) {
 			return false;
-		}
-
-		if (kernel_mode() && current_ring() != 0) {
-			printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
-			switch_to_ring0();
-		} else if (!kernel_mode() && current_ring() != 3) {
-			printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
-			switch_to_ring3();
 		}
 
 		// Execute the instruction, with interrupts disabled.

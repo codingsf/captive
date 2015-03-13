@@ -6,7 +6,9 @@
 
 using namespace captive::arch;
 
+#define PF_PRESENT	(1 << 0)
 #define PF_WRITE	(1 << 1)
+#define PF_USER_MODE	(1 << 2)
 
 extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 {
@@ -22,7 +24,7 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 
 			// Prepare an access_info structure to describe the memory access
 			// to the MMU.
-			info.mode = core->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+			info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
 
 			if (va == core->read_pc() && !(code & PF_WRITE)) {
 				// Detect a fetch
@@ -39,7 +41,7 @@ extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
 			// Get the core's MMU to handle the fault.
 			if (core->mmu().handle_fault((gva_t)va, info, fault)) {
 				// If we got this far, then the fault was handled by the core's logic.
-				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d\n", va, code, core->read_pc(), fault);
+				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%d\n", va, code, core->read_pc(), fault, info.mode);
 
 				// Return TRUE if we need to return to the safe-point, i.e. to do a side
 				// exit from the currently executing guest instruction.
