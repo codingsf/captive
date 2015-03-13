@@ -6,6 +6,7 @@
 #include <disasm.h>
 #include <string.h>
 #include <safepoint.h>
+#include <priv.h>
 #include <jit.h>
 #include <jit/guest-basic-block.h>
 #include <jit/translation-context.h>
@@ -105,7 +106,7 @@ bool CPU::run_interp()
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
 		if (unlikely(cpu_data().async_action)) {
-			switch_to_ring0();
+			if (!in_kernel_mode()) switch_to_kernel_mode();
 			if (handle_pending_action(cpu_data().async_action)) {
 				cpu_data().async_action = 0;
 			}
@@ -200,13 +201,13 @@ bool CPU::interpret_block()
 		uint32_t pc = read_pc();
 
 		// Switch x86 privilege mode, to match the mode of the emulated processor
-		/*if (kernel_mode() && current_ring() != 0) {
+		if (kernel_mode() && !in_kernel_mode()) {
 			//printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
-			switch_to_ring0();
-		} else if (!kernel_mode() && current_ring() != 3) {
+			switch_to_kernel_mode();
+		} else if (!kernel_mode() && !in_user_mode()) {
 			//printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
-			switch_to_ring3();
-		}*/
+			switch_to_user_mode();
+		}
 
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);
@@ -216,6 +217,8 @@ bool CPU::interpret_block()
 				return false;
 			}
 		}
+
+		assert((kernel_mode() && in_kernel_mode()) || (!kernel_mode() && in_user_mode()));
 
 		// Perhaps trace this instruction
 		if (unlikely(trace().enabled())) {

@@ -17,14 +17,5 @@ typedef struct safepoint {
 extern "C" int record_safepoint(safepoint_t *sp);
 extern "C" int interrupt_restore_safepoint(safepoint_t *sp, int v);
 
-extern "C" void switch_to_ring3(void);
-extern "C" void switch_to_ring0(void);
-
-static inline int current_ring() {
-	unsigned short cs;
-	asm volatile("mov %%cs, %0" : "=r"(cs));
-	return cs & 3;
-}
-
 #endif	/* SAFEPOINT_H */
 

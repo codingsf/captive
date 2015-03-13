@@ -40,26 +40,3 @@ interrupt_restore_safepoint:
 	push 56(%rdi)	// RIP
 
 	iretq
-
-.globl switch_to_ring3
-switch_to_ring3:
-	pop %rcx
-
-	mov %rsp, %rax
-
-	push $0x23
-	push %rax
-	pushf
-	push $0x1b
-	push %rcx
-
-	iretq
-
-.globl switch_to_ring0
-switch_to_ring0:
-	int $0x80
-
-.globl int80_handler
-int80_handler:
-	mov 24(%rsp), %rsp
-	ret
