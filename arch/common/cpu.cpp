@@ -57,6 +57,8 @@ bool CPU::handle_pending_action(uint32_t action)
 
 bool CPU::run()
 {
+	trace().enable();
+
 	switch (_per_cpu_data->execution_mode) {
 	case 0:
 		return run_interp();

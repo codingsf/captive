@@ -4,6 +4,7 @@
 #include <jit/llvm.h>
 #include <jit/wsj.h>
 #include <loader/zimage-loader.h>
+#include <loader/elf-loader.h>
 #include <loader/devtree-loader.h>
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
@@ -212,17 +213,18 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// Load the zimage
-	ZImageLoader zimage(argv[2]);
-	if (!guest->load(zimage)) {
+	// Load the kernel
+	/*ZImageLoader kernel(argv[2]);*/
+	ELFLoader kernel(argv[2]);
+	if (!guest->load(kernel)) {
 		delete guest;
 		delete hv;
 
-		ERROR << "Unable to load ZIMAGE";
+		ERROR << "Unable to load guest kernel";
 		return 1;
 	}
 
-	guest->guest_entrypoint(zimage.entrypoint());
+	guest->guest_entrypoint(kernel.entrypoint());
 
 	// Load the device-tree
 	DeviceTreeLoader device_tree(argv[3], 0x1000);

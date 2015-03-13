@@ -132,7 +132,7 @@ bool KVMGuest::load(loader::Loader& loader)
 		return false;
 	}
 
-	if (!loader.install((uint8_t *)gpm.front().vmr->host_buffer)) {
+	if (!loader.install((uint8_t *)get_phys_buffer(0))) {
 		return false;
 	}
 
