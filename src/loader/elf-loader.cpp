@@ -65,7 +65,7 @@ bool ELFLoader::install(uint8_t* gpm)
 		DEBUG << CONTEXT(ELF) << "Program Header: type=" << phdr->p_type << ", flags=" << phdr->p_flags << ", file offset=" << phdr->p_offset << ", file size=" << phdr->p_filesz << ", paddr=" << std::hex << phdr->p_paddr << ", vaddr=" << phdr->p_vaddr;
 
 		if (phdr->p_type == PT_LOAD) {
-			DEBUG << CONTEXT(ELF) << "Loading @ " << std::hex << phdr->p_vaddr;
+			DEBUG << CONTEXT(ELF) << "Loading @ " << std::hex << phdr->p_vaddr << " to " << (uint64_t)(gpm + phdr->p_vaddr);
 			memcpy(gpm + phdr->p_vaddr, elf_base + phdr->p_offset, phdr->p_filesz);
 		}
 	}

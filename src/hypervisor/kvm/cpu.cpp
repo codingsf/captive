@@ -197,6 +197,10 @@ bool KVMCpu::run()
 			run_cpu = false;
 			ERROR << CONTEXT(CPU) << "EXIT HYPERCALL";
 			break;
+		case KVM_EXIT_HLT:
+			run_cpu = false;
+			ERROR << CONTEXT(CPU) << "EXIT HALT";
+			break;
 		default:
 			run_cpu = false;
 			ERROR << CONTEXT(CPU) << "UNKNOWN: " << cpu_run_struct->exit_reason;

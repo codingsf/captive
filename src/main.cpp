@@ -83,6 +83,7 @@ int main(int argc, char **argv)
 	cfg.name = "linux";
 
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
+	//cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x10000000, 0x100000000-0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x40000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x80000000, 0x60000000));
 
@@ -214,8 +215,8 @@ int main(int argc, char **argv)
 	}
 
 	// Load the kernel
-	/*ZImageLoader kernel(argv[2]);*/
-	ELFLoader kernel(argv[2]);
+	ZImageLoader kernel(argv[2]);
+	//ELFLoader kernel(argv[2]);
 	if (!guest->load(kernel)) {
 		delete guest;
 		delete hv;
