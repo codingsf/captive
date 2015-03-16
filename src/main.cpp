@@ -237,7 +237,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::Interpreter); //(verify_enabled() && verify_get_tid() == 0) ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::BlockJIT);
+	GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::RegionJIT); //(verify_enabled() && verify_get_tid() == 0) ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::BlockJIT);
 
 	CPU *cpu = guest->create_cpu(cpu_cfg);
 	if (!cpu) {
