@@ -15,6 +15,7 @@ extern "C" void trap_gpf(void);
 
 extern "C" void int80_handler(void);
 extern "C" void int81_handler(void);
+extern "C" void int82_handler(void);
 
 struct IDT {
 	uint16_t off_low;
@@ -104,6 +105,7 @@ void Environment::install_idt()
 
 	set_idt(&idt[0x80], int80_handler, true);
 	set_idt(&idt[0x81], int81_handler, true);
+	set_idt(&idt[0x82], int82_handler, true);
 
 	asm volatile("lidt %0\n" :: "m"(IDTR));
 }

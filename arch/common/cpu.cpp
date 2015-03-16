@@ -69,12 +69,8 @@ bool CPU::run()
 	}
 }
 
-bool CPU::run_interp()
+bool CPU::check_safepoint()
 {
-	bool step_ok = true;
-
-	printf("cpu: starting interpretive cpu execution\n");
-
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
@@ -96,6 +92,23 @@ bool CPU::run_interp()
 		__local_irq_enable();
 	}
 
+	// Make sure we're operating in the correct mode
+	ensure_privilege_mode();
+
+	return true;
+}
+
+
+bool CPU::run_interp()
+{
+	bool step_ok = true;
+
+	printf("cpu: starting interpretive cpu execution\n");
+
+	if (!check_safepoint()) {
+		return false;
+	}
+
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -106,7 +119,6 @@ bool CPU::run_interp()
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
 		if (unlikely(cpu_data().async_action)) {
-			if (!in_kernel_mode()) switch_to_kernel_mode();
 			if (handle_pending_action(cpu_data().async_action)) {
 				cpu_data().async_action = 0;
 			}
@@ -124,25 +136,8 @@ bool CPU::run_block_jit()
 
 	printf("cpu: starting block-jit cpu execution\n");
 
-	// Create a safepoint for returning from a memory access fault
-	int rc = record_safepoint(&cpu_safepoint);
-	if (rc > 0) {
-		// If the return code is greater than zero, then we returned
-		// from a fault.
-
-		// If we're tracing, add a descriptive message, and close the
-		// trace packet.
-		if (unlikely(trace().enabled())) {
-			trace().add_str("memory exception taken");
-			trace().end_record();
-		}
-
-		// Instruct the interpreter to handle the memory fault, passing
-		// in the the type of fault.
-		interpreter().handle_memory_fault((MMU::resolution_fault)rc);
-
-		// Make sure interrupts are enabled.
-		__local_irq_enable();
+	if (!check_safepoint()) {
+		return false;
 	}
 
 	do {
@@ -186,7 +181,35 @@ bool CPU::run_block_jit()
 
 bool CPU::run_region_jit()
 {
-	return false;
+	bool step_ok = true;
+
+	printf("cpu: starting interpretive cpu execution\n");
+
+	if (!check_safepoint()) {
+		return false;
+	}
+
+	do {
+		// Check the ISR to determine if there is an interrupt pending,
+		// and if there is, instruct the interpreter to handle it.
+		if (unlikely(cpu_data().isr)) {
+			interpreter().handle_irq(cpu_data().isr);
+		}
+
+		// Check to see if there are any pending actions coming in from
+		// the hypervisor.
+		if (unlikely(cpu_data().async_action)) {
+			if (handle_pending_action(cpu_data().async_action)) {
+				cpu_data().async_action = 0;
+			}
+		}
+
+		uint32_t pc = read_pc();
+
+		step_ok = interpret_block();
+	} while(step_ok);
+
+	return true;
 }
 
 bool CPU::interpret_block()
@@ -200,14 +223,7 @@ bool CPU::interpret_block()
 		// Get the address of the next instruction to execute
 		uint32_t pc = read_pc();
 
-		// Switch x86 privilege mode, to match the mode of the emulated processor
-		if (kernel_mode() && !in_kernel_mode()) {
-			//printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
-			switch_to_kernel_mode();
-		} else if (!kernel_mode() && !in_user_mode()) {
-			//printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
-			switch_to_user_mode();
-		}
+		assert_privilege_mode();
 
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);
@@ -217,8 +233,6 @@ bool CPU::interpret_block()
 				return false;
 			}
 		}
-
-		assert((kernel_mode() && in_kernel_mode()) || (!kernel_mode() && in_user_mode()));
 
 		// Perhaps trace this instruction
 		if (unlikely(trace().enabled())) {

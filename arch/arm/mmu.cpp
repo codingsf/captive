@@ -97,12 +97,10 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 
 	switch (info.type) {
 	case MMU::ACCESS_READ:
-	case MMU::ACCESS_READ_USER:
 		fault = MMU::READ_FAULT;
 		break;
 
 	case MMU::ACCESS_WRITE:
-	case MMU::ACCESS_WRITE_USER:
 		fault = MMU::WRITE_FAULT;
 		break;
 
@@ -148,7 +146,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 		_coco.FSR(fsr);
 		_coco.FAR(va);
 	}
-	
+
 	return true;
 }
 

@@ -81,8 +81,8 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 #define write_device(a, b, c) cpu.env().write_core_device(cpu, a, b, c)
 #define read_device(a, b, c) cpu.env().read_core_device(cpu, a, b, c)
 
-#define flush_dtlb_entry(v)
-#define flush_itlb_entry(v)
+#define flush_dtlb_entry(v) asm volatile ("int $0x82\n" :: "D"(0), "S"(v) : "rax");
+#define flush_itlb_entry(v) asm volatile ("int $0x82\n" :: "D"(1), "S"(v) : "rax");
 
 #define __mem_read(_addr, _type) (*((_type *)((uint64_t)(_addr))))
 #define __mem_write(_addr, _data, _type) *((_type *)((uint64_t)(_addr))) = (_data)
@@ -100,7 +100,7 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 #define define_mem_read_user_func(_size, _type) static inline _type __mem_read_##_size ## _user(captive::arch::CPU& cpu, uint32_t addr) \
 { \
 	if (cpu.kernel_mode()) { switch_to_user_mode(); } \
-	_type value = mem_read_##_size(addr);\
+	_type value = mem_read_##_size(addr); \
 	if (cpu.kernel_mode()) { switch_to_kernel_mode(); } \
 	return value; \
 }
@@ -110,14 +110,14 @@ define_mem_read_user_func(16, uint16_t)
 define_mem_read_user_func(32, uint32_t)
 define_mem_read_user_func(64, uint64_t)
 
-#define mem_read_8_user(_addr) __mem_read_8_user(cpu, _addr)
-//#define mem_read_8_user(_addr) mem_read_8(_addr)
-#define mem_read_16_user(_addr) __mem_read_16_user(cpu, _addr)
-//#define mem_read_16_user(_addr) mem_read_16(_addr)
-#define mem_read_32_user(_addr) __mem_read_32_user(cpu, _addr)
-//#define mem_read_32_user(_addr) mem_read_32(_addr)
-#define mem_read_64_user(_addr) __mem_read_64_user(cpu, _addr)
-//#define mem_read_64_user(_addr) mem_read_64(_addr)
+//#define mem_read_8_user(_addr) __mem_read_8_user(cpu, _addr)
+#define mem_read_8_user(_addr) mem_read_8(_addr)
+//#define mem_read_16_user(_addr) __mem_read_16_user(cpu, _addr)
+#define mem_read_16_user(_addr) mem_read_16(_addr)
+//#define mem_read_32_user(_addr) __mem_read_32_user(cpu, _addr)
+#define mem_read_32_user(_addr) mem_read_32(_addr)
+//#define mem_read_64_user(_addr) __mem_read_64_user(cpu, _addr)
+#define mem_read_64_user(_addr) mem_read_64(_addr)
 
 #define define_mem_write_user_func(_size, _type) static inline void __mem_write_##_size ## _user(captive::arch::CPU& cpu, uint32_t addr, _type data) \
 { \
@@ -131,14 +131,14 @@ define_mem_write_user_func(16, uint16_t)
 define_mem_write_user_func(32, uint32_t)
 define_mem_write_user_func(64, uint64_t)
 
-#define mem_write_8_user(_addr, _data) __mem_write_8_user(cpu, _addr, _data)
-//#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)
-#define mem_write_16_user(_addr, _data) __mem_write_16_user(cpu, _addr, _data)
-//#define mem_write_16_user(_addr, _data) mem_write_16(_addr, _data)
-#define mem_write_32_user(_addr, _data) __mem_write_32_user(cpu, _addr, _data)
-//#define mem_write_32_user(_addr, _data) mem_write_32(_addr, _data)
-#define mem_write_64_user(_addr, _data) __mem_write_64_user(cpu, _addr, _data)
-//#define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)
+//#define mem_write_8_user(_addr, _data) __mem_write_8_user(cpu, _addr, _data)
+#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)
+//#define mem_write_16_user(_addr, _data) __mem_write_16_user(cpu, _addr, _data)
+#define mem_write_16_user(_addr, _data) mem_write_16(_addr, _data)
+//#define mem_write_32_user(_addr, _data) __mem_write_32_user(cpu, _addr, _data)
+#define mem_write_32_user(_addr, _data) mem_write_32(_addr, _data)
+//#define mem_write_64_user(_addr, _data) __mem_write_64_user(cpu, _addr, _data)
+#define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)
 
 #endif	/* CPU_INTRINSICS_H */
 

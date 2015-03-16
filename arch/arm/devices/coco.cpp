@@ -77,10 +77,10 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		_FAR = data;
 		break;
 
-	case 7:
-	//case 8:
+	/*case 7:
+	case 8:
 		cpu.mmu().flush();
-		break;
+		break;*/
 	}
 
 	return true;
