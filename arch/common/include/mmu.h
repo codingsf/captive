@@ -30,8 +30,6 @@ namespace captive {
 				ACCESS_READ,
 				ACCESS_WRITE,
 				ACCESS_FETCH,
-				ACCESS_READ_USER,
-				ACCESS_WRITE_USER,
 			};
 
 			enum access_mode {
@@ -43,8 +41,8 @@ namespace captive {
 				enum access_type type;
 				enum access_mode mode;
 
-				inline bool is_read() const { return type == ACCESS_READ || type == ACCESS_READ_USER; }
-				inline bool is_write() const { return type == ACCESS_WRITE || type == ACCESS_WRITE_USER; }
+				inline bool is_read() const { return type == ACCESS_READ; }
+				inline bool is_write() const { return type == ACCESS_WRITE; }
 				inline bool is_fetch() const { return type == ACCESS_FETCH; }
 				inline bool is_kernel() const { return mode == ACCESS_KERNEL; }
 				inline bool is_user() const { return mode == ACCESS_USER; }
@@ -66,6 +64,19 @@ namespace captive {
 
 			inline void flush() {
 				clear_vma();
+			}
+
+			inline void invalidate(gva_t va)
+			{
+				page_map_entry_t *pm;
+				page_dir_ptr_entry_t *pdp;
+				page_dir_entry_t *pd;
+				page_table_entry_t *pt;
+
+				Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
+				pt->present(false);
+
+				Memory::flush_page((va_t)(uint64_t)va);
 			}
 
 		private:

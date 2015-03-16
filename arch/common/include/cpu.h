@@ -12,6 +12,7 @@
 #include <trace.h>
 #include <mmu.h>
 #include <shmem.h>
+#include <priv.h>
 
 #define DECODE_CACHE_SIZE	8192
 #define DECODE_OBJ_SIZE		128
@@ -64,6 +65,7 @@ namespace captive {
 				if (local_state._kernel_mode != km) {
 					local_state._kernel_mode = km;
 					mmu().cpu_privilege_change(km);
+					ensure_privilege_mode();
 				}
 			}
 
@@ -100,6 +102,23 @@ namespace captive {
 			} local_state;
 
 		private:
+			inline void assert_privilege_mode()
+			{
+				//assert((kernel_mode() && in_kernel_mode()) || (!kernel_mode() && in_user_mode()));
+			}
+
+			inline void ensure_privilege_mode()
+			{
+				// Switch x86 privilege mode, to match the mode of the emulated processor
+				if (kernel_mode() && !in_kernel_mode()) {
+					//printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
+//					switch_to_kernel_mode();
+				} else if (!kernel_mode() && !in_user_mode()) {
+					//printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
+//					switch_to_user_mode();
+				}
+			}
+
 			static CPU *current_cpu;
 
 			uint32_t *block_interp_count;
@@ -120,6 +139,7 @@ namespace captive {
 				return (jit::GuestBasicBlock *)&block_cache[((pc >> 2) % BLOCK_CACHE_ENTRIES) * BLOCK_OBJ_SIZE];
 			}
 
+			bool check_safepoint();
 			bool run_interp();
 			bool run_block_jit();
 			bool run_region_jit();
