@@ -16,9 +16,9 @@ static bool emit_mov(X86OutputBuffer& buffer, X86Instruction& insn)
 	X86Operand& src = insn.operands.front();
 	X86Operand& dst = insn.operands.back();
 
-	assert(dst.type != IMMEDIATE);
-	assert(!(src.type == MEMORY && dst.type == MEMORY));
-	
+	assert(dst.type != X86Operand::IMMEDIATE);
+	assert(!(src.type == X86Operand::MEMORY && dst.type == X86Operand::MEMORY));
+
 
 	return false;
 }
