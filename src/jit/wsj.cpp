@@ -60,7 +60,7 @@ bool WSJ::lower_block(x86::X86Builder& builder, IRContext& ctx, ir::IRBlock& blo
 		DEBUG << "Lowering " << insn->to_string();
 		switch (insn->type()) {
 		case ir::IRInstruction::STREG:
-			builder.mov(X86Operand(X86Operand::RSI), X86Operand(X86Operand::RAX));
+			builder.mov(X86Operand(X86Operand::RSI, 0), X86Operand(X86Operand::RAX));
 			break;
 
 		//default: assert(false && "Unknown Instruction"); return false;

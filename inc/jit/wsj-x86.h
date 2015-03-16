@@ -38,6 +38,7 @@ namespace captive {
 
 				X86Operand(X86OperandType type) : type(type) { }
 				X86Operand(X86Register reg) : type(REGISTER), reg(reg) { }
+				X86Operand(X86Register base, uint32_t displacement) : type(MEMORY), base(base), displacement(displacement) { }
 
 				X86OperandType type;
 

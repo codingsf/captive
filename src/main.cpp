@@ -9,6 +9,8 @@
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
+#include <util/command-line.h>
+#include <util/cl/options.h>
 
 #include <devices/arm/cpu-irq.h>
 #include <devices/arm/pl011.h>
@@ -42,9 +44,16 @@ using namespace captive::jit;
 using namespace captive::loader;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
+using namespace captive::util;
 
 int main(int argc, char **argv)
 {
+	const CommandLine *cl = CommandLine::parse(argc, argv);
+
+	if (cl::Help) {
+		return 1;
+	}
+
 	if (argc < 5 || argc > 7 || argc == 6) {
 		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
 		return 1;
