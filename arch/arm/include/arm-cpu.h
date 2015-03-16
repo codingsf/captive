@@ -31,7 +31,7 @@ namespace captive {
 				friend class devices::CoCo;
 
 			public:
-				ArmCPU(ArmEnvironment& env, PerCPUData *per_cpu_data);
+				ArmCPU(ArmEnvironment& env, profile::Image& profile_image, PerCPUData *per_cpu_data);
 				virtual ~ArmCPU();
 
 				bool init() override;

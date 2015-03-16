@@ -18,7 +18,7 @@ safepoint_t cpu_safepoint;
 
 CPU *CPU::current_cpu;
 
-CPU::CPU(Environment& env, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data)
+CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), _profile_image(profile_image)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -183,7 +183,7 @@ bool CPU::run_region_jit()
 {
 	bool step_ok = true;
 
-	printf("cpu: starting interpretive cpu execution\n");
+	printf("cpu: starting region-jit cpu execution\n");
 
 	if (!check_safepoint()) {
 		return false;
@@ -204,7 +204,23 @@ bool CPU::run_region_jit()
 			}
 		}
 
-		uint32_t pc = read_pc();
+		gva_t virt_pc = (gva_t)read_pc();
+		gpa_t phys_pc;
+
+		MMU::access_info info;
+		info.mode = MMU::ACCESS_KERNEL;
+		info.type = MMU::ACCESS_FETCH;
+
+		MMU::resolution_fault fault;
+
+		if (!mmu().resolve_gpa(virt_pc, phys_pc, info, fault, false)) {
+			return false;
+		}
+
+		if (fault != MMU::NONE) {
+			step_ok = interpret_block();
+			continue;
+		}
 
 		step_ok = interpret_block();
 	} while(step_ok);

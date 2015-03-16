@@ -13,7 +13,7 @@
 
 using namespace captive::arch::arm;
 
-ArmCPU::ArmCPU(ArmEnvironment& env, captive::PerCPUData *per_cpu_data) : CPU(env, per_cpu_data), state(*(struct cpu_state *)0x211000000)
+ArmCPU::ArmCPU(ArmEnvironment& env, profile::Image& profile_image, captive::PerCPUData *per_cpu_data) : CPU(env, profile_image, per_cpu_data), state(*(struct cpu_state *)0x211000000)
 {
 
 }

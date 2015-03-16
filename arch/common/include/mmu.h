@@ -61,6 +61,7 @@ namespace captive {
 			void set_page_executed(uint32_t va);
 
 			bool handle_fault(gva_t va, const access_info& info, resolution_fault& fault);
+			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 
 			inline void flush() {
 				clear_vma();
@@ -88,8 +89,6 @@ namespace captive {
 
 		protected:
 			bool clear_vma();
-
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 		};
 	}
 }

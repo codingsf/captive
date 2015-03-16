@@ -28,6 +28,10 @@ namespace captive {
 			class GuestBasicBlock;
 		}
 
+		namespace profile {
+			class Image;
+		}
+
 		class Environment;
 		class MMU;
 		class Interpreter;
@@ -37,7 +41,7 @@ namespace captive {
 		class CPU
 		{
 		public:
-			CPU(Environment& env, PerCPUData *per_cpu_data);
+			CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data);
 			virtual ~CPU();
 
 			virtual bool init() = 0;
@@ -46,6 +50,8 @@ namespace captive {
 			virtual MMU& mmu() const = 0;
 			virtual Interpreter& interpreter() const = 0;
 			virtual JIT& jit() const = 0;
+
+			inline profile::Image& profile_image() const { return _profile_image; }
 
 			inline Environment& env() const { return _env; }
 			inline Trace& trace() const { return *_trace; }
@@ -121,8 +127,8 @@ namespace captive {
 
 			static CPU *current_cpu;
 
-			uint32_t *block_interp_count;
 
+			profile::Image& _profile_image;
 			bool _should_flush_decode_cache;
 
 			Environment& _env;
