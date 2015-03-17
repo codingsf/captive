@@ -9,6 +9,7 @@
 #define	REGION_H
 
 #include <define.h>
+#include <util/map.h>
 
 namespace captive {
 	namespace arch {
@@ -19,14 +20,20 @@ namespace captive {
 			class Region
 			{
 			public:
-				Region(Image& owner);
+				Region(Image& owner, gpa_t address);
 
 				inline Image& owner() const { return _owner; }
+				inline gpa_t address() const { return _address; }
 
-				Block& get_block(gva_t gva);
+				Block& get_block(gpa_t gva);
+
+				uint32_t hot_block_count();
 
 			private:
 				Image& _owner;
+				gpa_t _address;
+
+				util::map<gpa_t, Block *> blocks;
 			};
 		}
 	}

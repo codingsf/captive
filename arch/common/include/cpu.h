@@ -155,6 +155,8 @@ namespace captive {
 
 			bool handle_pending_action(uint32_t action);
 			bool interpret_block();
+
+			void analyse_regions();
 		};
 	}
 }
