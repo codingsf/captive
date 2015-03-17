@@ -30,6 +30,7 @@ namespace captive {
 
 		namespace profile {
 			class Image;
+			class Region;
 		}
 
 		class Environment;
@@ -157,6 +158,7 @@ namespace captive {
 			bool interpret_block();
 
 			void analyse_regions();
+			void compile_region(profile::Region& rgn);
 		};
 	}
 }

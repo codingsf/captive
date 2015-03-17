@@ -37,14 +37,6 @@ namespace captive {
 				inline bool initialised() const { return _initialised; }
 				inline int id() const { return _id; }
 
-			private:
-				bool _initialised;
-				int _id;
-				int fd;
-				struct kvm_run *cpu_run_struct;
-				uint32_t cpu_run_struct_size;
-				uint64_t per_cpu_virt_addr;
-
 				inline int vmioctl(unsigned long int req) const {
 					return vmioctl(req, (unsigned long int)0);
 				}
@@ -56,6 +48,14 @@ namespace captive {
 				inline int vmioctl(unsigned long int req, void *arg) const {
 					return ioctl(fd, req, arg);
 				}
+
+			private:
+				bool _initialised;
+				int _id;
+				int fd;
+				struct kvm_run *cpu_run_struct;
+				uint32_t cpu_run_struct_size;
+				uint64_t per_cpu_virt_addr;
 
 				bool handle_hypercall(uint64_t data);
 				bool handle_device_access(devices::Device *device, uint64_t pa, struct kvm_run& rs);

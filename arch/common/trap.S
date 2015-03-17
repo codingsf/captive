@@ -100,3 +100,12 @@ trap_pf:
 
 	iretq
 
+.globl trap_signal
+.extern
+trap_signal:
+	push_regs
+
+	call handle_signal
+
+	pop_regs
+	iretq

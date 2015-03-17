@@ -215,13 +215,13 @@ captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 
 bool KVMGuest::prepare_guest_irq()
 {
-	/*DEBUG << "Creating IRQ chip";
+	/*DEBUG << CONTEXT(Guest) << "Creating IRQ chip";
 	if (vmioctl(KVM_CREATE_IRQCHIP)) {
 		ERROR << "Unable to create IRQCHIP";
 		return false;
-	}
+	}*/
 
-	struct kvm_irqchip irqchip;
+	/*struct kvm_irqchip irqchip;
 	bzero(&irqchip, sizeof(irqchip));
 
 	irqchip.chip_id = 2;

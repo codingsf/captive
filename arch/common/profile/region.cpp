@@ -3,7 +3,7 @@
 
 using namespace captive::arch::profile;
 
-Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address)
+Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION)
 {
 
 }

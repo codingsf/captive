@@ -73,7 +73,8 @@ bool KVMCpu::init()
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	per_cpu_data().async_action = 1;
+	per_cpu_data().signal_code = code;
+	vmioctl(KVM_NMI);
 }
 
 static KVMCpu *signal_cpu;
@@ -83,7 +84,7 @@ static void handle_signal(int signo)
 	if (signo == SIGUSR1) {
 		signal_cpu->per_cpu_data().async_action = 2;
 	} else if (signo == SIGUSR2) {
-		signal_cpu->per_cpu_data().async_action = 4;
+		signal_cpu->interrupt(0);
 	}
 }
 

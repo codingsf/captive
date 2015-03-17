@@ -53,6 +53,11 @@ bool CPU::run_region_jit()
 
 		Block& block = profile_image().get_block(phys_pc);
 
+		if (block.have_translation()) {
+			block.execute(this, reg_state());
+			continue;
+		}
+
 		if (trace_interval > 10000) {
 			trace_interval = 0;
 			analyse_regions();
@@ -70,8 +75,20 @@ bool CPU::run_region_jit()
 
 void CPU::analyse_regions()
 {
-	printf("analysing:\n");
+	//printf("analysing:\n");
 	for (auto region : profile_image().regions) {
-		printf("region: %08x, hot-blocks=%d\n", region.t2->address(), region.t2->hot_block_count());
+		if (region.t2->hot_block_count() > 20 && region.t2->status() != Region::IN_TRANSLATION) {
+			compile_region(*region.t2);
+			//printf("hot region: %08x, hot-blocks=%d\n", region.t2->address(), region.t2->hot_block_count());
+		}
+	}
+}
+
+void CPU::compile_region(Region& rgn)
+{
+	rgn.status(Region::IN_TRANSLATION);
+
+	for (auto block : rgn.blocks) {
+		printf("generating block %x\n", block.t2->address());
 	}
 }

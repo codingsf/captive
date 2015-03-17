@@ -40,6 +40,7 @@ namespace captive {
 
 		uint32_t isr;			// Interrupt Status Register
 		uint32_t async_action;		// Pending actions
+		uint32_t signal_code;		// Incoming signal code
 		uint64_t insns_executed;	// Number of instructions executed
 
 		uint32_t execution_mode;	// Mode of execution

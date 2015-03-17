@@ -76,4 +76,9 @@ extern "C" {
 		printf("general protection fault: rip=0x%lx, code=0x%x\n", rip, code);
 		abort();
 	}
+
+	void handle_signal()
+	{
+		printf("signal %d\n", captive::arch::CPU::get_active_cpu()->cpu_data().signal_code);
+	}
 }

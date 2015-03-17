@@ -12,6 +12,7 @@ extern "C" void trap_unk_arg(void);
 
 extern "C" void trap_pf(void);
 extern "C" void trap_gpf(void);
+extern "C" void trap_signal(void);
 
 extern "C" void int80_handler(void);
 extern "C" void int81_handler(void);
@@ -91,6 +92,9 @@ void Environment::install_idt()
 		set_idt(&idt[i], trap_unk);
 	}
 
+	// NMI for signalling
+	set_idt(&idt[0x2], trap_signal, false);
+	
 	// Exceptions with arguments
 	set_idt(&idt[0x08], trap_unk_arg);
 	set_idt(&idt[0x0a], trap_unk_arg);
