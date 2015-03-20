@@ -1,10 +1,14 @@
 #include <cpu.h>
 #include <interp.h>
+#include <decode.h>
+#include <jit.h>
+#include <jit/translation-context.h>
 #include <profile/image.h>
 #include <profile/region.h>
 #include <profile/block.h>
 
 using namespace captive::arch;
+using namespace captive::arch::jit;
 using namespace captive::arch::profile;
 
 bool CPU::run_region_jit()
@@ -88,7 +92,34 @@ void CPU::compile_region(Region& rgn)
 {
 	rgn.status(Region::IN_TRANSLATION);
 
+	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
+	uint8_t decode_data[128];
+	Decode *insn = (Decode *)&decode_data[0];
+
+	printf("compiling region %x\n", rgn.address());
 	for (auto block : rgn.blocks) {
-		printf("generating block %x\n", block.t2->address());
+		printf("  generating block %x id=%d\n", block.t2->address(), ctx.current_block());
+
+		uint32_t pc = block.t2->address();
+		do {
+			// Attempt to decode the current instruction.
+			if (!decode_instruction_phys(pc, insn)) {
+				printf("cpu: unhandled decode fault @ %08x\n", pc);
+				assert(false);
+			}
+
+			//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+
+			// Translate this instruction into the context.
+			if (!jit().translate(insn, ctx)) {
+				printf("jit: instruction translation failed\n");
+				assert(false);
+			}
+
+			pc += insn->length;
+		} while (!insn->end_of_block);
+
+		// Finish off with a RET.
+		ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 	}
 }

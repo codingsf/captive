@@ -77,7 +77,9 @@ namespace captive {
 				};
 
 			protected:
-				bool decode_instruction(uint32_t addr, Decode* insn) override;
+				bool decode_instruction_virt(gva_t addr, Decode* insn) override;
+				bool decode_instruction_phys(gpa_t addr, Decode* insn) override;
+
 				void* reg_state() override { return &state.regs; }
 				uint32_t reg_state_size() override { return sizeof(state.regs); }
 

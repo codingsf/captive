@@ -65,7 +65,12 @@ bool ArmCPU::init()
 	return true;
 }
 
-bool ArmCPU::decode_instruction(uint32_t addr, Decode* insn)
+bool ArmCPU::decode_instruction_virt(gva_t addr, Decode* insn)
 {
-	return ((ArmDecode*)insn)->decode(ArmDecode::arm, addr);
+	return ((ArmDecode*)insn)->decode(ArmDecode::arm, addr, (uint8_t *)(uint64_t)addr);
+}
+
+bool ArmCPU::decode_instruction_phys(gpa_t addr, Decode* insn)
+{
+	return ((ArmDecode*)insn)->decode(ArmDecode::arm, addr, (uint8_t *)((uint64_t)addr + 0x100000000));
 }

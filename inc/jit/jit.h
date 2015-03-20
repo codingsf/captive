@@ -42,6 +42,7 @@ namespace captive {
 
 				MOV,
 				CMOV,
+				LDPC,
 
 				ADD,
 				SUB,

@@ -195,7 +195,7 @@ bool CPU::interpret_block()
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);
 		if (1) { //insn->pc != pc) {
-			if (unlikely(!decode_instruction(pc, insn))) {
+			if (unlikely(!decode_instruction_virt(pc, insn))) {
 				printf("cpu: unhandled decode fault @ %08x\n", pc);
 				return false;
 			}
@@ -291,7 +291,7 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 	uint32_t pc = block_addr;
 	do {
 		// Attempt to decode the current instruction.
-		if (!decode_instruction(pc, insn)) {
+		if (!decode_instruction_virt(pc, insn)) {
 			printf("cpu: unhandled decode fault @ %08x\n", pc);
 			return false;
 		}

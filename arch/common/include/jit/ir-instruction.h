@@ -46,6 +46,7 @@ namespace captive {
 
 					MOV,
 					CMOV,
+					LDPC,
 
 					ADD,
 					SUB,
@@ -222,6 +223,13 @@ namespace captive {
 					insn.type = IRInstruction::VERIFY;
 
 					return insn;
+				}
+
+				static IRInstruction create_ldpc(IROperand dst)
+				{
+					assert(dst.vreg());
+
+					return create_unary(IRInstruction::LDPC, dst);
 				}
 
 				static IRInstruction create_mov(IROperand src, IROperand dst)

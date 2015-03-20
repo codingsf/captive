@@ -476,21 +476,6 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		regptr = ctx.builder.CreateIntToPtr(regptr, type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(val, regptr);
 
-		/*{
-			std::vector<Type *> params;
-			params.push_back(ctx.pi8);
-			params.push_back(ctx.i64);
-			params.push_back(ctx.i32);
-
-			FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
-			Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("trace_reg_write", fntype);
-
-			assert(fn);
-
-			ctx.builder.CreateCall3(fn, ctx.cpu_obj, offset, ctx.builder.CreateCast(Instruction::ZExt, val, ctx.i32));
-			return true;
-		}*/
-
 		return true;
 	}
 
@@ -522,6 +507,8 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	}
 
 	case RawInstruction::CMOV: assert(false && "Unsupported CMOV"); return false;
+
+	case RawInstruction::LDPC: assert(false && "Unsupported LDPC"); return false;
 
 	case RawInstruction::BRANCH:
 	{

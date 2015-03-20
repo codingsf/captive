@@ -93,7 +93,9 @@ namespace captive {
 			bool verify_check();
 
 		protected:
-			virtual bool decode_instruction(uint32_t addr, Decode *insn) = 0;
+			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
+			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
+
 			virtual void *reg_state() = 0;
 			virtual uint32_t reg_state_size() = 0;
 
