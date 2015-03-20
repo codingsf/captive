@@ -80,9 +80,9 @@ bool CPU::run_region_jit()
 void CPU::analyse_regions()
 {
 	//printf("analysing:\n");
-	for (auto region : profile_image().regions) {
-		if (region.t2->hot_block_count() > 20 && region.t2->status() != Region::IN_TRANSLATION) {
-			compile_region(*region.t2);
+	for (auto region : profile_image()) {
+		if (region.second->hot_block_count() > 20 && region.second->status() != Region::IN_TRANSLATION) {
+			compile_region(*region.second);
 			//printf("hot region: %08x, hot-blocks=%d\n", region.t2->address(), region.t2->hot_block_count());
 		}
 	}
@@ -97,10 +97,10 @@ void CPU::compile_region(Region& rgn)
 	Decode *insn = (Decode *)&decode_data[0];
 
 	printf("compiling region %x\n", rgn.address());
-	for (auto block : rgn.blocks) {
-		printf("  generating block %x id=%d\n", block.t2->address(), ctx.current_block());
+	for (auto block : rgn) {
+		printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
 
-		uint32_t pc = block.t2->address();
+		uint32_t pc = block.second->address();
 		do {
 			// Attempt to decode the current instruction.
 			if (!decode_instruction_phys(pc, insn)) {
@@ -122,4 +122,7 @@ void CPU::compile_region(Region& rgn)
 		// Finish off with a RET.
 		ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 	}
+
+	// Genereate the block descriptors
+	// Make translation hypercall
 }

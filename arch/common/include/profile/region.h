@@ -9,7 +9,7 @@
 #define	REGION_H
 
 #include <define.h>
-#include <util/map.h>
+#include <map>
 
 namespace captive {
 	namespace arch {
@@ -26,6 +26,8 @@ namespace captive {
 					IN_TRANSLATION,
 				};
 
+				typedef std::map<gpa_t, Block *> block_map_t;
+
 				Region(Image& owner, gpa_t address);
 
 				inline Image& owner() const { return _owner; }
@@ -39,16 +41,15 @@ namespace captive {
 				inline Status status() const { return _status; }
 				inline void status(Status new_status) { _status = new_status; }
 
-				inline util::map<gpa_t, Block *>::value_iterator begin() { return blocks.values_begin(); }
-				inline util::map<gpa_t, Block *>::value_iterator end() { return blocks.values_end(); }
+				inline block_map_t::iterator begin() { return blocks.begin(); }
+				inline block_map_t::iterator end() { return blocks.end(); }
 
 			private:
 				Image& _owner;
 				gpa_t _address;
 				Status _status;
 
-			public:
-				util::map<gpa_t, Block *> blocks;
+				block_map_t blocks;
 			};
 		}
 	}

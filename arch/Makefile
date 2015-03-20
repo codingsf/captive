@@ -4,6 +4,7 @@ export q := @
 top-dir := $(CURDIR)
 export cmn-dir := $(top-dir)/common
 export cmn-inc-dir := $(cmn-dir)/include
+export cmn-cpp-dir := $(cmn-dir)/c++
 export cmn-out := $(cmn-dir)/common.a
 
 export make := make

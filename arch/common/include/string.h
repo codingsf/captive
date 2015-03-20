@@ -12,6 +12,7 @@
 
 extern void *memset(void *, int, size_t);
 extern void *memcpy(void *, const void *, size_t);
+extern void *memmove(void *, const void *, size_t);
 extern int memcmp(const void *, const void *, size_t);
 extern void *bzero(void *, size_t);
 
@@ -20,6 +21,9 @@ extern char *strcpy(char *, const char *);
 extern char *strncpy(char *, const char *, int n);
 extern char *strcat(char *, const char *);
 extern char *strncat(char *, const char *, int n);
+
+extern int strcmp(const char *, const char *);
+extern int strncmp(const char *, const char *, size_t n);
 
 #endif	/* STRING_H */
 

@@ -58,7 +58,10 @@ using namespace captive::hypervisor::kvm;
 #define VERIFY_SIZE			0x1000ULL
 
 #define IR_BUFFER_OFFSET		0x10000
-#define IR_BUFFER_SIZE			0x10000
+#define IR_BUFFER_SIZE			0x20000
+
+#define IR_DESC_BUFFER_OFFSET		0x30000
+#define IR_DESC_BUFFER_SIZE		0x10000
 
 #define PRINTF_BUFFER_OFFSET		0x9000
 #define PRINTF_BUFFER_SIZE		0x1000
@@ -255,6 +258,8 @@ bool KVMGuest::prepare_guest_memory()
 	per_guest_data->heap_size = ENGINE_HEAP_SIZE;
 	per_guest_data->ir_buffer = (void *)(SHARED_MEM_VIRT_BASE + IR_BUFFER_OFFSET);
 	per_guest_data->ir_buffer_size = IR_BUFFER_SIZE;
+	per_guest_data->ir_desc_buffer = (void *)(SHARED_MEM_VIRT_BASE + IR_DESC_BUFFER_OFFSET);
+	per_guest_data->ir_desc_buffer_size = IR_DESC_BUFFER_SIZE;
 	per_guest_data->code_buffer = (void *)JIT_VIRT_BASE;
 	per_guest_data->code_buffer_size = JIT_SIZE;
 	per_guest_data->printf_buffer = (void *)(SHARED_MEM_VIRT_BASE + PRINTF_BUFFER_OFFSET);

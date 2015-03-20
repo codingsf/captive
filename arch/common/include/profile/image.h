@@ -9,7 +9,7 @@
 #define	IMAGE_H
 
 #include <define.h>
-#include <util/map.h>
+#include <map>
 
 namespace captive {
 	namespace arch {
@@ -20,17 +20,19 @@ namespace captive {
 			class Image
 			{
 			public:
+				typedef std::map<gpa_t, Region *> region_map_t;
+
 				Image();
 				~Image();
 
 				Region& get_region(gpa_t gpa);
 				Block& get_block(gpa_t gpa);
 
-				//util::map<gpa_t, Region *>::value_iterator begin() { return regions.values_begin(); }
-				//util::map<gpa_t, Region *>::value_iterator end() { return regions.values_end(); }
+				region_map_t::iterator begin() { return regions.begin(); }
+				region_map_t::iterator end() { return regions.end(); }
 
-			//private:
-				util::map<gpa_t, Region *> regions;
+			private:
+				region_map_t regions;
 			};
 		}
 	}

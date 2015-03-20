@@ -6,7 +6,7 @@ obj := $(src:.cpp=.o)
 dep := $(src:.cpp=.d)
 
 cflags := -I$(cmn-inc-dir) -I$(local-inc-dir) $(common-cflags)
-cxxflags := -I$(cmn-inc-dir) -I$(local-inc-dir) $(common-cflags)
+cxxflags := -I$(cmn-inc-dir) -I$(cmn-cpp-dir) -I$(local-inc-dir) $(common-cflags)
 
 all: $(arch-out)
 

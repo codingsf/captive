@@ -24,11 +24,13 @@ Region& Image::get_region(gpa_t gpa)
 	gpa_t region_base_address = gpa & ~0xfffULL;
 
 	// Lookup the region from the image, allocating a new one if necessary.
-	Region *rgn;
-	if (!regions.try_get_value(region_base_address, rgn)) {
-		rgn = new Region(*this, region_base_address);
-		regions.insert(region_base_address, rgn);
-	}
+	region_map_t::iterator f = regions.find(region_base_address);
 
-	return *rgn;
+	if (f == regions.end()) {
+		Region *rgn = new Region(*this, region_base_address);
+		regions[region_base_address] = rgn;
+		return *rgn;
+	} else {
+		return *(f->second);
+	}
 }

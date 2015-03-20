@@ -25,6 +25,9 @@ namespace captive {
 		void *ir_buffer;
 		uint64_t ir_buffer_size;
 
+		void *ir_desc_buffer;
+		uint64_t ir_desc_buffer_size;
+
 		void *code_buffer;
 		uint64_t code_buffer_size;
 
