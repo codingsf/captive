@@ -48,12 +48,14 @@ namespace captive {
 				llvm::IRBuilder<>& builder;
 
 				llvm::BasicBlock *alloca_block;
+				llvm::BasicBlock *dispatch_block;
 
 				std::map<uint32_t, llvm::BasicBlock *> basic_blocks;
 				std::map<uint32_t, llvm::Value *> vregs;
 
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
+				llvm::Value *pc_ptr;
 
 				llvm::Type *vtype;
 				llvm::Type *i1;
@@ -62,29 +64,29 @@ namespace captive {
 				llvm::Type *i32, *pi32;
 				llvm::Type *i64, *pi64;
 
-				inline llvm::Value *const1(uint8_t v)
+				inline llvm::ConstantInt *const1(uint8_t v)
 				{
-					return llvm::ConstantInt::get(i1, v);
+					return (llvm::ConstantInt *)llvm::ConstantInt::get(i1, v);
 				}
 
-				inline llvm::Value *const8(uint8_t v)
+				inline llvm::ConstantInt *const8(uint8_t v)
 				{
-					return llvm::ConstantInt::get(i8, v);
+					return (llvm::ConstantInt *)llvm::ConstantInt::get(i8, v);
 				}
 
-				inline llvm::Value *const16(uint16_t v)
+				inline llvm::ConstantInt *const16(uint16_t v)
 				{
-					return llvm::ConstantInt::get(i16, v);
+					return (llvm::ConstantInt *)llvm::ConstantInt::get(i16, v);
 				}
 
-				inline llvm::Value *const32(uint32_t v)
+				inline llvm::ConstantInt *const32(uint32_t v)
 				{
-					return llvm::ConstantInt::get(i32, v);
+					return (llvm::ConstantInt *)llvm::ConstantInt::get(i32, v);
 				}
 
-				inline llvm::Value *const64(uint64_t v)
+				inline llvm::ConstantInt *const64(uint64_t v)
 				{
-					return llvm::ConstantInt::get(i64, v);
+					return (llvm::ConstantInt *)llvm::ConstantInt::get(i64, v);
 				}
 			};
 

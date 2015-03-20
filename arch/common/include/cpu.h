@@ -76,7 +76,7 @@ namespace captive {
 				}
 			}
 
-			void invalidate_executed_page(va_t page_base_addr);
+			void invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr);
 
 			inline void schedule_decode_cache_flush() {
 				_should_flush_decode_cache = true;

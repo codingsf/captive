@@ -18,9 +18,9 @@ namespace captive {
 		namespace jit {
 			struct TranslationBlockDescriptor
 			{
-				uint32_t block_addr;
-				uint32_t heat;
 				block_id_t block_id;
+				uint32_t heat;
+				uint32_t block_addr;
 			} packed;
 
 			struct TranslationBlocks

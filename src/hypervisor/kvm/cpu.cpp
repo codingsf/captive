@@ -338,8 +338,14 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	}
 
 	case 8: {	// COMPILE
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
 		DEBUG << CONTEXT(CPU) << "Compiling Region";
-		kvm_guest.jit().region_jit().compile_region(0, 0);
+		regs.rax = kvm_guest.jit().region_jit().compile_region(0, 0);
+
+		vmioctl(KVM_SET_REGS, &regs);
+
 		return true;
 	}
 

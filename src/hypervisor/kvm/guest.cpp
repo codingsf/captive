@@ -57,11 +57,11 @@ using namespace captive::hypervisor::kvm;
 #define VERIFY_VIRT_BASE		0x280000000ULL
 #define VERIFY_SIZE			0x1000ULL
 
-#define IR_BUFFER_OFFSET		0x10000
-#define IR_BUFFER_SIZE			0x20000
-
-#define IR_DESC_BUFFER_OFFSET		0x30000
+#define IR_DESC_BUFFER_OFFSET		0x10000
 #define IR_DESC_BUFFER_SIZE		0x10000
+
+#define IR_BUFFER_OFFSET		0x20000
+#define IR_BUFFER_SIZE			0x80000
 
 #define PRINTF_BUFFER_OFFSET		0x9000
 #define PRINTF_BUFFER_SIZE		0x1000
@@ -302,7 +302,7 @@ bool KVMGuest::prepare_guest_memory()
 	// various description buffers are.
 	jit().set_code_arena(get_phys_buffer(JIT_PHYS_BASE), JIT_SIZE);
 	jit().set_ir_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_BUFFER_OFFSET), per_guest_data->ir_buffer_size);
-	jit().set_ir_desc_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_DESC_BUFFER_OFFSET), per_guest_data->ir_buffer_size);
+	jit().set_ir_desc_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_DESC_BUFFER_OFFSET), per_guest_data->ir_desc_buffer_size);
 
 	DEBUG << CONTEXT(Guest) << "Installing guest memory regions";
 	for (auto& region : config().memory_regions) {

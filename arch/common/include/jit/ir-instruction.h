@@ -21,7 +21,8 @@ namespace captive {
 					CONSTANT,
 					VREG,
 					BLOCK,
-					FUNC
+					FUNC,
+					PC
 				};
 
 				IROperandType type;
@@ -32,6 +33,7 @@ namespace captive {
 				inline bool vreg() const { return type == VREG; }
 				inline bool block() const { return type == BLOCK; }
 				inline bool func() const { return type == FUNC; }
+				inline bool pc() const { return type == PC; }
 			} packed;
 
 			struct IRInstruction
@@ -140,6 +142,16 @@ namespace captive {
 					oper.type = IROperand::VREG;
 					oper.value = id;
 					oper.size = size;
+
+					return oper;
+				}
+
+				static IROperand create_pc(uint32_t offset)
+				{
+					IROperand oper;
+					oper.type = IROperand::PC;
+					oper.value = offset;
+					oper.size = 4;
 
 					return oper;
 				}
@@ -253,7 +265,7 @@ namespace captive {
 				static IRInstruction create_add(IROperand src, IROperand dst)
 				{
 					assert(src.size == dst.size);
-					assert(src.constant() || src.vreg());
+					assert(src.constant() || src.vreg() || src.pc());
 					assert(dst.vreg());
 
 					return create_binary(IRInstruction::ADD, src, dst);
@@ -445,7 +457,7 @@ namespace captive {
 
 				static IRInstruction create_streg(IROperand val, IROperand loc)
 				{
-					assert(val.constant() || val.vreg());
+					assert(val.constant() || val.vreg() || val.pc());
 					assert(loc.constant() || loc.vreg());
 
 					return create_binary(IRInstruction::WRITE_REG, val, loc);

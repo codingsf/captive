@@ -10,6 +10,7 @@
 #include <jit.h>
 #include <jit/guest-basic-block.h>
 #include <jit/translation-context.h>
+#include <profile/image.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
@@ -231,12 +232,14 @@ bool CPU::interpret_block()
 	} while(!insn->end_of_block && step_ok);
 }
 
-void CPU::invalidate_executed_page(va_t page_base_addr)
+void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr)
 {
-	if (page_base_addr > (va_t)0x100000000) return;
+	if (virt_page_base_addr > (va_t)0x100000000) return;
+
+	profile_image().invalidate((gpa_t)((uint64_t)phys_page_base_addr & 0xffffffffULL));
 
 	// Evict entries from the decode cache and block cache
-	uint32_t page_base = (uint32_t)(uint64_t)page_base_addr;
+	/*uint32_t page_base = (uint32_t)(uint64_t)page_base_addr;
 	for (uint32_t pc = page_base; pc < page_base + 0x1000; pc += 4) {
 		Decode *decode = get_decode(pc);
 
@@ -253,7 +256,7 @@ void CPU::invalidate_executed_page(va_t page_base_addr)
 
 			block->invalidate();
 		}
-	}
+	}*/
 }
 
 GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)

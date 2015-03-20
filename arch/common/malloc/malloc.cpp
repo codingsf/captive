@@ -12,7 +12,6 @@ static uint8_t *heap_end_ptr;
 
 void captive::arch::malloc_init(void *arena, size_t size)
 {
-	printf("malloc: arena=%p, size=0x%x\n", arena, size);
 	heap = (uint8_t *)arena;
 	heap_size = size;
 

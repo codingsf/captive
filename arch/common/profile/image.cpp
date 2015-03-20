@@ -13,9 +13,9 @@ Image::~Image()
 
 }
 
-Block& Image::get_block(gpa_t gva)
+Block& Image::get_block(gpa_t gpa)
 {
-	return get_region(gva).get_block(gva);
+	return get_region(gpa).get_block(gpa);
 }
 
 Region& Image::get_region(gpa_t gpa)
@@ -33,4 +33,16 @@ Region& Image::get_region(gpa_t gpa)
 	} else {
 		return *(f->second);
 	}
+}
+
+void Image::invalidate()
+{
+	printf("profile: invalidating regions\n");
+	regions.clear();
+}
+
+void Image::invalidate(gpa_t gpa)
+{
+	printf("profile: invalidating region %x\n", gpa);
+	regions.clear();
 }

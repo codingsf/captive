@@ -16,6 +16,8 @@ std::string RawOperand::render() const
 		return "i" + std::to_string(size) + " r" + std::to_string(val);
 	case BLOCK:
 		return "b" + std::to_string(val);
+	case PC:
+		return "pc";
 	case FUNC:
 	{
 		std::stringstream x;
@@ -34,6 +36,7 @@ std::string RawInstruction::mnemonic() const
 	case RawInstruction::CALL: return "call";
 	case RawInstruction::JMP: return "jump";
 	case RawInstruction::MOV: return "mov";
+	case RawInstruction::LDPC: return "ldpc";
 	case RawInstruction::ADD: return "add";
 	case RawInstruction::SUB: return "sub";
 	case RawInstruction::MUL: return "mul";
@@ -88,6 +91,7 @@ std::string RawBytecode::render() const
 		break;
 
 	case RawInstruction::JMP:
+	case RawInstruction::LDPC:
 	case RawInstruction::SET_CPU_MODE:
 		str << insn.operands[0].render();
 		break;
@@ -216,7 +220,7 @@ uint64_t RegionJIT::compile_region(uint64_t ir_offset, uint64_t ir_desc_offset)
 	}
 
 	assert((uint8_t *)rc > (uint8_t *)owner().get_code_arena());
-	assert((uint8_t *)rc >= ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
+	assert((uint8_t *)rc < ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
 
 	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
 }

@@ -58,7 +58,9 @@ bool CPU::run_region_jit()
 		Block& block = profile_image().get_block(phys_pc);
 
 		if (block.have_translation()) {
-			block.execute(this, reg_state());
+			//if (virt_pc > 0x480000)	printf("before %x:%x\n", virt_pc, phys_pc);
+			step_ok = (bool)block.execute(this, reg_state());
+			//if (virt_pc > 0x480000) printf("after %x\n", read_pc());
 			continue;
 		}
 
@@ -81,7 +83,7 @@ void CPU::analyse_regions()
 {
 	//printf("analysing:\n");
 	for (auto region : profile_image()) {
-		if (region.second->hot_block_count() > 20 && region.second->status() != Region::IN_TRANSLATION) {
+		if (region.second->hot_block_count() > 10 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
 			//printf("hot region: %08x, hot-blocks=%d\n", region.t2->address(), region.t2->hot_block_count());
 		}
@@ -93,6 +95,7 @@ void CPU::compile_region(Region& rgn)
 	rgn.status(Region::IN_TRANSLATION);
 
 	TranslationBlocks *tb = (TranslationBlocks *)cpu_data().guest_data->ir_desc_buffer;
+	tb->block_count = 0;
 
 	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
 	uint8_t decode_data[128];
@@ -100,10 +103,13 @@ void CPU::compile_region(Region& rgn)
 
 	//printf("compiling region %x\n", rgn.address());
 	for (auto block : rgn) {
+		// Make sure we start this GBB in a new IRBB
+		ctx.current_block(ctx.alloc_block());
+
 		//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
 
 		tb->descriptors[tb->block_count].block_id = ctx.current_block();
-		tb->descriptors[tb->block_count].block_addr = block.second->address();
+		tb->descriptors[tb->block_count].block_addr = block.second->address() & 0xfff;
 		tb->descriptors[tb->block_count].heat = block.second->interp_count();
 		tb->block_count++;
 
@@ -116,6 +122,11 @@ void CPU::compile_region(Region& rgn)
 			}
 
 			//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+
+			if (unlikely(cpu_data().verify_enabled)) {
+				//ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_pc(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
+				ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
+			}
 
 			// Translate this instruction into the context.
 			if (!jit().translate(insn, ctx)) {
@@ -130,8 +141,20 @@ void CPU::compile_region(Region& rgn)
 		ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 	}
 
-	printf("compiling region %x\n", rgn.address());
-
 	// Make region translation hypercall
-	asm volatile("out %0, $0xff" :: "r"(8));
+	uint64_t addr;
+	asm volatile("out %1, $0xff" : "=a"(addr): "r"(8));
+
+	if (!addr) {
+		assert(false && "Region Translation Failed");
+	}
+
+	Block::block_fn_t fn = (Block::block_fn_t)((uint64_t)cpu_data().guest_data->code_buffer + addr);
+	for (auto block : rgn) {
+		block.second->set_translation(fn);
+		block.second->reset_interp_count();
+	}
+
+	printf("compiled region %x %x\n", rgn.address(), addr);
+	rgn.status(Region::NOT_IN_TRANSLATION);
 }

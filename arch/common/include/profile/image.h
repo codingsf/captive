@@ -28,6 +28,9 @@ namespace captive {
 				Region& get_region(gpa_t gpa);
 				Block& get_block(gpa_t gpa);
 
+				void invalidate(gpa_t gpa);
+				void invalidate();
+
 				region_map_t::iterator begin() { return regions.begin(); }
 				region_map_t::iterator end() { return regions.end(); }
 

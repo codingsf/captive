@@ -21,7 +21,8 @@ namespace captive {
 				CONSTANT,
 				VREG,
 				BLOCK,
-				FUNC
+				FUNC,
+				PC
 			};
 
 			RawOperandType type;

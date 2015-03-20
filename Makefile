@@ -26,7 +26,7 @@ cc  := gcc
 cxx := g++
 ld  := ld
 rm  := rm
-make := make
+make := +make
 
 all: $(out) .FORCE
 	$(q)$(make) -C $(arch-dir)

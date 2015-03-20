@@ -26,6 +26,7 @@ namespace captive {
 				inline gpa_t address() const { return _address;}
 
 				inline void inc_interp_count() { _interp_count++; }
+				inline void reset_interp_count() { _interp_count = 0; }
 				inline uint32_t interp_count() const { return _interp_count; }
 
 				inline void set_translation(block_fn_t fn) { _block_fn = fn; }

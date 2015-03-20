@@ -1,3 +1,7 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
 #include <jit/llvm.h>
 #include <jit/llvm-mm.h>
 #include <jit/allocator.h>
@@ -63,6 +67,8 @@ Value *LLVMJIT::value_for_operand(LoweringContext& ctx, const RawOperand* oper)
 		}
 	} else if (oper->type == RawOperand::FUNC) {
 		return ctx.const64(oper->val);
+	} else if (oper->type == RawOperand::PC) {
+		return ctx.builder.CreateLoad(ctx.pc_ptr);
 	} else {
 		return NULL;
 	}
@@ -177,7 +183,8 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 	case RawInstruction::RET:
 	{
-		ctx.builder.CreateRet(ctx.const32(1));
+		//ctx.builder.CreateRet(ctx.const32(1));
+		ctx.builder.CreateBr(ctx.dispatch_block);
 		return true;
 	}
 
@@ -348,7 +355,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	{
 		Value *addr = value_for_operand(ctx, op1), *src = value_for_operand(ctx, op0);
 
-		assert(addr && dst);
+		assert(addr && src);
 
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
 		ctx.builder.CreateStore(src, memptr, true);
@@ -358,7 +365,17 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 	case RawInstruction::CMOV: assert(false && "Unsupported CMOV"); return false;
 
-	case RawInstruction::LDPC: assert(false && "Unsupported LDPC"); return false;
+	case RawInstruction::LDPC:
+	{
+		// TODO: Optimise this
+		Value *dst = vreg_for_operand(ctx, op0);
+
+		assert(dst);
+
+		ctx.builder.CreateStore(ctx.builder.CreateLoad(ctx.pc_ptr), dst);
+
+		return true;
+	}
 
 	case RawInstruction::BRANCH:
 	{
