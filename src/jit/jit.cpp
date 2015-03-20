@@ -202,7 +202,21 @@ uint64_t BlockJIT::compile_block(uint64_t ir_offset)
 	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
 }
 
-uint64_t RegionJIT::compile_region(uint64_t ir_offset)
+uint64_t RegionJIT::compile_region(uint64_t ir_offset, uint64_t ir_desc_offset)
 {
-	return 0;
+	assert(ir_offset < owner().get_ir_buffer_size());
+	assert(ir_desc_offset < owner().get_ir_desc_buffer_size());
+
+	const RawBlockDescriptors *bds = (const RawBlockDescriptors *)((uint64_t)owner().get_ir_desc_buffer() + ir_desc_offset);
+	const RawBytecodeDescriptor *ir = (const RawBytecodeDescriptor *)((uint64_t)owner().get_ir_buffer() + ir_offset);
+
+	void *rc = internal_compile_region(bds, ir);
+	if (!rc) {
+		return 0;
+	}
+
+	assert((uint8_t *)rc > (uint8_t *)owner().get_code_arena());
+	assert((uint8_t *)rc >= ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
+
+	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
 }

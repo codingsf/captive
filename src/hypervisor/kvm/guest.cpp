@@ -298,9 +298,11 @@ bool KVMGuest::prepare_guest_memory()
 		return false;
 	}
 
-	// Notify the JIT where the arena for generated code is.
+	// Notify the JIT where the arena for generated code is, and where the
+	// various description buffers are.
 	jit().set_code_arena(get_phys_buffer(JIT_PHYS_BASE), JIT_SIZE);
-	jit().set_ir_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + 0x10000), per_guest_data->ir_buffer_size);
+	jit().set_ir_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_BUFFER_OFFSET), per_guest_data->ir_buffer_size);
+	jit().set_ir_desc_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_DESC_BUFFER_OFFSET), per_guest_data->ir_buffer_size);
 
 	DEBUG << CONTEXT(Guest) << "Installing guest memory regions";
 	for (auto& region : config().memory_regions) {

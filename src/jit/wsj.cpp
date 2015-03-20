@@ -40,7 +40,7 @@ void* WSJ::internal_compile_block(const RawBytecodeDescriptor* bcd)
 	return buffer;
 }
 
-void* WSJ::internal_compile_region(const RawBytecodeDescriptor* bcd)
+void* WSJ::internal_compile_region(const RawBlockDescriptors* bds, const RawBytecodeDescriptor* bcd)
 {
 	return NULL;
 }

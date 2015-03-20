@@ -92,13 +92,20 @@ void CPU::compile_region(Region& rgn)
 {
 	rgn.status(Region::IN_TRANSLATION);
 
+	TranslationBlocks *tb = (TranslationBlocks *)cpu_data().guest_data->ir_desc_buffer;
+
 	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
-	printf("compiling region %x\n", rgn.address());
+	//printf("compiling region %x\n", rgn.address());
 	for (auto block : rgn) {
-		printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
+		//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
+
+		tb->decsriptors[tb->block_count].block_id = ctx.current_block();
+		tb->decsriptors[tb->block_count].block_addr = block.second->address();
+		tb->decsriptors[tb->block_count].heat = block.second->interp_count();
+		tb->block_count++;
 
 		uint32_t pc = block.second->address();
 		do {
@@ -123,6 +130,8 @@ void CPU::compile_region(Region& rgn)
 		ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 	}
 
-	// Genereate the block descriptors
-	// Make translation hypercall
+	printf("compiling region %x\n", rgn.address());
+	
+	// Make region translation hypercall
+	asm volatile("out %0, $0xff" :: "r"(8));
 }

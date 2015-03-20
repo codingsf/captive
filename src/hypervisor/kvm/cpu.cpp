@@ -337,6 +337,12 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		return true;
 	}
 
+	case 8: {	// COMPILE
+		DEBUG << CONTEXT(CPU) << "Compiling Region";
+		kvm_guest.jit().region_jit().compile_region(0, 0);
+		return true;
+	}
+
 	}
 
 	return false;

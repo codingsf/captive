@@ -194,11 +194,6 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 	return ptr;
 }
 
-void *LLVMJIT::internal_compile_region(const RawBytecodeDescriptor* bcd)
-{
-	return 0;
-}
-
 Value *LLVMJIT::value_for_operand(LoweringContext& ctx, const RawOperand* oper)
 {
 	if (oper->type == RawOperand::VREG) {

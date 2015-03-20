@@ -35,7 +35,7 @@ namespace captive {
 
 		protected:
 			void *internal_compile_block(const RawBytecodeDescriptor* bcd) override;
-			void *internal_compile_region(const RawBytecodeDescriptor* bcd) override;
+			void *internal_compile_region(const RawBlockDescriptors* bds, const RawBytecodeDescriptor* bcd) override;
 
 		private:
 			engine::Engine& _engine;

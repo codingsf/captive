@@ -199,8 +199,8 @@ int main(int argc, char **argv)
 	}
 
 	// Create the JIT
-	//LLVMJIT jit(engine);
-	WSJ jit(engine);
+	LLVMJIT jit(engine);
+	//WSJ jit(engine);
 	if (!jit.init()) {
 		ERROR << "Unable to initialise jit";
 		return 1;

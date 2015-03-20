@@ -109,6 +109,19 @@ namespace captive {
 			RawBytecode bc[];
 		} __attribute__((packed));
 
+		struct RawBlockDescriptor
+		{
+			uint32_t id;
+			uint32_t heat;
+			uint32_t addr;
+		} __attribute__((packed));
+
+		struct RawBlockDescriptors
+		{
+			uint32_t block_count;
+			RawBlockDescriptor blocks[];
+		} __attribute__((packed));
+
 		class JIT
 		{
 		public:
@@ -130,11 +143,19 @@ namespace captive {
 				_ir_buffer_size = ir_buffer_size;
 			}
 
+			void set_ir_desc_buffer(void *ir_desc_buffer, uint64_t ir_desc_buffer_size) {
+				_ir_desc_buffer = ir_desc_buffer;
+				_ir_desc_buffer_size = ir_desc_buffer_size;
+			}
+
 			void *get_code_arena() const { return _code_arena; }
 			uint64_t get_code_arena_size() const { return _code_arena_size; }
 
 			void *get_ir_buffer() const { return _ir_buffer; }
 			uint64_t get_ir_buffer_size() const { return _ir_buffer_size; }
+
+			void *get_ir_desc_buffer() const { return _ir_desc_buffer; }
+			uint64_t get_ir_desc_buffer_size() const { return _ir_desc_buffer_size; }
 
 		protected:
 			void *_code_arena;
@@ -142,6 +163,9 @@ namespace captive {
 
 			void *_ir_buffer;
 			uint64_t _ir_buffer_size;
+
+			void *_ir_desc_buffer;
+			uint64_t _ir_desc_buffer_size;
 		};
 
 		class JITStrategy
@@ -172,10 +196,10 @@ namespace captive {
 		public:
 			RegionJIT(JIT& owner);
 			virtual ~RegionJIT();
-			uint64_t compile_region(uint64_t ir_offset);
+			uint64_t compile_region(uint64_t ir_offset, uint64_t ir_desc_offset);
 
 		protected:
-			virtual void *internal_compile_region(const RawBytecodeDescriptor *ir) = 0;
+			virtual void *internal_compile_region(const RawBlockDescriptors *bds, const RawBytecodeDescriptor *ir) = 0;
 		};
 	}
 }
