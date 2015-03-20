@@ -43,7 +43,10 @@
 .globl int82_handler
 .extern do_syscall
 int82_handler:
+	push $0
 	push_regs
+	mov %rsp, %rdi
 	call do_syscall
 	pop_regs
+	add $8, %rsp
 	iretq

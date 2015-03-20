@@ -10,8 +10,11 @@ using namespace captive::arch;
 #define PF_WRITE	(1 << 1)
 #define PF_USER_MODE	(1 << 2)
 
-extern "C" int handle_pagefault(uint64_t va, uint64_t code, uint64_t rip)
+extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 {
+	uint64_t code = mctx->extra;
+	uint64_t rip = mctx->rip;
+
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
 	if (va < 0x100000000) {

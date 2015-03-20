@@ -48,25 +48,28 @@ start:
 	popf
 .endm
 
+.macro enter_intr,has_arg
+.if ! \has_arg
+	push $0
+.endif
+	push_regs
+
+	mov %rsp, %rdi
+.endm
+
+.macro exit_intr
+	pop_regs
+	add $8, %rsp
+	iretq
+.endm
+
 .macro trap_macro name,has_arg
 .extern handle_trap_\name
 .globl trap_\name
 trap_\name:
-	push_regs
-
-	movq (8 * (16 + \has_arg))(%rsp), %rdi
-.if \has_arg
-	movq (8 * 16)(%rsp), %rsi
-.endif
+	enter_intr \has_arg
 	call handle_trap_\name
-
-	pop_regs
-
-.if \has_arg
-	add $8, %rsp
-.endif
-
-	iretq
+	exit_intr
 .endm
 
 trap_macro unk,0
@@ -79,33 +82,23 @@ trap_macro gpf,1
 .extern handle_pagefault
 
 trap_pf:
-	push_regs
+	enter_intr 1
 
-	mov %cr2, %rdi
-	movq (8 * 16)(%rsp), %rsi
-	movq (8 * 17)(%rsp), %rdx
-
+	mov %cr2, %rsi
 	call handle_pagefault
 
 	test %rax, %rax
-	jz 1f
+	jnz 1f
+	exit_intr
 
+1:
 	leaq cpu_safepoint, %rdi
 	mov %rax, %rsi
 	jmp interrupt_restore_safepoint
 
-1:
-	pop_regs
-	add $8, %rsp
-
-	iretq
-
 .globl trap_signal
 .extern
 trap_signal:
-	push_regs
-
+	enter_intr 0
 	call handle_signal
-
-	pop_regs
-	iretq
+	exit_intr

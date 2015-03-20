@@ -3,14 +3,14 @@
 #include <cpu.h>
 
 extern "C" {
-	uint32_t do_syscall(uint32_t idx, uint32_t v)
+	uint32_t do_syscall(struct mcontext *mctx)
 	{
-		switch (idx) {
+		switch (mctx->rdi) {
 		case 0:
-			captive::arch::CPU::get_active_cpu()->mmu().invalidate((gva_t)v);
+			captive::arch::CPU::get_active_cpu()->mmu().invalidate((gva_t)mctx->rsi);
 			return 0;
 		case 1:
-			captive::arch::CPU::get_active_cpu()->mmu().invalidate((gva_t)v);
+			captive::arch::CPU::get_active_cpu()->mmu().invalidate((gva_t)mctx->rsi);
 			return 0;
 		}
 		return -1;

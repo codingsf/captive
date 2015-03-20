@@ -59,25 +59,25 @@ extern "C" {
 		abort();
 	}
 
-	void handle_trap_unk(uint64_t rip)
+	void handle_trap_unk(struct mcontext *mctx)
 	{
-		printf("IT'S A TRAP @ %lx\n", rip);
+		printf("unhandled exception: rip=0x%lx\n", mctx->rip);
 		abort();
 	}
 
-	void handle_trap_unk_arg(uint64_t rip, uint64_t code)
+	void handle_trap_unk_arg(struct mcontext *mctx)
 	{
-		printf("IT'S A TRAP @ %lx code=%lx\n", rip, code);
+		printf("unhandled exception: rip=0x%lx, code=0x%lx\n", mctx->rip, mctx->extra);
 		abort();
 	}
 
-	void handle_trap_gpf(uint64_t rip, uint64_t code)
+	void handle_trap_gpf(struct mcontext *mctx)
 	{
-		printf("general protection fault: rip=0x%lx, code=0x%x\n", rip, code);
+		printf("general protection fault: rip=0x%lx, code=0x%x\n", mctx->rip, mctx->extra);
 		abort();
 	}
 
-	void handle_signal()
+	void handle_signal(struct mcontext *mctx)
 	{
 		printf("signal %d\n", captive::arch::CPU::get_active_cpu()->cpu_data().signal_code);
 	}

@@ -102,9 +102,9 @@ void CPU::compile_region(Region& rgn)
 	for (auto block : rgn) {
 		//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
 
-		tb->decsriptors[tb->block_count].block_id = ctx.current_block();
-		tb->decsriptors[tb->block_count].block_addr = block.second->address();
-		tb->decsriptors[tb->block_count].heat = block.second->interp_count();
+		tb->descriptors[tb->block_count].block_id = ctx.current_block();
+		tb->descriptors[tb->block_count].block_addr = block.second->address();
+		tb->descriptors[tb->block_count].heat = block.second->interp_count();
 		tb->block_count++;
 
 		uint32_t pc = block.second->address();
@@ -131,7 +131,7 @@ void CPU::compile_region(Region& rgn)
 	}
 
 	printf("compiling region %x\n", rgn.address());
-	
+
 	// Make region translation hypercall
 	asm volatile("out %0, $0xff" :: "r"(8));
 }

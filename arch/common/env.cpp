@@ -5,18 +5,18 @@
 #include <device.h>
 #include <mm.h>
 
-typedef void (*trap_fn_t)(void);
+typedef void (*trap_fn_t)(struct mcontext *);
 
-extern "C" void trap_unk(void);
-extern "C" void trap_unk_arg(void);
+extern "C" void trap_unk(struct mcontext *);
+extern "C" void trap_unk_arg(struct mcontext *);
 
-extern "C" void trap_pf(void);
-extern "C" void trap_gpf(void);
-extern "C" void trap_signal(void);
+extern "C" void trap_pf(struct mcontext *);
+extern "C" void trap_gpf(struct mcontext *);
+extern "C" void trap_signal(struct mcontext *);
 
-extern "C" void int80_handler(void);
-extern "C" void int81_handler(void);
-extern "C" void int82_handler(void);
+extern "C" void int80_handler(struct mcontext *);
+extern "C" void int81_handler(struct mcontext *);
+extern "C" void int82_handler(struct mcontext *);
 
 struct IDT {
 	uint16_t off_low;
@@ -94,7 +94,7 @@ void Environment::install_idt()
 
 	// NMI for signalling
 	set_idt(&idt[0x2], trap_signal, false);
-	
+
 	// Exceptions with arguments
 	set_idt(&idt[0x08], trap_unk_arg);
 	set_idt(&idt[0x0a], trap_unk_arg);

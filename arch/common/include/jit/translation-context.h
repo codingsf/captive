@@ -26,7 +26,7 @@ namespace captive {
 			struct TranslationBlocks
 			{
 				uint32_t block_count;
-				TranslationBlockDescriptor decsriptors[];
+				TranslationBlockDescriptor descriptors[];
 			} packed;
 
 			class TranslationContext
