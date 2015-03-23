@@ -44,6 +44,8 @@ namespace captive {
 				inline block_map_t::iterator begin() { return blocks.begin(); }
 				inline block_map_t::iterator end() { return blocks.end(); }
 
+				void invalidate();
+
 			private:
 				Image& _owner;
 				gpa_t _address;

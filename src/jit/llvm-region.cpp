@@ -20,6 +20,8 @@
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <fstream>
+
 USE_CONTEXT(JIT)
 USE_CONTEXT(LLVM)
 DECLARE_CHILD_CONTEXT(LLVMRegionJIT, LLVM);
@@ -79,6 +81,7 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 
 	Value *pc_ptr_off = builder.CreateAdd(lc.reg_state, lc.const64(60));
 	lc.pc_ptr = builder.CreateIntToPtr(pc_ptr_off, lc.pi32);
+	lc.virtual_base_address = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
 
 	// Populate the basic-block map
 	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
@@ -108,6 +111,21 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 
 	builder.SetInsertPoint(dispatch_block);
 
+	{
+		std::vector<Type *> params;
+		params.push_back(lc.pi8);
+
+		FunctionType *fntype = FunctionType::get(lc.vtype, params, false);
+		Constant *fn = builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_check_interrupts", fntype);
+		builder.CreateCall(fn, lc.cpu_obj);
+	}
+
+	BasicBlock *do_dispatch_block = BasicBlock::Create(ctx, "do_dispatch", region_fn);
+
+	Value *pc_region = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
+	builder.CreateCondBr(builder.CreateICmpNE(pc_region, lc.virtual_base_address), exit_block, do_dispatch_block);
+
+	builder.SetInsertPoint(do_dispatch_block);
 	Value *pc_offset = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), 0xfff);
 	SwitchInst *dispatcher = builder.CreateSwitch(pc_offset, exit_block);
 
@@ -147,7 +165,10 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 
 	// Print out the module
 	/*{
-		raw_os_ostream str(std::cerr);
+		std::stringstream filename;
+		filename << "region-" << std::hex << (uint64_t)(bd->blocks[0].addr & ~0xfffULL) << ".ll";
+		std::ofstream file(filename.str());
+		raw_os_ostream str(file);
 
 		PassManager printManager;
 		printManager.add(createPrintModulePass(str, ""));

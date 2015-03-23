@@ -99,7 +99,6 @@ bool CPU::check_safepoint()
 	return true;
 }
 
-
 bool CPU::run_interp()
 {
 	bool step_ok = true;
@@ -140,6 +139,8 @@ bool CPU::run_block_jit()
 	if (!check_safepoint()) {
 		return false;
 	}
+
+	printf("w: %x\n", read_pc());
 
 	do {
 		// Check the ISR to determine if there is an interrupt pending,

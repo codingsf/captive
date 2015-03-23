@@ -56,6 +56,7 @@ namespace captive {
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
 				llvm::Value *pc_ptr;
+				llvm::Value *virtual_base_address;
 
 				llvm::Type *vtype;
 				llvm::Type *i1;

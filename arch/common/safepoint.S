@@ -6,24 +6,24 @@ record_safepoint:
 	pushf
 	pop 64(%rdi)
 
-	pop	%rsi
+	movq %rbx, (%rdi)
+	pop %rcx
+	movq %rsp, 8(%rdi)
+	push %rcx
+	movq %rbp, 16(%rdi)
+	movq %r12, 24(%rdi)
+	movq %r13, 32(%rdi)
+	movq %r14, 40(%rdi)
+	movq %r15, 48(%rdi)
+	movq %rcx, 56(%rdi)
+
 	xor %eax, %eax
-	mov %rbx, (%rdi)
-	mov %rsp, 8(%rdi)
-	push %rsi
-
-	mov %rbp, 16(%rdi)
-	mov %r12, 24(%rdi)
-	mov %r13, 32(%rdi)
-	mov %r14, 40(%rdi)
-	mov %r15, 48(%rdi)
-	mov %rsi, 56(%rdi)
-
 	ret
 
 .globl interrupt_restore_safepoint
 interrupt_restore_safepoint:
-	movl %esi, %eax
+	// RAX should be set on entry to this
+
 	movq (%rdi), %rbx
 	movq 8(%rdi), %rsp
 	movq 16(%rdi), %rbp
@@ -33,10 +33,10 @@ interrupt_restore_safepoint:
 	movq 48(%rdi), %r15
 
 	// We should return into ring0
-	push $0			// SS
+	push $0x10		// SS
 	push 8(%rdi)	// RSP
 	push 64(%rdi)	// RFLAGS
-	push $8			// CS
+	push $0x08		// CS
 	push 56(%rdi)	// RIP
 
 	iretq

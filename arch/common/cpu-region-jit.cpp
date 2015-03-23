@@ -58,9 +58,9 @@ bool CPU::run_region_jit()
 		Block& block = profile_image().get_block(phys_pc);
 
 		if (block.have_translation()) {
-			//if (virt_pc > 0x480000)	printf("before %x:%x\n", virt_pc, phys_pc);
+			//if (virt_pc != phys_pc)	printf("before %x:%x\n", virt_pc, phys_pc);
 			step_ok = (bool)block.execute(this, reg_state());
-			//if (virt_pc > 0x480000) printf("after %x\n", read_pc());
+			//if (virt_pc != phys_pc) printf("after %x\n", read_pc());
 			continue;
 		}
 
@@ -155,6 +155,6 @@ void CPU::compile_region(Region& rgn)
 		block.second->reset_interp_count();
 	}
 
-	printf("compiled region %x %x\n", rgn.address(), addr);
+	//printf("compiled region %x %x\n", rgn.address(), addr);
 	rgn.status(Region::NOT_IN_TRANSLATION);
 }

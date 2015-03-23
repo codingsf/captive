@@ -44,5 +44,5 @@ void Image::invalidate()
 void Image::invalidate(gpa_t gpa)
 {
 	printf("profile: invalidating region %x\n", gpa);
-	regions.clear();
+	get_region(gpa).invalidate();
 }

@@ -37,3 +37,8 @@ uint32_t Region::hot_block_count()
 
 	return r;
 }
+
+void Region::invalidate()
+{
+	blocks.clear();
+}

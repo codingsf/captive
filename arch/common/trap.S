@@ -93,7 +93,6 @@ trap_pf:
 
 1:
 	leaq cpu_safepoint, %rdi
-	mov %rax, %rsi
 	jmp interrupt_restore_safepoint
 
 .globl trap_signal
