@@ -76,6 +76,8 @@ namespace captive {
 				}
 			}
 
+			inline bool executing_translation() const { return _exec_txl; }
+
 			void invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr);
 
 			inline void schedule_decode_cache_flush() {
@@ -136,6 +138,8 @@ namespace captive {
 
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
+
+			bool _exec_txl;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
 			uint8_t block_cache[BLOCK_CACHE_SIZE];

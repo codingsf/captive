@@ -19,7 +19,7 @@ safepoint_t cpu_safepoint;
 
 CPU *CPU::current_cpu;
 
-CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), _profile_image(profile_image)
+CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), _exec_txl(false), _profile_image(profile_image)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -75,6 +75,9 @@ bool CPU::check_safepoint()
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
+		// Reset the executing translation flag.
+		_exec_txl = false;
+
 		// If the return code is greater than zero, then we returned
 		// from a fault.
 
@@ -207,6 +210,7 @@ bool CPU::interpret_block()
 			trace().start_record(get_insns_executed(), pc, insn);
 		}
 
+		// Perhaps verify this instruction
 		if (unlikely(cpu_data().verify_enabled) && !verify_check()) {
 			return false;
 		}

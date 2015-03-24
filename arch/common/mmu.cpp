@@ -32,7 +32,7 @@ MMU::~MMU()
 
 }
 
-void MMU::set_page_executed(uint32_t va)
+void MMU::set_page_executed(gva_t va)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
@@ -135,9 +135,17 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 	}
 
 	if (info.is_write() && pt->executed()) {
-		//printf("mmu: write to executed page %08x\n", va);
+		// Clear the EXECUTED flag and invalidate the page, so that translations
+		// can be discarded.
 		pt->executed(false);
 		_cpu.invalidate_executed_page((pa_t)(pt->base_address()), (va_t)((uint64_t)va & ~0xfffULL));
+
+		// Now, if we are executing in the JIT, and we are executing code in the page
+		// which was invalidated - i.e. self-modifying code in the same page, then we
+		// need to do something special.  ASSERT!
+		if (_cpu.executing_translation() && ((uint64_t)_cpu.read_pc() & ~0xfffULL) == ((uint64_t)va & ~0xfffULL)) {
+			assert(false && "write to same executed page whilst in jitted code");
+		}
 	}
 
 	if (!enabled()) {

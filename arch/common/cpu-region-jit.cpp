@@ -56,11 +56,12 @@ bool CPU::run_region_jit()
 		}
 
 		Block& block = profile_image().get_block(phys_pc);
+		mmu().set_page_executed(virt_pc);
 
 		if (block.have_translation()) {
-			//if (virt_pc != phys_pc)	printf("before %x:%x\n", virt_pc, phys_pc);
+			_exec_txl = true;
 			step_ok = (bool)block.execute(this, reg_state());
-			//if (virt_pc != phys_pc) printf("after %x\n", read_pc());
+			_exec_txl = false;
 			continue;
 		} else {
 			block.owner().add_virtual_base(virt_pc);
@@ -83,12 +84,9 @@ bool CPU::run_region_jit()
 
 void CPU::analyse_regions()
 {
-	//printf("analysing:\n");
 	for (auto region : profile_image()) {
 		if (region.second->hot_block_count() > 10 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
-			//printf("hot region: %08x, hot-blocks=%d\n", region.t2->address(), region.t2->hot_block_count());
-			return;
 		}
 	}
 }
@@ -133,8 +131,8 @@ void CPU::compile_region(Region& rgn)
 
 			// Translate this instruction into the context.
 			if (!jit().translate(insn, ctx)) {
-				printf("jit: instruction translation failed\n");
-				assert(false);
+				rgn.invalidate();
+				return;
 			}
 
 			pc += insn->length;
@@ -151,7 +149,7 @@ void CPU::compile_region(Region& rgn)
 	// Set each page that this region has been executed from as executed, so
 	// that we invalidate correctly.
 	for (auto vb : rgn.virtual_bases()) {
-		mmu().set_page_executed((uint32_t)vb);
+		//mmu().set_page_executed((uint32_t)vb);
 	}
 
 	if (!addr) {
