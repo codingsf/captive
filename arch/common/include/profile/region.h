@@ -10,6 +10,7 @@
 
 #include <define.h>
 #include <map>
+#include <set>
 
 namespace captive {
 	namespace arch {
@@ -27,6 +28,7 @@ namespace captive {
 				};
 
 				typedef std::map<gpa_t, Block *> block_map_t;
+				typedef std::set<gva_t> vaddr_set_t;
 
 				Region(Image& owner, gpa_t address);
 
@@ -46,12 +48,20 @@ namespace captive {
 
 				void invalidate();
 
+				inline void add_virtual_base(gva_t address)
+				{
+					vaddrs.insert(address & ~0xfffULL);
+				}
+
+				const vaddr_set_t& virtual_bases() const { return vaddrs; }
+
 			private:
 				Image& _owner;
 				gpa_t _address;
 				Status _status;
 
 				block_map_t blocks;
+				vaddr_set_t vaddrs;
 			};
 		}
 	}

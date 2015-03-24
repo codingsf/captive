@@ -184,7 +184,6 @@ bool CPU::run_block_jit()
 bool CPU::interpret_block()
 {
 	bool step_ok = false;
-	uint32_t prev_pc = 0xffffffff;
 
 	// Now, execute one basic-block of instructions.
 	Decode *insn;
@@ -206,12 +205,6 @@ bool CPU::interpret_block()
 		// Perhaps trace this instruction
 		if (unlikely(trace().enabled())) {
 			trace().start_record(get_insns_executed(), pc, insn);
-		}
-
-		if (unlikely(prev_pc >> 12 != pc >> 12)) {
-			// Mark the page as has_been_executed
-			mmu().set_page_executed(pc);
-			prev_pc = pc;
 		}
 
 		if (unlikely(cpu_data().verify_enabled) && !verify_check()) {
