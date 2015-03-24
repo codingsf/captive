@@ -62,6 +62,8 @@ bool CPU::run_region_jit()
 			step_ok = (bool)block.execute(this, reg_state());
 			//if (virt_pc != phys_pc) printf("after %x\n", read_pc());
 			continue;
+		} else {
+			block.owner().add_virtual_base(virt_pc);
 		}
 
 		if (trace_interval > 100000) {
@@ -144,7 +146,13 @@ void CPU::compile_region(Region& rgn)
 
 	// Make region translation hypercall
 	uint64_t addr;
-	asm volatile("out %1, $0xff" : "=a"(addr): "r"(8));
+	asm volatile("out %1, $0xff" : "=a"(addr): "a"(8));
+
+	// Set each page that this region has been executed from as executed, so
+	// that we invalidate correctly.
+	for (auto vb : rgn.virtual_bases()) {
+		mmu().set_page_executed((uint32_t)vb);
+	}
 
 	if (!addr) {
 		assert(false && "Region Translation Failed");

@@ -41,4 +41,5 @@ uint32_t Region::hot_block_count()
 void Region::invalidate()
 {
 	blocks.clear();
+	vaddrs.clear();
 }

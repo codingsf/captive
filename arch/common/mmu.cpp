@@ -64,7 +64,6 @@ bool MMU::clear_vma()
 	// Flush the TLB
 	Memory::flush_tlb();
 
-	_cpu.profile_image().invalidate();
 	return true;
 }
 
@@ -128,7 +127,6 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
 			base->entries[i].present(false);
-			base->entries[i].executed(false);
 			base->entries[i].allow_user(false);
 		}
 
