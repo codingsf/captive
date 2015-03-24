@@ -1,4 +1,5 @@
 #include <devices/arm/sp810.h>
+#include <devices/timers/tick-source.h>
 
 #include <chrono>
 
@@ -6,7 +7,7 @@
 
 using namespace captive::devices::arm;
 
-SP810::SP810() : Primecell(0x00041011), hr_begin(clock_t::now()), leds(0), lockval(0), colour_mode(0x1f00)
+SP810::SP810(timers::TickSource& ts) : Primecell(0x00041011), start_time(ts.count()), leds(0), lockval(0), colour_mode(0x1f00), _tick_source(ts)
 {
 
 }
@@ -43,7 +44,7 @@ bool SP810::read(uint64_t off, uint8_t len, uint64_t& data)
 		break;
 
 	case 0x24:
-		data = std::chrono::duration_cast<tick_100Hz_t>(clock_t::now() - hr_begin).count();
+		data = std::chrono::duration_cast<tick_100Hz_t>(std::chrono::milliseconds(_tick_source.count() - start_time)).count();
 		break;
 
 	case 0x50:
@@ -51,7 +52,7 @@ bool SP810::read(uint64_t off, uint8_t len, uint64_t& data)
 		break;
 
 	case 0x5c:
-		data = std::chrono::duration_cast<tick_24MHz_t>(clock_t::now() - hr_begin).count();
+		data = std::chrono::duration_cast<tick_24MHz_t>(std::chrono::milliseconds(_tick_source.count() - start_time)).count();
 		break;
 	}
 

@@ -17,6 +17,10 @@ namespace captive {
 		namespace irq {
 			class CPUIRQController;
 		}
+
+		namespace timers {
+			class CallbackTickSource;
+		}
 	}
 
 	namespace hypervisor {
@@ -28,15 +32,20 @@ namespace captive {
 				RegionJIT,
 			};
 
-			explicit GuestCPUConfiguration(CPUExecutionMode exec_mode) : _exec_mode(exec_mode) { }
+			explicit GuestCPUConfiguration(CPUExecutionMode exec_mode) : _exec_mode(exec_mode), _verify_mode(false), _cts(NULL) { }
+			explicit GuestCPUConfiguration(CPUExecutionMode exec_mode, bool verify_mode, devices::timers::CallbackTickSource *cts) : _exec_mode(exec_mode), _verify_mode(verify_mode), _cts(cts) { }
 
 			bool validate() const;
 
 			CPUExecutionMode execution_mode() const { return _exec_mode; }
 
+			bool verify_mode() const { return _verify_mode; }
+			devices::timers::CallbackTickSource *verify_tick_source() const { return _cts; }
+
 		private:
 			CPUExecutionMode _exec_mode;
-
+			bool _verify_mode;
+			devices::timers::CallbackTickSource *_cts;
 		};
 
 		class GuestMemoryRegionConfiguration

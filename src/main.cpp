@@ -34,6 +34,7 @@
 #include <devices/gfx/sdl-virtual-screen.h>
 
 #include <devices/timers/millisecond-tick-source.h>
+#include <devices/timers/callback-tick-source.h>
 
 DECLARE_CONTEXT(Main);
 
@@ -85,7 +86,13 @@ int main(int argc, char **argv)
 	}
 
 	// Create the master tick source
-	MillisecondTickSource mts;
+	TickSource *ts;
+
+	if (verify_enabled()) {
+		ts = new CallbackTickSource();
+	} else {
+		ts = new MillisecondTickSource();
+	}
 
 	// Attempt to create a guest in the hypervisor.
 	GuestConfiguration cfg;
@@ -136,14 +143,14 @@ int main(int argc, char **argv)
 	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs, *vic->get_irq_line(16));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
 
-	devices::arm::SP810 *sysctl = new devices::arm::SP810();
+	devices::arm::SP810 *sysctl = new devices::arm::SP810(*ts);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *sysctl));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e0000, *sysctl));
 
-	devices::arm::SP804 *timer0 = new devices::arm::SP804(mts, *vic->get_irq_line(4));
+	devices::arm::SP804 *timer0 = new devices::arm::SP804(*ts, *vic->get_irq_line(4));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e2000, *timer0));
 
-	devices::arm::SP804 *timer1 = new devices::arm::SP804(mts, *vic->get_irq_line(5));
+	devices::arm::SP804 *timer1 = new devices::arm::SP804(*ts, *vic->get_irq_line(5));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, *timer1));
 
 	devices::arm::PrimecellStub *static_memory_controller = new devices::arm::PrimecellStub(0x00141093, "smc", 0x10000);
@@ -246,9 +253,16 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	GuestCPUConfiguration cpu_cfg(verify_enabled() ? (verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT) : GuestCPUConfiguration::RegionJIT);
 
-	CPU *cpu = guest->create_cpu(cpu_cfg);
+	CPU *cpu = NULL;
+	if (verify_enabled()) {
+		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
+		cpu = guest->create_cpu(cpu_cfg);
+	} else {
+		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::RegionJIT);
+		cpu = guest->create_cpu(cpu_cfg);
+	}
+
 	if (!cpu) {
 		delete guest;
 		delete hv;
@@ -269,14 +283,15 @@ int main(int argc, char **argv)
 	vs->cpu(*cpu);
 
 	// Start the tick source
-	mts.start();
+	ts->start();
 
 	if (!cpu->run()) {
 		ERROR << "Unable to run CPU";
 	}
 
 	// Stop the tick source
-	mts.stop();
+	ts->stop();
+	delete ts;
 
 	// Clean-up
 	delete cpu;

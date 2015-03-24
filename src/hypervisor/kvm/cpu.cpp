@@ -11,6 +11,7 @@
 
 #include <devices/device.h>
 #include <devices/irq/irq-controller.h>
+#include <devices/timers/callback-tick-source.h>
 #include <sys/eventfd.h>
 #include <sys/signal.h>
 #include <chrono>
@@ -348,6 +349,10 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 
 		return true;
 	}
+
+	case 9:
+		config().verify_tick_source()->do_tick();
+		return true;
 
 	}
 

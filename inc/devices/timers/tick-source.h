@@ -33,10 +33,13 @@ namespace captive {
 					sinks.push_back(&sink);
 				}
 
+				inline uint64_t count() const { return _count; }
+
 			protected:
 				void tick(uint32_t period);
 
 			private:
+				uint64_t _count;
 				std::list<TickSink *> sinks;
 			};
 		}

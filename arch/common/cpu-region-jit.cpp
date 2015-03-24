@@ -64,7 +64,7 @@ bool CPU::run_region_jit()
 			continue;
 		}
 
-		if (trace_interval > 10000) {
+		if (trace_interval > 100000) {
 			trace_interval = 0;
 			analyse_regions();
 		} else {
@@ -86,6 +86,7 @@ void CPU::analyse_regions()
 		if (region.second->hot_block_count() > 10 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
 			//printf("hot region: %08x, hot-blocks=%d\n", region.t2->address(), region.t2->hot_block_count());
+			return;
 		}
 	}
 }
@@ -155,6 +156,6 @@ void CPU::compile_region(Region& rgn)
 		block.second->reset_interp_count();
 	}
 
-	//printf("compiled region %x %x\n", rgn.address(), addr);
+	printf("compiled region %x %x\n", rgn.address(), addr);
 	rgn.status(Region::NOT_IN_TRANSLATION);
 }

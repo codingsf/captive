@@ -349,6 +349,9 @@ bool CPU::verify_check()
 	// Wait on the entry barrier
 	enter->wait(cpu_data().verify_tid);
 
+	// Tick!
+	asm volatile("out %0, $0xff" :: "a"(9));
+
 	// If we're the primary CPU, perform verification.
 	if (cpu_data().verify_tid == 0) {
 		// Compare OUR register state to the other CPU's.
