@@ -10,6 +10,7 @@
 #include <hypervisor/cpu.h>
 #include <hypervisor/kvm/kvm.h>
 #include <util/command-line.h>
+#include <util/thread-pool.h>
 #include <util/cl/options.h>
 
 #include <devices/arm/cpu-irq.h>
@@ -205,8 +206,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// Create the worker thread pool
+	ThreadPool worker_threads(1, 10);
+	worker_threads.start();
+
 	// Create the JIT
-	LLVMJIT jit(engine);
+	LLVMJIT jit(engine, worker_threads);
 	//WSJ jit(engine);
 	if (!jit.init()) {
 		ERROR << "Unable to initialise jit";

@@ -11,6 +11,10 @@
 #include <define.h>
 
 namespace captive {
+	namespace util {
+		class ThreadPool;
+	}
+
 	namespace jit {
 		class BlockJIT;
 		class RegionJIT;
@@ -195,12 +199,18 @@ namespace captive {
 		class RegionJIT : public JITStrategy
 		{
 		public:
-			RegionJIT(JIT& owner);
+			typedef void (*completion_t)(void *data, bool success, uint64_t address);
+
+			RegionJIT(JIT& owner, util::ThreadPool& worker_threads);
 			virtual ~RegionJIT();
 			uint64_t compile_region(uint64_t ir_offset, uint64_t ir_desc_offset);
+			uint64_t compile_region_async(uint64_t ir_offset, uint64_t ir_desc_offset, completion_t completion, void *data);
 
 		protected:
 			virtual void *internal_compile_region(const RawBlockDescriptors *bds, const RawBytecodeDescriptor *ir) = 0;
+
+		private:
+			util::ThreadPool& _worker_threads;
 		};
 	}
 }

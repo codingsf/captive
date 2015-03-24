@@ -19,13 +19,17 @@ namespace captive {
 		class Engine;
 	}
 
+	namespace util {
+		class ThreadPool;
+	}
+
 	namespace jit {
 		class LLVMJITMemoryManager;
 		class Allocator;
 
 		class LLVMJIT : public JIT, public BlockJIT, public RegionJIT {
 		public:
-			LLVMJIT(engine::Engine& engine);
+			LLVMJIT(engine::Engine& engine, util::ThreadPool& worker_threads);
 			virtual ~LLVMJIT();
 
 			virtual bool init() override;

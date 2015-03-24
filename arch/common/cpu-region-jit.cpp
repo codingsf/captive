@@ -144,9 +144,9 @@ void CPU::compile_region(Region& rgn)
 
 	// Make region translation hypercall
 	uint64_t addr;
-	asm volatile("out %1, $0xff" : "=a"(addr): "a"(8));
+	asm volatile("out %0, $0xff" :: "a"(8));
 
-	// Set each page that this region has been executed from as executed, so
+	/*// Set each page that this region has been executed from as executed, so
 	// that we invalidate correctly.
 	for (auto vb : rgn.virtual_bases()) {
 		//mmu().set_page_executed((uint32_t)vb);
@@ -163,5 +163,5 @@ void CPU::compile_region(Region& rgn)
 	}
 
 	printf("compiled region %x %x\n", rgn.address(), addr);
-	rgn.status(Region::NOT_IN_TRANSLATION);
+	rgn.status(Region::NOT_IN_TRANSLATION);*/
 }

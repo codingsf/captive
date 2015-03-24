@@ -31,7 +31,7 @@ namespace captive {
 		class WSJ : public JIT, public BlockJIT, public RegionJIT
 		{
 		public:
-			WSJ(engine::Engine& engine);
+			WSJ(engine::Engine& engine, util::ThreadPool& worker_threads);
 			virtual ~WSJ();
 
 			virtual bool init() override;

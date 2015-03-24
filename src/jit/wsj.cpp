@@ -8,7 +8,7 @@
 using namespace captive::jit;
 using namespace captive::jit::x86;
 
-WSJ::WSJ(engine::Engine& engine) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine), _allocator(NULL)
+WSJ::WSJ(engine::Engine& engine, util::ThreadPool& worker_threads) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this, worker_threads), _engine(engine), _allocator(NULL)
 {
 }
 
@@ -63,7 +63,7 @@ bool WSJ::lower_block(x86::X86Builder& builder, IRContext& ctx, ir::IRBlock& blo
 			builder.mov(X86Operand(X86Operand::RSI, 0), X86Operand(X86Operand::RAX));
 			break;
 
-		//default: assert(false && "Unknown Instruction"); return false;
+		default: assert(false && "Unknown Instruction"); return false;
 		}
 	}
 

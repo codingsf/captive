@@ -33,7 +33,7 @@ DECLARE_CHILD_CONTEXT(LLVM, JIT);
 using namespace captive::jit;
 using namespace llvm;
 
-LLVMJIT::LLVMJIT(engine::Engine& engine) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine), _allocator(NULL)
+LLVMJIT::LLVMJIT(engine::Engine& engine, util::ThreadPool& worker_threads) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this, worker_threads), _engine(engine), _allocator(NULL)
 {
 }
 

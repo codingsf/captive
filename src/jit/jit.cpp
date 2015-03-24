@@ -1,7 +1,9 @@
 #include <jit/jit.h>
+#include <util/thread-pool.h>
 #include <captive.h>
 
 #include <sstream>
+#include <unistd.h>
 
 DECLARE_CONTEXT(JIT);
 
@@ -179,7 +181,7 @@ BlockJIT::~BlockJIT()
 
 }
 
-RegionJIT::RegionJIT(JIT& owner) : JITStrategy(owner)
+RegionJIT::RegionJIT(JIT& owner, util::ThreadPool& worker_threads) : JITStrategy(owner), _worker_threads(worker_threads)
 {
 
 }
@@ -223,4 +225,29 @@ uint64_t RegionJIT::compile_region(uint64_t ir_offset, uint64_t ir_desc_offset)
 	assert((uint8_t *)rc < ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
 
 	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
+}
+
+uint64_t RegionJIT::compile_region_async(uint64_t ir_offset, uint64_t ir_desc_offset, completion_t completion, void *data)
+{
+	struct work {
+		completion_t completion;
+		void *data;
+	};
+
+	struct work *work = new struct work();
+	work->completion = completion;
+	work->data = data;
+
+	_worker_threads.queue_work((util::action_t)([](void *data) -> uint64_t {
+		struct work *work = (struct work *)data;
+
+		usleep(1000000);
+		if (work->completion) {
+			work->completion(work->data, true, 50);
+		}
+
+		delete work;
+		return 0;
+	}), NULL, work);
+	return 0;
 }
