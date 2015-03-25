@@ -49,7 +49,7 @@ namespace captive {
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
-				int fd;
+				int fd, irq_fd;
 				int next_cpu_id;
 				int next_slot_idx;
 

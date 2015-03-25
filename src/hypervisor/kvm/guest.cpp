@@ -154,7 +154,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
-	DEBUG << "Creating KVM VCPU";
+	DEBUG << CONTEXT(Guest) << "Creating KVM VCPU";
 	int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, next_cpu_id);
 	if (cpu_fd < 0) {
 		ERROR << "Failed to create KVM VCPU";
@@ -181,7 +181,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_tid = 0;
 	}
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, *per_cpu_data, SHARED_MEM_VIRT_BASE + per_cpu_offset);
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, *per_cpu_data, SHARED_MEM_VIRT_BASE + per_cpu_offset);
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
@@ -218,24 +218,60 @@ captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
 
 bool KVMGuest::prepare_guest_irq()
 {
-	/*DEBUG << CONTEXT(Guest) << "Creating IRQ chip";
+	DEBUG << CONTEXT(Guest) << "Creating IRQ chip";
 	if (vmioctl(KVM_CREATE_IRQCHIP)) {
 		ERROR << "Unable to create IRQCHIP";
 		return false;
-	}*/
+	}
 
-	/*struct kvm_irqchip irqchip;
+	struct kvm_irqchip irqchip;
 	bzero(&irqchip, sizeof(irqchip));
-
 	irqchip.chip_id = 2;
-	irqchip.chip.ioapic.base_address = 0x1000;
-	irqchip.chip.ioapic.id = 0;
-	irqchip.chip.ioapic.redirtbl[0].fields.vector = 0x10;
 
+	if (vmioctl(KVM_GET_IRQCHIP, &irqchip)) {
+		ERROR << "Unable to retrieve IRQCHIP";
+		return false;
+	}
+
+	irqchip.chip.ioapic.redirtbl[16].fields.vector = 0x30;
+	irqchip.chip.ioapic.redirtbl[16].fields.trig_mode = 1;
+
+	DEBUG << CONTEXT(Guest) << "Configuring IRQ chip";
 	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
 		ERROR << "Unable to configure IRQCHIP";
 		return false;
+	}
+
+	/*DEBUG << CONTEXT(Guest) << "Setting GSI routing";
+	struct kvm_irq_routing *routing = (struct kvm_irq_routing *)calloc(1, sizeof(struct kvm_irq_routing) + (sizeof(struct kvm_irq_routing_entry) * 1));
+
+	routing->nr = 1;
+	routing->entries[0].gsi = 16;
+	routing->entries[0].type = KVM_IRQ_ROUTING_IRQCHIP;
+	routing->entries[0].u.irqchip.irqchip = 2;
+	routing->entries[0].u.irqchip.pin = 0;
+
+	if (vmioctl(KVM_SET_GSI_ROUTING, &routing)) {
+		ERROR << "Unable to setup GSI routing";
+		return false;
 	}*/
+
+	DEBUG << CONTEXT(Guest) << "Creating IRQ fd";
+	irq_fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (irq_fd < 0) {
+		ERROR << "Unable to create IRQ fd";
+		return false;
+	}
+
+	struct kvm_irqfd irqfd;
+	bzero(&irqfd, sizeof(irqfd));
+	irqfd.fd = irq_fd;
+	irqfd.gsi = 16;
+
+	if (vmioctl(KVM_IRQFD, &irqfd)) {
+		ERROR << "Unable to install IRQ fd";
+		return false;
+	}
 
 	return true;
 }
@@ -415,6 +451,9 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 
 	// For now, put the stack starting at the end of shared memory
 	stack = SHARED_MEM_VIRT_BASE + SHARED_MEM_SIZE;
+
+	// Map the LAPIC
+	map_page(0x280001000, 0xfee00900, PT_PRESENT | PT_WRITABLE);
 
 	// Map the verification region (if enabled)
 	if (verify_enabled()) {

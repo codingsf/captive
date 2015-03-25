@@ -18,6 +18,8 @@ extern "C" void int80_handler(struct mcontext *);
 extern "C" void int81_handler(struct mcontext *);
 extern "C" void int82_handler(struct mcontext *);
 
+extern "C" void trap_irq(struct mcontext *);
+
 struct IDT {
 	uint16_t off_low;
 	uint16_t sel;
@@ -92,9 +94,6 @@ void Environment::install_idt()
 		set_idt(&idt[i], trap_unk);
 	}
 
-	// NMI for signalling
-	set_idt(&idt[0x2], trap_signal, false);
-
 	// Exceptions with arguments
 	set_idt(&idt[0x08], trap_unk_arg);
 	set_idt(&idt[0x0a], trap_unk_arg);
@@ -107,6 +106,10 @@ void Environment::install_idt()
 	set_idt(&idt[0x0d], trap_gpf);
 	set_idt(&idt[0x0e], trap_pf);
 
+	// IRQ Handler
+	set_idt(&idt[0x30], trap_irq);
+
+	// Software-interrupt handlers
 	set_idt(&idt[0x80], int80_handler, true);
 	set_idt(&idt[0x81], int81_handler, true);
 	set_idt(&idt[0x82], int82_handler, true);
@@ -119,11 +122,17 @@ void Environment::install_tss()
 	asm volatile("ltr %0\n" :: "a"((uint16_t)0x2b));
 }
 
+void Environment::setup_interrupts()
+{
+	asm volatile("sti\n");
+}
+
 bool Environment::init()
 {
 	install_gdt();
 	install_idt();
 	install_tss();
+	setup_interrupts();
 
 	return true;
 }

@@ -227,27 +227,43 @@ uint64_t RegionJIT::compile_region(uint64_t ir_offset, uint64_t ir_desc_offset)
 	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
 }
 
+struct compilation_work {
+	explicit compilation_work(RegionJIT::completion_t completion, void *data) : completion(completion), data(data) { }
+
+	RegionJIT::completion_t completion;
+	void *data;
+
+	const RawBlockDescriptors *bds;
+	const RawBytecodeDescriptor *ir;
+};
+
+static uint64_t do_compile_region(void *data)
+{
+	struct compilation_work *work = (struct compilation_work *)data;
+
+	usleep(1000000);
+
+	return 0;
+}
+
+static void do_compile_region_complete(uint64_t result, void *data)
+{
+	struct compilation_work *work = (struct compilation_work *)data;
+
+	if (work->completion) {
+		work->completion(work->data, true, result);
+	}
+
+	delete work;
+}
+
 uint64_t RegionJIT::compile_region_async(uint64_t ir_offset, uint64_t ir_desc_offset, completion_t completion, void *data)
 {
-	struct work {
-		completion_t completion;
-		void *data;
-	};
+	struct compilation_work *work = new struct compilation_work(completion, data);
 
-	struct work *work = new struct work();
-	work->completion = completion;
-	work->data = data;
+	work->bds = (const RawBlockDescriptors *)((uint64_t)owner().get_ir_desc_buffer() + ir_desc_offset);
+	work->ir = (const RawBytecodeDescriptor *)((uint64_t)owner().get_ir_buffer() + ir_offset);
 
-	_worker_threads.queue_work((util::action_t)([](void *data) -> uint64_t {
-		struct work *work = (struct work *)data;
-
-		usleep(1000000);
-		if (work->completion) {
-			work->completion(work->data, true, 50);
-		}
-
-		delete work;
-		return 0;
-	}), NULL, work);
+	_worker_threads.queue_work(do_compile_region, do_compile_region_complete, work);
 	return 0;
 }

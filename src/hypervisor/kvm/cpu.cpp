@@ -20,11 +20,12 @@ USE_CONTEXT(CPU);
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, PerCPUData& per_cpu_data, uint64_t per_cpu_virt_addr)
+KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd, PerCPUData& per_cpu_data, uint64_t per_cpu_virt_addr)
 	: CPU(owner, config, per_cpu_data),
 	_initialised(false),
 	_id(id),
 	fd(fd),
+	irqfd(irqfd),
 	cpu_run_struct(NULL),
 	cpu_run_struct_size(0),
 	per_cpu_virt_addr(per_cpu_virt_addr)
@@ -52,6 +53,9 @@ bool KVMCpu::init()
 	if (!CPU::init())
 		return false;
 
+	if (!setup_interrupts())
+		return false;
+
 	// Attach the CPU IRQ controller
 	owner().config().cpu_irq_controller->attach(*this);
 
@@ -74,8 +78,10 @@ bool KVMCpu::init()
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	per_cpu_data().signal_code = code;
-	vmioctl(KVM_NMI);
+	//per_cpu_data().signal_code = code;
+
+	uint64_t data = code;
+	write(irqfd, &data, sizeof(data));
 }
 
 static KVMCpu *signal_cpu;
@@ -341,7 +347,6 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	case 8: {	// COMPILE
 		DEBUG << CONTEXT(CPU) << "Compiling Region";
 		kvm_guest.jit().region_jit().compile_region_async(0, 0, ([](void *data, bool success, uint64_t addr)->void{
-			DEBUG << "HELLO " << success;
 			if (success) {
 				((KVMCpu *)data)->per_cpu_data().region_addr = addr;
 				((KVMCpu *)data)->interrupt(1);
@@ -428,4 +433,20 @@ void KVMCpu::dump_regs()
 	<< "idt base=" << std::hex << sregs.idt.base << ", limit=" << std::hex << sregs.idt.limit << std::endl
 	<< "apic base=" << std::hex << sregs.apic_base << std::endl
 	<< "efer=" << std::hex << sregs.efer << std::endl;
+}
+
+bool KVMCpu::setup_interrupts()
+{
+	struct kvm_lapic_state lapic;
+	/*if (!vmioctl(KVM_GET_LAPIC, &lapic)) {
+		ERROR << "Unable to retrieve LAPIC state";
+		return false;
+	}*/
+
+	/*if (!vmioctl(KVM_SET_LAPIC, &lapic)) {
+		ERROR << "Unable to update LAPIC state";
+		return false;
+	}*/
+
+	return true;
 }

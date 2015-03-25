@@ -16,6 +16,13 @@ static void call_static_constructors()
 	// TODO
 }
 
+static void init_irqs()
+{
+	/*volatile uint8_t *lapic = (volatile uint8_t *)0x280001000;
+
+	lapic[0xf0] = 0xff;*/
+}
+
 static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
 {
 	uint32_t low = msr_value & 0xffffffff;
@@ -32,6 +39,9 @@ extern "C" {
 
 		// Run the static constructors.
 		call_static_constructors();
+
+		// Initialise IRQs.
+		init_irqs();
 
 		// Initialise the printf() system.
 		printf_init((char *)cpu_data->guest_data->printf_buffer, cpu_data->guest_data->printf_buffer_size);
@@ -74,6 +84,12 @@ extern "C" {
 	void handle_trap_gpf(struct mcontext *mctx)
 	{
 		printf("general protection fault: rip=0x%lx, code=0x%x\n", mctx->rip, mctx->extra);
+		abort();
+	}
+
+	void handle_trap_irq(struct mcontext *mctx)
+	{
+		printf("irq!\n");
 		abort();
 	}
 

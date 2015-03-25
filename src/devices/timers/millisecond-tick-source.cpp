@@ -28,7 +28,9 @@ void MillisecondTickSource::stop()
 	terminate = true;
 	if (tick_thread->joinable())
 		tick_thread->join();
+	
 	delete tick_thread;
+	tick_thread = NULL;
 }
 
 void MillisecondTickSource::tick_thread_proc(MillisecondTickSource *o)

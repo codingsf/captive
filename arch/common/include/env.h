@@ -56,6 +56,7 @@ namespace captive {
 			void install_gdt();
 			void install_idt();
 			void install_tss();
+			void setup_interrupts();
 
 		protected:
 			PerCPUData *per_cpu_data;

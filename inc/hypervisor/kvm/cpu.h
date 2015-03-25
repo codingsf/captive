@@ -26,7 +26,7 @@ namespace captive {
 
 			class KVMCpu : public CPU {
 			public:
-				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, PerCPUData& per_cpu_data, uint64_t per_cpu_virt_addr);
+				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd, PerCPUData& per_cpu_data, uint64_t per_cpu_virt_addr);
 				~KVMCpu();
 
 				bool init();
@@ -52,11 +52,13 @@ namespace captive {
 			private:
 				bool _initialised;
 				int _id;
-				int fd;
+				int fd, irqfd;
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;
 				uint64_t per_cpu_virt_addr;
 
+				bool setup_interrupts();
+				
 				bool handle_hypercall(uint64_t data);
 				bool handle_device_access(devices::Device *device, uint64_t pa, struct kvm_run& rs);
 

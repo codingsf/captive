@@ -68,7 +68,6 @@ void ThreadPool::thread_proc()
 	while (!terminate) {
 		lock.lock();
 
-		DEBUG << "Waiting for work";
 		while (work_queue.size() == 0 && !terminate) {
 			work_queue_cond.wait(lock);
 		}
@@ -89,7 +88,7 @@ void ThreadPool::thread_proc()
 
 void ThreadPool::process_work(ThreadPoolWork& work)
 {
-	DEBUG << "Doing Work";
+	DEBUG << "worker thread " << std::this_thread::get_id();
 
 	if (work.action) {
 		uint64_t result = work.action(work.data);
