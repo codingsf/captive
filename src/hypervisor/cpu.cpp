@@ -7,7 +7,7 @@ DECLARE_CHILD_CONTEXT(CPU, Guest);
 
 using namespace captive::hypervisor;
 
-CPU::CPU(Guest& owner, const GuestCPUConfiguration& config, PerCPUData& per_cpu_data) : _owner(owner), _config(config), _per_cpu_data(per_cpu_data)
+CPU::CPU(Guest& owner, const GuestCPUConfiguration& config, PerCPUData *per_cpu_data) : _owner(owner), _config(config), _per_cpu_data(per_cpu_data)
 {
 
 }

@@ -40,9 +40,9 @@ using namespace captive::hypervisor::kvm;
 #define ENGINE_HEAP_VIRT_BASE		0x210000000ULL
 #define ENGINE_HEAP_SIZE		0x050000000ULL
 
-#define SHARED_MEM_PHYS_BASE		0x090000000ULL
-#define SHARED_MEM_VIRT_BASE		0x260000000ULL
-#define SHARED_MEM_SIZE			0x010000000ULL
+#define SHARED_MEM_PHYS_BASE		0x6f0000000000ULL
+#define SHARED_MEM_VIRT_BASE		0x6f0000000000ULL
+#define SHARED_MEM_SIZE			0x010000000000ULL
 
 #define JIT_PHYS_BASE			0x0a0000000ULL
 #define JIT_VIRT_BASE			0x270000000ULL
@@ -57,29 +57,19 @@ using namespace captive::hypervisor::kvm;
 #define VERIFY_VIRT_BASE		0x280000000ULL
 #define VERIFY_SIZE			0x1000ULL
 
-#define IR_DESC_BUFFER_OFFSET		0x10000
-#define IR_DESC_BUFFER_SIZE		0x10000
-
-#define IR_BUFFER_OFFSET		0x20000
-#define IR_BUFFER_SIZE			0x80000
-
-#define PRINTF_BUFFER_OFFSET		0x9000
-#define PRINTF_BUFFER_SIZE		0x1000
-
 struct {
 	std::string name;
 	uint64_t phys_base;
 	uint64_t virt_base;
 	uint64_t size;
 	uint32_t prot_flags;
+	void *fixed;
 } guest_memory_regions[] = {
-	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
-	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
-	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
-	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS },
-	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE, .prot_flags = PT_USER_ACCESS },
-	/*{ .name = "gpm",         .phys_base = GPM_PHYS_BASE,         .virt_base = GPM_VIRT_BASE,         .size = GPM_SIZE },
-	{ .name = "gpm-copy",    .phys_base = GPM_PHYS_BASE,         .virt_base = GPM_COPY_VIRT_BASE,    .size = GPM_SIZE },*/
+	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = NULL },
+	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE,      .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = NULL },
+	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = NULL },
+	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE,  .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = (void *)SHARED_MEM_VIRT_BASE },
+	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE,         .prot_flags = PT_USER_ACCESS,               .fixed = NULL },
 };
 
 #define DEFAULT_NR_SLOTS		32
@@ -161,13 +151,11 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return NULL;
 	}
 
-	uint64_t per_cpu_offset = 0x1000 + (0x1000 * next_cpu_id);
-
 	// Locate the storage location for the Per-CPU data, and initialise the structure.
-	PerCPUData *per_cpu_data = (PerCPUData *)get_phys_buffer(SHARED_MEM_PHYS_BASE + per_cpu_offset);
+	PerCPUData *per_cpu_data = (PerCPUData *)_shared_memory.allocate(sizeof(PerCPUData));
 	per_cpu_data->async_action = 0;
 	per_cpu_data->execution_mode = (uint32_t)config.execution_mode();
-	per_cpu_data->guest_data = (PerGuestData *)SHARED_MEM_VIRT_BASE;
+	per_cpu_data->guest_data = per_guest_data;
 	per_cpu_data->insns_executed = 0;
 	per_cpu_data->isr = 0;
 
@@ -181,7 +169,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_tid = 0;
 	}
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, *per_cpu_data, SHARED_MEM_VIRT_BASE + per_cpu_offset);
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
@@ -273,22 +261,20 @@ bool KVMGuest::prepare_guest_memory()
 			<< ", phys-base=" << std::hex << guest_memory_regions[i].phys_base
 			<< ", size=" << std::hex << guest_memory_regions[i].size;
 
-		alloc_guest_memory(guest_memory_regions[i].phys_base, guest_memory_regions[i].size);
+		if (!alloc_guest_memory(guest_memory_regions[i].phys_base, guest_memory_regions[i].size, 0, guest_memory_regions[i].fixed)) {
+			ERROR << "Unable to allocate guest memory for region " << guest_memory_regions[i].name;
+			return false;
+		}
 	}
 
-	per_guest_data = (PerGuestData *)get_phys_buffer(SHARED_MEM_PHYS_BASE);
+	_shared_memory.set_arena((void *)SHARED_MEM_VIRT_BASE, SHARED_MEM_SIZE);
+
+	per_guest_data = (PerGuestData *)_shared_memory.allocate(sizeof(*per_guest_data));
 	assert(per_guest_data);
 
+	per_guest_data->shared_memory = (void *)SHARED_MEM_VIRT_BASE;
 	per_guest_data->heap = (void *)ENGINE_HEAP_VIRT_BASE;
 	per_guest_data->heap_size = ENGINE_HEAP_SIZE;
-	per_guest_data->ir_buffer = (void *)(SHARED_MEM_VIRT_BASE + IR_BUFFER_OFFSET);
-	per_guest_data->ir_buffer_size = IR_BUFFER_SIZE;
-	per_guest_data->ir_desc_buffer = (void *)(SHARED_MEM_VIRT_BASE + IR_DESC_BUFFER_OFFSET);
-	per_guest_data->ir_desc_buffer_size = IR_DESC_BUFFER_SIZE;
-	per_guest_data->code_buffer = (void *)JIT_VIRT_BASE;
-	per_guest_data->code_buffer_size = JIT_SIZE;
-	per_guest_data->printf_buffer = (void *)(SHARED_MEM_VIRT_BASE + PRINTF_BUFFER_OFFSET);
-	per_guest_data->printf_buffer_size = PRINTF_BUFFER_SIZE;
 
 	if (!install_gdt()) {
 		ERROR << CONTEXT(Guest) << "Unable to install GDT";
@@ -323,11 +309,8 @@ bool KVMGuest::prepare_guest_memory()
 		return false;
 	}
 
-	// Notify the JIT where the arena for generated code is, and where the
-	// various description buffers are.
-	jit().set_code_arena(get_phys_buffer(JIT_PHYS_BASE), JIT_SIZE);
-	jit().set_ir_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_BUFFER_OFFSET), per_guest_data->ir_buffer_size);
-	jit().set_ir_desc_buffer(get_phys_buffer(SHARED_MEM_PHYS_BASE + IR_DESC_BUFFER_OFFSET), per_guest_data->ir_desc_buffer_size);
+	// Tell the JIT about the shared memory.
+	jit().set_shared_memory(_shared_memory);
 
 	DEBUG << CONTEXT(Guest) << "Installing guest memory regions";
 	for (auto& region : config().memory_regions) {
@@ -482,7 +465,7 @@ void KVMGuest::put_mem_slot(vm_mem_region* region)
 	}
 }
 
-KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags)
+KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags, void *fixed_addr)
 {
 	// Try to obtain a free memory region slot.
 	vm_mem_region *rgn = get_mem_slot();
@@ -495,7 +478,15 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 	rgn->kvm.memory_size = size;
 
 	// Allocate a userspace buffer for the region.
-	rgn->host_buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS, -1, 0);
+	int mmap_flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS;
+
+	if (fixed_addr) {
+		mmap_flags |= MAP_FIXED;
+	}
+
+	int mmap_prot = PROT_READ | PROT_WRITE;
+
+	rgn->host_buffer = mmap(fixed_addr, size, mmap_prot, mmap_flags, -1, 0);
 	if (rgn->host_buffer == MAP_FAILED) {
 		put_mem_slot(rgn);
 
@@ -628,5 +619,5 @@ bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 
 void KVMGuest::do_guest_printf()
 {
-	fprintf(stderr, "%s", (char *)get_phys_buffer(SHARED_MEM_PHYS_BASE + PRINTF_BUFFER_OFFSET));
+	fprintf(stderr, "%s", "x");
 }

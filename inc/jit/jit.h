@@ -11,6 +11,10 @@
 #include <define.h>
 
 namespace captive {
+	namespace hypervisor {
+		class SharedMemory;
+	}
+
 	namespace util {
 		class ThreadPool;
 	}
@@ -130,47 +134,23 @@ namespace captive {
 		class JIT
 		{
 		public:
-			JIT();
+			JIT(util::ThreadPool& worker_threads);
 			virtual ~JIT();
+
+			inline util::ThreadPool& worker_threads() const { return _worker_threads; }
 
 			virtual bool init() = 0;
 
 			virtual BlockJIT& block_jit() = 0;
 			virtual RegionJIT& region_jit() = 0;
 
-			void set_code_arena(void *code_arena, uint64_t arena_size) {
-				_code_arena = code_arena;
-				_code_arena_size = arena_size;
+			void set_shared_memory(hypervisor::SharedMemory& shmem) {
+				_shared_memory = &shmem;
 			}
-
-			void set_ir_buffer(void *ir_buffer, uint64_t ir_buffer_size) {
-				_ir_buffer = ir_buffer;
-				_ir_buffer_size = ir_buffer_size;
-			}
-
-			void set_ir_desc_buffer(void *ir_desc_buffer, uint64_t ir_desc_buffer_size) {
-				_ir_desc_buffer = ir_desc_buffer;
-				_ir_desc_buffer_size = ir_desc_buffer_size;
-			}
-
-			void *get_code_arena() const { return _code_arena; }
-			uint64_t get_code_arena_size() const { return _code_arena_size; }
-
-			void *get_ir_buffer() const { return _ir_buffer; }
-			uint64_t get_ir_buffer_size() const { return _ir_buffer_size; }
-
-			void *get_ir_desc_buffer() const { return _ir_desc_buffer; }
-			uint64_t get_ir_desc_buffer_size() const { return _ir_desc_buffer_size; }
 
 		protected:
-			void *_code_arena;
-			uint64_t _code_arena_size;
-
-			void *_ir_buffer;
-			uint64_t _ir_buffer_size;
-
-			void *_ir_desc_buffer;
-			uint64_t _ir_desc_buffer_size;
+			util::ThreadPool& _worker_threads;
+			hypervisor::SharedMemory *_shared_memory;
 		};
 
 		class JITStrategy
@@ -185,32 +165,55 @@ namespace captive {
 			JIT& _owner;
 		};
 
+		class WorkUnit
+		{
+		public:
+			uint64_t work_unit_id;
+		};
+
+		class BlockWorkUnit : public WorkUnit
+		{
+
+		};
+
+		class RegionWorkUnit : public WorkUnit
+		{
+
+		};
+
+		struct BlockCompilationResult
+		{
+			uint64_t work_unit_id;
+			void *fn_ptr;
+		};
+
+		struct RegionCompilationResult
+		{
+			uint64_t work_unit_id;
+			void *fn_ptr;
+		};
+
 		class BlockJIT : public JITStrategy
 		{
 		public:
+			typedef void (*block_completion_t)(BlockCompilationResult result, void *completion_data);
+
 			BlockJIT(JIT& owner);
 			virtual ~BlockJIT();
-			uint64_t compile_block(uint64_t ir_offset);
-
-		protected:
-			virtual void *internal_compile_block(const RawBytecodeDescriptor *ir) = 0;
+			virtual BlockCompilationResult compile_block(BlockWorkUnit *work_unit) = 0;
+			void compile_block_async(BlockWorkUnit *work_unit, block_completion_t completion, void *completion_data);
 		};
 
 		class RegionJIT : public JITStrategy
 		{
 		public:
-			typedef void (*completion_t)(void *data, bool success, uint64_t address);
+			typedef void (*region_completion_t)(RegionCompilationResult result, void *completion_data);
 
-			RegionJIT(JIT& owner, util::ThreadPool& worker_threads);
+			RegionJIT(JIT& owner);
 			virtual ~RegionJIT();
-			uint64_t compile_region(uint64_t ir_offset, uint64_t ir_desc_offset);
-			uint64_t compile_region_async(uint64_t ir_offset, uint64_t ir_desc_offset, completion_t completion, void *data);
 
-		protected:
-			virtual void *internal_compile_region(const RawBlockDescriptors *bds, const RawBytecodeDescriptor *ir) = 0;
-
-		private:
-			util::ThreadPool& _worker_threads;
+			virtual RegionCompilationResult compile_region(RegionWorkUnit *work_unit) = 0;
+			void compile_region_async(RegionWorkUnit *work_unit, region_completion_t completion, void *completion_data);
 		};
 	}
 }

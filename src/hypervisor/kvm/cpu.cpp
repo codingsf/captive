@@ -20,15 +20,14 @@ USE_CONTEXT(CPU);
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd, PerCPUData& per_cpu_data, uint64_t per_cpu_virt_addr)
+KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd, PerCPUData *per_cpu_data)
 	: CPU(owner, config, per_cpu_data),
 	_initialised(false),
 	_id(id),
 	fd(fd),
 	irqfd(irqfd),
 	cpu_run_struct(NULL),
-	cpu_run_struct_size(0),
-	per_cpu_virt_addr(per_cpu_virt_addr)
+	cpu_run_struct_size(0)
 {
 
 }
@@ -276,7 +275,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			regs.rbp = 0;
 
 			// Startup Arguments
-			regs.rdi = per_cpu_virt_addr;
+			regs.rdi = (uint64_t)&per_cpu_data();
 
 			per_cpu_data().entrypoint = kvm_guest.guest_entrypoint();
 
@@ -329,7 +328,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		vmioctl(KVM_GET_REGS, &regs);
 
 		DEBUG << CONTEXT(CPU) << "Compiling Block, incoming offset=" << regs.rdi;
-		regs.rax = kvm_guest.jit().block_jit().compile_block(regs.rdi);
+		regs.rax = 0; //kvm_guest.jit().block_jit().compile_block(regs.rdi);
 		DEBUG << CONTEXT(CPU) << "Compiled Block, outgoing offset=" << regs.rax;
 
 		vmioctl(KVM_SET_REGS, &regs);
@@ -345,12 +344,15 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	}
 
 	case 8: {	// COMPILE
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
 		DEBUG << CONTEXT(CPU) << "Compiling Region";
-		kvm_guest.jit().region_jit().compile_region_async(0, 0, ([](void *data, bool success, uint64_t addr)->void{
-			if (success) {
+		kvm_guest.jit().region_jit().compile_region_async((jit::RegionWorkUnit *)regs.rdi, ([](jit::RegionCompilationResult result, void *data)->void{
+			/*if (success) {
 				((KVMCpu *)data)->per_cpu_data().region_addr = addr;
 				((KVMCpu *)data)->interrupt(1);
-			}
+			}*/
 		}), this);
 
 		return true;
@@ -437,16 +439,5 @@ void KVMCpu::dump_regs()
 
 bool KVMCpu::setup_interrupts()
 {
-	struct kvm_lapic_state lapic;
-	/*if (!vmioctl(KVM_GET_LAPIC, &lapic)) {
-		ERROR << "Unable to retrieve LAPIC state";
-		return false;
-	}*/
-
-	/*if (!vmioctl(KVM_SET_LAPIC, &lapic)) {
-		ERROR << "Unable to update LAPIC state";
-		return false;
-	}*/
-
 	return true;
 }

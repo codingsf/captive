@@ -13,7 +13,10 @@
 #include <sys/ioctl.h>
 
 #include <shmem.h>
+
 #include <hypervisor/guest.h>
+#include <hypervisor/shared-memory.h>
+
 #include <linux/kvm.h>
 
 namespace captive {
@@ -45,7 +48,28 @@ namespace captive {
 
 				void do_guest_printf();
 
+				virtual SharedMemory& shared_memory() const { return (SharedMemory&)_shared_memory; }
+
 			private:
+				class KVMSharedMemory : public SharedMemory
+				{
+					friend class KVMGuest;
+
+				public:
+					void *allocate(size_t size) override;
+					void free(void *p) override;
+
+				private:
+					inline void set_arena(void *arena, size_t arena_size)
+					{
+						_arena = arena;
+						_arena_size = arena_size;
+					}
+
+					void *_arena;
+					size_t _arena_size;
+				} _shared_memory;
+
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
@@ -93,7 +117,7 @@ namespace captive {
 				vm_mem_region *get_mem_slot();
 				void put_mem_slot(vm_mem_region *region);
 
-				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags = 0);
+				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags = 0, void *fixed_addr = NULL);
 				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
 

@@ -33,6 +33,8 @@ namespace captive {
 		class Hypervisor;
 		class CPU;
 
+		class SharedMemory;
+
 		class GuestConfiguration;
 		class GuestCPUConfiguration;
 
@@ -50,6 +52,8 @@ namespace captive {
 			inline Hypervisor& owner() const { return _owner; }
 			inline engine::Engine& engine() const { return _engine; }
 			inline jit::JIT& jit() const { return _jit; }
+
+			virtual SharedMemory& shared_memory() const = 0;
 
 			inline const GuestConfiguration& config() const { return _config; }
 

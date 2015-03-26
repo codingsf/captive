@@ -150,7 +150,7 @@ std::string RawBytecode::render() const
 	return str.str();
 }
 
-JIT::JIT() : _code_arena(NULL), _code_arena_size(0), _ir_buffer(NULL), _ir_buffer_size(0)
+JIT::JIT(util::ThreadPool& worker_threads) : _worker_threads(worker_threads), _shared_memory(NULL)
 {
 
 }
@@ -181,7 +181,12 @@ BlockJIT::~BlockJIT()
 
 }
 
-RegionJIT::RegionJIT(JIT& owner, util::ThreadPool& worker_threads) : JITStrategy(owner), _worker_threads(worker_threads)
+void BlockJIT::compile_block_async(BlockWorkUnit* work_unit, block_completion_t completion, void* completion_data)
+{
+	assert(false);
+}
+
+RegionJIT::RegionJIT(JIT& owner) : JITStrategy(owner)
 {
 
 }
@@ -191,79 +196,35 @@ RegionJIT::~RegionJIT()
 
 }
 
-uint64_t BlockJIT::compile_block(uint64_t ir_offset)
-{
-	assert(ir_offset < owner().get_ir_buffer_size());
+class RegionAsyncCompilation {
+public:
+	RegionAsyncCompilation(RegionWorkUnit *rwu, RegionJIT::region_completion_t completion, void *completion_data) : _rwu(rwu), _completion(completion), _completion_data(completion_data) { }
 
-	const RawBytecodeDescriptor *ir = (const RawBytecodeDescriptor *)((uint64_t)owner().get_ir_buffer() + ir_offset);
+	inline RegionWorkUnit *region_work_unit() const { return _rwu; }
+	inline RegionJIT::region_completion_t completion() const { return _completion; }
+	inline void *completion_data() const { return _completion_data; }
 
-	void *rc = internal_compile_block(ir);
-	if (!rc) {
-		return 0;
-	}
-
-	assert((uint8_t *)rc > (uint8_t *)owner().get_code_arena());
-	assert((uint8_t *)rc >= ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
-
-	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
-}
-
-uint64_t RegionJIT::compile_region(uint64_t ir_offset, uint64_t ir_desc_offset)
-{
-	assert(ir_offset < owner().get_ir_buffer_size());
-	assert(ir_desc_offset < owner().get_ir_desc_buffer_size());
-
-	const RawBlockDescriptors *bds = (const RawBlockDescriptors *)((uint64_t)owner().get_ir_desc_buffer() + ir_desc_offset);
-	const RawBytecodeDescriptor *ir = (const RawBytecodeDescriptor *)((uint64_t)owner().get_ir_buffer() + ir_offset);
-
-	void *rc = internal_compile_region(bds, ir);
-	if (!rc) {
-		return 0;
-	}
-
-	assert((uint8_t *)rc > (uint8_t *)owner().get_code_arena());
-	assert((uint8_t *)rc < ((uint8_t *)owner().get_code_arena() + owner().get_code_arena_size()));
-
-	return (uint64_t)rc - (uint64_t)owner().get_code_arena();
-}
-
-struct compilation_work {
-	explicit compilation_work(RegionJIT::completion_t completion, void *data) : completion(completion), data(data) { }
-
-	RegionJIT::completion_t completion;
-	void *data;
-
-	const RawBlockDescriptors *bds;
-	const RawBytecodeDescriptor *ir;
+private:
+	RegionWorkUnit *_rwu;
+	RegionJIT::region_completion_t _completion;
+	void *_completion_data;
 };
 
-static uint64_t do_compile_region(void *data)
+static uint64_t do_compile_region(void *odata)
 {
-	struct compilation_work *work = (struct compilation_work *)data;
+	RegionAsyncCompilation *data = (RegionAsyncCompilation *)odata;
 
 	usleep(1000000);
+	RegionCompilationResult result;
+	result.fn_ptr = NULL;
+	result.work_unit_id = data->region_work_unit()->work_unit_id;
 
+	data->completion()(result, data->completion_data());
 	return 0;
 }
 
-static void do_compile_region_complete(uint64_t result, void *data)
+void RegionJIT::compile_region_async(RegionWorkUnit *rwu, region_completion_t completion, void *completion_data)
 {
-	struct compilation_work *work = (struct compilation_work *)data;
-
-	if (work->completion) {
-		work->completion(work->data, true, result);
-	}
-
-	delete work;
-}
-
-uint64_t RegionJIT::compile_region_async(uint64_t ir_offset, uint64_t ir_desc_offset, completion_t completion, void *data)
-{
-	struct compilation_work *work = new struct compilation_work(completion, data);
-
-	work->bds = (const RawBlockDescriptors *)((uint64_t)owner().get_ir_desc_buffer() + ir_desc_offset);
-	work->ir = (const RawBytecodeDescriptor *)((uint64_t)owner().get_ir_buffer() + ir_offset);
-
-	_worker_threads.queue_work(do_compile_region, do_compile_region_complete, work);
-	return 0;
+	RegionAsyncCompilation *data = new RegionAsyncCompilation(rwu, completion, completion_data);
+	owner().worker_threads().queue_work(do_compile_region, NULL, data);
 }

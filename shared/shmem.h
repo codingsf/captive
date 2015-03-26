@@ -22,17 +22,7 @@ namespace captive {
 		void *heap;
 		uint64_t heap_size;
 
-		void *ir_buffer;
-		uint64_t ir_buffer_size;
-
-		void *ir_desc_buffer;
-		uint64_t ir_desc_buffer_size;
-
-		void *code_buffer;
-		uint64_t code_buffer_size;
-
-		void *printf_buffer;
-		uint64_t printf_buffer_size;
+		void *shared_memory;
 	};
 
 	struct PerCPUData {
