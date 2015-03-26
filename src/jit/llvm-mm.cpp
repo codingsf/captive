@@ -1,5 +1,5 @@
 #include <jit/llvm-mm.h>
-#include <jit/allocator.h>
+#include <hypervisor/shared-memory.h>
 #include <engine/engine.h>
 #include <captive.h>
 
@@ -7,7 +7,7 @@ USE_CONTEXT(LLVM);
 
 using namespace captive::jit;
 
-LLVMJITMemoryManager::LLVMJITMemoryManager(engine::Engine& engine, Allocator& allocator) : _engine(engine), _allocator(allocator)
+LLVMJITMemoryManager::LLVMJITMemoryManager(engine::Engine& engine, hypervisor::SharedMemory& shared_memory) : _engine(engine), _shared_memory(shared_memory)
 {
 	DEBUG << CONTEXT(LLVM) << "Creating LLVMJITMemoryManager";
 }
@@ -19,25 +19,25 @@ LLVMJITMemoryManager::~LLVMJITMemoryManager()
 
 uint8_t* LLVMJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName)
 {
-	AllocationRegion *region = _allocator.allocate(Size);
+	void *region = _shared_memory.allocate((size_t)Size);
 
 	if (!region) {
 		return NULL;
 	} else {
-		_regions.push_back(region);
-		return (uint8_t *)region->base_address();
+		_allocated_memory.push_back(region);
+		return (uint8_t *)region;
 	}
 }
 
 uint8_t* LLVMJITMemoryManager::allocateDataSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName, bool IsReadOnly)
 {
-	AllocationRegion *region = _allocator.allocate(Size);
+	void *region = _shared_memory.allocate((size_t)Size);
 
 	if (!region) {
 		return NULL;
 	} else {
-		_regions.push_back(region);
-		return (uint8_t *)region->base_address();
+		_allocated_memory.push_back(region);
+		return (uint8_t *)region;
 	}
 }
 

@@ -15,6 +15,10 @@ namespace captive {
 		class Engine;
 	}
 
+	namespace hypervisor {
+		class SharedMemory;
+	}
+
 	namespace jit {
 		class IRContext;
 
@@ -25,8 +29,6 @@ namespace captive {
 		namespace ir {
 			class IRBlock;
 		}
-
-		class Allocator;
 
 		class WSJ : public JIT, public BlockJIT, public RegionJIT
 		{
@@ -39,13 +41,11 @@ namespace captive {
 			virtual BlockJIT& block_jit() override { return *this; }
 			virtual RegionJIT& region_jit() override { return *this; }
 
-		protected:
-			void *internal_compile_block(const RawBytecodeDescriptor* bcd) override;
-			void *internal_compile_region(const RawBlockDescriptors* bds, const RawBytecodeDescriptor* bcd) override;
+			BlockCompilationResult compile_block(BlockWorkUnit *bwu) override;
+			RegionCompilationResult compile_region(RegionWorkUnit *rwu) override;
 
 		private:
 			engine::Engine& _engine;
-			Allocator *_allocator;
 
 			bool build(x86::X86Builder& builder, const RawBytecodeDescriptor* bcd);
 			bool lower_block(x86::X86Builder& builder, IRContext& ctx, ir::IRBlock& block);

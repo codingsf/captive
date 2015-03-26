@@ -8,6 +8,8 @@
 #ifndef GUEST_SHARED_MEMORY_H
 #define	GUEST_SHARED_MEMORY_H
 
+#include <define.h>
+
 namespace captive {
 	namespace hypervisor {
 		class SharedMemory

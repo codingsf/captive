@@ -32,18 +32,16 @@ namespace captive {
 			LLVMJIT(engine::Engine& engine, util::ThreadPool& worker_threads);
 			virtual ~LLVMJIT();
 
-			virtual bool init() override;
+			bool init() override;
 
-			virtual BlockJIT& block_jit() override { return *this; }
-			virtual RegionJIT& region_jit() override { return *this; }
+			BlockJIT& block_jit() override { return *this; }
+			RegionJIT& region_jit() override { return *this; }
 
-		protected:
-			void *internal_compile_block(const RawBytecodeDescriptor* bcd) override;
-			void *internal_compile_region(const RawBlockDescriptors* bds, const RawBytecodeDescriptor* bcd) override;
+			BlockCompilationResult compile_block(BlockWorkUnit *bwu) override;
+			RegionCompilationResult compile_region(RegionWorkUnit *rwu) override;
 
 		private:
 			engine::Engine& _engine;
-			Allocator *_allocator;
 
 			struct LoweringContext
 			{

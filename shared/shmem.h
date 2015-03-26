@@ -16,13 +16,18 @@ namespace captive {
 		uint8_t cpu_data[256];
 	};
 
+	struct MemoryVector
+	{
+		void *base_address;
+		uint64_t size;
+	};
+
 	struct PerGuestData {
 		uint64_t next_phys_page;
 
-		void *heap;
-		uint64_t heap_size;
-
-		void *shared_memory;
+		MemoryVector shared_memory;
+		MemoryVector heap;
+		MemoryVector printf_buffer;
 	};
 
 	struct PerCPUData {

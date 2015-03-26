@@ -169,6 +169,7 @@ namespace captive {
 		{
 		public:
 			uint64_t work_unit_id;
+			const RawBytecodeDescriptor *bds;
 		};
 
 		class BlockWorkUnit : public WorkUnit
@@ -178,7 +179,8 @@ namespace captive {
 
 		class RegionWorkUnit : public WorkUnit
 		{
-
+		public:
+			const RawBlockDescriptors *block_descriptors;
 		};
 
 		struct BlockCompilationResult

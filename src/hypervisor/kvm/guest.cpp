@@ -272,9 +272,14 @@ bool KVMGuest::prepare_guest_memory()
 	per_guest_data = (PerGuestData *)_shared_memory.allocate(sizeof(*per_guest_data));
 	assert(per_guest_data);
 
-	per_guest_data->shared_memory = (void *)SHARED_MEM_VIRT_BASE;
-	per_guest_data->heap = (void *)ENGINE_HEAP_VIRT_BASE;
-	per_guest_data->heap_size = ENGINE_HEAP_SIZE;
+	per_guest_data->shared_memory.size = SHARED_MEM_SIZE;
+	per_guest_data->shared_memory.base_address = (void *)SHARED_MEM_VIRT_BASE;
+
+	per_guest_data->heap.size = ENGINE_HEAP_SIZE;
+	per_guest_data->heap.base_address = (void *)ENGINE_HEAP_VIRT_BASE;
+
+	per_guest_data->printf_buffer.size = 1024;
+	per_guest_data->printf_buffer.base_address = _shared_memory.allocate(per_guest_data->printf_buffer.size);
 
 	if (!install_gdt()) {
 		ERROR << CONTEXT(Guest) << "Unable to install GDT";
@@ -619,5 +624,5 @@ bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 
 void KVMGuest::do_guest_printf()
 {
-	fprintf(stderr, "%s", "x");
+	fprintf(stderr, "%s", (const char *)per_guest_data->printf_buffer.base_address);
 }

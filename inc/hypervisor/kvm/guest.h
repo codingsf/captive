@@ -12,6 +12,7 @@
 
 #include <sys/ioctl.h>
 
+#include <define.h>
 #include <shmem.h>
 
 #include <hypervisor/guest.h>

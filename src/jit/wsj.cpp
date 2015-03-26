@@ -1,14 +1,14 @@
 #include <jit/wsj.h>
 #include <jit/wsj-x86.h>
-#include <jit/allocator.h>
 #include <jit/ir.h>
+#include <hypervisor/shared-memory.h>
 
 #include <captive.h>
 
 using namespace captive::jit;
 using namespace captive::jit::x86;
 
-WSJ::WSJ(engine::Engine& engine, util::ThreadPool& worker_threads) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this, worker_threads), _engine(engine), _allocator(NULL)
+WSJ::WSJ(engine::Engine& engine, util::ThreadPool& worker_threads) : JIT(worker_threads), BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine)
 {
 }
 
@@ -21,28 +21,33 @@ bool WSJ::init()
 	return true;
 }
 
-void* WSJ::internal_compile_block(const RawBytecodeDescriptor* bcd)
+BlockCompilationResult WSJ::compile_block(BlockWorkUnit *bwu)
 {
+	BlockCompilationResult result;
+	result.fn_ptr = NULL;
+	result.work_unit_id = bwu->work_unit_id;
+
 	X86Builder builder;
 
-	if (!build(builder, bcd))
-		return NULL;
+	if (!build(builder, bwu->bds))
+		return result;
 
-	if (_allocator == NULL) {
-		_allocator = new Allocator(_code_arena, _code_arena_size);
-	}
-
-	auto region = _allocator->allocate(4096);
-	void *buffer = region->base_address();
-	uint64_t buffer_size = region->size();
+	uint64_t buffer_size = 4096;
+	void *buffer = _shared_memory->allocate(buffer_size);
 
 	builder.generate(buffer, buffer_size);
-	return buffer;
+
+	result.fn_ptr = buffer;
+	return result;
 }
 
-void* WSJ::internal_compile_region(const RawBlockDescriptors* bds, const RawBytecodeDescriptor* bcd)
+RegionCompilationResult WSJ::compile_region(RegionWorkUnit *rwu)
 {
-	return NULL;
+	RegionCompilationResult result;
+	result.fn_ptr = NULL;
+	result.work_unit_id = rwu->work_unit_id;
+
+	return result;
 }
 
 bool WSJ::build(x86::X86Builder& builder, const RawBytecodeDescriptor* bcd)

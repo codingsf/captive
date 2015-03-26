@@ -1,6 +1,5 @@
 #include <jit/llvm.h>
 #include <jit/llvm-mm.h>
-#include <jit/allocator.h>
 #include <captive.h>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -29,10 +28,14 @@ DECLARE_CHILD_CONTEXT(LLVMBlockJIT, LLVM);
 using namespace captive::jit;
 using namespace llvm;
 
-void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
+BlockCompilationResult LLVMJIT::compile_block(BlockWorkUnit *bwu)
 {
-	if (bcd->bytecode_count == 0)
-		return NULL;
+	BlockCompilationResult result;
+	result.fn_ptr = NULL;
+	result.work_unit_id = bwu->work_unit_id;
+
+	if (bwu->bds->bytecode_count == 0)
+		return result;
 
 	LLVMContext ctx;
 	Module *block_module = new Module("block", ctx);
@@ -65,23 +68,23 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 	lc.reg_state = builder.CreatePtrToInt(args.getNext(&args.front()), lc.i64);
 
 	// Populate the basic-block map
-	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
-		if (lc.basic_blocks[bcd->bc[idx].block_id] == NULL) {
-			lc.basic_blocks[bcd->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", block_fn);
+	for (uint32_t idx = 0; idx < bwu->bds->bytecode_count; idx++) {
+		if (lc.basic_blocks[bwu->bds->bc[idx].block_id] == NULL) {
+			lc.basic_blocks[bwu->bds->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", block_fn);
 		}
 	}
 
 	lc.alloca_block = entry_block;
 
 	// Lower all instructions
-	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
-		const RawBytecode *bc = &bcd->bc[idx];
+	for (uint32_t idx = 0; idx < bwu->bds->bytecode_count; idx++) {
+		const RawBytecode *bc = &bwu->bds->bc[idx];
 		BasicBlock *bb = lc.basic_blocks[bc->block_id];
 
 		builder.SetInsertPoint(bb);
 		if (!lower_bytecode(lc, bc)) {
 			ERROR << CONTEXT(LLVMBlockJIT) << "Failed to lower byte-code: " << bc->render();
-			return NULL;
+			return result;
 		}
 	}
 
@@ -129,10 +132,6 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 		printManager.run(*block_module);
 	}*/
 
-	if (_allocator == NULL) {
-		_allocator = new Allocator(_code_arena, _code_arena_size);
-	}
-
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
 	target_opts.DisableTailCalls = false;
@@ -143,16 +142,14 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 
 	ExecutionEngine *engine = EngineBuilder(std::unique_ptr<Module>(block_module))
 		.setEngineKind(EngineKind::JIT)
-		/*.setOptLevel(CodeGenOpt::Aggressive)
-		.setRelocationModel(Reloc::PIC_)*/
-		//.setUseMCJIT(true)
-		.setMCJITMemoryManager(std::unique_ptr<RTDyldMemoryManager>(new LLVMJITMemoryManager(_engine, *_allocator)))
+		.setOptLevel(CodeGenOpt::Aggressive)
+		.setMCJITMemoryManager(std::unique_ptr<RTDyldMemoryManager>(new LLVMJITMemoryManager(_engine, *_shared_memory)))
 		.setTargetOptions(target_opts)
 		.create();
 
 	if (!engine) {
 		ERROR << CONTEXT(LLVMBlockJIT) << "Unable to create LLVM Engine";
-		return NULL;
+		return result;
 	}
 
 	// We actually want compilation to happen.
@@ -163,12 +160,12 @@ void *LLVMJIT::internal_compile_block(const RawBytecodeDescriptor* bcd)
 	void *ptr = (void *)engine->getFunctionAddress(block_fn->getName());
 	if (!ptr) {
 		ERROR << CONTEXT(LLVMBlockJIT) << "Unable to compile function";
-		return NULL;
+		return result;
 	}
 
 	block_fn->deleteBody();
 	delete engine;
 
-	return ptr;
+	result.fn_ptr = ptr;
+	return result;
 }
-

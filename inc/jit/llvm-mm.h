@@ -16,6 +16,10 @@ namespace captive {
 		class Engine;
 	}
 
+	namespace hypervisor {
+		class SharedMemory;
+	}
+
 	namespace jit {
 		class Allocator;
 		class AllocationRegion;
@@ -23,7 +27,7 @@ namespace captive {
 		class LLVMJITMemoryManager : public llvm::RTDyldMemoryManager
 		{
 		public:
-			LLVMJITMemoryManager(engine::Engine& engine, Allocator& allocator);
+			LLVMJITMemoryManager(engine::Engine& engine, hypervisor::SharedMemory& shared_memory);
 			virtual ~LLVMJITMemoryManager();
 
 			uint8_t* allocateCodeSection(uintptr_t Size, unsigned Alignment, unsigned SectionID, llvm::StringRef SectionName) override;
@@ -37,9 +41,9 @@ namespace captive {
 
 		private:
 			engine::Engine& _engine;
-			Allocator& _allocator;
+			hypervisor::SharedMemory& _shared_memory;
 
-			std::list<AllocationRegion *> _regions;
+			std::list<void *> _allocated_memory;
 		};
 	}
 }

@@ -1,5 +1,4 @@
 #include <jit/llvm.h>
-#include <jit/allocator.h>
 #include <jit/llvm-mm.h>
 #include <captive.h>
 
@@ -29,15 +28,19 @@ DECLARE_CHILD_CONTEXT(LLVMRegionJIT, LLVM);
 using namespace captive::jit;
 using namespace llvm;
 
-void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawBytecodeDescriptor* bcd)
+RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 {
+	RegionCompilationResult result;
+	result.fn_ptr = NULL;
+	result.work_unit_id = rwu->work_unit_id;
+
 	//DEBUG << "Compiling Region with " << bd->block_count << " basic blocks.";
 
-	if (bd->block_count == 0)
-		return NULL;
+	if (rwu->block_descriptors->block_count == 0)
+		return result;
 
-	if (bcd->bytecode_count == 0)
-		return NULL;
+	if (rwu->bds->bytecode_count == 0)
+		return result;
 
 	/*for (unsigned int i = 0; i < bd->block_count; i++) {
 		DEBUG << "GBB: addr=" << std::hex << bd->blocks[i].addr << ", id=" << std::dec << bd->blocks[i].id << ", heat=" << bd->blocks[i].heat;
@@ -84,9 +87,9 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 	lc.virtual_base_address = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
 
 	// Populate the basic-block map
-	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
-		if (lc.basic_blocks[bcd->bc[idx].block_id] == NULL) {
-			lc.basic_blocks[bcd->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", region_fn);
+	for (uint32_t idx = 0; idx < rwu->bds->bytecode_count; idx++) {
+		if (lc.basic_blocks[rwu->bds->bc[idx].block_id] == NULL) {
+			lc.basic_blocks[rwu->bds->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", region_fn);
 		}
 	}
 
@@ -94,14 +97,14 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 	lc.dispatch_block = dispatch_block;
 
 	// Lower all instructions
-	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
-		const RawBytecode *bc = &bcd->bc[idx];
+	for (uint32_t idx = 0; idx < rwu->bds->bytecode_count; idx++) {
+		const RawBytecode *bc = &rwu->bds->bc[idx];
 		BasicBlock *bb = lc.basic_blocks[bc->block_id];
 
 		builder.SetInsertPoint(bb);
 		if (!lower_bytecode(lc, bc)) {
 			ERROR << CONTEXT(LLVMRegionJIT) << "Failed to lower byte-code: " << bc->render();
-			return NULL;
+			return result;
 		}
 	}
 
@@ -129,8 +132,8 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 	Value *pc_offset = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), 0xfff);
 	SwitchInst *dispatcher = builder.CreateSwitch(pc_offset, exit_block);
 
-	for (unsigned int i = 0; i < bd->block_count; i++) {
-		dispatcher->addCase(lc.const32(bd->blocks[i].addr & 0xfff), lc.basic_blocks[bd->blocks[i].id]);
+	for (unsigned int i = 0; i < rwu->block_descriptors->block_count; i++) {
+		dispatcher->addCase(lc.const32(rwu->block_descriptors->blocks[i].addr & 0xfff), lc.basic_blocks[rwu->block_descriptors->blocks[i].id]);
 	}
 
 	// Verify
@@ -175,10 +178,6 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 		printManager.run(*region_module);
 	}*/
 
-	if (_allocator == NULL) {
-		_allocator = new Allocator(_code_arena, _code_arena_size);
-	}
-
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
 	target_opts.DisableTailCalls = false;
@@ -189,13 +188,13 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 
 	ExecutionEngine *engine = EngineBuilder(std::unique_ptr<Module>(region_module))
 		.setEngineKind(EngineKind::JIT)
-		.setMCJITMemoryManager(std::unique_ptr<RTDyldMemoryManager>(new LLVMJITMemoryManager(_engine, *_allocator)))
+		.setMCJITMemoryManager(std::unique_ptr<RTDyldMemoryManager>(new LLVMJITMemoryManager(_engine, *_shared_memory)))
 		.setTargetOptions(target_opts)
 		.create();
 
 	if (!engine) {
 		ERROR << CONTEXT(LLVMRegionJIT) << "Unable to create LLVM Engine";
-		return NULL;
+		return result;
 	}
 
 	// We actually want compilation to happen.
@@ -206,12 +205,13 @@ void *LLVMJIT::internal_compile_region(const RawBlockDescriptors* bd, const RawB
 	void *ptr = (void *)engine->getFunctionAddress(region_fn->getName());
 	if (!ptr) {
 		ERROR << CONTEXT(LLVMRegionJIT) << "Unable to compile function";
-		return NULL;
+		return result;
 	}
 
 	region_fn->deleteBody();
 	delete engine;
 
-	return ptr;
+	result.fn_ptr = ptr;
+	return result;
 }
 

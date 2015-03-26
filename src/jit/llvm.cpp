@@ -4,7 +4,6 @@
 
 #include <jit/llvm.h>
 #include <jit/llvm-mm.h>
-#include <jit/allocator.h>
 #include <captive.h>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -33,15 +32,12 @@ DECLARE_CHILD_CONTEXT(LLVM, JIT);
 using namespace captive::jit;
 using namespace llvm;
 
-LLVMJIT::LLVMJIT(engine::Engine& engine, util::ThreadPool& worker_threads) : BlockJIT((JIT&)*this), RegionJIT((JIT&)*this, worker_threads), _engine(engine), _allocator(NULL)
+LLVMJIT::LLVMJIT(engine::Engine& engine, util::ThreadPool& worker_threads) : JIT(worker_threads), BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine)
 {
 }
 
 LLVMJIT::~LLVMJIT()
 {
-	if (_allocator) {
-		delete _allocator;
-	}
 }
 
 bool LLVMJIT::init()
