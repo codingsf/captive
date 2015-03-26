@@ -124,6 +124,7 @@ void Environment::install_tss()
 
 void Environment::setup_interrupts()
 {
+	// Enable interrupts
 	asm volatile("sti\n");
 }
 

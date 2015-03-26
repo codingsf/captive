@@ -13,11 +13,10 @@ entry16:
 	// Load the IDT with a null pointer
     lidt %cs:idt_ptr
 
-	// Setup the LAPIC
-	xor %eax, %eax
-	mov %eax, %es
-	movl $0xfee009f0, %eax
-	//movl $0x0, %es:(%eax)
+	// Disable the PIC - we're using the LAPIC/IOAPIC
+	mov $0xff, %eax
+	out %al, $0xa1
+	out %al, $0x21
 
 	// Enable PAE and PGE
     mov $0xa0, %eax

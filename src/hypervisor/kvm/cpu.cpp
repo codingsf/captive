@@ -78,9 +78,9 @@ bool KVMCpu::init()
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	//per_cpu_data().signal_code = code;
+	per_cpu_data().signal_code = code;
 
-	uint64_t data = code;
+	uint64_t data = 0;
 	write(irqfd, &data, sizeof(data));
 }
 

@@ -233,28 +233,17 @@ bool KVMGuest::prepare_guest_irq()
 		return false;
 	}
 
+	// GSI 16 will be our externally signalled interrupt - route it to
+	// vector 0x30, and unmask it.  Also, set it to be level triggered
 	irqchip.chip.ioapic.redirtbl[16].fields.vector = 0x30;
 	irqchip.chip.ioapic.redirtbl[16].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[16].fields.mask = 0;
 
 	DEBUG << CONTEXT(Guest) << "Configuring IRQ chip";
 	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
 		ERROR << "Unable to configure IRQCHIP";
 		return false;
 	}
-
-	/*DEBUG << CONTEXT(Guest) << "Setting GSI routing";
-	struct kvm_irq_routing *routing = (struct kvm_irq_routing *)calloc(1, sizeof(struct kvm_irq_routing) + (sizeof(struct kvm_irq_routing_entry) * 1));
-
-	routing->nr = 1;
-	routing->entries[0].gsi = 16;
-	routing->entries[0].type = KVM_IRQ_ROUTING_IRQCHIP;
-	routing->entries[0].u.irqchip.irqchip = 2;
-	routing->entries[0].u.irqchip.pin = 0;
-
-	if (vmioctl(KVM_SET_GSI_ROUTING, &routing)) {
-		ERROR << "Unable to setup GSI routing";
-		return false;
-	}*/
 
 	DEBUG << CONTEXT(Guest) << "Creating IRQ fd";
 	irq_fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
@@ -453,7 +442,7 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	stack = SHARED_MEM_VIRT_BASE + SHARED_MEM_SIZE;
 
 	// Map the LAPIC
-	map_page(0x280001000, 0xfee00900, PT_PRESENT | PT_WRITABLE);
+	map_page(0x280002000, 0xfee00000, PT_PRESENT | PT_WRITABLE);
 
 	// Map the verification region (if enabled)
 	if (verify_enabled()) {

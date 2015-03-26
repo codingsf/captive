@@ -11,24 +11,90 @@
 
 extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
 
-static void call_static_constructors()
-{
-	// TODO
-}
-
-static void init_irqs()
-{
-	/*volatile uint8_t *lapic = (volatile uint8_t *)0x280001000;
-
-	lapic[0xf0] = 0xff;*/
-}
-
 static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
 {
 	uint32_t low = msr_value & 0xffffffff;
 	uint32_t high = (msr_value >> 32);
 
 	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
+}
+
+static inline uint64_t rdmsr(uint32_t msr_id)
+{
+	uint32_t low, high;
+
+	asm volatile("rex.b rdmsr" : "=a"(low), "=d"(high) : "c" (msr_id));
+	return (uint64_t)low | ((uint64_t)high << 32);
+}
+
+static void call_static_constructors()
+{
+}
+
+//static uint32_t volatile * const lapic = (uint32_t volatile * const)0x280002000;
+#define lapic ((volatile uint32_t *)0x280002000)
+
+// Local APIC registers, divided by 4 for use as uint[] indices.
+#define ID      (0x0020)   // ID
+#define VER     (0x0030)   // Version
+#define TPR     (0x0080)   // Task Priority
+#define EOI     (0x00B0)   // EOI
+#define SVR     (0x00F0)   // Spurious Interrupt Vector
+  #define ENABLE     0x00000100   // Unit Enable
+#define ESR     (0x0280)   // Error Status
+#define ICRLO   (0x0300)   // Interrupt Command
+  #define INIT       0x00000500   // INIT/RESET
+  #define STARTUP    0x00000600   // Startup IPI
+  #define DELIVS     0x00001000   // Delivery status
+  #define ASSERT     0x00004000   // Assert interrupt (vs deassert)
+  #define DEASSERT   0x00000000
+  #define LEVEL      0x00008000   // Level triggered
+  #define BCAST      0x00080000   // Send to all APICs, including self.
+  #define BUSY       0x00001000
+  #define FIXED      0x00000000
+#define ICRHI   (0x0310)   // Interrupt Command [63:32]
+#define TIMER   (0x0320)   // Local Vector Table 0 (TIMER)
+  #define X1         0x0000000B   // divide counts by 1
+  #define PERIODIC   0x00020000   // Periodic
+#define PCINT   (0x0340)   // Performance Counter LVT
+#define LINT0   (0x0350)   // Local Vector Table 1 (LINT0)
+#define LINT1   (0x0360)   // Local Vector Table 2 (LINT1)
+#define ERROR   (0x0370)   // Local Vector Table 3 (ERROR)
+  #define MASKED     0x00010000   // Interrupt masked
+#define TICR    (0x0380)   // Timer Initial Count
+#define TCCR    (0x0390)   // Timer Current Count
+#define TDCR    (0x03E0)   // Timer Divide Configuration
+
+static void apic_write(uint32_t reg, uint32_t value)
+{
+	lapic[reg >> 2] = value;
+	lapic[1];
+}
+
+static uint32_t apic_read(uint32_t reg)
+{
+	return lapic[reg >> 2];
+}
+
+static void init_irqs()
+{
+	apic_write(SVR, 0x1ff);
+
+	apic_write(LINT0, MASKED);
+	apic_write(LINT1, MASKED);
+	apic_write(ERROR, MASKED);
+
+	apic_write(ESR, 0);
+	apic_write(ESR, 0);
+
+	apic_write(EOI, 0);
+
+	apic_write(ICRHI, 0);
+	apic_write(ICRLO, BCAST | INIT | LEVEL);
+
+	while (apic_read(ICRLO) & DELIVS);
+
+	apic_write(TPR, 0);
 }
 
 extern "C" {
@@ -89,8 +155,13 @@ extern "C" {
 
 	void handle_trap_irq(struct mcontext *mctx)
 	{
-		printf("irq!\n");
-		abort();
+		switch (captive::arch::CPU::get_active_cpu()->cpu_data().signal_code) {
+		case 1:
+			printf("region translation is ready\n");
+			break;
+		}
+
+		apic_write(EOI, 0);
 	}
 
 	void handle_signal(struct mcontext *mctx)
