@@ -18,5 +18,7 @@
 typedef uint32_t gpa_t;
 typedef uint32_t gva_t;
 
+#define __packed __attribute__((packed))
+
 #endif	/* DEFINE_H */
 

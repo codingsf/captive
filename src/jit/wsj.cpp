@@ -3,10 +3,13 @@
 #include <jit/ir.h>
 #include <hypervisor/shared-memory.h>
 
+#include <shared-jit.h>
+
 #include <captive.h>
 
 using namespace captive::jit;
 using namespace captive::jit::x86;
+using namespace captive::shared;
 
 WSJ::WSJ(engine::Engine& engine, util::ThreadPool& worker_threads) : JIT(worker_threads), BlockJIT((JIT&)*this), RegionJIT((JIT&)*this), _engine(engine)
 {
@@ -29,7 +32,7 @@ BlockCompilationResult WSJ::compile_block(BlockWorkUnit *bwu)
 
 	X86Builder builder;
 
-	if (!build(builder, bwu->bds))
+	if (!build(builder, (const RawBytecodeDescriptor *)bwu->ir))
 		return result;
 
 	uint64_t buffer_size = 4096;

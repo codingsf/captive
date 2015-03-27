@@ -1,5 +1,6 @@
 #include <jit/jit.h>
 #include <util/thread-pool.h>
+#include <shared-jit.h>
 #include <captive.h>
 
 #include <sstream>
@@ -8,6 +9,7 @@
 DECLARE_CONTEXT(JIT);
 
 using namespace captive::jit;
+using namespace captive::shared;
 
 std::string RawOperand::render() const
 {
@@ -198,13 +200,16 @@ RegionJIT::~RegionJIT()
 
 class RegionAsyncCompilation {
 public:
-	RegionAsyncCompilation(RegionWorkUnit *rwu, RegionJIT::region_completion_t completion, void *completion_data) : _rwu(rwu), _completion(completion), _completion_data(completion_data) { }
+	RegionAsyncCompilation(RegionJIT *jit, RegionWorkUnit *rwu, RegionJIT::region_completion_t completion, void *completion_data)
+		: _jit(jit), _rwu(rwu), _completion(completion), _completion_data(completion_data) { }
 
+	inline RegionJIT *jit() const { return _jit; }
 	inline RegionWorkUnit *region_work_unit() const { return _rwu; }
 	inline RegionJIT::region_completion_t completion() const { return _completion; }
 	inline void *completion_data() const { return _completion_data; }
 
 private:
+	RegionJIT *_jit;
 	RegionWorkUnit *_rwu;
 	RegionJIT::region_completion_t _completion;
 	void *_completion_data;
@@ -214,17 +219,15 @@ static uint64_t do_compile_region(void *odata)
 {
 	RegionAsyncCompilation *data = (RegionAsyncCompilation *)odata;
 
-	usleep(1000000);
-	RegionCompilationResult result;
-	result.fn_ptr = NULL;
-	result.work_unit_id = data->region_work_unit()->work_unit_id;
-
+	RegionCompilationResult result = data->jit()->compile_region(data->region_work_unit());
 	data->completion()(result, data->completion_data());
+
+	delete data;
 	return 0;
 }
 
 void RegionJIT::compile_region_async(RegionWorkUnit *rwu, region_completion_t completion, void *completion_data)
 {
-	RegionAsyncCompilation *data = new RegionAsyncCompilation(rwu, completion, completion_data);
+	RegionAsyncCompilation *data = new RegionAsyncCompilation(this, rwu, completion, completion_data);
 	owner().worker_threads().queue_work(do_compile_region, NULL, data);
 }

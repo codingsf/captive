@@ -1,5 +1,6 @@
 #include <jit/llvm.h>
 #include <jit/llvm-mm.h>
+#include <shared-jit.h>
 #include <captive.h>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -26,6 +27,7 @@ USE_CONTEXT(LLVM)
 DECLARE_CHILD_CONTEXT(LLVMRegionJIT, LLVM);
 
 using namespace captive::jit;
+using namespace captive::shared;
 using namespace llvm;
 
 RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
@@ -36,10 +38,12 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 	//DEBUG << "Compiling Region with " << bd->block_count << " basic blocks.";
 
-	if (rwu->block_descriptors->block_count == 0)
+	if (rwu->blocks->block_count == 0)
 		return result;
 
-	if (rwu->bds->bytecode_count == 0)
+	const RawBytecodeDescriptor *bds = (const RawBytecodeDescriptor *)rwu->ir;
+
+	if (bds->bytecode_count == 0)
 		return result;
 
 	/*for (unsigned int i = 0; i < bd->block_count; i++) {
@@ -87,9 +91,9 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	lc.virtual_base_address = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
 
 	// Populate the basic-block map
-	for (uint32_t idx = 0; idx < rwu->bds->bytecode_count; idx++) {
-		if (lc.basic_blocks[rwu->bds->bc[idx].block_id] == NULL) {
-			lc.basic_blocks[rwu->bds->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", region_fn);
+	for (uint32_t idx = 0; idx < bds->bytecode_count; idx++) {
+		if (lc.basic_blocks[bds->bc[idx].block_id] == NULL) {
+			lc.basic_blocks[bds->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", region_fn);
 		}
 	}
 
@@ -97,8 +101,8 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	lc.dispatch_block = dispatch_block;
 
 	// Lower all instructions
-	for (uint32_t idx = 0; idx < rwu->bds->bytecode_count; idx++) {
-		const RawBytecode *bc = &rwu->bds->bc[idx];
+	for (uint32_t idx = 0; idx < bds->bytecode_count; idx++) {
+		const RawBytecode *bc = &bds->bc[idx];
 		BasicBlock *bb = lc.basic_blocks[bc->block_id];
 
 		builder.SetInsertPoint(bb);
@@ -132,8 +136,8 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	Value *pc_offset = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), 0xfff);
 	SwitchInst *dispatcher = builder.CreateSwitch(pc_offset, exit_block);
 
-	for (unsigned int i = 0; i < rwu->block_descriptors->block_count; i++) {
-		dispatcher->addCase(lc.const32(rwu->block_descriptors->blocks[i].addr & 0xfff), lc.basic_blocks[rwu->block_descriptors->blocks[i].id]);
+	for (unsigned int i = 0; i < rwu->blocks->block_count; i++) {
+		dispatcher->addCase(lc.const32(rwu->blocks->descriptors[i].block_addr & 0xfff), lc.basic_blocks[rwu->blocks->descriptors[i].block_id]);
 	}
 
 	// Verify
@@ -167,16 +171,16 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	}
 
 	// Print out the module
-	/*{
+	{
 		std::stringstream filename;
-		filename << "region-" << std::hex << (uint64_t)(bd->blocks[0].addr & ~0xfffULL) << ".ll";
+		filename << "region-" << std::hex << (uint64_t)(rwu->region_base_address) << ".ll";
 		std::ofstream file(filename.str());
 		raw_os_ostream str(file);
 
 		PassManager printManager;
 		printManager.add(createPrintModulePass(str, ""));
 		printManager.run(*region_module);
-	}*/
+	}
 
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;

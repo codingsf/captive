@@ -68,7 +68,7 @@ namespace captive {
 					{
 						spinlock_t lock;
 						void *next_free;
-					} __attribute__((packed));
+					} __packed;
 
 					inline void set_arena(void *arena, size_t arena_size)
 					{
@@ -152,6 +152,7 @@ namespace captive {
 				}
 
 				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
+				void map_huge_page(uint64_t va, uint64_t pa, uint32_t flags);
 
 				inline int vmioctl(unsigned long int req) const {
 					return vmioctl(req, (unsigned long int)0);

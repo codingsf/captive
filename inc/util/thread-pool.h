@@ -25,7 +25,7 @@ namespace captive {
 		{
 			friend void ::thread_proc_tramp(void *);
 		public:
-			explicit ThreadPool(uint32_t min_threads = 1, uint32_t max_threads = 10);
+			explicit ThreadPool(uint32_t min_threads = 1, uint32_t max_threads = 4);
 			~ThreadPool();
 
 			void queue_work(action_t action, completion_t completion, void *data);

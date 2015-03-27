@@ -66,7 +66,7 @@ namespace captive {
 							uint8_t int_en : 1;
 							uint8_t mode : 1;
 							uint8_t enable : 1;
-						} __attribute__((packed)) bits;
+						} __packed bits;
 					} control_reg;
 
 					void update();

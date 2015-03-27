@@ -1,5 +1,6 @@
 #include <jit/llvm.h>
 #include <jit/llvm-mm.h>
+#include <shared-jit.h>
 #include <captive.h>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -26,6 +27,7 @@ USE_CONTEXT(LLVM);
 DECLARE_CHILD_CONTEXT(LLVMBlockJIT, LLVM);
 
 using namespace captive::jit;
+using namespace captive::shared;
 using namespace llvm;
 
 BlockCompilationResult LLVMJIT::compile_block(BlockWorkUnit *bwu)
@@ -34,7 +36,10 @@ BlockCompilationResult LLVMJIT::compile_block(BlockWorkUnit *bwu)
 	result.fn_ptr = NULL;
 	result.work_unit_id = bwu->work_unit_id;
 
-	if (bwu->bds->bytecode_count == 0)
+	const RawBytecodeDescriptor *bds = (const RawBytecodeDescriptor *)bwu->ir;
+	assert(bds);
+
+	if (bds->bytecode_count == 0)
 		return result;
 
 	LLVMContext ctx;
@@ -68,17 +73,17 @@ BlockCompilationResult LLVMJIT::compile_block(BlockWorkUnit *bwu)
 	lc.reg_state = builder.CreatePtrToInt(args.getNext(&args.front()), lc.i64);
 
 	// Populate the basic-block map
-	for (uint32_t idx = 0; idx < bwu->bds->bytecode_count; idx++) {
-		if (lc.basic_blocks[bwu->bds->bc[idx].block_id] == NULL) {
-			lc.basic_blocks[bwu->bds->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", block_fn);
+	for (uint32_t idx = 0; idx < bds->bytecode_count; idx++) {
+		if (lc.basic_blocks[bds->bc[idx].block_id] == NULL) {
+			lc.basic_blocks[bds->bc[idx].block_id] = BasicBlock::Create(ctx, "bb", block_fn);
 		}
 	}
 
 	lc.alloca_block = entry_block;
 
 	// Lower all instructions
-	for (uint32_t idx = 0; idx < bwu->bds->bytecode_count; idx++) {
-		const RawBytecode *bc = &bwu->bds->bc[idx];
+	for (uint32_t idx = 0; idx < bds->bytecode_count; idx++) {
+		const RawBytecode *bc = &bds->bc[idx];
 		BasicBlock *bb = lc.basic_blocks[bc->block_id];
 
 		builder.SetInsertPoint(bb);

@@ -4,6 +4,7 @@
 #include <jit.h>
 #include <jit/translation-context.h>
 #include <shared-memory.h>
+#include <shared-jit.h>
 #include <profile/image.h>
 #include <profile/region.h>
 #include <profile/block.h>
@@ -94,16 +95,23 @@ void CPU::analyse_regions()
 
 void CPU::compile_region(Region& rgn)
 {
+	using namespace captive::shared;
+
 	rgn.status(Region::IN_TRANSLATION);
 
-	TranslationBlocks *tb = (TranslationBlocks *)Memory::shared_memory().allocate(0x10000);
-	tb->block_count = 0;
+	RegionWorkUnit *rwu = (RegionWorkUnit *)Memory::shared_memory().allocate(sizeof(RegionWorkUnit));
 
-	void *instruction_buffer = Memory::shared_memory().allocate(0x10000);
+	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(0x10000);
+	rwu->blocks->block_count = 0;
 
-	TranslationContext ctx(instruction_buffer, 0x10000);
+	rwu->ir = Memory::shared_memory().allocate(0x10000);
+
+	TranslationContext ctx(rwu->ir, 0x10000);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
+
+	rwu->region_base_address = (uint32_t)rgn.address();
+	rwu->work_unit_id = 1;
 
 	//printf("compiling region %x\n", rgn.address());
 	for (auto block : rgn) {
@@ -112,10 +120,10 @@ void CPU::compile_region(Region& rgn)
 
 		//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
 
-		tb->descriptors[tb->block_count].block_id = ctx.current_block();
-		tb->descriptors[tb->block_count].block_addr = block.second->address() & 0xfff;
-		tb->descriptors[tb->block_count].heat = block.second->interp_count();
-		tb->block_count++;
+		rwu->blocks->descriptors[rwu->blocks->block_count].block_id = ctx.current_block();
+		rwu->blocks->descriptors[rwu->blocks->block_count].block_addr = block.second->address() & 0xfff;
+		rwu->blocks->descriptors[rwu->blocks->block_count].heat = block.second->interp_count();
+		rwu->blocks->block_count++;
 
 		uint32_t pc = block.second->address();
 		do {
@@ -146,5 +154,5 @@ void CPU::compile_region(Region& rgn)
 	}
 
 	// Make region translation hypercall
-	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)tb), "S"((uint64_t)instruction_buffer));
+	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
 }

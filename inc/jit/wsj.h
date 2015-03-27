@@ -41,8 +41,8 @@ namespace captive {
 			virtual BlockJIT& block_jit() override { return *this; }
 			virtual RegionJIT& region_jit() override { return *this; }
 
-			BlockCompilationResult compile_block(BlockWorkUnit *bwu) override;
-			RegionCompilationResult compile_region(RegionWorkUnit *rwu) override;
+			BlockCompilationResult compile_block(shared::BlockWorkUnit *bwu) override;
+			RegionCompilationResult compile_region(shared::RegionWorkUnit *rwu) override;
 
 		private:
 			engine::Engine& _engine;

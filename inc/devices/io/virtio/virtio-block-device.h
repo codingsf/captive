@@ -39,7 +39,7 @@ namespace captive {
 						uint32_t type;
 						uint32_t ioprio;
 						uint64_t sector;
-					} __attribute__((packed));
+					} __packed;
 
 					struct {
 						uint64_t capacity;
@@ -51,7 +51,7 @@ namespace captive {
 							uint8_t sectors;
 						} geometry;
 						uint32_t block_size;
-					} __attribute__((packed)) config;
+					} __packed config;
 				};
 			}
 		}

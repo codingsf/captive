@@ -16,19 +16,6 @@
 namespace captive {
 	namespace arch {
 		namespace jit {
-			struct TranslationBlockDescriptor
-			{
-				block_id_t block_id;
-				uint32_t heat;
-				uint32_t block_addr;
-			} packed;
-
-			struct TranslationBlocks
-			{
-				uint32_t block_count;
-				TranslationBlockDescriptor descriptors[];
-			} packed;
-
 			class TranslationContext
 			{
 			public:

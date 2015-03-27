@@ -58,7 +58,7 @@ namespace captive {
 						uint8_t rsvd1 : 2;
 						uint8_t watermark : 1;
 						uint32_t rsvd0 : 15;
-					} __attribute__((packed)) fields;
+					} __packed fields;
 				} control;
 
 				uint32_t lcd_timing[4];

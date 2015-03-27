@@ -18,8 +18,8 @@ entry16:
 	out %al, $0xa1
 	out %al, $0x21
 
-	// Enable PAE and PGE
-    mov $0xa0, %eax
+	// Enable PAE, PGE and PSE
+    mov $0xb0, %eax
     mov %eax, %cr4
 
 	// Setup cr3 with the PML4

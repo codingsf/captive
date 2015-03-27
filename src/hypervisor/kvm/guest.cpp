@@ -25,6 +25,7 @@ using namespace captive::hypervisor::kvm;
 #define PT_PRESENT	(1 << 0)
 #define PT_WRITABLE	(1 << 1)
 #define PT_USER_ACCESS	(1 << 2)
+#define PT_HUGE_PAGE	(1 << 7)
 
 #define BIOS_PHYS_BASE			0xf0000ULL
 
@@ -40,7 +41,7 @@ using namespace captive::hypervisor::kvm;
 #define ENGINE_HEAP_VIRT_BASE		0x210000000ULL
 #define ENGINE_HEAP_SIZE		0x050000000ULL
 
-#define SHARED_MEM_PHYS_BASE		0x6f0000000000ULL
+#define SHARED_MEM_PHYS_BASE		0x000200000000ULL
 #define SHARED_MEM_VIRT_BASE		0x6f0000000000ULL
 #define SHARED_MEM_SIZE			0x000010000000ULL
 
@@ -424,13 +425,19 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 			<< ", virt-base=" << std::hex << guest_memory_regions[i].virt_base
 			<< ", size=" << std::hex << guest_memory_regions[i].size;
 
-		for (uint64_t va = guest_memory_regions[i].virt_base, pa = guest_memory_regions[i].phys_base; va < (guest_memory_regions[i].virt_base + guest_memory_regions[i].size); va += 0x1000, pa += 0x1000) {
-			map_page(va, pa, PT_PRESENT | guest_memory_regions[i].prot_flags);
+		if ((guest_memory_regions[i].size % 0x200000) == 0) {
+			for (uint64_t va = guest_memory_regions[i].virt_base, pa = guest_memory_regions[i].phys_base; va < (guest_memory_regions[i].virt_base + guest_memory_regions[i].size); va += 0x200000, pa += 0x200000) {
+				map_huge_page(va, pa, PT_PRESENT | guest_memory_regions[i].prot_flags);
+			}
+		} else {
+			for (uint64_t va = guest_memory_regions[i].virt_base, pa = guest_memory_regions[i].phys_base; va < (guest_memory_regions[i].virt_base + guest_memory_regions[i].size); va += 0x1000, pa += 0x1000) {
+				map_page(va, pa, PT_PRESENT | guest_memory_regions[i].prot_flags);
+			}
 		}
 	}
 
-	// For now, put the stack starting at the end of shared memory
-	stack = SHARED_MEM_VIRT_BASE + SHARED_MEM_SIZE;
+	// For now, put the stack starting at the end of the heap
+	stack = ENGINE_HEAP_VIRT_BASE + ENGINE_HEAP_SIZE;
 
 	DEBUG << CONTEXT(Guest) << "Mapping LAPIC";
 
@@ -446,8 +453,8 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	DEBUG << CONTEXT(Guest) << "Mapping GPM copy";
 	// Map ALL guest physical memory, and mark it as present and writable for
 	// use by the engine.
-	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x1000, pa += 0x1000) {
-		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
+	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x200000, pa += 0x200000) {
+		map_huge_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
 	return true;
@@ -578,10 +585,18 @@ void KVMGuest::release_all_guest_memory()
 
 void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 {
+	// VA must be page-aligned
+	assert((va & 0xfff) == 0);
+
 	uint16_t pm_idx = BITS(va, 39, 47);
 	uint16_t pdp_idx = BITS(va, 30, 38);
 	uint16_t pd_idx = BITS(va, 21, 29);
 	uint16_t pt_idx = BITS(va, 12, 20);
+
+	assert(pm_idx < 0x200);
+	assert(pdp_idx < 0x200);
+	assert(pd_idx < 0x200);
+	assert(pt_idx < 0x200);
 
 	pm_t pm = (pm_t)get_phys_buffer(0x2000);
 	if (pm[pm_idx] == 0) {
@@ -607,15 +622,56 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 		pd[pd_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
+	assert(!(pd[pd_idx] & PT_HUGE_PAGE));
+
 	pt_t pt = (pt_t)get_phys_buffer(pd[pd_idx] & ADDR_MASK);
 	pt[pt_idx] = (pa & ADDR_MASK) | ((uint64_t)flags & FLAGS_MASK);
 
-	/*DEBUG << "Map Page VA=" << std::hex << va
+	DEBUG << CONTEXT(Guest) << "Map Page VA=" << std::hex << va
 		<< ", PA=" << pa
-		<< ", PM[2000]=" << (uint32_t)pm_idx
-		<< ", PDP[" << pm[pm_idx] << "]=" << (uint32_t)pdp_idx
-		<< ", PD[" << pdp[pdp_idx] << "]=" << (uint32_t)pd_idx
-		<< ", PT[" << pd[pd_idx] << "]=" << (uint32_t)pt_idx;*/
+		<< ", PM[" << (uint32_t)pm_idx << "] = " << pm[pm_idx]
+		<< ", PDP[" << (uint32_t)pdp_idx << "]=" << pdp[pdp_idx]
+		<< ", PD[" << (uint32_t)pd_idx << "]=" << pd[pd_idx]
+		<< ", PT[" << (uint32_t)pt_idx << "]=" << pt[pt_idx];
+}
+
+void KVMGuest::map_huge_page(uint64_t va, uint64_t pa, uint32_t flags)
+{
+	// VA must be huge-page-aligned
+	assert((va & 0x1fffff) == 0);
+
+	uint16_t pm_idx = BITS(va, 39, 47);
+	uint16_t pdp_idx = BITS(va, 30, 38);
+	uint16_t pd_idx = BITS(va, 21, 29);
+
+	pm_t pm = (pm_t)get_phys_buffer(0x2000);
+	if (pm[pm_idx] == 0) {
+		uint64_t new_page = alloc_page();
+		bzero(get_phys_buffer(new_page), 0x1000);
+
+		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
+	}
+
+	pdp_t pdp = (pdp_t)get_phys_buffer(pm[pm_idx] & ADDR_MASK);
+	if (pdp[pdp_idx] == 0) {
+		uint64_t new_page = alloc_page();
+		bzero(get_phys_buffer(new_page), 0x1000);
+
+		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
+	}
+
+	pd_t pd = (pd_t)get_phys_buffer(pdp[pdp_idx] & ADDR_MASK);
+
+	assert(pd[pd_idx] == 0);
+
+	flags |= PT_HUGE_PAGE;
+	pd[pd_idx] = (pa & ADDR_MASK) | ((uint64_t)flags & FLAGS_MASK);
+
+	DEBUG << CONTEXT(Guest) << "Map Huge Page VA=" << std::hex << va
+		<< ", PA=" << pa
+		<< ", PM[" << (uint32_t)pm_idx << "] = " << pm[pm_idx]
+		<< ", PDP[" << (uint32_t)pdp_idx << "]=" << pdp[pdp_idx]
+		<< ", PD[" << (uint32_t)pd_idx << "]=" << pd[pd_idx];
 }
 
 bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const

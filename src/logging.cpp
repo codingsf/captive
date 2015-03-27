@@ -25,7 +25,5 @@ void captive::logging::configure_logging_contexts()
 		} else {
 			context.second->_parent = NULL;
 		}
-
-		context.second->enable();
 	}
 }

@@ -27,24 +27,24 @@ namespace captive
 						uint32_t len;
 						uint16_t flags;
 						uint16_t next;
-					} __attribute__((packed));
+					} __packed;
 
 					struct VirtRingAvail {
 						uint16_t flags;
 						uint16_t idx;
 						uint16_t ring[];
-					} __attribute__((packed));
+					} __packed;
 
 					struct VirtRingUsedElem {
 						uint32_t id;
 						uint32_t len;
-					} __attribute__((packed));
+					} __packed;
 
 					struct VirtRingUsed {
 						uint16_t flags;
 						uint16_t idx;
 						VirtRingUsedElem ring[];
-					} __attribute__((packed));
+					} __packed;
 
 					inline struct VirtRingDesc *GetDescriptor(uint8_t index) const {
 						return &descriptors[index];
