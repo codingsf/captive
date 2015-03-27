@@ -42,7 +42,7 @@ using namespace captive::hypervisor::kvm;
 
 #define SHARED_MEM_PHYS_BASE		0x6f0000000000ULL
 #define SHARED_MEM_VIRT_BASE		0x6f0000000000ULL
-#define SHARED_MEM_SIZE			0x010000000000ULL
+#define SHARED_MEM_SIZE			0x000010000000ULL
 
 #define JIT_PHYS_BASE			0x0a0000000ULL
 #define JIT_VIRT_BASE			0x270000000ULL
@@ -267,11 +267,14 @@ bool KVMGuest::prepare_guest_memory()
 		}
 	}
 
+	DEBUG << CONTEXT(Guest) << "Initialising shared memory";
 	_shared_memory.set_arena((void *)SHARED_MEM_VIRT_BASE, SHARED_MEM_SIZE);
 
+	DEBUG << CONTEXT(Guest) << "Allocating per-guest data structure";
 	per_guest_data = (PerGuestData *)_shared_memory.allocate(sizeof(*per_guest_data));
 	assert(per_guest_data);
 
+	DEBUG << CONTEXT(Guest) << "Initialising per-guest data structure";
 	per_guest_data->shared_memory.size = SHARED_MEM_SIZE;
 	per_guest_data->shared_memory.base_address = (void *)SHARED_MEM_VIRT_BASE;
 
@@ -429,14 +432,18 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	// For now, put the stack starting at the end of shared memory
 	stack = SHARED_MEM_VIRT_BASE + SHARED_MEM_SIZE;
 
+	DEBUG << CONTEXT(Guest) << "Mapping LAPIC";
+
 	// Map the LAPIC
 	map_page(0x280002000, 0xfee00000, PT_PRESENT | PT_WRITABLE);
 
 	// Map the verification region (if enabled)
 	if (verify_enabled()) {
+		DEBUG << CONTEXT(Guest) << "Mapping verification region";
 		map_page(VERIFY_VIRT_BASE, VERIFY_PHYS_BASE, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
 
+	DEBUG << CONTEXT(Guest) << "Mapping GPM copy";
 	// Map ALL guest physical memory, and mark it as present and writable for
 	// use by the engine.
 	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x1000, pa += 0x1000) {
@@ -501,6 +508,8 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 
 	// Store the buffer address in the KVM memory structure.
 	rgn->kvm.userspace_addr = (uint64_t) rgn->host_buffer;
+
+	DEBUG << CONTEXT(Guest) << "Installing memory region into guest";
 
 	// Install the memory region into the guest.
 	int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &rgn->kvm);

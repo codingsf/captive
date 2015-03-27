@@ -2,8 +2,6 @@
 
 .globl spin_lock
 spin_lock:
-	cli
-
 	mov $1, %eax
 	xchgq (%rdi), %rax
 	test %eax, %eax
@@ -14,5 +12,5 @@ spin_lock:
 spin_unlock:
 	mov $0, %eax
 	xchgq (%rdi), %rax
-	sti
+
 	ret

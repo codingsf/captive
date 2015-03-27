@@ -100,6 +100,8 @@ static void init_irqs()
 extern "C" {
 	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{
+		printf("no time for that now...\n");
+		
 		// Populate the FS register with the address of the Per-CPU data structure.
 		wrmsr(0xc0000100, (uint64_t)cpu_data);
 

@@ -58,6 +58,8 @@ namespace captive {
 					friend class KVMGuest;
 
 				public:
+					KVMSharedMemory();
+
 					void *allocate(size_t size) override;
 					void free(void *p) override;
 
@@ -73,6 +75,9 @@ namespace captive {
 						_arena = arena;
 						_arena_size = arena_size;
 						_header = (volatile struct shared_memory_header *)arena;
+
+						_header->lock = 0;
+						_header->next_free = (void *)((uint64_t)_arena + 16);
 					}
 
 					void *_arena;

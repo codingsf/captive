@@ -2,6 +2,12 @@
 
 using namespace captive::hypervisor::kvm;
 
+KVMGuest::KVMSharedMemory::KVMSharedMemory() : _arena(NULL), _arena_size(0)
+{
+
+}
+
+
 void *KVMGuest::KVMSharedMemory::allocate(size_t size)
 {
 	if (size % 16) {
