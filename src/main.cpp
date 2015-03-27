@@ -56,6 +56,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	captive::logging::configure_logging_contexts();
+
 	if (argc < 5 || argc > 7 || argc == 6) {
 		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
 		return 1;

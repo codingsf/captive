@@ -11,13 +11,15 @@
 #include <define.h>
 
 namespace captive {
+	struct MemoryVector;
+	
 	namespace arch {
 		struct malloc_unit
 		{
 			uint32_t size;
 		};
 
-		void malloc_init(void *arena, size_t size);
+		void malloc_init(MemoryVector& arena);
 		void *malloc(size_t size);
 		void *calloc(size_t nmemb, size_t size);
 		void *realloc(void *p, size_t size);

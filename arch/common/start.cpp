@@ -110,13 +110,15 @@ extern "C" {
 		init_irqs();
 
 		// Initialise the printf() system.
-		printf_init((char *)cpu_data->guest_data->printf_buffer, cpu_data->guest_data->printf_buffer_size);
+		printf_init(cpu_data->guest_data->printf_buffer);
 
 		// Initialise the malloc() memory allocation system.
-		captive::arch::malloc_init(cpu_data->guest_data->heap, cpu_data->guest_data->heap_size);
+		captive::arch::malloc_init(cpu_data->guest_data->heap);
 
-		// Initialise the memory manager, and create the environment.
-		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
+		// Initialise the memory manager.
+		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page, cpu_data->guest_data->shared_memory);
+
+
 		captive::arch::Environment *env = create_environment(cpu_data);
 
 		if (!env) {

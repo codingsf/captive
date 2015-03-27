@@ -12,7 +12,7 @@ export shared-dir := $(top-dir)/shared
 
 out := $(bin-dir)/captive
 src := $(patsubst src/%,$(src-dir)/%,$(shell find src/ | grep -e "\.cpp"))
-obj := $(src:.cpp=.o)
+obj := $(src:.cpp=.o) $(src-dir)/util/spin-lock.o
 dep := $(src:.cpp=.d)
 
 bios := $(bios-dir)/bios.bin.o
@@ -20,10 +20,12 @@ bios := $(bios-dir)/bios.bin.o
 common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O0 -pthread
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
+asflags  :=
 ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lz -lncurses
 
 cc  := gcc
 cxx := g++
+as  := as
 ld  := ld
 rm  := rm
 make := +make
@@ -49,17 +51,21 @@ $(out): $(dep) $(obj) $(bios)
 	@echo "  C++     $(patsubst $(src-dir)/%,%,$@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) $<
 
-$(src-dir)/jit/jit.o: $(src-dir)/jit/jit.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
+%.o: %.S
+	@echo "  AS      $(patsubst $(src-dir)/%,%,$@)"
+	$(q)$(as) -o $@ $(asflags) $<
 
-$(src-dir)/jit/llvm.o: $(src-dir)/jit/llvm.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-
-$(src-dir)/jit/llvm-mm.o: $(src-dir)/jit/llvm-mm.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
+#$(src-dir)/jit/jit.o: $(src-dir)/jit/jit.cpp
+#	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
+#	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
+#
+#$(src-dir)/jit/llvm.o: $(src-dir)/jit/llvm.cpp
+#	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
+#	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
+#
+#$(src-dir)/jit/llvm-mm.o: $(src-dir)/jit/llvm-mm.cpp
+#	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
+#	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
 
 %.d: %.cpp
 	$(q)$(cxx) -M -MT $(@:.d=.o) -o $@ $(cxxflags) $<

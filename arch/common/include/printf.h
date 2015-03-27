@@ -10,7 +10,12 @@
 
 #include <stdarg.h>
 
-extern void printf_init(char *_fast_buffer, int _fast_buffer_size);
+namespace captive
+{
+	struct MemoryVector;
+}
+
+extern void printf_init(captive::MemoryVector&);
 
 extern int printf(const char *fmt, ...);
 extern int sprintf(char *buffer, const char *fmt, ...);

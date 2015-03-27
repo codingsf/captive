@@ -16,19 +16,33 @@
 
 namespace captive {
 	namespace logging {
+		class LogContext;
+
+		extern void configure_logging_contexts();
+		extern void register_logging_context(LogContext& ctx);
+
 		class LogContext
 		{
+			friend void configure_logging_contexts();
+
 		public:
-			explicit LogContext(std::string name) : _parent(NULL), _name(name), _enabled(false) { }
+			explicit LogContext(std::string name) : _parent_name(""), _name(name), _enabled(false), _parent(NULL) { register_logging_context(*this); }
+			explicit LogContext(std::string name, std::string parent_name) : _parent_name(parent_name), _name(name), _enabled(false), _parent(NULL) { register_logging_context(*this); }
 
 			inline std::string name() const { return _name; }
+			inline std::string parent_name() const { return _parent_name; }
+
+			inline LogContext *parent() const { return _parent; }
+
 			inline bool enabled() const { return _enabled; }
 			inline void enable() { _enabled = true; }
 			inline void disable() { _enabled = false; }
 		private:
-			LogContext *_parent;
+			std::string _parent_name;
 			std::string _name;
 			bool _enabled;
+
+			LogContext *_parent;
 		};
 	}
 
@@ -126,8 +140,10 @@ namespace captive {
 
 #define CONTEXT(_ctx) captive::set_context(captive::logging::LogContext##_ctx)
 
-#define DECLARE_CONTEXT(_ctx) namespace captive { namespace logging { LogContext LogContext##_ctx(#_ctx); } }
-#define DECLARE_CHILD_CONTEXT(_child, _parent) DECLARE_CONTEXT(_child)
+#define ___STR(a) #a
+#define __STR(a) ___STR(a)
+#define DECLARE_CONTEXT(_ctx) namespace captive { namespace logging { __attribute__((init_priority(210))) LogContext LogContext##_ctx(#_ctx); } }
+#define DECLARE_CHILD_CONTEXT(_child, _parent) namespace captive { namespace logging { __attribute__((init_priority(210))) LogContext LogContext##_child(#_child, #_parent); } }
 #define USE_CONTEXT(_ctx) namespace captive { namespace logging { extern LogContext LogContext##_ctx; } }
 
 #define LAST_ERROR_TEXT strerror(errno)

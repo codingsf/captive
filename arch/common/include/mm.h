@@ -10,12 +10,14 @@
 
 #include <define.h>
 #include <printf.h>
+#include <shmem.h>
 
 #define packed __attribute__((packed))
 
 namespace captive {
 	namespace arch {
 		class MMU;
+		class SharedMemory;
 
 		namespace arm {
 			class ArmMMU;
@@ -116,14 +118,18 @@ namespace captive {
 				pa_t pa;
 			};
 
-			Memory(uint64_t first_phys_page);
+			Memory(uint64_t first_phys_page, MemoryVector shared_memory_arena);
 
 			static Page alloc_page();
 			static void free_page(Page& page);
 			static void map_page(va_t va, Page& page);
 
+			static inline SharedMemory& shared_memory() { return *mm->_shared_memory; }
+
 		private:
 			static Memory *mm;
+
+			SharedMemory *_shared_memory;
 
 			pa_t _next_phys_page;
 			va_t _data_base;

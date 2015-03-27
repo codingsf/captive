@@ -17,6 +17,7 @@
 
 #include <hypervisor/guest.h>
 #include <hypervisor/shared-memory.h>
+#include <util/spin-lock.h>
 
 #include <linux/kvm.h>
 
@@ -61,14 +62,23 @@ namespace captive {
 					void free(void *p) override;
 
 				private:
+					struct shared_memory_header
+					{
+						spinlock_t lock;
+						void *next_free;
+					} __attribute__((packed));
+
 					inline void set_arena(void *arena, size_t arena_size)
 					{
 						_arena = arena;
 						_arena_size = arena_size;
+						_header = (volatile struct shared_memory_header *)arena;
 					}
 
 					void *_arena;
 					size_t _arena_size;
+
+					volatile struct shared_memory_header *_header;
 				} _shared_memory;
 
 				std::vector<KVMCpu *> kvm_cpus;

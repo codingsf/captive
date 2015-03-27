@@ -1,6 +1,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <printf.h>
+#include <shmem.h>
 
 using namespace captive::arch;
 
@@ -10,10 +11,10 @@ static size_t heap_size;
 static uint8_t *heap_free_ptr;
 static uint8_t *heap_end_ptr;
 
-void captive::arch::malloc_init(void *arena, size_t size)
+void captive::arch::malloc_init(captive::MemoryVector& arena)
 {
-	heap = (uint8_t *)arena;
-	heap_size = size;
+	heap = (uint8_t *)arena.base_address;
+	heap_size = arena.size;
 
 	heap_free_ptr = heap;
 	heap_end_ptr = heap + heap_size;

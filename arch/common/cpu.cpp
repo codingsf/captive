@@ -284,7 +284,7 @@ GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
 
 bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 {
-	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
+/*	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
@@ -330,7 +330,9 @@ bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
 	} else {
 		block->invalidate();
 		return false;
-	}
+	}*/
+	
+	return false;
 }
 
 bool CPU::verify_check()

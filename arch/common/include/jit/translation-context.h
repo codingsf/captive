@@ -32,7 +32,7 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext(void *instruction_buffer, uint64_t instruction_buffer_size, uint64_t instruction_buffer_offset, uint64_t code_buffer_offset);
+				TranslationContext(void *instruction_buffer, uint64_t instruction_buffer_size);
 
 				GuestBasicBlock::GuestBasicBlockFn compile();
 
@@ -60,8 +60,6 @@ namespace captive {
 			private:
 				block_id_t current_block_id;
 				uint64_t instruction_buffer_size;
-				uint64_t instruction_buffer_offset;
-				uint64_t code_buffer_offset;
 
 				struct instruction_entry {
 					block_id_t block_id;

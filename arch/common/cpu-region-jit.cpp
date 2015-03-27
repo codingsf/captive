@@ -3,6 +3,7 @@
 #include <decode.h>
 #include <jit.h>
 #include <jit/translation-context.h>
+#include <shared-memory.h>
 #include <profile/image.h>
 #include <profile/region.h>
 #include <profile/block.h>
@@ -95,10 +96,12 @@ void CPU::compile_region(Region& rgn)
 {
 	rgn.status(Region::IN_TRANSLATION);
 
-	TranslationBlocks *tb = (TranslationBlocks *)cpu_data().guest_data->ir_desc_buffer;
+	TranslationBlocks *tb = (TranslationBlocks *)Memory::shared_memory().allocate(0x10000);
 	tb->block_count = 0;
 
-	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
+	void *instruction_buffer = Memory::shared_memory().allocate(0x10000);
+
+	TranslationContext ctx(instruction_buffer, 0x10000);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
@@ -143,25 +146,5 @@ void CPU::compile_region(Region& rgn)
 	}
 
 	// Make region translation hypercall
-	uint64_t addr;
-	asm volatile("out %0, $0xff" :: "a"(8));
-
-	/*// Set each page that this region has been executed from as executed, so
-	// that we invalidate correctly.
-	for (auto vb : rgn.virtual_bases()) {
-		//mmu().set_page_executed((uint32_t)vb);
-	}
-
-	if (!addr) {
-		assert(false && "Region Translation Failed");
-	}
-
-	Block::block_fn_t fn = (Block::block_fn_t)((uint64_t)cpu_data().guest_data->code_buffer + addr);
-	for (auto block : rgn) {
-		block.second->set_translation(fn);
-		block.second->reset_interp_count();
-	}
-
-	printf("compiled region %x %x\n", rgn.address(), addr);
-	rgn.status(Region::NOT_IN_TRANSLATION);*/
+	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)tb), "S"((uint64_t)instruction_buffer));
 }

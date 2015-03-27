@@ -1,7 +1,9 @@
 /*
  * printf.c
  */
+#include <define.h>
 #include <printf.h>
+#include <shmem.h>
 
 static inline void putch(char c)
 {
@@ -11,10 +13,10 @@ static inline void putch(char c)
 static char *fast_buffer;
 static int fast_buffer_size;
 
-void printf_init(char *_fast_buffer, int _fast_buffer_size)
+void printf_init(captive::MemoryVector& printf_buffer)
 {
-	fast_buffer = _fast_buffer;
-	fast_buffer_size = _fast_buffer_size;
+	fast_buffer = (char *)printf_buffer.base_address;
+	fast_buffer_size = printf_buffer.size;
 }
 
 int printf(const char *fmt, ...)
