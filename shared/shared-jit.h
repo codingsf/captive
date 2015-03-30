@@ -35,6 +35,7 @@ namespace captive {
 		{
 			uint32_t work_unit_id;
 			uint32_t region_base_address;
+			uint64_t function_addr;
 
 			TranslationBlocks *blocks;
 			void *ir;

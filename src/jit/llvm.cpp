@@ -124,7 +124,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	 DEBUG << "Lowering: " << bc->render();
+	// DEBUG << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];
@@ -344,7 +344,14 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		assert(memptrtype);
 
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, memptrtype);
-		ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr, true), dst);
+		LoadInst *load = ctx.builder.CreateLoad(memptr, true);
+
+		/*SmallVector<Value *, 1> metadata_data;
+		metadata_data.push_back(ctx.const32(1));
+
+		load->setMetadata("cai", MDNode::get(ctx.builder.getContext(), metadata_data));*/
+
+		ctx.builder.CreateStore(load, dst);
 
 		return true;
 	}
@@ -356,7 +363,14 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		assert(addr && src);
 
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
-		ctx.builder.CreateStore(src, memptr, true);
+		StoreInst *store = ctx.builder.CreateStore(src, memptr, true);
+
+		/*SmallVector<Value *, 1> metadata_data;
+		metadata_data.push_back(ctx.const32(2));
+
+		Metadata *md = Metadata
+
+		store->setMetadata("cai", MDNode::get(ctx.builder.getContext(), metadata_data));*/
 
 		return true;
 	}
@@ -481,6 +495,9 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 	}
 
 	case RawInstruction::INVALID: assert(false && "Invalid Instruction"); return false;
-	default: assert(false && "Unhandled Instruction"); return false;
+
+	default:
+		ERROR << "Unhandled Instruction: " << bc->insn.type;
+		assert(false && "Unhandled Instruction"); return false;
 	}
 }

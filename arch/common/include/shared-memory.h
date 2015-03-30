@@ -28,30 +28,24 @@ namespace captive {
 			void free(void *p);
 
 		private:
+			void *_arena;
+			uint64_t _arena_size;
+
+			// Shared Stuff
 			struct shared_memory_block
 			{
-				uint32_t block_size;
+				struct shared_memory_block *next;
+				uint64_t size;
+				uint8_t data[];
 			} packed;
 
 			struct shared_memory_header
 			{
-				spinlock_t lock;
-				void *next_free;
+				volatile spinlock_t lock;
+				struct shared_memory_block *first;
 			} packed;
 
-			void *_arena;
-			uint64_t _arena_size;
-
-			volatile struct shared_memory_header *_header;
-
-			inline struct shared_memory_block *get_block(void *p) const
-			{
-				if (p) {
-					return (struct shared_memory_block *)((uint64_t)p - sizeof(struct shared_memory_block));
-				} else {
-					return NULL;
-				}
-			}
+			struct shared_memory_header *_header;
 		};
 	}
 }

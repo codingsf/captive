@@ -354,11 +354,9 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 			([](captive::shared::RegionWorkUnit *rwu, jit::RegionCompilationResult result, void *data) -> void {
 				KVMCpu *cpu = (KVMCpu *)data;
 
-				if (result.fn_ptr) {
-					cpu->per_cpu_data().rwu[0] = rwu;
-					cpu->per_cpu_data().rcr[0] = result.fn_ptr;
-					((KVMCpu *)data)->interrupt(1);
-				}
+				rwu->function_addr = (uint64_t)result.fn_ptr;
+				cpu->per_cpu_data().rwu[0] = rwu;
+				((KVMCpu *)data)->interrupt(1);
 			}),
 			this);
 

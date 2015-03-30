@@ -48,7 +48,6 @@ namespace captive {
 		uint32_t verify_tid;
 
 		void *rwu[4];
-		void *rcr[4];
 	};
 }
 

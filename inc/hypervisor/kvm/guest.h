@@ -64,31 +64,36 @@ namespace captive {
 					void free(void *p) override;
 
 				private:
-					struct shared_memory_block
-					{
-						uint32_t block_size;
-					} __packed;
-
-					struct shared_memory_header
-					{
-						spinlock_t lock;
-						void *next_free;
-					} __packed;
-
 					inline void set_arena(void *arena, size_t arena_size)
 					{
 						_arena = arena;
 						_arena_size = arena_size;
-						_header = (volatile struct shared_memory_header *)arena;
+						_header = (struct shared_memory_header *)arena;
 
 						_header->lock = 0;
-						_header->next_free = (void *)((uint64_t)_arena + 32);
+						initialise();
 					}
+
+					void initialise();
 
 					void *_arena;
 					size_t _arena_size;
 
-					volatile struct shared_memory_header *_header;
+					// Shared Stuff
+					struct shared_memory_block
+					{
+						struct shared_memory_block *next;
+						uint64_t size;
+						uint8_t data[];
+					} __packed;
+
+					struct shared_memory_header
+					{
+						volatile spinlock_t lock;
+						struct shared_memory_block *first;
+					} __packed;
+
+					struct shared_memory_header *_header;
 				} _shared_memory;
 
 				std::vector<KVMCpu *> kvm_cpus;

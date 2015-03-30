@@ -103,11 +103,14 @@ void CPU::compile_region(Region& rgn)
 
 	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(sizeof(*rwu->blocks));
 	rwu->blocks->block_count = 0;
+
+	// TODO: Don't hard-code this
 	rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().allocate(sizeof(TranslationBlockDescriptor) * 512);
 
-	rwu->ir = Memory::shared_memory().allocate(0x10000);
+	// TODO: Don't hard-code this
+	rwu->ir = Memory::shared_memory().allocate(0x100000);
 
-	TranslationContext ctx(rwu->ir, 0x10000);
+	TranslationContext ctx(rwu->ir, 0x100000);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
@@ -162,7 +165,12 @@ void CPU::compile_region(Region& rgn)
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 {
-	printf("jit: register region %p\n", rwu);
+	printf("jit: register region %p @ %lx\n", rwu, rwu->function_addr);
+
+	Region& rgn = profile_image().get_region(rwu->region_base_address);
+	for (int i = 0; i < rwu->blocks->block_count; i++) {
+		rgn.get_block(rwu->blocks->descriptors[i].block_addr).set_translation((Block::block_fn_t)rwu->function_addr);
+	}
 
 	Memory::shared_memory().free(rwu->blocks);
 	Memory::shared_memory().free(rwu->ir);

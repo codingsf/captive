@@ -24,6 +24,7 @@ void ThreadPool::start()
 {
 	terminate = false;
 
+	DEBUG << CONTEXT(ThreadPool) << " Launching " << _max_threads << " worker threads";
 	for (uint32_t i = 0; i < _max_threads; i++) {
 		threads.push_back(new std::thread(thread_proc_tramp, this));
 	}
@@ -69,6 +70,7 @@ void ThreadPool::thread_proc()
 		lock.lock();
 
 		while (work_queue.size() == 0 && !terminate) {
+			DEBUG << CONTEXT(ThreadPool) << " Worker thread " << std::this_thread::get_id() << " idling";
 			work_queue_cond.wait(lock);
 		}
 
@@ -88,7 +90,7 @@ void ThreadPool::thread_proc()
 
 void ThreadPool::process_work(ThreadPoolWork& work)
 {
-	DEBUG << "worker thread " << std::this_thread::get_id();
+	DEBUG << CONTEXT(ThreadPool) << " Worker thread " << std::this_thread::get_id() << " picking up work";
 
 	if (work.action) {
 		uint64_t result = work.action(work.data);

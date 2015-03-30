@@ -14,53 +14,52 @@ SharedMemory::SharedMemory(void* arena, uint64_t arena_size)
 
 void* SharedMemory::allocate(size_t size, alloc_flags_t flags)
 {
-	size += sizeof(shared_memory_block);
+	spinlock_wrapper lock(&_header->lock);
+	
+	struct shared_memory_block **block_slot = &(_header->first);
 
-	if (size % 16) {
-		size += 16 - (size % 16);
+	if (size % 64) {
+		size += 64 - (size % 64);
 	}
 
-	spin_lock(&_header->lock);
+	while (*block_slot) {
+		if ((*block_slot)->size > size) {
+			struct shared_memory_block *this_block = (*block_slot);
+			uint64_t old_size = this_block->size;
+			this_block->size = size;
 
-	void *p = _header->next_free;
-	_header->next_free = (void *)((uint64_t)_header->next_free + size);
+			struct shared_memory_block *next_block = this_block->next;
+			struct shared_memory_block *new_block = (struct shared_memory_block *)((uint64_t)this_block + this_block->size + 8);
 
-	spin_unlock(&_header->lock);
+			this_block->next = new_block;
+			new_block->next = next_block;
+			new_block->size = old_size - size;
 
-	if (flags & ZERO) {
-		bzero(p, size);
+			break;
+		} else if ((*block_slot)->size == size) {
+			break;
+		}
+
+		block_slot = &((*block_slot)->next);
 	}
 
-	struct shared_memory_block *block = (struct shared_memory_block *)p;
-	block->block_size = size;
+	if (!*block_slot) {
+		return NULL;
+	}
 
-	return (void *)((uint64_t)p + sizeof(struct shared_memory_block));
+	struct shared_memory_block *found_block = *block_slot;
+
+	*block_slot = (*block_slot)->next;
+
+	return (void *)(&found_block->data[0]);
 }
 
 void* SharedMemory::reallocate(void* p, size_t size)
 {
-	printf("realloc %p %d\n", p, size);
-
-	struct shared_memory_block *block = get_block(p);
-	if (block && (size <= (block->block_size - sizeof(struct shared_memory_block)))) {
-		return p;
-	}
-
-	void *new_p = allocate(size);
-	if (!new_p) {
-		return NULL;
-	}
-
-	if (block) {
-		memcpy(new_p, p, block->block_size - sizeof(struct shared_memory_block));
-		free(p);
-	}
-
-	return new_p;
+	assert(false);
 }
 
 void SharedMemory::free(void* p)
 {
-	struct shared_memory_block *block = get_block(p);
-	if (!block) return;
+	assert(false);
 }
