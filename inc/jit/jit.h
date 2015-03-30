@@ -183,7 +183,7 @@ namespace captive {
 		class RegionJIT : public JITStrategy
 		{
 		public:
-			typedef void (*region_completion_t)(RegionCompilationResult result, void *completion_data);
+			typedef void (*region_completion_t)(shared::RegionWorkUnit *work_unit, RegionCompilationResult result, void *completion_data);
 
 			RegionJIT(JIT& owner);
 			virtual ~RegionJIT();

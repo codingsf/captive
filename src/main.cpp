@@ -209,7 +209,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the worker thread pool
-	ThreadPool worker_threads(1, 10);
+	ThreadPool worker_threads(1, 1);
 	worker_threads.start();
 
 	// Create the JIT

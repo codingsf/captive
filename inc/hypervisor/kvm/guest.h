@@ -64,6 +64,11 @@ namespace captive {
 					void free(void *p) override;
 
 				private:
+					struct shared_memory_block
+					{
+						uint32_t block_size;
+					} __packed;
+
 					struct shared_memory_header
 					{
 						spinlock_t lock;
@@ -77,7 +82,7 @@ namespace captive {
 						_header = (volatile struct shared_memory_header *)arena;
 
 						_header->lock = 0;
-						_header->next_free = (void *)((uint64_t)_arena + 16);
+						_header->next_free = (void *)((uint64_t)_arena + 32);
 					}
 
 					void *_arena;

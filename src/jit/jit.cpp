@@ -220,7 +220,7 @@ static uint64_t do_compile_region(void *odata)
 	RegionAsyncCompilation *data = (RegionAsyncCompilation *)odata;
 
 	RegionCompilationResult result = data->jit()->compile_region(data->region_work_unit());
-	data->completion()(result, data->completion_data());
+	data->completion()(data->region_work_unit(), result, data->completion_data());
 
 	delete data;
 	return 0;

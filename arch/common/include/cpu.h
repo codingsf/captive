@@ -23,6 +23,10 @@
 #define BLOCK_CACHE_ENTRIES	(BLOCK_CACHE_SIZE / BLOCK_OBJ_SIZE)
 
 namespace captive {
+	namespace shared {
+		struct RegionWorkUnit;
+	}
+
 	namespace arch {
 		namespace jit {
 			class GuestBasicBlock;
@@ -93,6 +97,8 @@ namespace captive {
 			}
 
 			bool verify_check();
+
+			void register_region(captive::shared::RegionWorkUnit *rwu);
 
 		protected:
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;

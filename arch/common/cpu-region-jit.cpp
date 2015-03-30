@@ -101,8 +101,9 @@ void CPU::compile_region(Region& rgn)
 
 	RegionWorkUnit *rwu = (RegionWorkUnit *)Memory::shared_memory().allocate(sizeof(RegionWorkUnit));
 
-	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(0x10000);
+	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(sizeof(*rwu->blocks));
 	rwu->blocks->block_count = 0;
+	rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().allocate(sizeof(TranslationBlockDescriptor) * 512);
 
 	rwu->ir = Memory::shared_memory().allocate(0x10000);
 
@@ -120,6 +121,7 @@ void CPU::compile_region(Region& rgn)
 
 		//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
 
+		//rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().reallocate(rwu->blocks->descriptors, sizeof(*rwu->blocks->descriptors) * (rwu->blocks->block_count + 1));
 		rwu->blocks->descriptors[rwu->blocks->block_count].block_id = ctx.current_block();
 		rwu->blocks->descriptors[rwu->blocks->block_count].block_addr = block.second->address() & 0xfff;
 		rwu->blocks->descriptors[rwu->blocks->block_count].heat = block.second->interp_count();
@@ -154,5 +156,15 @@ void CPU::compile_region(Region& rgn)
 	}
 
 	// Make region translation hypercall
+	printf("jit: dispatching region %p\n", rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
+}
+
+void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
+{
+	printf("jit: register region %p\n", rwu);
+
+	Memory::shared_memory().free(rwu->blocks);
+	Memory::shared_memory().free(rwu->ir);
+	Memory::shared_memory().free(rwu);
 }

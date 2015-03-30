@@ -124,7 +124,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 
 bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 {
-	// DEBUG << CONTEXT(LLVMBlockJIT) << "Lowering: " << bc->render();
+	 DEBUG << "Lowering: " << bc->render();
 
 	const RawOperand *op0 = &bc->insn.operands[0];
 	const RawOperand *op1 = &bc->insn.operands[1];
@@ -208,6 +208,8 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		Value *src = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
 		assert(src && dst);
+
+
 
 		Value *lhs = ctx.builder.CreateLoad(dst);
 		Value *rhs = src;

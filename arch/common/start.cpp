@@ -101,7 +101,7 @@ extern "C" {
 	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{
 		printf("no time for that now...\n");
-		
+
 		// Populate the FS register with the address of the Per-CPU data structure.
 		wrmsr(0xc0000100, (uint64_t)cpu_data);
 
@@ -159,9 +159,16 @@ extern "C" {
 
 	void handle_trap_irq(struct mcontext *mctx)
 	{
-		switch (captive::arch::CPU::get_active_cpu()->cpu_data().signal_code) {
+		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
+		switch (cpu->cpu_data().signal_code) {
 		case 1:
-			printf("region translation is ready\n");
+			for (int i = 0; i < 4; i++) {
+				if (cpu->cpu_data().rwu[i] != NULL) {
+					cpu->register_region((captive::shared::RegionWorkUnit *)cpu->cpu_data().rwu[i]);
+					cpu->cpu_data().rwu[i] = NULL;
+				}
+			}
+
 			break;
 		}
 

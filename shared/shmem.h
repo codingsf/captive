@@ -47,8 +47,8 @@ namespace captive {
 		bool verify_enabled;
 		uint32_t verify_tid;
 
-		uint64_t region_id;
-		uint64_t region_addr;
+		void *rwu[4];
+		void *rcr[4];
 	};
 }
 

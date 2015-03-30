@@ -349,12 +349,18 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		vmioctl(KVM_GET_REGS, &regs);
 
 		DEBUG << CONTEXT(CPU) << "Compiling Region: " << std::hex << "RDI=" << regs.rdi;
-		kvm_guest.jit().region_jit().compile_region_async((captive::shared::RegionWorkUnit *)regs.rdi, ([](jit::RegionCompilationResult result, void *data)->void{
-			//if (success) {
-				//((KVMCpu *)data)->per_cpu_data().region_addr = addr;
-				((KVMCpu *)data)->interrupt(1);
-			//}
-		}), this);
+		kvm_guest.jit().region_jit().compile_region_async(
+			(captive::shared::RegionWorkUnit *)regs.rdi,
+			([](captive::shared::RegionWorkUnit *rwu, jit::RegionCompilationResult result, void *data) -> void {
+				KVMCpu *cpu = (KVMCpu *)data;
+
+				if (result.fn_ptr) {
+					cpu->per_cpu_data().rwu[0] = rwu;
+					cpu->per_cpu_data().rcr[0] = result.fn_ptr;
+					((KVMCpu *)data)->interrupt(1);
+				}
+			}),
+			this);
 
 		return true;
 	}

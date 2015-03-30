@@ -28,7 +28,7 @@ namespace captive {
 		struct TranslationBlocks
 		{
 			uint32_t block_count;
-			TranslationBlockDescriptor descriptors[];
+			TranslationBlockDescriptor *descriptors;
 		} __packed;
 
 		struct RegionWorkUnit
