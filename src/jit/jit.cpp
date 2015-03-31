@@ -6,6 +6,9 @@
 #include <sstream>
 #include <unistd.h>
 
+#include <unordered_map>
+#include <set>
+
 DECLARE_CONTEXT(JIT);
 
 using namespace captive::jit;
@@ -230,4 +233,125 @@ void RegionJIT::compile_region_async(RegionWorkUnit *rwu, region_completion_t co
 {
 	RegionAsyncCompilation *data = new RegionAsyncCompilation(this, rwu, completion, completion_data);
 	owner().worker_threads().queue_work(do_compile_region, NULL, data);
+}
+
+bool JIT::quick_opt(RawBytecode* bcarr, uint32_t count)
+{
+	std::set<uint32_t> blocks;
+	std::unordered_multimap<uint32_t, uint32_t> block_succs;
+	std::unordered_multimap<uint32_t, uint32_t> block_preds;
+	std::unordered_map<uint32_t, RawBytecode *> block_terminators;
+
+	// Remove useless instructions, and build a block predecessor/successor map while we're at it.
+	for (uint32_t i = 0; i < count; i++) {
+		RawBytecode *bc = (RawBytecode *)&bcarr[i];
+
+		blocks.insert(bc->block_id);
+
+		switch (bc->insn.type) {
+		case RawInstruction::ADD:
+		case RawInstruction::SUB:
+		case RawInstruction::SAR:
+		case RawInstruction::SHR:
+		case RawInstruction::SHL:
+		case RawInstruction::OR:
+		case RawInstruction::XOR:
+			if (bc->insn.operands[0].type == RawOperand::CONSTANT && bc->insn.operands[0].val == 0) {
+				bc->insn.type = RawInstruction::NOP;
+			}
+			break;
+
+		case RawInstruction::MUL:
+		case RawInstruction::DIV:
+			if (bc->insn.operands[0].type == RawOperand::CONSTANT && bc->insn.operands[0].val == 1) {
+				bc->insn.type = RawInstruction::NOP;
+			}
+			break;
+
+		case RawInstruction::JMP:
+			assert(bc->insn.operands[0].type == RawOperand::BLOCK);
+
+			block_succs.emplace((uint32_t)bc->block_id, (uint32_t)bc->insn.operands[0].val);
+			block_preds.emplace((uint32_t)bc->insn.operands[0].val, (uint32_t)bc->block_id);
+			block_terminators[(uint32_t)bc->block_id] = bc;
+
+			break;
+
+		case RawInstruction::BRANCH:
+			assert(bc->insn.operands[1].type == RawOperand::BLOCK);
+			assert(bc->insn.operands[2].type == RawOperand::BLOCK);
+
+			block_succs.emplace((uint32_t)bc->block_id, (uint32_t)bc->insn.operands[1].val);
+			block_succs.emplace((uint32_t)bc->block_id, (uint32_t)bc->insn.operands[2].val);
+
+			block_preds.emplace((uint32_t)bc->insn.operands[1].val, (uint32_t)bc->block_id);
+			block_preds.emplace((uint32_t)bc->insn.operands[2].val, (uint32_t)bc->block_id);
+
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	// Now, merge blocks
+/*retry:
+	for (auto merger : blocks) {
+		// If the merger has multiple successors, then we can't merge
+		if (block_succs.count(merger) != 1) continue;
+
+		// Find the candidate mergee
+		auto mergee = block_succs.find(merger)->second;
+
+		// If the mergee has multiple predecessors, then we can't merge.
+		if (block_preds.count(mergee) != 1) continue;
+
+		// Okay, so we can merge the mergee into the merger.
+		fprintf(stderr, "merge %d into %d\n", mergee, merger);
+
+		// Delete the terminator instruction in the merger.
+		block_terminators[merger]->insn.type = RawInstruction::NOP;
+
+		// Rewrite the instructions in the mergee block, to belong to
+		// the merger block.
+		for (uint32_t i = 0; i < count; i++) {
+			if (bcarr[i].block_id == mergee) {
+				bcarr[i].block_id = merger;
+			}
+		}
+
+		// Erase the successors of the merger (should only be the mergee).
+		block_succs.erase(merger);
+
+		// Insert the successors of the mergee as the successors of the
+		// merger, and change the predecessors of the mergee successors
+		// to the merger.
+		for (auto S = block_succs.find(mergee); S != block_succs.end(); ++S) {
+			auto original_successor = S->second;
+			// Insert the successor
+			block_succs.emplace((uint32_t)merger, (uint32_t)original_successor);
+
+			for (auto P = block_preds.find(original_successor); P != block_preds.end(); ++P) {
+				auto original_predecessor = P->second;
+
+				if (original_predecessor == mergee) {
+					block_preds.erase(P);
+					block_preds.emplace((uint32_t)original_successor, (uint32_t)merger);
+				}
+			}
+		}
+
+		// Erase the successors of the mergee.
+		block_succs.erase(mergee);
+
+		// Erase the predecessors of the mergee.
+		block_preds.erase(mergee);
+
+		// Erase the mergee
+		blocks.erase(mergee);
+
+		goto retry;
+	}*/
+
+	return true;
 }

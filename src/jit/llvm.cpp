@@ -654,6 +654,7 @@ bool LLVMJIT::initialise_pass_manager(llvm::PassManagerBase* pm)
 	add_pass(pm, createGlobalOptimizerPass());
 	add_pass(pm, createIPSCCPPass());
 	add_pass(pm, createDeadArgEliminationPass());
+	add_pass(pm, createJumpThreadingPass());
 
 	add_pass(pm, createInstructionCombiningPass());
 	add_pass(pm, createCFGSimplificationPass());

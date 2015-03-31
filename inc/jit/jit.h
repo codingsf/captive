@@ -143,6 +143,8 @@ namespace captive {
 		protected:
 			util::ThreadPool& _worker_threads;
 			hypervisor::SharedMemory *_shared_memory;
+
+			bool quick_opt(RawBytecode *bc, uint32_t count);
 		};
 
 		class JITStrategy

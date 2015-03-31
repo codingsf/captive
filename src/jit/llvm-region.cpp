@@ -44,10 +44,16 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	if (rwu->blocks->block_count == 0)
 		return result;
 
-	const RawBytecodeDescriptor *bds = (const RawBytecodeDescriptor *)rwu->ir;
+	RawBytecodeDescriptor *mutable_bds = (RawBytecodeDescriptor *)rwu->ir;
 
-	if (bds->bytecode_count == 0)
+	if (mutable_bds->bytecode_count == 0)
 		return result;
+
+	if (!quick_opt(mutable_bds->bc, mutable_bds->bytecode_count)) {
+		return result;
+	}
+
+	const RawBytecodeDescriptor *bds = (const RawBytecodeDescriptor *)rwu->ir;
 
 	/*for (unsigned int i = 0; i < bd->block_count; i++) {
 		DEBUG << "GBB: addr=" << std::hex << bd->blocks[i].addr << ", id=" << std::dec << bd->blocks[i].id << ", heat=" << bd->blocks[i].heat;
