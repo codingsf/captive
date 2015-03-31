@@ -5,6 +5,7 @@
 DECLARE_CONTEXT(SharedMemoryAllocator);
 
 extern "C" void *dlmalloc(size_t s);
+extern "C" void *dlrealloc(void *p, size_t s);
 extern "C" void *dlfree(void *p);
 
 using namespace captive::hypervisor::kvm;
@@ -27,6 +28,11 @@ void KVMGuest::KVMSharedMemory::set_arena(void* arena, size_t arena_size)
 void *KVMGuest::KVMSharedMemory::allocate(size_t size)
 {
 	return dlmalloc(size);
+}
+
+void *KVMGuest::KVMSharedMemory::reallocate(void *p, size_t size)
+{
+	return dlrealloc(p, size);
 }
 
 void KVMGuest::KVMSharedMemory::free(void* p)

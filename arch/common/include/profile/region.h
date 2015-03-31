@@ -46,6 +46,8 @@ namespace captive {
 				inline block_map_t::iterator begin() { return blocks.begin(); }
 				inline block_map_t::iterator end() { return blocks.end(); }
 
+				inline uint32_t generation() const { return _generation; }
+
 				void invalidate();
 
 				inline void add_virtual_base(gva_t address)
@@ -59,6 +61,7 @@ namespace captive {
 				Image& _owner;
 				gpa_t _address;
 				Status _status;
+				uint32_t _generation;
 
 				block_map_t blocks;
 				vaddr_set_t vaddrs;

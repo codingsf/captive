@@ -23,29 +23,24 @@ namespace captive {
 
 			SharedMemory(void *arena, uint64_t arena_size);
 
-			void *allocate(size_t size, alloc_flags_t flags = NONE);
-			void *reallocate(void *p, size_t size);
-			void free(void *p);
-
-		private:
-			void *_arena;
-			uint64_t _arena_size;
-
-			// Shared Stuff
-			struct shared_memory_block
+			inline void *allocate(size_t size, alloc_flags_t flags = NONE)
 			{
-				volatile struct shared_memory_block *next;
-				uint64_t size;
-				uint8_t data[];
-			} packed;
+				uint64_t addr;
+				asm volatile ("out %2, $0xff" : "=a"(addr) : "D"(size), "a"(10));
+				return (void *)addr;
+			}
 
-			struct shared_memory_header
+			inline void *reallocate(void *p, size_t size)
 			{
-				spinlock_t lock;
-				volatile struct shared_memory_block *first;
-			} packed;
+				uint64_t addr;
+				asm volatile ("out %3, $0xff" : "=a"(addr) : "D"(p), "S"(size), "a"(11));
+				return (void *)addr;
+			}
 
-			volatile struct shared_memory_header *_header;
+			inline void free(void *p)
+			{
+				asm volatile ("out %1, $0xff" : : "D"(p), "a"(12));
+			}
 		};
 	}
 }

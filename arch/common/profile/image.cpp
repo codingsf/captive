@@ -37,12 +37,14 @@ Region& Image::get_region(gpa_t gpa)
 
 void Image::invalidate()
 {
-	printf("profile: invalidating regions\n");
-	regions.clear();
+	printf("profile: invalidating all regions\n");
+	
+	for (auto rgn : regions) {
+		rgn.second->invalidate();
+	}
 }
 
 void Image::invalidate(gpa_t gpa)
 {
-	printf("profile: invalidating region %x\n", gpa);
 	get_region(gpa).invalidate();
 }

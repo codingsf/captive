@@ -647,8 +647,19 @@ bool LLVMJIT::add_pass(PassManagerBase *pm, Pass *pass)
 	return true;
 }
 
+#define DISABLE_AA
+
 bool LLVMJIT::initialise_pass_manager(llvm::PassManagerBase* pm)
 {
+#ifdef DISABLE_AA
+	PassManagerBuilder optManagerBuilder;
+
+	optManagerBuilder.BBVectorize = false;
+	optManagerBuilder.DisableTailCalls = true;
+	optManagerBuilder.OptLevel = 3;
+
+	optManagerBuilder.populateModulePassManager(*pm);
+#else
 	pm->add(createTypeBasedAliasAnalysisPass());
 
 	add_pass(pm, createGlobalOptimizerPass());
@@ -709,6 +720,7 @@ bool LLVMJIT::initialise_pass_manager(llvm::PassManagerBase* pm)
 	add_pass(pm, createStripDeadPrototypesPass());
 	add_pass(pm, createGlobalDCEPass());
 	add_pass(pm, createConstantMergePass());
+#endif
 
 	return true;
 }

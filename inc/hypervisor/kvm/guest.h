@@ -62,6 +62,7 @@ namespace captive {
 					KVMSharedMemory();
 
 					void *allocate(size_t size) override;
+					void *reallocate(void *p, size_t size) override;
 					void free(void *p) override;
 
 				private:

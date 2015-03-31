@@ -108,19 +108,19 @@ void CPU::compile_region(Region& rgn)
 	rwu->blocks->block_count = 0;
 
 	// TODO: Don't hard-code this
-	rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().allocate(sizeof(TranslationBlockDescriptor) * 512);
+	rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().allocate(sizeof(TranslationBlockDescriptor) * 1024);
 	assert(rwu->blocks->descriptors);
 
 	// TODO: Don't hard-code this
-	rwu->ir = Memory::shared_memory().allocate(0x200000);
+	rwu->ir = Memory::shared_memory().allocate(0x500000);
 	assert(rwu->ir);
 
-	TranslationContext ctx(rwu->ir, 0x200000);
+	TranslationContext ctx(rwu->ir, 0x500000);
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
 	rwu->region_base_address = (uint32_t)rgn.address();
-	rwu->work_unit_id = 1;
+	rwu->work_unit_id = rgn.generation();
 
 	//printf("compiling region %x\n", rgn.address());
 	for (auto block : rgn) {
@@ -164,19 +164,24 @@ void CPU::compile_region(Region& rgn)
 	}
 
 	// Make region translation hypercall
-	printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
+	//printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
 }
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 {
-	printf("jit: register region %08x rwu=%p fn=%lx\n", rwu->region_base_address, rwu, rwu->function_addr);
+	//printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
 
 	Region& rgn = profile_image().get_region(rwu->region_base_address);
-	for (int i = 0; i < rwu->blocks->block_count; i++) {
-		rgn.get_block(rwu->blocks->descriptors[i].block_addr).set_translation((Block::block_fn_t)rwu->function_addr);
+	if (rwu->work_unit_id < rgn.generation()) {
+		printf("jit: discarding old translation, rwu gen=%d cur gen=%d\n", rwu->work_unit_id, rgn.generation());
+	} else {
+		for (int i = 0; i < rwu->blocks->block_count; i++) {
+			rgn.get_block(rwu->blocks->descriptors[i].block_addr).set_translation((Block::block_fn_t)rwu->function_addr);
+		}
 	}
 
+	Memory::shared_memory().free(rwu->blocks->descriptors);
 	Memory::shared_memory().free(rwu->blocks);
 	Memory::shared_memory().free(rwu->ir);
 	Memory::shared_memory().free(rwu);

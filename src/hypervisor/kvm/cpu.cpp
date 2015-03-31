@@ -379,6 +379,15 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	case 11: {
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
+		regs.rax = (uint64_t)owner().shared_memory().reallocate((void *)regs.rdi, regs.rsi);
+		vmioctl(KVM_SET_REGS, &regs);
+
+		return true;
+	}
+
+	case 12: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
 		owner().shared_memory().free((void *)regs.rdi);
 
 		return true;
