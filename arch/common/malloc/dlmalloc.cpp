@@ -326,7 +326,7 @@ static int cpuinfo (int whole, unsigned long*kernel, unsigned long*user);
 
 /* define LACKS_SYS_PARAM_H if your system does not have a <sys/param.h>. */
 
-/* #define  LACKS_SYS_PARAM_H */
+#define  LACKS_SYS_PARAM_H
 
 
 //#include <stdio.h>    /* needed for malloc_stats */
@@ -623,13 +623,7 @@ Void_t* memcpy();
 */
 
 #ifndef MALLOC_FAILURE_ACTION
-#if __STD_C
-#define MALLOC_FAILURE_ACTION \
-   errno = ENOMEM;
-
-#else
 #define MALLOC_FAILURE_ACTION
-#endif
 #endif
 
 /*

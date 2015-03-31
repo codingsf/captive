@@ -14,10 +14,11 @@ void captive::arch::malloc_init(captive::MemoryVector& arena)
 	heap_size = arena.size;
 }
 
-extern "C" void *sbrk(int64_t incr)
+void *sbrk(unsigned long incr)
 {
+	printf("sbrk: %p %lu\n", brk, incr);
 	if (incr == 0)
-		return (void *)brk;
+		return (void *)heap;
 
 	brk += incr;
 	return (void *)brk;
