@@ -27,11 +27,13 @@ void KVMGuest::KVMSharedMemory::set_arena(void* arena, size_t arena_size)
 
 void *KVMGuest::KVMSharedMemory::allocate(size_t size)
 {
+	//fprintf(stderr, "ALLOC %lu\n", size);
 	return dlmalloc(size);
 }
 
 void *KVMGuest::KVMSharedMemory::reallocate(void *p, size_t size)
 {
+	//fprintf(stderr, "REALLOC %lu\n", size);
 	return dlrealloc(p, size);
 }
 
@@ -46,5 +48,6 @@ extern "C" void *gsmsbrk(intptr_t incr)
 		return gsmbrk_base;
 
 	gsmbrk = (void *)((intptr_t)gsmbrk + incr);
+	//printf("new brk: %p\n", gsmbrk);
 	return gsmbrk;
 }

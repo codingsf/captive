@@ -17,7 +17,7 @@ dep := $(src:.cpp=.d)
 
 bios := $(bios-dir)/bios.bin.o
 
-common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O0 -pthread
+common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
 asflags  := -g

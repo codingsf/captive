@@ -1,6 +1,7 @@
 #include <cpu.h>
 #include <interp.h>
 #include <decode.h>
+#include <disasm.h>
 #include <jit.h>
 #include <jit/translation-context.h>
 #include <shared-memory.h>
@@ -99,7 +100,7 @@ void CPU::compile_region(Region& rgn)
 
 	rgn.status(Region::IN_TRANSLATION);
 
-	RegionWorkUnit *rwu = (RegionWorkUnit *)Memory::shared_memory().allocate(sizeof(RegionWorkUnit));
+	RegionWorkUnit *rwu = (RegionWorkUnit *)Memory::shared_memory().allocate(sizeof(RegionWorkUnit), SharedMemory::ZERO);
 	assert(rwu);
 
 	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(sizeof(*rwu->blocks));
@@ -111,11 +112,7 @@ void CPU::compile_region(Region& rgn)
 	rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().allocate(sizeof(TranslationBlockDescriptor) * 1024);
 	assert(rwu->blocks->descriptors);
 
-	// TODO: Don't hard-code this
-	rwu->ir = Memory::shared_memory().allocate(0x500000);
-	assert(rwu->ir);
-
-	TranslationContext ctx(rwu->ir, 0x500000);
+	TranslationContext ctx(Memory::shared_memory());
 	uint8_t decode_data[128];
 	Decode *insn = (Decode *)&decode_data[0];
 
@@ -146,13 +143,18 @@ void CPU::compile_region(Region& rgn)
 			//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
 			if (unlikely(cpu_data().verify_enabled)) {
-				//ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_pc(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
 				ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
 			}
 
 			// Translate this instruction into the context.
 			if (!jit().translate(insn, ctx)) {
 				rgn.invalidate();
+
+				Memory::shared_memory().free(rwu->blocks->descriptors);
+				Memory::shared_memory().free(rwu->blocks);
+				Memory::shared_memory().free(rwu->ir);
+				Memory::shared_memory().free(rwu);
+
 				return;
 			}
 
@@ -162,6 +164,9 @@ void CPU::compile_region(Region& rgn)
 		// Finish off with a RET.
 		ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
 	}
+
+	// Fill in the RWU with the IR buffer
+	rwu->ir = ctx.buffer();
 
 	// Make region translation hypercall
 	//printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
@@ -185,4 +190,6 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 	Memory::shared_memory().free(rwu->blocks);
 	Memory::shared_memory().free(rwu->ir);
 	Memory::shared_memory().free(rwu);
+
+	rgn.status(Region::NOT_IN_TRANSLATION);
 }

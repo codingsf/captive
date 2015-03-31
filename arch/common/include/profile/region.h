@@ -57,11 +57,17 @@ namespace captive {
 
 				const vaddr_set_t& virtual_bases() const { return vaddrs; }
 
+				inline void set_translation(void *fn)
+				{
+					_txln = fn;
+				}
+
 			private:
 				Image& _owner;
 				gpa_t _address;
 				Status _status;
 				uint32_t _generation;
+				void *_txln;
 
 				block_map_t blocks;
 				vaddr_set_t vaddrs;

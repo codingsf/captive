@@ -9,6 +9,7 @@
 #define	SHARED_MEMORY_H
 
 #include <define.h>
+#include <string.h>
 #include <lock.h>
 
 namespace captive {
@@ -27,6 +28,11 @@ namespace captive {
 			{
 				uint64_t addr;
 				asm volatile ("out %2, $0xff" : "=a"(addr) : "D"(size), "a"(10));
+
+				if (addr && (flags & ZERO) == ZERO) {
+					bzero((void *)addr, size);
+				}
+
 				return (void *)addr;
 			}
 

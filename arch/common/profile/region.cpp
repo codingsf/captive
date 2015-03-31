@@ -3,7 +3,7 @@
 
 using namespace captive::arch::profile;
 
-Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION)
+Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION), _generation(0), _txln(NULL)
 {
 
 }
@@ -40,6 +40,13 @@ uint32_t Region::hot_block_count()
 
 void Region::invalidate()
 {
+	_status = NOT_IN_TRANSLATION;
+
+	if (_txln) {
+		// TODO: FIXME: XXX Free the associated memory
+		_txln = NULL;
+	}
+
 	_generation++;
 
 	blocks.clear();

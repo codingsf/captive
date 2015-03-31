@@ -229,7 +229,7 @@
   Otherwise defaults are for unix.
 */
 
-#define DL_DEBUG 1
+//#define DL_DEBUG 1
 #define HAVE_MMAP 0
 
 /* #define WIN32 */

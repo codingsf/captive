@@ -1,13 +1,14 @@
 #include <jit/translation-context.h>
+#include <shared-memory.h>
 #include <printf.h>
 
 using namespace captive::arch::jit;
 
-TranslationContext::TranslationContext(void *_instruction_buffer, uint64_t _instruction_buffer_size)
-	: current_block_id(0),
-	instruction_buffer_size(_instruction_buffer_size),
-	instruction_buffer((bytecode_descriptor *)_instruction_buffer)
+TranslationContext::TranslationContext(SharedMemory& allocator)
+	: _allocator(allocator), _current_block_id(0), _buffer_size(0x100)
 {
+	instruction_buffer = (struct bytecode_descriptor *)allocator.allocate(_buffer_size);
+
 	instruction_buffer->block_count = 0;
 	instruction_buffer->entry_count = 0;
 	instruction_buffer->vreg_count = 0;
@@ -17,16 +18,5 @@ TranslationContext::TranslationContext(void *_instruction_buffer, uint64_t _inst
 
 GuestBasicBlock::GuestBasicBlockFn TranslationContext::compile()
 {
-	/*uint64_t addr;
-
-	asm volatile("out %1, $0xff" : "=a"(addr) : "a"((uint8_t)6), "D"(instruction_buffer_offset));
-
-	if (addr == 0) {
-		return NULL;
-	}
-
-	addr += code_buffer_offset;
-	return (GuestBasicBlock::GuestBasicBlockFn)(addr);*/
-
 	return NULL;
 }
