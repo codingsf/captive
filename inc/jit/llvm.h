@@ -11,6 +11,7 @@
 #include <jit/jit.h>
 
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/PassManager.h>
 
 #include <map>
 
@@ -92,6 +93,16 @@ namespace captive {
 					return (llvm::ConstantInt *)llvm::ConstantInt::get(i64, v);
 				}
 			};
+
+			enum metadata_tags
+			{
+				TAG_CLASS_MEMORY  = 1,
+				TAG_CLASS_REGISTER = 2,
+			};
+
+			void set_aa_metadata(llvm::Value *inst, metadata_tags tag);
+			bool add_pass(llvm::PassManagerBase *pm, llvm::Pass *pass);
+			bool initialise_pass_manager(llvm::PassManagerBase *pm);
 
 			llvm::Value *insert_vreg(LoweringContext& ctx, uint32_t idx, uint8_t size);
 			llvm::Value *value_for_operand(LoweringContext& ctx, const RawOperand* oper);

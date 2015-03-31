@@ -20,6 +20,9 @@
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/Passes.h>
+
 #include <fstream>
 
 USE_CONTEXT(JIT)
@@ -88,6 +91,8 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 	Value *pc_ptr_off = builder.CreateAdd(lc.reg_state, lc.const64(60));
 	lc.pc_ptr = builder.CreateIntToPtr(pc_ptr_off, lc.pi32);
+	set_aa_metadata(lc.pc_ptr, TAG_CLASS_REGISTER);
+
 	lc.virtual_base_address = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
 
 	// Populate the basic-block map
@@ -161,17 +166,23 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	{
 		PassManager optManager;
 
-		PassManagerBuilder optManagerBuilder;
+		/*PassManagerBuilder optManagerBuilder;
+
 		optManagerBuilder.BBVectorize = false;
 		optManagerBuilder.DisableTailCalls = true;
 		optManagerBuilder.OptLevel = 3;
-		optManagerBuilder.populateModulePassManager(optManager);
+
+		optManager.add(createTypeBasedAliasAnalysisPass());
+		optManager.add(new CaptiveAA());
+		optManagerBuilder.populateModulePassManager(optManager);*/
+
+		initialise_pass_manager(&optManager);
 
 		optManager.run(*region_module);
 	}
 
 	// Print out the module
-	{
+	/*{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_base_address) << ".ll";
 		std::ofstream file(filename.str());
@@ -180,7 +191,7 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 		PassManager printManager;
 		printManager.add(createPrintModulePass(str, ""));
 		printManager.run(*region_module);
-	}
+	}*/
 
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;

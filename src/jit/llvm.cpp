@@ -15,13 +15,24 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/BasicBlock.h>
-
-#include <llvm/PassManager.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/Verifier.h>
+
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
+
+#include <llvm/PassManager.h>
+
+#include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/DependenceAnalysis.h>
+#include <llvm/Analysis/MemoryDependenceAnalysis.h>
+#include <llvm/Analysis/Passes.h>
+#include <llvm/Analysis/ScalarEvolution.h>
+
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Vectorize.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include <map>
 #include <vector>
@@ -52,7 +63,9 @@ bool LLVMJIT::init()
 Value *LLVMJIT::value_for_operand(LoweringContext& ctx, const RawOperand* oper)
 {
 	if (oper->type == RawOperand::VREG) {
-		return ctx.builder.CreateLoad(vreg_for_operand(ctx, oper));
+		LoadInst *load = ctx.builder.CreateLoad(vreg_for_operand(ctx, oper));
+
+		return load;
 	} else if (oper->type == RawOperand::CONSTANT) {
 		switch(oper->size) {
 		case 1: return ctx.const8(oper->val);
@@ -314,6 +327,8 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.i64);
 
 		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op1, true));
+		set_aa_metadata(regptr, TAG_CLASS_REGISTER);
+
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(regptr), dst);
 
 		return true;
@@ -329,6 +344,8 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 		Value *regptr = ctx.builder.CreateAdd(ctx.reg_state, offset);
 		regptr = ctx.builder.CreateIntToPtr(regptr, type_for_operand(ctx, op0, true));
+		set_aa_metadata(regptr, TAG_CLASS_REGISTER);
+
 		ctx.builder.CreateStore(val, regptr);
 
 		return true;
@@ -344,14 +361,9 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		assert(memptrtype);
 
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, memptrtype);
-		LoadInst *load = ctx.builder.CreateLoad(memptr, true);
+		set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
-		/*SmallVector<Value *, 1> metadata_data;
-		metadata_data.push_back(ctx.const32(1));
-
-		load->setMetadata("cai", MDNode::get(ctx.builder.getContext(), metadata_data));*/
-
-		ctx.builder.CreateStore(load, dst);
+		ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr, true), dst);
 
 		return true;
 	}
@@ -363,14 +375,9 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		assert(addr && src);
 
 		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
-		StoreInst *store = ctx.builder.CreateStore(src, memptr, true);
+		set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
-		/*SmallVector<Value *, 1> metadata_data;
-		metadata_data.push_back(ctx.const32(2));
-
-		Metadata *md = Metadata
-
-		store->setMetadata("cai", MDNode::get(ctx.builder.getContext(), metadata_data));*/
+		ctx.builder.CreateStore(src, memptr, true);
 
 		return true;
 	}
@@ -500,4 +507,207 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		ERROR << "Unhandled Instruction: " << bc->insn.type;
 		assert(false && "Unhandled Instruction"); return false;
 	}
+}
+
+void LLVMJIT::set_aa_metadata(Value *v, metadata_tags tag)
+{
+	assert(v->getValueID() >= Value::InstructionVal);
+
+	Instruction *inst = (Instruction *)v;
+	SmallVector<Metadata *, 1> metadata_data;
+	metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
+
+	inst->setMetadata("cai", MDNode::get(inst->getContext(), metadata_data));
+}
+
+class CaptiveAA : public FunctionPass, public AliasAnalysis
+{
+public:
+	static char ID;
+
+	CaptiveAA() : FunctionPass(ID) {}
+
+	virtual void *getAdjustedAnalysisPointer(AnalysisID PI)
+	{
+		if (PI == &AliasAnalysis::ID) return (AliasAnalysis *)this;
+		return this;
+	}
+
+private:
+	virtual void getAnalysisUsage(AnalysisUsage &usage) const;
+	virtual AliasAnalysis::AliasResult alias(const AliasAnalysis::Location &L1, const AliasAnalysis::Location &L2);
+	virtual bool runOnFunction(Function &F);
+};
+
+char CaptiveAA::ID = 0;
+
+static RegisterPass<CaptiveAA> P("captive-aa", "Captive-specific Alias Analysis", false, true);
+static RegisterAnalysisGroup<AliasAnalysis> G(P);
+
+void CaptiveAA::getAnalysisUsage(AnalysisUsage &usage) const
+{
+	AliasAnalysis::getAnalysisUsage(usage);
+	usage.setPreservesAll();
+}
+
+static bool IsInstr(const Value *v)
+{
+	return (v->getValueID() >= Value::InstructionVal);
+}
+
+static bool IsIntToPtr(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::IntToPtr);
+}
+
+static bool IsBitCast(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::BitCast);
+}
+
+static bool IsAlloca(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::Alloca);
+}
+
+AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, const AliasAnalysis::Location &L2)
+{
+	// First heuristic - really easy.  Taken from SCEV-AA
+	if (L1.Size == 0 || L2.Size == 0) return NoAlias;
+
+	// Second heuristic - obvious.
+	if (L1.Ptr == L2.Ptr) return MustAlias;
+
+	const Value *v1 = L1.Ptr, *v2 = L2.Ptr;
+
+	if (IsAlloca(v1) && IsAlloca(v2)) {
+		// They can't alias, because we've already checked for equality above.
+		return NoAlias;
+	} else if (IsAlloca(v1) || IsAlloca(v2)) {
+		const AllocaInst *alloca = IsAlloca(v1) ? (const AllocaInst *)v1 : (const AllocaInst *)v2;
+		const Value *other = !IsAlloca(v1) ? v1 : v2;
+
+		// Allocas and IntToPtrs don't alias.
+		if (IsIntToPtr(other))
+			return AliasAnalysis::NoAlias;
+	} else if (IsIntToPtr(v1) && IsIntToPtr(v2)) {
+		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
+		const MDNode *md2 = ((Instruction *)v1)->getMetadata("cai");
+
+		if (md1 && md2) {
+			if (md1->getOperand(0).get() == md2->getOperand(0)) {
+				return AliasAnalysis::MayAlias;
+			} else {
+				return AliasAnalysis::NoAlias;
+			}
+		} else {
+			/*fprintf(stderr, "*** UNDECORATED INTTOPTR\n");
+			v1->dump();
+			v2->dump();*/
+		}
+	}
+
+	/*fprintf(stderr, "*** MAY ALIAS\n");
+	v1->dump();
+	v2->dump();*/
+
+	return AliasAnalysis::MayAlias;
+}
+
+bool CaptiveAA::runOnFunction(llvm::Function &F)
+{
+	bool changed = false;
+	AliasAnalysis::InitializeAliasAnalysis(this);
+
+	for (auto& bb : F) {
+		for (auto& insn : bb) {
+			if (IsBitCast(&insn)) {
+				BitCastInst *bc = (BitCastInst *)&insn;
+
+				if (bc->getOperand(0) == &(F.getArgumentList().back())) {
+					changed = true;
+
+					SmallVector<Metadata *, 1> metadata_data;
+					metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(bc->getContext()), 2)));
+
+					bc->setMetadata("cai", MDNode::get(bc->getContext(), metadata_data));
+				}
+			}
+		}
+	}
+
+	return changed;
+}
+
+bool LLVMJIT::add_pass(PassManagerBase *pm, Pass *pass)
+{
+	pm->add(new CaptiveAA());
+	pm->add(pass);
+
+	return true;
+}
+
+bool LLVMJIT::initialise_pass_manager(llvm::PassManagerBase* pm)
+{
+	pm->add(createTypeBasedAliasAnalysisPass());
+
+	add_pass(pm, createGlobalOptimizerPass());
+	add_pass(pm, createIPSCCPPass());
+	add_pass(pm, createDeadArgEliminationPass());
+
+	add_pass(pm, createInstructionCombiningPass());
+	add_pass(pm, createCFGSimplificationPass());
+
+	add_pass(pm, createPruneEHPass());
+	add_pass(pm, createFunctionInliningPass(0));
+
+	add_pass(pm, createFunctionAttrsPass());
+	add_pass(pm, createAggressiveDCEPass());
+
+	add_pass(pm, createArgumentPromotionPass());
+
+	add_pass(pm, createSROAPass(false));
+
+	add_pass(pm, createEarlyCSEPass());
+	add_pass(pm, createJumpThreadingPass());
+	add_pass(pm, createCorrelatedValuePropagationPass());
+	add_pass(pm, createCFGSimplificationPass());
+	add_pass(pm, createInstructionCombiningPass());
+
+	add_pass(pm, createTailCallEliminationPass());
+	add_pass(pm, createCFGSimplificationPass());
+
+	add_pass(pm, createReassociatePass());
+	//add_pass(pm, createLoopRotatePass());
+
+	add_pass(pm, createInstructionCombiningPass());
+	add_pass(pm, createIndVarSimplifyPass());
+	//add_pass(pm, createLoopIdiomPass());
+	//add_pass(pm, createLoopDeletionPass());
+
+	//add_pass(pm, createLoopUnrollPass());
+
+	add_pass(pm, createGVNPass());
+	add_pass(pm, createMemCpyOptPass());
+	add_pass(pm, createSCCPPass());
+
+	add_pass(pm, createInstructionCombiningPass());
+	add_pass(pm, createJumpThreadingPass());
+	add_pass(pm, createCorrelatedValuePropagationPass());
+
+	add_pass(pm, createDeadStoreEliminationPass());
+	//add_pass(pm, createSLPVectorizerPass());
+	add_pass(pm, createAggressiveDCEPass());
+	add_pass(pm, createCFGSimplificationPass());
+	add_pass(pm, createInstructionCombiningPass());
+	add_pass(pm, createBarrierNoopPass());
+	//add_pass(pm, createLoopVectorizePass(false));
+	add_pass(pm, createInstructionCombiningPass());
+	add_pass(pm, createCFGSimplificationPass());
+	add_pass(pm, createDeadStoreEliminationPass());
+	add_pass(pm, createStripDeadPrototypesPass());
+	add_pass(pm, createGlobalDCEPass());
+	add_pass(pm, createConstantMergePass());
+
+	return true;
 }
