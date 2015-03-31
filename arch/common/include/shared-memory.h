@@ -34,18 +34,18 @@ namespace captive {
 			// Shared Stuff
 			struct shared_memory_block
 			{
-				struct shared_memory_block *next;
+				volatile struct shared_memory_block *next;
 				uint64_t size;
 				uint8_t data[];
 			} packed;
 
 			struct shared_memory_header
 			{
-				volatile spinlock_t lock;
-				struct shared_memory_block *first;
+				spinlock_t lock;
+				volatile struct shared_memory_block *first;
 			} packed;
 
-			struct shared_memory_header *_header;
+			volatile struct shared_memory_header *_header;
 		};
 	}
 }

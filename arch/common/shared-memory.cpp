@@ -14,44 +14,9 @@ SharedMemory::SharedMemory(void* arena, uint64_t arena_size)
 
 void* SharedMemory::allocate(size_t size, alloc_flags_t flags)
 {
-	spinlock_wrapper lock(&_header->lock);
-	
-	struct shared_memory_block **block_slot = &(_header->first);
-
-	if (size % 64) {
-		size += 64 - (size % 64);
-	}
-
-	while (*block_slot) {
-		if ((*block_slot)->size > size) {
-			struct shared_memory_block *this_block = (*block_slot);
-			uint64_t old_size = this_block->size;
-			this_block->size = size;
-
-			struct shared_memory_block *next_block = this_block->next;
-			struct shared_memory_block *new_block = (struct shared_memory_block *)((uint64_t)this_block + this_block->size + 8);
-
-			this_block->next = new_block;
-			new_block->next = next_block;
-			new_block->size = old_size - size;
-
-			break;
-		} else if ((*block_slot)->size == size) {
-			break;
-		}
-
-		block_slot = &((*block_slot)->next);
-	}
-
-	if (!*block_slot) {
-		return NULL;
-	}
-
-	struct shared_memory_block *found_block = *block_slot;
-
-	*block_slot = (*block_slot)->next;
-
-	return (void *)(&found_block->data[0]);
+	uint64_t addr;
+	asm volatile ("out %2, $0xff" : "=a"(addr) : "D"(size), "a"(10));
+	return (void *)addr;
 }
 
 void* SharedMemory::reallocate(void* p, size_t size)
@@ -61,5 +26,5 @@ void* SharedMemory::reallocate(void* p, size_t size)
 
 void SharedMemory::free(void* p)
 {
-	assert(false);
+	asm volatile ("out %1, $0xff" : : "D"(p), "a"(11));
 }

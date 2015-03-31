@@ -9,6 +9,7 @@
 #define	KVM_GUEST_H
 
 #include <list>
+#include <map>
 
 #include <sys/ioctl.h>
 
@@ -64,36 +65,32 @@ namespace captive {
 					void free(void *p) override;
 
 				private:
+					struct region_header
+					{
+						uint64_t size;
+						uint8_t data[];
+					};
+
+					typedef std::multimap<size_t, struct region_header *> region_map_t;
+
 					inline void set_arena(void *arena, size_t arena_size)
 					{
 						_arena = arena;
 						_arena_size = arena_size;
-						_header = (struct shared_memory_header *)arena;
 
-						_header->lock = 0;
-						initialise();
+						struct region_header *header = (struct region_header *)arena;
+						header->size = arena_size - 8;
+
+						free_regions.emplace(header->size, header);
 					}
 
-					void initialise();
+					void coalesce();
 
 					void *_arena;
 					size_t _arena_size;
 
-					// Shared Stuff
-					struct shared_memory_block
-					{
-						struct shared_memory_block *next;
-						uint64_t size;
-						uint8_t data[];
-					} __packed;
+					region_map_t free_regions;
 
-					struct shared_memory_header
-					{
-						volatile spinlock_t lock;
-						struct shared_memory_block *first;
-					} __packed;
-
-					struct shared_memory_header *_header;
 				} _shared_memory;
 
 				std::vector<KVMCpu *> kvm_cpus;

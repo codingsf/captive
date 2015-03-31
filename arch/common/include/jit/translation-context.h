@@ -28,6 +28,8 @@ namespace captive {
 				}
 
 				inline void add_instruction(block_id_t block_id, const IRInstruction& instruction) {
+					assert(instruction_buffer->entry_count * sizeof(instruction_buffer->entries[0]) < instruction_buffer_size);
+					
 					instruction_buffer->entries[instruction_buffer->entry_count].block_id = block_id;
 					instruction_buffer->entries[instruction_buffer->entry_count].instruction = instruction;
 					instruction_buffer->entry_count++;

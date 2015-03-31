@@ -14,67 +14,51 @@ KVMGuest::KVMSharedMemory::KVMSharedMemory() : _arena(NULL), _arena_size(0)
 
 void *KVMGuest::KVMSharedMemory::allocate(size_t size)
 {
-	captive::util::SpinLockWrapper lock(&_header->lock);
-	
-	struct shared_memory_block **block_slot = &(_header->first);
-
-	if (size % 64) {
-		size += 64 - (size % 64);
+	if (size % 16) {
+		size += 16 - (size % 16);
 	}
 
-	DEBUG << "Looking for block at least " << std::hex << size;
-	while (*block_slot) {
-		DEBUG << "Considering block @ 0x" << std::hex << (uint64_t)(*block_slot) << ", size=" << (*block_slot)->size;
+	//DEBUG << "Locating region of size " << std::hex << size;
+	region_map_t::iterator rgn = free_regions.lower_bound(size);
 
-		if ((*block_slot)->size > size) {
-			DEBUG << "Splitting block";
+	if (rgn == free_regions.end())
+		return NULL;
 
-			struct shared_memory_block *this_block = (*block_slot);
-			uint64_t old_size = this_block->size;
-			this_block->size = size;
+	size_t region_size = rgn->first;
+	struct region_header *region_hdr = rgn->second;
 
-			struct shared_memory_block *next_block = this_block->next;
-			struct shared_memory_block *new_block = (struct shared_memory_block *)((uint64_t)this_block + this_block->size + 8);
+	//DEBUG << "Found region of size " << std::hex << region_size << " @ " << (uint64_t)region_hdr;
 
-			this_block->next = new_block;
-			new_block->next = next_block;
-			new_block->size = old_size - size;
+	free_regions.erase(rgn);
 
-			break;
-		} else if ((*block_slot)->size == size) {
-			DEBUG << "Exact match!";
-			break;
-		}
+	if (region_size > size) {
+		size_t new_size = region_size - size;
+		struct region_header *new_ptr = (struct region_header *)((uint64_t)region_hdr + size + 8);
+		new_ptr->size = new_size - 8;
 
-		DEBUG << "Moving on...";
-		block_slot = &((*block_slot)->next);
-	}
+		//DEBUG << "Splitting Region, new size=" << std::hex << new_size << " @ " << (uint64_t)new_ptr;
 
-	if (!*block_slot) {
-		WARNING << "Out of Memory";
+		free_regions.emplace(new_size, new_ptr);
+		region_hdr->size = size;
+	} else if (region_size < size) {
 		return NULL;
 	}
 
-	struct shared_memory_block *found_block = *block_slot;
-
-	DEBUG << "Removing from list";
-	*block_slot = (*block_slot)->next;
-
-	return (void *)(&found_block->data[0]);
+	return &region_hdr->data[0];
 }
 
 void KVMGuest::KVMSharedMemory::free(void* p)
 {
-	//
+	struct region_header *header = (struct region_header *)((uint64_t)p - 8);
+
+	//DEBUG << "Returning region of size " << std::hex << header->size;
+	free_regions.emplace(header->size, header);
+
+	if (free_regions.size() > 5)
+		coalesce();
 }
 
-void KVMGuest::KVMSharedMemory::initialise()
+void KVMGuest::KVMSharedMemory::coalesce()
 {
-	struct shared_memory_block *block = (struct shared_memory_block *)((uint64_t)_header + 64);
-	_header->first = block;
-
-	block->next = NULL;
-	block->size = (uint64_t)_arena_size - 64 - 8;
-
-	DEBUG << "Initialised shared memory";
+	//
 }
