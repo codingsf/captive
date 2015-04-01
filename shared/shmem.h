@@ -9,6 +9,26 @@
 #define	SHMEM_H
 
 namespace captive {
+	namespace lock {
+		typedef uint64_t SpinLock;
+
+		inline void spinlock_init(SpinLock *lock)
+		{
+			*lock = 0;
+		}
+
+		inline void spinlock_acquire(SpinLock *lock)
+		{
+			while(!__sync_bool_compare_and_swap(lock, 0, 1)) while (*lock) asm volatile("pause");
+		}
+
+		inline void spinlock_release(SpinLock *lock)
+		{
+			asm volatile ("");
+			*lock = 0;
+		}
+	}
+
 	struct VerificationData {
 		bool verify_failed;
 		uint8_t barrier_enter[32];
@@ -30,6 +50,36 @@ namespace captive {
 		MemoryVector printf_buffer;
 	};
 
+	namespace queue {
+		struct QueueItem {
+			void *data;
+			QueueItem *next;
+		};
+
+		typedef QueueItem *(*allocate_fn_t)();
+		typedef void (*free_fn_t)(QueueItem *);
+
+		inline void enqueue(QueueItem **queue, QueueItem *new_item)
+		{
+			while (*queue) {
+				queue = &((*queue)->next);
+			}
+
+			new_item->next = NULL;
+
+			(*queue) = new_item;
+		}
+
+		inline QueueItem *dequeue(QueueItem **queue)
+		{
+			QueueItem *head = *queue;
+			if (!head) return NULL;
+
+			*queue = head->next;
+			return head;
+		}
+	}
+
 	struct PerCPUData {
 		PerGuestData *guest_data;
 		VerificationData *verify_data;
@@ -47,7 +97,8 @@ namespace captive {
 		bool verify_enabled;
 		uint32_t verify_tid;
 
-		void *rwu[4];
+		lock::SpinLock rwu_ready_queue_lock;
+		queue::QueueItem *rwu_ready_queue;
 	};
 }
 

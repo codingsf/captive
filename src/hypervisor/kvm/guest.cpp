@@ -160,6 +160,9 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->insns_executed = 0;
 	per_cpu_data->isr = 0;
 
+	per_cpu_data->rwu_ready_queue = NULL;
+	lock::spinlock_init(&per_cpu_data->rwu_ready_queue_lock);
+
 	if (verify_enabled()) {
 		per_cpu_data->verify_data = (VerificationData *)VERIFY_VIRT_BASE;
 		per_cpu_data->verify_enabled = true;

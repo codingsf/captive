@@ -60,7 +60,6 @@ bool CPU::run_region_jit()
 		}
 
 		Block& block = profile_image().get_block(phys_pc);
-		mmu().set_page_executed(virt_pc);
 
 		if (block.has_translation()) {
 			_exec_txl = true;
@@ -70,6 +69,8 @@ bool CPU::run_region_jit()
 		} else {
 			block.owner().add_virtual_base(virt_pc);
 		}
+
+		mmu().set_page_executed(virt_pc);
 
 		if (trace_interval > 100000) {
 			trace_interval = 0;
@@ -89,7 +90,7 @@ bool CPU::run_region_jit()
 void CPU::analyse_regions()
 {
 	for (auto region : profile_image()) {
-		if (region.second->hot_block_count() > 10 && region.second->status() != Region::IN_TRANSLATION) {
+		if (region.second->hot_block_count() > 20 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
 		}
 	}

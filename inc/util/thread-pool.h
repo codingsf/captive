@@ -34,6 +34,12 @@ namespace captive {
 			void stop();
 
 		private:
+			struct ThreadPoolWorkerInfo
+			{
+				ThreadPool *owner;
+				uint32_t id;
+			};
+
 			struct ThreadPoolWork
 			{
 				void *data;
@@ -44,7 +50,7 @@ namespace captive {
 
 			uint32_t _min_threads, _max_threads;
 
-			void thread_proc();
+			void thread_proc(uint32_t id);
 			void process_work(ThreadPoolWork& work);
 
 			std::list<std::thread *> threads;

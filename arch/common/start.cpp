@@ -7,6 +7,7 @@
 #include <cpu.h>
 #include <mmu.h>
 #include <malloc.h>
+#include <shared-memory.h>
 #include <shmem.h>
 
 extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
@@ -159,20 +160,26 @@ extern "C" {
 
 	void handle_trap_irq(struct mcontext *mctx)
 	{
+		apic_write(EOI, 0);
+
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
 		case 1:
-			for (int i = 0; i < 4; i++) {
-				if (cpu->cpu_data().rwu[i] != NULL) {
-					cpu->register_region((captive::shared::RegionWorkUnit *)cpu->cpu_data().rwu[i]);
-					cpu->cpu_data().rwu[i] = NULL;
-				}
-			}
+			captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
+			do {
+				captive::queue::QueueItem *qi = captive::queue::dequeue(&(cpu->cpu_data().rwu_ready_queue));
+				captive::lock::spinlock_release(&(cpu->cpu_data().rwu_ready_queue_lock));
+
+				if (!qi) break;
+
+				if (qi->data) cpu->register_region((captive::shared::RegionWorkUnit *)qi->data);
+				captive::arch::Memory::shared_memory().free(qi);
+
+				captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
+			} while(true);
 
 			break;
 		}
-
-		apic_write(EOI, 0);
 	}
 
 	void handle_signal(struct mcontext *mctx)

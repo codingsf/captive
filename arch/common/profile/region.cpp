@@ -57,6 +57,10 @@ void Region::invalidate()
 
 	_generation++;
 
+	for (auto block : blocks) {
+		delete block.second;
+	}
+
 	blocks.clear();
 	vaddrs.clear();
 }

@@ -17,7 +17,9 @@ ThreadPool::~ThreadPool()
 
 void thread_proc_tramp(void *o)
 {
-	((ThreadPool *)o)->thread_proc();
+	ThreadPool::ThreadPoolWorkerInfo *info = (ThreadPool::ThreadPoolWorkerInfo *)o;
+
+	info->owner->thread_proc(info->id);
 }
 
 void ThreadPool::start()
@@ -26,7 +28,11 @@ void ThreadPool::start()
 
 	DEBUG << CONTEXT(ThreadPool) << " Launching " << _max_threads << " worker threads";
 	for (uint32_t i = 0; i < _max_threads; i++) {
-		threads.push_back(new std::thread(thread_proc_tramp, this));
+		ThreadPoolWorkerInfo *info = new ThreadPoolWorkerInfo();
+		info->owner = this;
+		info->id = i;
+
+		threads.push_back(new std::thread(thread_proc_tramp, info));
 	}
 }
 
@@ -61,7 +67,7 @@ void ThreadPool::queue_work(action_t action, completion_t completion, void* data
 	work_queue_mutex.unlock();
 }
 
-void ThreadPool::thread_proc()
+void ThreadPool::thread_proc(uint32_t id)
 {
 	std::unique_lock<std::mutex> lock(work_queue_mutex);
 	lock.unlock();
