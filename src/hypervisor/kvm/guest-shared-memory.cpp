@@ -2,6 +2,8 @@
 #include <util/spin-lock.h>
 #include <captive.h>
 
+#include <mutex>
+
 DECLARE_CONTEXT(SharedMemoryAllocator);
 
 extern "C" void *dlmalloc(size_t s);
@@ -25,20 +27,23 @@ void KVMGuest::KVMSharedMemory::set_arena(void* arena, size_t arena_size)
 	_arena_size = arena_size;
 }
 
+std::mutex shared_memory_mutex;
+
 void *KVMGuest::KVMSharedMemory::allocate(size_t size)
 {
-	//fprintf(stderr, "ALLOC %lu\n", size);
+	std::unique_lock<std::mutex> lock(shared_memory_mutex);
 	return dlmalloc(size);
 }
 
 void *KVMGuest::KVMSharedMemory::reallocate(void *p, size_t size)
 {
-	//fprintf(stderr, "REALLOC %lu\n", size);
+	std::unique_lock<std::mutex> lock(shared_memory_mutex);
 	return dlrealloc(p, size);
 }
 
 void KVMGuest::KVMSharedMemory::free(void* p)
 {
+	std::unique_lock<std::mutex> lock(shared_memory_mutex);
 	dlfree(p);
 }
 

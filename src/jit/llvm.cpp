@@ -647,7 +647,7 @@ bool LLVMJIT::add_pass(PassManagerBase *pm, Pass *pass)
 	return true;
 }
 
-#define DISABLE_AA
+//#define DISABLE_AA
 
 bool LLVMJIT::initialise_pass_manager(llvm::PassManagerBase* pm)
 {

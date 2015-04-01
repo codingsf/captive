@@ -39,6 +39,9 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	result.fn_ptr = NULL;
 	result.work_unit_id = rwu->work_unit_id;
 
+	if (!rwu->valid)
+		return result;
+
 	//DEBUG << "Compiling Region with " << bd->block_count << " basic blocks.";
 
 	if (rwu->blocks->block_count == 0)

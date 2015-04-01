@@ -37,6 +37,8 @@ namespace captive {
 			uint32_t region_base_address;
 			uint64_t function_addr;
 
+			bool valid;
+
 			TranslationBlocks *blocks;
 			void *ir;
 		} __packed;

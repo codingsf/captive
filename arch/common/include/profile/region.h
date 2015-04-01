@@ -13,10 +13,15 @@
 #include <set>
 
 namespace captive {
+	namespace shared {
+		struct RegionWorkUnit;
+	}
+
 	namespace arch {
 		namespace profile {
 			class Image;
 			class Block;
+			class Translation;
 
 			class Region
 			{
@@ -57,9 +62,13 @@ namespace captive {
 
 				const vaddr_set_t& virtual_bases() const { return vaddrs; }
 
-				inline void set_translation(void *fn)
+				inline bool has_translation() const { return _txln != NULL; }
+				inline void translation(Translation *txln) { _txln = txln; }
+				inline Translation *translation() const { return _txln; }
+
+				inline void set_work_unit(shared::RegionWorkUnit *rwu)
 				{
-					_txln = fn;
+					_rwu = rwu;
 				}
 
 			private:
@@ -67,7 +76,8 @@ namespace captive {
 				gpa_t _address;
 				Status _status;
 				uint32_t _generation;
-				void *_txln;
+				Translation *_txln;
+				shared::RegionWorkUnit *_rwu;
 
 				block_map_t blocks;
 				vaddr_set_t vaddrs;

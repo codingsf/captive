@@ -9,6 +9,7 @@
 #include <profile/image.h>
 #include <profile/region.h>
 #include <profile/block.h>
+#include <profile/translation.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
@@ -61,9 +62,9 @@ bool CPU::run_region_jit()
 		Block& block = profile_image().get_block(phys_pc);
 		mmu().set_page_executed(virt_pc);
 
-		if (block.have_translation()) {
+		if (block.has_translation()) {
 			_exec_txl = true;
-			step_ok = (bool)block.execute(this, reg_state());
+			step_ok = (bool)block.translation()->execute(*this);
 			_exec_txl = false;
 			continue;
 		} else {
@@ -102,6 +103,8 @@ void CPU::compile_region(Region& rgn)
 
 	RegionWorkUnit *rwu = (RegionWorkUnit *)Memory::shared_memory().allocate(sizeof(RegionWorkUnit), SharedMemory::ZERO);
 	assert(rwu);
+
+	rgn.set_work_unit(rwu);
 
 	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(sizeof(*rwu->blocks));
 	assert(rwu->blocks);
@@ -168,6 +171,9 @@ void CPU::compile_region(Region& rgn)
 	// Fill in the RWU with the IR buffer
 	rwu->ir = ctx.buffer();
 
+	// Validate the RWU
+	rwu->valid = true;
+
 	// Make region translation hypercall
 	//printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
@@ -178,13 +184,21 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 	//printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
 
 	Region& rgn = profile_image().get_region(rwu->region_base_address);
-	if (rwu->work_unit_id < rgn.generation()) {
-		printf("jit: discarding old translation, rwu gen=%d cur gen=%d\n", rwu->work_unit_id, rgn.generation());
-	} else {
-		for (int i = 0; i < rwu->blocks->block_count; i++) {
-			rgn.get_block(rwu->blocks->descriptors[i].block_addr).set_translation((Block::block_fn_t)rwu->function_addr);
+
+	if (rwu->function_addr) {
+		if (rwu->work_unit_id < rgn.generation()) {
+			printf("jit: discarding stale translation, rwu %08x gen=%d cur gen=%d\n", rwu->region_base_address, rwu->work_unit_id, rgn.generation());
+		} else {
+			Translation *txln = new Translation((Translation::translation_fn_t)rwu->function_addr);
+
+			rgn.translation(txln);
+			for (int i = 0; i < rwu->blocks->block_count; i++) {
+				rgn.get_block(rwu->blocks->descriptors[i].block_addr).translation(txln);
+			}
 		}
 	}
+
+	rgn.set_work_unit(NULL);
 
 	Memory::shared_memory().free(rwu->blocks->descriptors);
 	Memory::shared_memory().free(rwu->blocks);

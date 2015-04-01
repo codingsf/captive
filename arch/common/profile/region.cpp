@@ -1,9 +1,11 @@
 #include <profile/region.h>
 #include <profile/block.h>
+#include <profile/translation.h>
+#include <shared-jit.h>
 
 using namespace captive::arch::profile;
 
-Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION), _generation(0), _txln(NULL)
+Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION), _generation(0), _txln(NULL), _rwu(NULL)
 {
 
 }
@@ -42,8 +44,14 @@ void Region::invalidate()
 {
 	_status = NOT_IN_TRANSLATION;
 
+	if (_rwu) {
+		_rwu->valid = false;
+		_rwu = NULL;
+	}
+
 	if (_txln) {
-		// TODO: FIXME: XXX Free the associated memory
+		// FIXME: TODO
+		//delete _txln;
 		_txln = NULL;
 	}
 
