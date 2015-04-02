@@ -4,19 +4,14 @@
 
 using namespace captive::arch::jit;
 
-TranslationContext::TranslationContext(SharedMemory& allocator)
-	: _allocator(allocator), _current_block_id(0), _buffer_size(0x100)
+TranslationContext::TranslationContext(SharedMemory& allocator, shared::TranslationBlock& block)
+	: _allocator(allocator), _block(block), _current_block_id(0), _ir_insn_buffer_size(0x1000)
 {
-	instruction_buffer = (struct bytecode_descriptor *)allocator.allocate(_buffer_size);
+	block.ir_insn = (shared::IRInstruction *)allocator.allocate(_ir_insn_buffer_size);
 
-	instruction_buffer->block_count = 0;
-	instruction_buffer->entry_count = 0;
-	instruction_buffer->vreg_count = 0;
+	block.ir_block_count = 0;
+	block.ir_insn_count = 0;
+	block.ir_reg_count = 0;
 
 	current_block(alloc_block());
-}
-
-GuestBasicBlock::GuestBasicBlockFn TranslationContext::compile()
-{
-	return NULL;
 }

@@ -135,7 +135,7 @@ BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* o
 	}
 }
 
-bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
+bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* bc)
 {
 	// DEBUG << "Lowering: " << bc->render();
 
@@ -192,9 +192,10 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 
 	case RawInstruction::RET:
 	{
+		return emit_block_control_flow(ctx, bc);
 		//ctx.builder.CreateRet(ctx.const32(1));
-		ctx.builder.CreateBr(ctx.dispatch_block);
-		return true;
+		//ctx.builder.CreateBr(ctx.dispatch_block);
+		//return true;
 	}
 
 	case RawInstruction::MOV:
@@ -507,6 +508,12 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const RawBytecode* bc)
 		ERROR << "Unhandled Instruction: " << bc->insn.type;
 		assert(false && "Unhandled Instruction"); return false;
 	}
+}
+
+bool LLVMJIT::emit_block_control_flow(LoweringContext& ctx, const RawBytecode* bc)
+{
+	ctx.
+	return true;
 }
 
 void LLVMJIT::set_aa_metadata(Value *v, metadata_tags tag)

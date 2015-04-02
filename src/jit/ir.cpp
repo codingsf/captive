@@ -5,7 +5,7 @@
 using namespace captive::jit;
 using namespace captive::jit::ir;
 
-IRContext::IRContext()
+/*IRContext::IRContext()
 {
 
 }
@@ -199,3 +199,4 @@ void TerminatorIRInstruction::add_destination(IRBlock& block)
 	owner().add_successor(block);
 	block.add_predecessor(owner());
 }
+*/

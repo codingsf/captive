@@ -9,6 +9,7 @@
 #define	IR_H
 
 #include <jit/jit.h>
+#include <shared-jit.h>
 
 #include <map>
 #include <list>
@@ -51,7 +52,7 @@ namespace captive {
 
 				IROperand(OperandType type, uint8_t size) : _owner(NULL), _type(type), _size(size) { }
 
-				static IROperand *create_from_bytecode(IRContext& ctx, const RawOperand *oper);
+				static IROperand *create_from_bytecode(IRContext& ctx, const shared::IROperand *oper);
 
 				inline void owner(IRInstruction& insn) { _owner = &insn; }
 
@@ -167,7 +168,7 @@ namespace captive {
 
 				IRInstruction(IRBlock& owner, InstructionType type) : _owner(owner), _type(type) { }
 
-				static IRInstruction *create_from_bytecode(IRContext& ctx, IRBlock& owner, const RawBytecode *bc);
+				static IRInstruction *create_from_instruction(IRContext& ctx, IRBlock& owner, const shared::IRInstruction *insn);
 
 				inline IRBlock& owner() const { return _owner; }
 
@@ -428,7 +429,7 @@ namespace captive {
 			typedef std::map<uint32_t, ir::IRBlock *> block_map_t;
 			typedef std::map<uint32_t, ir::IRRegister *> register_map_t;
 
-			static IRContext *build_context(const RawBytecodeDescriptor *bcd);
+			static IRContext *build_context(const shared::TranslationBlock *tb);
 
 			ir::IRRegister& get_or_create_vreg(uint32_t id, uint8_t size);
 			ir::IRBlock& get_or_create_block(uint32_t id);

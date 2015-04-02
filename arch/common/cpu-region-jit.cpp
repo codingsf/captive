@@ -26,6 +26,7 @@ bool CPU::run_region_jit()
 		return false;
 	}
 
+	gpa_t prev_pc = 0;
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -55,6 +56,7 @@ bool CPU::run_region_jit()
 		}
 
 		if (fault != MMU::NONE) {
+			prev_pc = phys_pc;
 			step_ok = interpret_block();
 			continue;
 		}
@@ -62,6 +64,8 @@ bool CPU::run_region_jit()
 		Block& block = profile_image().get_block(phys_pc);
 
 		if (block.has_translation()) {
+			prev_pc = 0;
+
 			_exec_txl = true;
 			step_ok = (bool)block.translation()->execute(*this);
 			_exec_txl = false;
@@ -79,6 +83,12 @@ bool CPU::run_region_jit()
 			trace_interval++;
 		}
 
+		if (prev_pc == 0 || ((prev_pc & ~0xfffULL) != (phys_pc & ~0xfffULL))) {
+			block.entry_block(true);
+		}
+
+		prev_pc = phys_pc;
+
 		if (block.owner().status() == Region::NOT_IN_TRANSLATION)
 			block.inc_interp_count();
 
@@ -91,7 +101,7 @@ bool CPU::run_region_jit()
 void CPU::analyse_regions()
 {
 	for (auto region : profile_image()) {
-		if (region.second->hot_block_count() > 40 && region.second->status() != Region::IN_TRANSLATION) {
+		if (region.second->hot_block_count() > 20 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
 			region.second->reset_heat();
 		}
@@ -134,8 +144,9 @@ void CPU::compile_region(Region& rgn)
 
 		//rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().reallocate(rwu->blocks->descriptors, sizeof(*rwu->blocks->descriptors) * (rwu->blocks->block_count + 1));
 		rwu->blocks->descriptors[rwu->blocks->block_count].block_id = ctx.current_block();
-		rwu->blocks->descriptors[rwu->blocks->block_count].block_addr = block.second->address() & 0xfff;
+		rwu->blocks->descriptors[rwu->blocks->block_count].block_addr = block.second->address();
 		rwu->blocks->descriptors[rwu->blocks->block_count].heat = block.second->interp_count();
+		rwu->blocks->descriptors[rwu->blocks->block_count].entry = block.second->entry_block() ? 1 : 0;
 		rwu->blocks->block_count++;
 
 		uint32_t pc = block.second->address();
@@ -195,8 +206,13 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 			Translation *txln = new Translation((Translation::translation_fn_t)rwu->function_addr);
 
 			rgn.translation(txln);
+
+			// Only register entry blocks
 			for (int i = 0; i < rwu->blocks->block_count; i++) {
-				rgn.get_block(rwu->blocks->descriptors[i].block_addr).translation(txln);
+				if (rwu->blocks->descriptors[i].entry) {
+					//printf("jit: registering block %08x\n", rwu->blocks->descriptors[i].block_addr);
+					rgn.get_block(rwu->blocks->descriptors[i].block_addr).translation(txln);
+				}
 			}
 		}
 	}

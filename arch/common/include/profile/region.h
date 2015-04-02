@@ -41,7 +41,7 @@ namespace captive {
 				inline gpa_t address() const { return _address; }
 				inline gpa_t offset() const { return _address & 0xfffULL; }
 
-				Block& get_block(gpa_t gva);
+				Block& get_block(gpa_t gpa);
 
 				uint32_t hot_block_count();
 

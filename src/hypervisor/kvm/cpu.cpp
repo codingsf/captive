@@ -351,10 +351,8 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		DEBUG << CONTEXT(CPU) << "Compiling Region: " << std::hex << "RDI=" << regs.rdi;
 		kvm_guest.jit().region_jit().compile_region_async(
 			(captive::shared::RegionWorkUnit *)regs.rdi,
-			([](captive::shared::RegionWorkUnit *rwu, jit::RegionCompilationResult result, void *data) -> void {
+			([](captive::shared::RegionWorkUnit *rwu, bool success, void *data) -> void {
 				KVMCpu *cpu = (KVMCpu *)data;
-
-				rwu->function_addr = (uint64_t)result.fn_ptr;
 
 				queue::QueueItem *qi = (queue::QueueItem *)cpu->owner().shared_memory().allocate(sizeof(queue::QueueItem));
 				qi->data = rwu;

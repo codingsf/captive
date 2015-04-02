@@ -10,8 +10,7 @@
 
 #include <define.h>
 #include <shared-memory.h>
-#include <jit/guest-basic-block.h>
-#include <jit/ir-instruction.h>
+#include <shared-jit.h>
 
 namespace captive {
 	namespace arch {
@@ -21,67 +20,49 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext(SharedMemory& allocator);
+				TranslationContext(SharedMemory& allocator, shared::TranslationBlock& block);
 
-				GuestBasicBlock::GuestBasicBlockFn compile();
-
-				inline void add_instruction(const IRInstruction& instruction) {
+				inline void add_instruction(const shared::IRInstruction& instruction) {
 					add_instruction(_current_block_id, instruction);
 				}
 
-				inline void add_instruction(block_id_t block_id, const IRInstruction& instruction) {
-					ensure_buffer(instruction_buffer->entry_count + 1);
+				inline void add_instruction(shared::IRBlockId block_id, const shared::IRInstruction& instruction) {
+					ensure_buffer(_block.ir_insn_count + 1);
 
-					instruction_buffer->entries[instruction_buffer->entry_count].block_id = block_id;
-					instruction_buffer->entries[instruction_buffer->entry_count].instruction = instruction;
-					instruction_buffer->entry_count++;
+					_block.ir_insn[_block.ir_insn_count] = instruction;
+					_block.ir_insn_count++;
 				}
 
-				inline block_id_t current_block() const { return _current_block_id; }
-				inline void current_block(block_id_t block_id) { _current_block_id = block_id; }
+				inline shared::IRBlockId current_block() const { return _current_block_id; }
+				inline void current_block(shared::IRBlockId block_id) { _current_block_id = block_id; }
 
-				inline block_id_t alloc_block() {
-					return instruction_buffer->block_count++;
+				inline shared::IRBlockId alloc_block() {
+					return _block.ir_block_count++;
 				}
 
-				inline reg_id_t alloc_reg(uint8_t size) {
-					return instruction_buffer->vreg_count++;
+				inline shared::IRRegId alloc_reg(uint8_t size) {
+					return _block.ir_reg_count++;
 				}
-
-				inline void *buffer() const { return instruction_buffer; }
 
 			private:
 				SharedMemory& _allocator;
-				block_id_t _current_block_id;
-				uint32_t _buffer_size;
+				shared::TranslationBlock& _block;
+
+				shared::IRBlockId _current_block_id;
+				uint32_t _ir_insn_buffer_size;
 
 				inline void ensure_buffer(uint32_t elem_capacity)
 				{
-					uint32_t required_size = (sizeof(struct instruction_entry) * elem_capacity) + sizeof(struct bytecode_descriptor);
-					if (_buffer_size < required_size) {
-						while (_buffer_size < required_size) {
-							_buffer_size <<= 1;
+					uint32_t required_size = (sizeof(shared::IRInstruction) * elem_capacity);
+
+					if (_ir_insn_buffer_size < required_size) {
+						while (_ir_insn_buffer_size < required_size) {
+							_ir_insn_buffer_size <<= 1;
 						}
 
-						instruction_buffer = (struct bytecode_descriptor *)_allocator.reallocate(instruction_buffer, _buffer_size);
+						_block.ir_insn = (shared::IRInstruction *)_allocator.reallocate(_block.ir_insn, _ir_insn_buffer_size);
 					}
 				}
-
-				struct instruction_entry {
-					block_id_t block_id;
-					IRInstruction instruction;
-				} packed;
-
-				struct vreg_entry {
-					uint8_t size;
-				} packed;
-
-				struct bytecode_descriptor {
-					uint32_t block_count;
-					uint32_t vreg_count;
-					uint32_t entry_count;
-					struct instruction_entry entries[];
-				} packed *instruction_buffer;
 			};
 		}
 	}

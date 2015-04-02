@@ -34,9 +34,13 @@ namespace captive {
 
 				inline void invalidate() { _txln = NULL; _interp_count = 0; }
 
+				inline bool entry_block() const { return _entry; }
+				inline void entry_block(bool e) { _entry = e; }
+
 			private:
 				Region& _owner;
 				gpa_t _address;
+				bool _entry;
 				uint32_t _interp_count;
 				Translation *_txln;
 			};

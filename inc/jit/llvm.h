@@ -38,8 +38,8 @@ namespace captive {
 			BlockJIT& block_jit() override { return *this; }
 			RegionJIT& region_jit() override { return *this; }
 
-			BlockCompilationResult compile_block(shared::BlockWorkUnit *bwu) override;
-			RegionCompilationResult compile_region(shared::RegionWorkUnit *rwu) override;
+			bool compile_block(shared::BlockWorkUnit *bwu) override;
+			bool compile_region(shared::RegionWorkUnit *rwu) override;
 
 		private:
 			engine::Engine& _engine;
@@ -111,6 +111,7 @@ namespace captive {
 			llvm::BasicBlock *block_for_operand(LoweringContext& ctx, const RawOperand* oper);
 
 			bool lower_bytecode(LoweringContext& ctx, const RawBytecode* bc);
+			bool emit_block_control_flow(LoweringContext& ctx, const RawBytecode* bc);
 		};
 	}
 }

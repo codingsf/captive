@@ -18,17 +18,442 @@
 
 namespace captive {
 	namespace shared {
-		struct TranslationBlockDescriptor
+		typedef uint32_t IRBlockId;
+		typedef uint32_t IRRegId;
+
+		struct IROperand
 		{
-			uint32_t block_id;
-			uint32_t heat;
-			uint32_t block_addr;
+			enum IROperandType {
+				NONE,
+				CONSTANT,
+				VREG,
+				BLOCK,
+				FUNC,
+				PC
+			};
+
+			IROperandType type;
+			uint64_t value;
+			uint8_t size;
+
+			IROperand() : type(NONE), value(0), size(0) { }
+
+			IROperand(IROperandType type, uint64_t value, uint8_t size) : type(type), value(value), size(size) { }
+
+			inline bool is_constant() const { return type == CONSTANT; }
+			inline bool is_vreg() const { return type == VREG; }
+			inline bool is_block() const { return type == BLOCK; }
+			inline bool is_func() const { return type == FUNC; }
+			inline bool is_pc() const { return type == PC; }
+
+			static IROperand none() { return IROperand(NONE, 0, 0); }
+
+			static IROperand const8(uint8_t value) { return IROperand(CONSTANT, value, 1); }
+			static IROperand const16(uint16_t value) { return IROperand(CONSTANT, value, 2); }
+			static IROperand const32(uint32_t value) { return IROperand(CONSTANT, value, 4); }
+			static IROperand const64(uint64_t value) { return IROperand(CONSTANT, value, 8); }
+
+			static IROperand vreg(IRRegId id, uint8_t size) { return IROperand(VREG, (uint64_t)id, size); }
+
+			static IROperand pc(uint32_t offset) { return IROperand(PC, (uint64_t)offset, 4); }
+
+			static IROperand block(IRBlockId id) { return IROperand(BLOCK, (uint64_t)id, 0); }
+			static IROperand func(void *addr) { return IROperand(FUNC, (uint64_t)addr, 0); }
 		} __packed;
 
-		struct TranslationBlocks
+		struct IRInstruction
 		{
-			uint32_t block_count;
-			TranslationBlockDescriptor *descriptors;
+			enum IRInstructionType {
+				INVALID,
+
+				VERIFY,
+
+				NOP,
+				TRAP,
+
+				MOV,
+				CMOV,
+				LDPC,
+
+				ADD,
+				SUB,
+				MUL,
+				DIV,
+				MOD,
+
+				SHL,
+				SHR,
+				SAR,
+				CLZ,
+
+				AND,
+				OR,
+				XOR,
+
+				CMPEQ,
+				CMPNE,
+				CMPGT,
+				CMPGTE,
+				CMPLT,
+				CMPLTE,
+
+				SX,
+				ZX,
+				TRUNC,
+
+				READ_REG,
+				WRITE_REG,
+				READ_MEM,
+				WRITE_MEM,
+
+				CALL,
+				JMP,
+				BRANCH,
+				RET,
+
+				SET_CPU_MODE,
+				WRITE_DEVICE,
+				READ_DEVICE,
+			};
+
+			IRBlockId ir_block;
+			IRInstructionType type;
+			IROperand operands[6];
+
+			IRInstruction(IRInstructionType type)
+				: type(type),
+				operands { IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
+
+			IRInstruction(IRInstructionType type, IROperand& op1)
+				: type(type),
+				operands { op1, IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
+
+			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2)
+				: type(type),
+				operands { op1, op2, IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
+
+			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2, IROperand& op3)
+				: type(type),
+				operands { op1, op2, op3, IROperand::none(), IROperand::none(), IROperand::none() } { }
+
+			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2, IROperand& op3, IROperand& op4)
+				: type(type),
+				operands { op1, op2, op3, op4, IROperand::none(), IROperand::none() } { }
+
+			static IRInstruction nop() { return IRInstruction(NOP); }
+			static IRInstruction ret() { return IRInstruction(RET); }
+			static IRInstruction trap() { return IRInstruction(TRAP); }
+			static IRInstruction verify() { return IRInstruction(VERIFY); }
+
+			static IRInstruction ldpc(IROperand& dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
+
+			//
+			// Data Motion
+			//
+			static IRInstruction mov(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(MOV, src, dst);
+			}
+
+			static IRInstruction cmov(IROperand& cond, IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMOV, cond, src, dst);
+			}
+
+			static IRInstruction sx(IROperand& src, IROperand& dst) {
+				assert(src.size < dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(SX, src, dst);
+			}
+
+			static IRInstruction zx(IROperand& src, IROperand& dst) {
+				assert(src.size < dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(ZX, src, dst);
+			}
+
+			static IRInstruction trunc(IROperand& src, IROperand& dst) {
+				assert(src.size > dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(TRUNC, src, dst);
+			}
+
+			//
+			// Arithmetic Operations
+			//
+			static IRInstruction add(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(ADD, src, dst);
+			}
+
+			static IRInstruction sub(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(SUB, src, dst);
+			}
+
+			static IRInstruction mul(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(MUL, src, dst);
+			}
+
+			static IRInstruction div(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(DIV, src, dst);
+			}
+
+			static IRInstruction mod(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(MOD, src, dst);
+			}
+
+			// Bit-shifting
+			static IRInstruction shl(IROperand& amt, IROperand& dst) {
+				assert(amt.is_constant() || amt.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(SHL, amt, dst);
+			}
+
+			static IRInstruction shr(IROperand& amt, IROperand& dst) {
+				assert(amt.is_constant() || amt.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(SHR, amt, dst);
+			}
+
+			static IRInstruction sar(IROperand& amt, IROperand& dst) {
+				assert(amt.is_constant() || amt.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(SAR, amt, dst);
+			}
+
+			// Bit manipulation
+			static IRInstruction clz(IROperand& src, IROperand& dst) {
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CLZ, src, dst);
+			}
+
+			static IRInstruction bitwise_and(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(AND, src, dst);
+			}
+
+			static IRInstruction bitwise_or(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(OR, src, dst);
+			}
+
+			static IRInstruction bitwise_xor(IROperand& src, IROperand& dst) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(XOR, src, dst);
+			}
+
+			//
+			// Comparison
+			//
+			static IRInstruction cmpeq(IROperand& lh, IROperand& rh, IROperand& dst)
+			{
+				assert(lh.size == rh.size);
+				assert(lh.is_vreg() || lh.is_constant());
+				assert(rh.is_vreg() || rh.is_constant());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMPEQ, lh, rh, dst);
+			}
+
+			static IRInstruction cmpne(IROperand& lh, IROperand& rh, IROperand& dst)
+			{
+				assert(lh.size == rh.size);
+				assert(lh.is_vreg() || lh.is_constant());
+				assert(rh.is_vreg() || rh.is_constant());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMPNE, lh, rh, dst);
+			}
+
+			static IRInstruction cmplt(IROperand& lh, IROperand& rh, IROperand& dst)
+			{
+				assert(lh.size == rh.size);
+				assert(lh.is_vreg() || lh.is_constant());
+				assert(rh.is_vreg() || rh.is_constant());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMPLT, lh, rh, dst);
+			}
+
+			static IRInstruction cmplte(IROperand& lh, IROperand& rh, IROperand& dst)
+			{
+				assert(lh.size == rh.size);
+				assert(lh.is_vreg() || lh.is_constant());
+				assert(rh.is_vreg() || rh.is_constant());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMPLTE, lh, rh, dst);
+			}
+
+			static IRInstruction cmpgt(IROperand& lh, IROperand& rh, IROperand& dst)
+			{
+				assert(lh.size == rh.size);
+				assert(lh.is_vreg() || lh.is_constant());
+				assert(rh.is_vreg() || rh.is_constant());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMPGT, lh, rh, dst);
+			}
+
+			static IRInstruction cmpgte(IROperand& lh, IROperand& rh, IROperand& dst)
+			{
+				assert(lh.size == rh.size);
+				assert(lh.is_vreg() || lh.is_constant());
+				assert(rh.is_vreg() || rh.is_constant());
+				assert(dst.is_vreg());
+
+				return IRInstruction(CMPGTE, lh, rh, dst);
+			}
+
+			//
+			// Domain-specific operations
+			//
+			static IRInstruction ldreg(IROperand& offset, IROperand& dst)
+			{
+				assert(offset.is_constant() || offset.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(READ_REG, offset, dst);
+			}
+
+			static IRInstruction streg(IROperand& src, IROperand& offset)
+			{
+				assert(offset.is_constant() || offset.is_vreg());
+				assert(src.is_constant() || src.is_vreg());
+
+				return IRInstruction(WRITE_REG, src, offset);
+			}
+
+			static IRInstruction ldmem(IROperand& offset, IROperand& dst)
+			{
+				assert(offset.is_constant() || offset.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(READ_MEM, offset, dst);
+			}
+
+			static IRInstruction stmem(IROperand& src, IROperand& offset)
+			{
+				assert(offset.is_constant() || offset.is_vreg());
+				assert(src.is_constant() || src.is_vreg());
+
+				return IRInstruction(WRITE_MEM, src, offset);
+			}
+
+			static IRInstruction write_device(IROperand& dev, IROperand& reg, IROperand& val)
+			{
+				assert(dev.is_constant() || dev.is_vreg());
+				assert(reg.is_constant() || reg.is_vreg());
+				assert(val.is_constant() || val.is_vreg());
+
+				return IRInstruction(WRITE_DEVICE, dev, reg, val);
+			}
+
+			static IRInstruction read_device(IROperand& dev, IROperand& reg, IROperand& dst)
+			{
+				assert(dev.is_constant() || dev.is_vreg());
+				assert(reg.is_constant() || reg.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(READ_DEVICE, dev, reg, dst);
+			}
+
+			static IRInstruction set_cpu_mode(IROperand& mode)
+			{
+				assert(mode.is_constant() || mode.is_vreg());
+
+				return IRInstruction(SET_CPU_MODE, mode);
+			}
+
+			//
+			// Control Flow
+			//
+			static IRInstruction jump(IROperand& target)
+			{
+				assert(target.is_block());
+				return IRInstruction(JMP, target);
+			}
+
+			static IRInstruction branch(IROperand& cond, IROperand& tt, IROperand& ft)
+			{
+				assert(cond.is_constant() || cond.is_vreg());
+				assert(tt.is_block());
+				assert(ft.is_block());
+
+				return IRInstruction(BRANCH, cond, tt, ft);
+			}
+
+			static IRInstruction call(IROperand& fn)
+			{
+				assert(fn.is_func());
+
+				return IRInstruction(CALL, fn);
+			}
+
+			static IRInstruction call(IROperand& fn, IROperand& arg0)
+			{
+				assert(fn.is_func());
+				assert(arg0.is_constant() || arg0.is_vreg());
+
+				return IRInstruction(CALL, fn, arg0);
+			}
+		} __packed;
+
+		struct TranslationBlock
+		{
+			uint32_t block_addr;
+			uint32_t heat;
+			uint32_t is_entry;
+
+			uint32_t ir_block_count;
+			uint32_t ir_reg_count;
+			uint32_t ir_insn_count;
+			IRInstruction *ir_insn;
 		} __packed;
 
 		struct RegionWorkUnit
@@ -39,8 +464,9 @@ namespace captive {
 
 			bool valid;
 
-			TranslationBlocks *blocks;
-			void *ir;
+
+			uint32_t block_count;
+			TranslationBlock *blocks;
 		} __packed;
 
 		struct BlockWorkUnit

@@ -33,33 +33,18 @@ using namespace captive::jit;
 using namespace captive::shared;
 using namespace llvm;
 
-RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
+bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 {
-	RegionCompilationResult result;
-	result.fn_ptr = NULL;
-	result.work_unit_id = rwu->work_unit_id;
-
 	if (!rwu->valid)
-		return result;
+		return false;
 
-	//DEBUG << "Compiling Region with " << bd->block_count << " basic blocks.";
+	DEBUG << CONTEXT(LLVMRegionJit) << "Compiling Region with " << rwu->block_count << " basic blocks.";
 
-	if (rwu->blocks->block_count == 0)
-		return result;
+	if (rwu->block_count == 0)
+		return false;;
 
-	RawBytecodeDescriptor *mutable_bds = (RawBytecodeDescriptor *)rwu->ir;
-
-	if (mutable_bds->bytecode_count == 0)
-		return result;
-
-	if (!quick_opt(mutable_bds->bc, mutable_bds->bytecode_count)) {
-		return result;
-	}
-
-	const RawBytecodeDescriptor *bds = (const RawBytecodeDescriptor *)rwu->ir;
-
-	/*for (unsigned int i = 0; i < bd->block_count; i++) {
-		DEBUG << "GBB: addr=" << std::hex << bd->blocks[i].addr << ", id=" << std::dec << bd->blocks[i].id << ", heat=" << bd->blocks[i].heat;
+	/*for (unsigned int i = 0; i < rwu->blocks->block_count; i++) {
+		DEBUG << "GBB: addr=" << std::hex << rwu->blocks->descriptors[i].block_addr << ", id=" << std::dec << rwu->blocks->descriptors[i].block_id << ", heat=" << rwu->blocks->descriptors[i].heat << ", entry=" << rwu->blocks->descriptors[i].entry;
 	}*/
 
 	LLVMContext ctx;
@@ -150,8 +135,11 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	Value *pc_offset = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), 0xfff);
 	SwitchInst *dispatcher = builder.CreateSwitch(pc_offset, exit_block);
 
+	// Only add entry blocks into the switch statement.
 	for (unsigned int i = 0; i < rwu->blocks->block_count; i++) {
-		dispatcher->addCase(lc.const32(rwu->blocks->descriptors[i].block_addr & 0xfff), lc.basic_blocks[rwu->blocks->descriptors[i].block_id]);
+		if (rwu->blocks->descriptors[i].entry) {
+			dispatcher->addCase(lc.const32(rwu->blocks->descriptors[i].block_addr & 0xfff), lc.basic_blocks[rwu->blocks->descriptors[i].block_id]);
+		}
 	}
 
 	// Verify
@@ -174,17 +162,6 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	// Optimise
 	{
 		PassManager optManager;
-
-		/*PassManagerBuilder optManagerBuilder;
-
-		optManagerBuilder.BBVectorize = false;
-		optManagerBuilder.DisableTailCalls = true;
-		optManagerBuilder.OptLevel = 3;
-
-		optManager.add(createTypeBasedAliasAnalysisPass());
-		optManager.add(new CaptiveAA());
-		optManagerBuilder.populateModulePassManager(optManager);*/
-
 		initialise_pass_manager(&optManager);
 
 		optManager.run(*region_module);
@@ -218,7 +195,7 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 	if (!engine) {
 		ERROR << CONTEXT(LLVMRegionJIT) << "Unable to create LLVM Engine";
-		return result;
+		return false;
 	}
 
 	// We actually want compilation to happen.
@@ -229,13 +206,13 @@ RegionCompilationResult LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	void *ptr = (void *)engine->getFunctionAddress(region_fn->getName());
 	if (!ptr) {
 		ERROR << CONTEXT(LLVMRegionJIT) << "Unable to compile function";
-		return result;
+		return false;
 	}
 
 	region_fn->deleteBody();
 	delete engine;
 
-	result.fn_ptr = ptr;
-	return result;
+	rwu->function_addr = (uint64_t)ptr;
+	return true;
 }
 
