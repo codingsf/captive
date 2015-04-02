@@ -79,9 +79,10 @@ bool CPU::run_region_jit()
 			trace_interval++;
 		}
 
-		block.inc_interp_count();
-		step_ok = interpret_block();
+		if (block.owner().status() == Region::NOT_IN_TRANSLATION)
+			block.inc_interp_count();
 
+		step_ok = interpret_block();
 	} while(step_ok);
 
 	return true;
@@ -90,8 +91,9 @@ bool CPU::run_region_jit()
 void CPU::analyse_regions()
 {
 	for (auto region : profile_image()) {
-		if (region.second->hot_block_count() > 20 && region.second->status() != Region::IN_TRANSLATION) {
+		if (region.second->hot_block_count() > 40 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
+			region.second->reset_heat();
 		}
 	}
 }
@@ -176,13 +178,13 @@ void CPU::compile_region(Region& rgn)
 	rwu->valid = true;
 
 	// Make region translation hypercall
-	//printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
+	printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
 }
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 {
-	//printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
+	printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
 
 	Region& rgn = profile_image().get_region(rwu->region_base_address);
 

@@ -10,7 +10,7 @@
 
 namespace captive {
 	namespace lock {
-		typedef uint64_t SpinLock;
+		typedef volatile uint64_t SpinLock;
 
 		inline void spinlock_init(SpinLock *lock)
 		{
@@ -19,12 +19,12 @@ namespace captive {
 
 		inline void spinlock_acquire(SpinLock *lock)
 		{
-			while(!__sync_bool_compare_and_swap(lock, 0, 1)) while (*lock) asm volatile("pause");
+			while(__sync_lock_test_and_set(lock, 1)) asm volatile("pause" ::: "memory");
 		}
 
 		inline void spinlock_release(SpinLock *lock)
 		{
-			asm volatile ("");
+			__sync_synchronize();
 			*lock = 0;
 		}
 	}

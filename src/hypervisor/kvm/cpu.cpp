@@ -358,7 +358,7 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 
 				queue::QueueItem *qi = (queue::QueueItem *)cpu->owner().shared_memory().allocate(sizeof(queue::QueueItem));
 				qi->data = rwu;
-				
+
 				lock::spinlock_acquire(&(cpu->per_cpu_data().rwu_ready_queue_lock));
 				queue::enqueue(&(cpu->per_cpu_data().rwu_ready_queue), qi);
 				lock::spinlock_release(&(cpu->per_cpu_data().rwu_ready_queue_lock));

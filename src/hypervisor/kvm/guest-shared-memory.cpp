@@ -27,7 +27,7 @@ void KVMGuest::KVMSharedMemory::set_arena(void* arena, size_t arena_size)
 	_arena_size = arena_size;
 }
 
-std::mutex shared_memory_mutex;
+static std::mutex shared_memory_mutex;
 
 void *KVMGuest::KVMSharedMemory::allocate(size_t size)
 {

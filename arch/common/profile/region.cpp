@@ -40,6 +40,13 @@ uint32_t Region::hot_block_count()
 	return r;
 }
 
+void Region::reset_heat()
+{
+	for (auto block : blocks) {
+		block.second->reset_interp_count();
+	}
+}
+
 void Region::invalidate()
 {
 	_status = NOT_IN_TRANSLATION;

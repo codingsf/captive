@@ -155,6 +155,7 @@ extern "C" {
 	void handle_trap_gpf(struct mcontext *mctx)
 	{
 		printf("general protection fault: rip=0x%lx, code=0x%x\n", mctx->rip, mctx->extra);
+		dump_stack();
 		abort();
 	}
 

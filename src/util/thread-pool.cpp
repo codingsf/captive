@@ -70,11 +70,8 @@ void ThreadPool::queue_work(action_t action, completion_t completion, void* data
 void ThreadPool::thread_proc(uint32_t id)
 {
 	std::unique_lock<std::mutex> lock(work_queue_mutex);
-	lock.unlock();
 
 	while (!terminate) {
-		lock.lock();
-
 		while (work_queue.size() == 0 && !terminate) {
 			DEBUG << CONTEXT(ThreadPool) << " Worker thread " << std::this_thread::get_id() << " idling";
 			work_queue_cond.wait(lock);
@@ -91,6 +88,8 @@ void ThreadPool::thread_proc(uint32_t id)
 		lock.unlock();
 
 		process_work(work);
+
+		lock.lock();
 	}
 }
 

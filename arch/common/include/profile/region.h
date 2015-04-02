@@ -54,6 +54,7 @@ namespace captive {
 				inline uint32_t generation() const { return _generation; }
 
 				void invalidate();
+				void reset_heat();
 
 				inline void add_virtual_base(gva_t address)
 				{
