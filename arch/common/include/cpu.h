@@ -118,6 +118,13 @@ namespace captive {
 				uint32_t last_exception_action;
 			} local_state;
 
+			struct {
+				void *cpu;
+				void *registers;
+				uint32_t registers_size;
+				void *region_chaining_table;
+			} jit_state;
+
 		private:
 			inline void assert_privilege_mode()
 			{

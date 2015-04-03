@@ -28,11 +28,14 @@ CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_da
 
 	// Initialise the block cache
 	memset(block_cache, 0xff, sizeof(block_cache));
+
+	jit_state.cpu = this;
+	jit_state.region_chaining_table = malloc(sizeof(void *) * 0x100000);
 }
 
 CPU::~CPU()
 {
-
+	free(jit_state.region_chaining_table);
 }
 
 bool CPU::handle_pending_action(uint32_t action)

@@ -48,6 +48,9 @@ bool ArmCPU::init()
 	_jit = new ArmJIT();
 	_mmu = new ArmMMU(*this);
 
+	jit_state.registers = &state.regs;
+	jit_state.registers_size = sizeof(state.regs);
+
 	//printf("installing 3-byte bootloader\n");
 	volatile uint32_t *mem = (volatile uint32_t *)0;
 	*mem++ = 0xef000000;
