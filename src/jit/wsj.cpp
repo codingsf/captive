@@ -24,38 +24,30 @@ bool WSJ::init()
 	return true;
 }
 
-BlockCompilationResult WSJ::compile_block(BlockWorkUnit *bwu)
+bool WSJ::compile_block(BlockWorkUnit *bwu)
 {
-	BlockCompilationResult result;
-	result.fn_ptr = NULL;
-	result.work_unit_id = bwu->work_unit_id;
-
 	X86Builder builder;
 
-	if (!build(builder, (const RawBytecodeDescriptor *)bwu->ir))
-		return result;
+	if (!build(builder, NULL))
+		return false;
 
 	uint64_t buffer_size = 4096;
 	void *buffer = _shared_memory->allocate(buffer_size);
 
 	builder.generate(buffer, buffer_size);
 
-	result.fn_ptr = buffer;
-	return result;
+	//bwu->fnptr =  buffer;
+	return false;
 }
 
-RegionCompilationResult WSJ::compile_region(RegionWorkUnit *rwu)
+bool WSJ::compile_region(RegionWorkUnit *rwu)
 {
-	RegionCompilationResult result;
-	result.fn_ptr = NULL;
-	result.work_unit_id = rwu->work_unit_id;
-
-	return result;
+	return false;
 }
 
-bool WSJ::build(x86::X86Builder& builder, const RawBytecodeDescriptor* bcd)
+bool WSJ::build(x86::X86Builder& builder, const TranslationBlock* tb)
 {
-	IRContext *ir = IRContext::build_context(bcd);
+	IRContext *ir = IRContext::build_context(tb);
 	DEBUG << "IR:\n" << ir->to_string();
 
 	ir::IRBlock *block = &ir->entry_block();

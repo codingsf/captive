@@ -9,6 +9,7 @@
 #define	WSJ_H
 
 #include <jit/jit.h>
+#include <shared-jit.h>
 
 namespace captive {
 	namespace engine {
@@ -41,13 +42,13 @@ namespace captive {
 			virtual BlockJIT& block_jit() override { return *this; }
 			virtual RegionJIT& region_jit() override { return *this; }
 
-			BlockCompilationResult compile_block(shared::BlockWorkUnit *bwu) override;
-			RegionCompilationResult compile_region(shared::RegionWorkUnit *rwu) override;
+			bool compile_block(shared::BlockWorkUnit *bwu) override;
+			bool compile_region(shared::RegionWorkUnit *rwu) override;
 
 		private:
 			engine::Engine& _engine;
 
-			bool build(x86::X86Builder& builder, const RawBytecodeDescriptor* bcd);
+			bool build(x86::X86Builder& builder, const shared::TranslationBlock* tb);
 			bool lower_block(x86::X86Builder& builder, IRContext& ctx, ir::IRBlock& block);
 		};
 	}

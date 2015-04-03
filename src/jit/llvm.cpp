@@ -60,94 +60,90 @@ bool LLVMJIT::init()
 	return true;
 }
 
-Value *LLVMJIT::value_for_operand(LoweringContext& ctx, const RawOperand* oper)
+Value *LLVMJIT::value_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper)
 {
-	if (oper->type == RawOperand::VREG) {
-		LoadInst *load = ctx.builder.CreateLoad(vreg_for_operand(ctx, oper));
-
-		return load;
-	} else if (oper->type == RawOperand::CONSTANT) {
+	if (oper->is_vreg()) {
+		return ctx.builder.CreateLoad(vreg_for_operand(ctx, oper));
+	} else if (oper->is_constant()) {
 		switch(oper->size) {
-		case 1: return ctx.const8(oper->val);
-		case 2: return ctx.const16(oper->val);
-		case 4: return ctx.const32(oper->val);
-		case 8: return ctx.const64(oper->val);
+		case 1: return ctx.parent.const8(oper->value);
+		case 2: return ctx.parent.const16(oper->value);
+		case 4: return ctx.parent.const32(oper->value);
+		case 8: return ctx.parent.const64(oper->value);
 		default: return NULL;
 		}
-	} else if (oper->type == RawOperand::FUNC) {
-		return ctx.const64(oper->val);
-	} else if (oper->type == RawOperand::PC) {
-		return ctx.builder.CreateLoad(ctx.pc_ptr);
+	} else if (oper->is_func()) {
+		return ctx.parent.const64(oper->value);
+	} else if (oper->is_pc()) {
+		return ctx.builder.CreateLoad(ctx.parent.pc_ptr);
 	} else {
 		return NULL;
 	}
 }
 
-Type *LLVMJIT::type_for_operand(LoweringContext& ctx, const RawOperand* oper, bool ptr)
+Type *LLVMJIT::type_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper, bool ptr)
 {
 	switch (oper->size) {
-	case 1: return ptr ? ctx.pi8 : ctx.i8;
-	case 2: return ptr ? ctx.pi16 : ctx.i16;
-	case 4: return ptr ? ctx.pi32 : ctx.i32;
-	case 8: return ptr ? ctx.pi64 : ctx.i64;
+	case 1: return ptr ? ctx.parent.pi8 : ctx.parent.i8;
+	case 2: return ptr ? ctx.parent.pi16 : ctx.parent.i16;
+	case 4: return ptr ? ctx.parent.pi32 : ctx.parent.i32;
+	case 8: return ptr ? ctx.parent.pi64 : ctx.parent.i64;
 	default: assert(false); return NULL;
 	}
 }
 
-Value *LLVMJIT::insert_vreg(LoweringContext& ctx, uint32_t idx, uint8_t size)
+Value *LLVMJIT::insert_vreg(BlockLoweringContext& ctx, uint32_t idx, uint8_t size)
 {
 	IRBuilder<> alloca_block_builder(ctx.alloca_block);
 
 	Type *vreg_type = NULL;
 	switch (size) {
-	case 1: vreg_type = ctx.i8; break;
-	case 2: vreg_type = ctx.i16; break;
-	case 4: vreg_type = ctx.i32; break;
-	case 8: vreg_type = ctx.i64; break;
+	case 1: vreg_type = ctx.parent.i8; break;
+	case 2: vreg_type = ctx.parent.i16; break;
+	case 4: vreg_type = ctx.parent.i32; break;
+	case 8: vreg_type = ctx.parent.i64; break;
 	default: assert(false); return NULL;
 	}
 
 	Value *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "r" + std::to_string(idx));
 
-	ctx.vregs[idx] = vreg_alloc;
+	ctx.ir_vregs[idx] = vreg_alloc;
 	return vreg_alloc;
 }
 
-Value *LLVMJIT::vreg_for_operand(LoweringContext& ctx, const RawOperand* oper)
+Value *LLVMJIT::vreg_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper)
 {
-	if (oper->type == RawOperand::VREG) {
-		if (ctx.vregs.find(oper->val) == ctx.vregs.end()) {
-			return insert_vreg(ctx, oper->val, oper->size);
+	if (oper->is_vreg()) {
+		auto vreg = ctx.ir_vregs.find(oper->value);
+		if (vreg == ctx.ir_vregs.end()) {
+			return insert_vreg(ctx, oper->value, oper->size);
 		} else {
-			return ctx.vregs[oper->val];
+			return vreg->second;
 		}
 	} else {
 		return NULL;
 	}
 }
 
-BasicBlock *LLVMJIT::block_for_operand(LoweringContext& ctx, const RawOperand* oper)
+BasicBlock *LLVMJIT::block_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper)
 {
-	if (oper->type == RawOperand::BLOCK) {
-		return ctx.basic_blocks[oper->val];
+	if (oper->is_block()) {
+		return ctx.ir_blocks[oper->value];
 	} else {
 		return NULL;
 	}
 }
 
-bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* bc)
+bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRInstruction *ir)
 {
 	// DEBUG << "Lowering: " << bc->render();
 
-	const RawOperand *op0 = &bc->insn.operands[0];
-	const RawOperand *op1 = &bc->insn.operands[1];
-	const RawOperand *op2 = &bc->insn.operands[2];
-	/*const RawOperand *op3 = &bc->insn.operands[3];
-	const RawOperand *op4 = &bc->insn.operands[4];
-	const RawOperand *op5 = &bc->insn.operands[5];*/
+	const shared::IROperand *op0 = &ir->operands[0];
+	const shared::IROperand *op1 = &ir->operands[1];
+	const shared::IROperand *op2 = &ir->operands[2];
 
-	switch (bc->insn.type) {
-	case RawInstruction::JMP:
+	switch (ir->type) {
+	case shared::IRInstruction::JMP:
 	{
 		BasicBlock *bb = block_for_operand(ctx, op0);
 
@@ -156,28 +152,28 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::CALL:
+	case shared::IRInstruction::CALL:
 	{
 		std::vector<Type *> param_types;
-		param_types.push_back(ctx.pi8);
+		param_types.push_back(ctx.parent.pi8);
 
 		std::vector<Value *> param_vals;
-		param_vals.push_back(ctx.cpu_obj);
+		param_vals.push_back(ctx.parent.cpu_obj);
 
 		for (int i = 1; i < 6; i++) {
-			const RawOperand *oper = &bc->insn.operands[i];
-			if (oper->type == RawOperand::NONE) continue;
+			const shared::IROperand *oper = &ir->operands[i];
+			if (oper->type == shared::IROperand::NONE) continue;
 
 			switch (oper->size) {
-			case 1: param_types.push_back(ctx.i8); param_vals.push_back(value_for_operand(ctx, oper)); break;
-			case 2: param_types.push_back(ctx.i16); param_vals.push_back(value_for_operand(ctx, oper)); break;
-			case 4: param_types.push_back(ctx.i32); param_vals.push_back(value_for_operand(ctx, oper)); break;
-			case 8: param_types.push_back(ctx.i64); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 1: param_types.push_back(ctx.parent.i8); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 2: param_types.push_back(ctx.parent.i16); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 4: param_types.push_back(ctx.parent.i32); param_vals.push_back(value_for_operand(ctx, oper)); break;
+			case 8: param_types.push_back(ctx.parent.i64); param_vals.push_back(value_for_operand(ctx, oper)); break;
 			default: assert(false);
 			}
 		}
 
-		PointerType *fntype = FunctionType::get(ctx.vtype, param_types, false)->getPointerTo(0);
+		PointerType *fntype = FunctionType::get(ctx.parent.vtype, param_types, false)->getPointerTo(0);
 		assert(fntype);
 
 		Value *fn = value_for_operand(ctx, op0);
@@ -190,15 +186,15 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::RET:
+	case shared::IRInstruction::RET:
 	{
-		return emit_block_control_flow(ctx, bc);
+		return emit_block_control_flow(ctx, ir);
 		//ctx.builder.CreateRet(ctx.const32(1));
 		//ctx.builder.CreateBr(ctx.dispatch_block);
 		//return true;
 	}
 
-	case RawInstruction::MOV:
+	case shared::IRInstruction::MOV:
 	{
 		Value *src = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
@@ -207,17 +203,17 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::ADD:
-	case RawInstruction::SUB:
-	case RawInstruction::MUL:
-	case RawInstruction::DIV:
-	case RawInstruction::MOD:
-	case RawInstruction::SHL:
-	case RawInstruction::SHR:
-	case RawInstruction::SAR:
-	case RawInstruction::AND:
-	case RawInstruction::OR:
-	case RawInstruction::XOR:
+	case shared::IRInstruction::ADD:
+	case shared::IRInstruction::SUB:
+	case shared::IRInstruction::MUL:
+	case shared::IRInstruction::DIV:
+	case shared::IRInstruction::MOD:
+	case shared::IRInstruction::SHL:
+	case shared::IRInstruction::SHR:
+	case shared::IRInstruction::SAR:
+	case shared::IRInstruction::AND:
+	case shared::IRInstruction::OR:
+	case shared::IRInstruction::XOR:
 	{
 		Value *src = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
@@ -229,20 +225,20 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		Value *rhs = src;
 
 		Value *result = NULL;
-		switch (bc->insn.type) {
-		case RawInstruction::ADD: result = ctx.builder.CreateAdd(lhs, rhs); break;
-		case RawInstruction::SUB: result = ctx.builder.CreateSub(lhs, rhs); break;
-		case RawInstruction::MUL: result = ctx.builder.CreateMul(lhs, rhs); break;
-		case RawInstruction::DIV: result = ctx.builder.CreateUDiv(lhs, rhs); break;
-		case RawInstruction::MOD: result = ctx.builder.CreateURem(lhs, rhs); break;
+		switch (ir->type) {
+		case shared::IRInstruction::ADD: result = ctx.builder.CreateAdd(lhs, rhs); break;
+		case shared::IRInstruction::SUB: result = ctx.builder.CreateSub(lhs, rhs); break;
+		case shared::IRInstruction::MUL: result = ctx.builder.CreateMul(lhs, rhs); break;
+		case shared::IRInstruction::DIV: result = ctx.builder.CreateUDiv(lhs, rhs); break;
+		case shared::IRInstruction::MOD: result = ctx.builder.CreateURem(lhs, rhs); break;
 
-		case RawInstruction::SHL: result = ctx.builder.CreateShl(lhs, rhs); break;
-		case RawInstruction::SHR: result = ctx.builder.CreateLShr(lhs, rhs); break;
-		case RawInstruction::SAR: result = ctx.builder.CreateAShr(lhs, rhs); break;
+		case shared::IRInstruction::SHL: result = ctx.builder.CreateShl(lhs, rhs); break;
+		case shared::IRInstruction::SHR: result = ctx.builder.CreateLShr(lhs, rhs); break;
+		case shared::IRInstruction::SAR: result = ctx.builder.CreateAShr(lhs, rhs); break;
 
-		case RawInstruction::AND: result = ctx.builder.CreateAnd(lhs, rhs); break;
-		case RawInstruction::OR:  result = ctx.builder.CreateOr(lhs, rhs); break;
-		case RawInstruction::XOR: result = ctx.builder.CreateXor(lhs, rhs); break;
+		case shared::IRInstruction::AND: result = ctx.builder.CreateAnd(lhs, rhs); break;
+		case shared::IRInstruction::OR:  result = ctx.builder.CreateOr(lhs, rhs); break;
+		case shared::IRInstruction::XOR: result = ctx.builder.CreateXor(lhs, rhs); break;
 
 		default: assert(false);
 		}
@@ -252,66 +248,66 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::CMPEQ:
-	case RawInstruction::CMPNE:
-	case RawInstruction::CMPLT:
-	case RawInstruction::CMPLTE:
-	case RawInstruction::CMPGT:
-	case RawInstruction::CMPGTE:
+	case shared::IRInstruction::CMPEQ:
+	case shared::IRInstruction::CMPNE:
+	case shared::IRInstruction::CMPLT:
+	case shared::IRInstruction::CMPLTE:
+	case shared::IRInstruction::CMPGT:
+	case shared::IRInstruction::CMPGTE:
 	{
 		Value *lh = value_for_operand(ctx, op0), *rh = value_for_operand(ctx, op1), *dst = vreg_for_operand(ctx, op2);
 
 		assert(lh && rh && dst);
 
 		Value *result = NULL;
-		switch(bc->insn.type) {
-		case RawInstruction::CMPEQ: result = ctx.builder.CreateICmpEQ(lh, rh); break;
-		case RawInstruction::CMPNE: result = ctx.builder.CreateICmpNE(lh, rh); break;
+		switch(ir->type) {
+		case shared::IRInstruction::CMPEQ: result = ctx.builder.CreateICmpEQ(lh, rh); break;
+		case shared::IRInstruction::CMPNE: result = ctx.builder.CreateICmpNE(lh, rh); break;
 
-		case RawInstruction::CMPLT: result = ctx.builder.CreateICmpULT(lh, rh); break;
-		case RawInstruction::CMPLTE: result = ctx.builder.CreateICmpULE(lh, rh); break;
+		case shared::IRInstruction::CMPLT: result = ctx.builder.CreateICmpULT(lh, rh); break;
+		case shared::IRInstruction::CMPLTE: result = ctx.builder.CreateICmpULE(lh, rh); break;
 
-		case RawInstruction::CMPGT: result = ctx.builder.CreateICmpUGT(lh, rh); break;
-		case RawInstruction::CMPGTE: result = ctx.builder.CreateICmpUGE(lh, rh); break;
+		case shared::IRInstruction::CMPGT: result = ctx.builder.CreateICmpUGT(lh, rh); break;
+		case shared::IRInstruction::CMPGTE: result = ctx.builder.CreateICmpUGE(lh, rh); break;
 
 		default: assert(false);
 		}
 
-		result = ctx.builder.CreateCast(Instruction::ZExt, result, ctx.i8);
+		result = ctx.builder.CreateCast(Instruction::ZExt, result, ctx.parent.i8);
 		ctx.builder.CreateStore(result, dst);
 
 		return true;
 	}
 
-	case RawInstruction::CLZ:
+	case shared::IRInstruction::CLZ:
 	{
 		std::vector<Type *> params;
-		params.push_back(ctx.i32);
-		params.push_back(ctx.i1);
+		params.push_back(ctx.parent.i32);
+		params.push_back(ctx.parent.i1);
 
-		FunctionType *fntype = FunctionType::get(ctx.i32, params, false);
+		FunctionType *fntype = FunctionType::get(ctx.parent.i32, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("llvm.ctlz.i32", fntype);
 		assert(fn);
 
 		Value *src = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 		assert(src && dst);
 
-		Value *result = ctx.builder.CreateCall2(fn, src, ctx.const1(0));
+		Value *result = ctx.builder.CreateCall2(fn, src, ctx.parent.const1(0));
 		ctx.builder.CreateStore(result, dst);
 
 		return true;
 	}
 
-	case RawInstruction::SX:
-	case RawInstruction::ZX:
-	case RawInstruction::TRUNC:
+	case shared::IRInstruction::SX:
+	case shared::IRInstruction::ZX:
+	case shared::IRInstruction::TRUNC:
 	{
 		Value *src = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
 		Instruction::CastOps op = Instruction::Trunc;
-		if (bc->insn.type == RawInstruction::SX) {
+		if (ir->type == shared::IRInstruction::SX) {
 			op = Instruction::SExt;
-		} else if (bc->insn.type == RawInstruction::ZX) {
+		} else if (ir->type == shared::IRInstruction::ZX) {
 			op = Instruction::ZExt;
 		}
 
@@ -319,15 +315,15 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::READ_REG:
+	case shared::IRInstruction::READ_REG:
 	{
 		Value *offset = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
 		assert(offset && dst);
 
-		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.i64);
+		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.parent.i64);
 
-		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.reg_state, offset), type_for_operand(ctx, op1, true));
+		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.parent.reg_state, offset), type_for_operand(ctx, op1, true));
 		set_aa_metadata(regptr, TAG_CLASS_REGISTER);
 
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(regptr), dst);
@@ -335,15 +331,15 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::WRITE_REG:
+	case shared::IRInstruction::WRITE_REG:
 	{
 		Value *offset = value_for_operand(ctx, op1), *val = value_for_operand(ctx, op0);
 
 		assert(offset && val);
 
-		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.i64);
+		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.parent.i64);
 
-		Value *regptr = ctx.builder.CreateAdd(ctx.reg_state, offset);
+		Value *regptr = ctx.builder.CreateAdd(ctx.parent.reg_state, offset);
 		regptr = ctx.builder.CreateIntToPtr(regptr, type_for_operand(ctx, op0, true));
 		set_aa_metadata(regptr, TAG_CLASS_REGISTER);
 
@@ -352,7 +348,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::READ_MEM:
+	case shared::IRInstruction::READ_MEM:
 	{
 		Value *addr = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
 
@@ -369,7 +365,7 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::WRITE_MEM:
+	case shared::IRInstruction::WRITE_MEM:
 	{
 		Value *addr = value_for_operand(ctx, op1), *src = value_for_operand(ctx, op0);
 
@@ -383,21 +379,21 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		return true;
 	}
 
-	case RawInstruction::CMOV: assert(false && "Unsupported CMOV"); return false;
+	case shared::IRInstruction::CMOV: assert(false && "Unsupported CMOV"); return false;
 
-	case RawInstruction::LDPC:
+	case shared::IRInstruction::LDPC:
 	{
 		// TODO: Optimise this
 		Value *dst = vreg_for_operand(ctx, op0);
 
 		assert(dst);
 
-		ctx.builder.CreateStore(ctx.builder.CreateLoad(ctx.pc_ptr), dst);
+		ctx.builder.CreateStore(ctx.builder.CreateLoad(ctx.parent.pc_ptr), dst);
 
 		return true;
 	}
 
-	case RawInstruction::BRANCH:
+	case shared::IRInstruction::BRANCH:
 	{
 		Value *cond = value_for_operand(ctx, op0);
 		BasicBlock *bbt = block_for_operand(ctx, op1);
@@ -405,46 +401,46 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 
 		assert(cond && bbt && bbf);
 
-		cond = ctx.builder.CreateCast(Instruction::Trunc, cond, ctx.i1);
+		cond = ctx.builder.CreateCast(Instruction::Trunc, cond, ctx.parent.i1);
 		ctx.builder.CreateCondBr(cond, bbt, bbf);
 
 		return true;
 	}
 
-	case RawInstruction::NOP: return true;
+	case shared::IRInstruction::NOP: return true;
 
-	case RawInstruction::TRAP: {
+	case shared::IRInstruction::TRAP: {
 		std::vector<Type *> params;
-		params.push_back(ctx.pi8);
+		params.push_back(ctx.parent.pi8);
 
-		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_trap", fntype);
 
 		assert(fn);
 
-		ctx.builder.CreateCall(fn, ctx.cpu_obj);
+		ctx.builder.CreateCall(fn, ctx.parent.cpu_obj);
 		return true;
 	}
 
-	case RawInstruction::VERIFY: {
+	case shared::IRInstruction::VERIFY: {
 		std::vector<Type *> params;
-		params.push_back(ctx.pi8);
+		params.push_back(ctx.parent.pi8);
 
-		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_verify", fntype);
 
 		assert(fn);
 
-		ctx.builder.CreateCall(fn, ctx.cpu_obj);
+		ctx.builder.CreateCall(fn, ctx.parent.cpu_obj);
 		return true;
 	}
 
-	case RawInstruction::SET_CPU_MODE: {
+	case shared::IRInstruction::SET_CPU_MODE: {
 		std::vector<Type *> params;
-		params.push_back(ctx.pi8);
-		params.push_back(ctx.i8);
+		params.push_back(ctx.parent.pi8);
+		params.push_back(ctx.parent.i8);
 
-		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_set_mode", fntype);
 
 		assert(fn);
@@ -452,18 +448,18 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		Value *v1 = value_for_operand(ctx, op0);
 		assert(v1);
 
-		ctx.builder.CreateCall2(fn, ctx.cpu_obj, v1);
+		ctx.builder.CreateCall2(fn, ctx.parent.cpu_obj, v1);
 		return true;
 	}
 
-	case RawInstruction::WRITE_DEVICE: {
+	case shared::IRInstruction::WRITE_DEVICE: {
 		std::vector<Type *> params;
-		params.push_back(ctx.pi8);
-		params.push_back(ctx.i32);
-		params.push_back(ctx.i32);
-		params.push_back(ctx.i32);
+		params.push_back(ctx.parent.pi8);
+		params.push_back(ctx.parent.i32);
+		params.push_back(ctx.parent.i32);
+		params.push_back(ctx.parent.i32);
 
-		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_write_device", fntype);
 
 		assert(fn);
@@ -475,18 +471,18 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		Value *v3 = value_for_operand(ctx, op2);
 		assert(v3);
 
-		ctx.builder.CreateCall4(fn, ctx.cpu_obj, v1, v2, v3);
+		ctx.builder.CreateCall4(fn, ctx.parent.cpu_obj, v1, v2, v3);
 		return true;
 	}
 
-	case RawInstruction::READ_DEVICE: {
+	case shared::IRInstruction::READ_DEVICE: {
 		std::vector<Type *> params;
-		params.push_back(ctx.pi8);
-		params.push_back(ctx.i32);
-		params.push_back(ctx.i32);
-		params.push_back(ctx.pi32);
+		params.push_back(ctx.parent.pi8);
+		params.push_back(ctx.parent.i32);
+		params.push_back(ctx.parent.i32);
+		params.push_back(ctx.parent.pi32);
 
-		FunctionType *fntype = FunctionType::get(ctx.vtype, params, false);
+		FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
 		Constant *fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("cpu_read_device", fntype);
 
 		assert(fn);
@@ -498,21 +494,33 @@ bool LLVMJIT::lower_bytecode(LoweringContext& ctx, const Blo const RawBytecode* 
 		Value *v3 = vreg_for_operand(ctx, op2);
 		assert(v3);
 
-		ctx.builder.CreateCall4(fn, ctx.cpu_obj, v1, v2, v3);
+		ctx.builder.CreateCall4(fn, ctx.parent.cpu_obj, v1, v2, v3);
 		return true;
 	}
 
-	case RawInstruction::INVALID: assert(false && "Invalid Instruction"); return false;
+	case shared::IRInstruction::INVALID: assert(false && "Invalid Instruction"); return false;
 
 	default:
-		ERROR << "Unhandled Instruction: " << bc->insn.type;
+		ERROR << "Unhandled Instruction: " << ir->type;
 		assert(false && "Unhandled Instruction"); return false;
 	}
 }
 
-bool LLVMJIT::emit_block_control_flow(LoweringContext& ctx, const RawBytecode* bc)
+bool LLVMJIT::emit_block_control_flow(BlockLoweringContext& ctx, const shared::IRInstruction* ir)
 {
-	ctx.
+	ctx.builder.CreateBr(ctx.parent.dispatch_block);
+	return true;
+}
+
+bool LLVMJIT::emit_interrupt_check(BlockLoweringContext& ctx)
+{
+	std::vector<Type *> params;
+	params.push_back(ctx.parent.pi8);
+
+	FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
+	Constant *fn = ctx.parent.region_fn->getParent()->getOrInsertFunction("cpu_check_interrupts", fntype);
+	ctx.builder.CreateCall(fn, ctx.parent.cpu_obj);
+
 	return true;
 }
 

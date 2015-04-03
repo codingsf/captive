@@ -1,24 +1,26 @@
 #include <jit/ir.h>
+#include <shared-jit.h>
 
 #include <sstream>
 
 using namespace captive::jit;
 using namespace captive::jit::ir;
+//using namespace captive::shared;
 
-/*IRContext::IRContext()
+IRContext::IRContext()
 {
 
 }
 
-IRContext *IRContext::build_context(const RawBytecodeDescriptor* bcd)
+IRContext *IRContext::build_context(const shared::TranslationBlock* tb)
 {
 	IRContext *ctx = new IRContext();
 
-	for (uint32_t idx = 0; idx < bcd->bytecode_count; idx++) {
-		const RawBytecode *bc = &bcd->bc[idx];
+	for (uint32_t idx = 0; idx < 0; idx++) {
+		const shared::IRInstruction *rinsn = NULL;
 
-		IRBlock& block = ctx->get_or_create_block(bc->block_id);
-		IRInstruction *insn = IRInstruction::create_from_bytecode(*ctx, block, bc);
+		IRBlock& block = ctx->get_or_create_block(rinsn->ir_block);
+		IRInstruction *insn = IRInstruction::create_from_instruction(*ctx, block, rinsn);
 
 		block.append_instruction(insn);
 	}
@@ -119,42 +121,42 @@ ir::IRRegister& IRContext::get_or_create_vreg(uint32_t id, uint8_t size)
 	return *reg;
 }
 
-IRInstruction* IRInstruction::create_from_bytecode(IRContext& ctx, IRBlock& owner, const RawBytecode* bc)
+IRInstruction* IRInstruction::create_from_instruction(IRContext& ctx, IRBlock& owner, const shared::IRInstruction *bc)
 {
 	IRInstruction *insn = NULL;
 
-	switch (bc->insn.type) {
-	case RawInstruction::MOV:
+	switch (bc->type) {
+	case shared::IRInstruction::MOV:
 		insn = new instructions::Move(
 			owner,
-			*IROperand::create_from_bytecode(ctx, &bc->insn.operands[0]),
-			*IROperand::create_from_bytecode(ctx, &bc->insn.operands[1]));
+			*IROperand::create_from_bytecode(ctx, &bc->operands[0]),
+			*IROperand::create_from_bytecode(ctx, &bc->operands[1]));
 		break;
 
-	case RawInstruction::CALL:
-		insn = new instructions::Call(owner, *IROperand::create_from_bytecode(ctx, &bc->insn.operands[0]));
+	case shared::IRInstruction::CALL:
+		insn = new instructions::Call(owner, *IROperand::create_from_bytecode(ctx, &bc->operands[0]));
 		break;
 
-	case RawInstruction::JMP:
-		insn = new instructions::Jump(owner, *IROperand::create_from_bytecode(ctx, &bc->insn.operands[0]));
+	case shared::IRInstruction::JMP:
+		insn = new instructions::Jump(owner, *IROperand::create_from_bytecode(ctx, &bc->operands[0]));
 		break;
 
-	case RawInstruction::RET:
+	case shared::IRInstruction::RET:
 		insn = new instructions::Return(owner);
 		break;
 
-	case RawInstruction::READ_REG:
+	case shared::IRInstruction::READ_REG:
 		insn = new instructions::RegisterLoad(
 			owner,
-			*IROperand::create_from_bytecode(ctx, &bc->insn.operands[0]),
-			*IROperand::create_from_bytecode(ctx, &bc->insn.operands[1]));
+			*IROperand::create_from_bytecode(ctx, &bc->operands[0]),
+			*IROperand::create_from_bytecode(ctx, &bc->operands[1]));
 		break;
 
-	case RawInstruction::WRITE_REG:
+	case shared::IRInstruction::WRITE_REG:
 		insn = new instructions::RegisterStore(
 			owner,
-			*IROperand::create_from_bytecode(ctx, &bc->insn.operands[0]),
-			*IROperand::create_from_bytecode(ctx, &bc->insn.operands[1]));
+			*IROperand::create_from_bytecode(ctx, &bc->operands[0]),
+			*IROperand::create_from_bytecode(ctx, &bc->operands[1]));
 		break;
 
 	default:
@@ -165,25 +167,25 @@ IRInstruction* IRInstruction::create_from_bytecode(IRContext& ctx, IRBlock& owne
 	return insn;
 }
 
-IROperand* IROperand::create_from_bytecode(IRContext& ctx, const RawOperand* op)
+IROperand* IROperand::create_from_bytecode(IRContext& ctx, const shared::IROperand* op)
 {
 	IROperand *oper = NULL;
 
 	switch (op->type) {
-	case RawOperand::VREG:
-		oper = new operands::RegisterOperand(ctx.get_or_create_vreg(op->val, op->size));
+	case shared::IROperand::VREG:
+		oper = new operands::RegisterOperand(ctx.get_or_create_vreg(op->value, op->size));
 		break;
 
-	case RawOperand::CONSTANT:
-		oper = new operands::ImmediateOperand(op->val, op->size);
+	case shared::IROperand::CONSTANT:
+		oper = new operands::ImmediateOperand(op->value, op->size);
 		break;
 
-	case RawOperand::BLOCK:
-		oper = new operands::BlockOperand(ctx.get_or_create_block(op->val));
+	case shared::IROperand::BLOCK:
+		oper = new operands::BlockOperand(ctx.get_or_create_block(op->value));
 		break;
 
-	case RawOperand::FUNC:
-		oper = new operands::FunctionOperand((void *)op->val);
+	case shared::IROperand::FUNC:
+		oper = new operands::FunctionOperand((void *)op->value);
 		break;
 
 	default:
@@ -199,4 +201,3 @@ void TerminatorIRInstruction::add_destination(IRBlock& block)
 	owner().add_successor(block);
 	block.add_predecessor(owner());
 }
-*/

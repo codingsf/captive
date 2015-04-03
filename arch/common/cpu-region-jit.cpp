@@ -119,71 +119,22 @@ void CPU::compile_region(Region& rgn)
 
 	rgn.set_work_unit(rwu);
 
-	rwu->blocks = (TranslationBlocks *)Memory::shared_memory().allocate(sizeof(*rwu->blocks));
-	assert(rwu->blocks);
-
-	rwu->blocks->block_count = 0;
-
-	// TODO: Don't hard-code this
-	rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().allocate(sizeof(TranslationBlockDescriptor) * 1024);
-	assert(rwu->blocks->descriptors);
-
-	TranslationContext ctx(Memory::shared_memory());
-	uint8_t decode_data[128];
-	Decode *insn = (Decode *)&decode_data[0];
-
 	rwu->region_base_address = (uint32_t)rgn.address();
 	rwu->work_unit_id = rgn.generation();
 
-	//printf("compiling region %x\n", rgn.address());
+	rwu->block_count = 0;
+	rwu->blocks = NULL;
+
+	// Loop over each block in the region.
 	for (auto block : rgn) {
-		// Make sure we start this GBB in a new IRBB
-		ctx.current_block(ctx.alloc_block());
+		rwu->blocks = (TranslationBlock *)Memory::shared_memory().reallocate(rwu->blocks, sizeof(TranslationBlock) * (rwu->block_count + 1));
 
-		//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
+		if (!compile_block(*block.second, rwu->blocks[rwu->block_count])) {
+			assert(false);
+		}
 
-		//rwu->blocks->descriptors = (TranslationBlockDescriptor *)Memory::shared_memory().reallocate(rwu->blocks->descriptors, sizeof(*rwu->blocks->descriptors) * (rwu->blocks->block_count + 1));
-		rwu->blocks->descriptors[rwu->blocks->block_count].block_id = ctx.current_block();
-		rwu->blocks->descriptors[rwu->blocks->block_count].block_addr = block.second->address();
-		rwu->blocks->descriptors[rwu->blocks->block_count].heat = block.second->interp_count();
-		rwu->blocks->descriptors[rwu->blocks->block_count].entry = block.second->entry_block() ? 1 : 0;
-		rwu->blocks->block_count++;
-
-		uint32_t pc = block.second->address();
-		do {
-			// Attempt to decode the current instruction.
-			if (!decode_instruction_phys(pc, insn)) {
-				printf("cpu: unhandled decode fault @ %08x\n", pc);
-				assert(false);
-			}
-
-			//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
-
-			if (unlikely(cpu_data().verify_enabled)) {
-				ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
-			}
-
-			// Translate this instruction into the context.
-			if (!jit().translate(insn, ctx)) {
-				rgn.invalidate();
-
-				Memory::shared_memory().free(rwu->blocks->descriptors);
-				Memory::shared_memory().free(rwu->blocks);
-				Memory::shared_memory().free(rwu->ir);
-				Memory::shared_memory().free(rwu);
-
-				return;
-			}
-
-			pc += insn->length;
-		} while (!insn->end_of_block);
-
-		// Finish off with a RET.
-		ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
+		rwu->block_count++;
 	}
-
-	// Fill in the RWU with the IR buffer
-	rwu->ir = ctx.buffer();
 
 	// Validate the RWU
 	rwu->valid = true;
@@ -191,6 +142,51 @@ void CPU::compile_region(Region& rgn)
 	// Make region translation hypercall
 	printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
+}
+
+bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock& tb)
+{
+	using namespace captive::shared;
+
+	TranslationContext ctx(Memory::shared_memory(), tb);
+	uint8_t decode_data[128];
+	Decode *insn = (Decode *)&decode_data[0];
+
+	// We MUST begin in block zero.
+	assert(ctx.current_block() == 0);
+
+	//printf("  generating block %x id=%d heat=%d\n", block.second->address(), ctx.current_block(), block.second->interp_count());
+
+	tb.block_addr = block.address();
+	tb.heat = block.interp_count();
+	tb.is_entry = block.entry_block() ? 1 : 0;
+
+	uint32_t pc = block.address();
+	do {
+		// Attempt to decode the current instruction.
+		if (!decode_instruction_phys(pc, insn)) {
+			printf("cpu: unhandled decode fault @ %08x\n", pc);
+			assert(false);
+		}
+
+		//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+
+		if (unlikely(cpu_data().verify_enabled)) {
+			ctx.add_instruction(IRInstruction::verify());
+		}
+
+		// Translate this instruction into the context.
+		if (!jit().translate(insn, ctx)) {
+			return false;
+		}
+
+		pc += insn->length;
+	} while (!insn->end_of_block);
+
+	// Finish off with a RET.
+	ctx.add_instruction(IRInstruction::ret());
+
+	return true;
 }
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
@@ -202,16 +198,17 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 	if (rwu->function_addr) {
 		if (rwu->work_unit_id < rgn.generation()) {
 			printf("jit: discarding stale translation, rwu %08x gen=%d cur gen=%d\n", rwu->region_base_address, rwu->work_unit_id, rgn.generation());
+			Memory::shared_memory().free((void *)rwu->function_addr);
 		} else {
 			Translation *txln = new Translation((Translation::translation_fn_t)rwu->function_addr);
 
 			rgn.translation(txln);
 
 			// Only register entry blocks
-			for (int i = 0; i < rwu->blocks->block_count; i++) {
-				if (rwu->blocks->descriptors[i].entry) {
+			for (int i = 0; i < rwu->block_count; i++) {
+				if (rwu->blocks[i].is_entry) {
 					//printf("jit: registering block %08x\n", rwu->blocks->descriptors[i].block_addr);
-					rgn.get_block(rwu->blocks->descriptors[i].block_addr).translation(txln);
+					rgn.get_block(rwu->blocks[i].block_addr).translation(txln);
 				}
 			}
 		}
@@ -219,10 +216,11 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 
 	rgn.set_work_unit(NULL);
 
-	Memory::shared_memory().free(rwu->blocks->descriptors);
+	for (int i = 0; i < rwu->block_count; i++) {
+		Memory::shared_memory().free(rwu->blocks[i].ir_insn);
+	}
+
 	Memory::shared_memory().free(rwu->blocks);
-	Memory::shared_memory().free(rwu->ir);
-	Memory::shared_memory().free(rwu);
 
 	rgn.status(Region::NOT_IN_TRANSLATION);
 }

@@ -8,7 +8,6 @@
 #include <safepoint.h>
 #include <priv.h>
 #include <jit.h>
-#include <jit/guest-basic-block.h>
 #include <jit/translation-context.h>
 #include <profile/image.h>
 
@@ -139,49 +138,7 @@ bool CPU::run_block_jit()
 
 	printf("cpu: starting block-jit cpu execution\n");
 
-	if (!check_safepoint()) {
-		return false;
-	}
-
-	printf("w: %x\n", read_pc());
-
-	do {
-		// Check the ISR to determine if there is an interrupt pending,
-		// and if there is, instruct the interpreter to handle it.
-		if (unlikely(cpu_data().isr)) {
-			interpreter().handle_irq(cpu_data().isr);
-		}
-
-		// Check to see if there are any pending actions coming in from
-		// the hypervisor.
-		if (unlikely(cpu_data().async_action)) {
-			if (handle_pending_action(cpu_data().async_action)) {
-				cpu_data().async_action = 0;
-			}
-		}
-
-		uint32_t pc = read_pc();
-
-		jit::GuestBasicBlock *block = get_block(pc);
-		if (block->block_address() != pc) {
-			if (block->valid()) block->release_memory();
-
-			printf("jit: compiling at %x\n", pc);
-			if (!compile_basic_block(pc, block)) {
-				printf("jit: compilation of block %08x failed\n", pc);
-				abort();
-			}
-		}
-
-		mmu().set_page_executed(pc);
-
-		// Execute the block, with interrupts disabled.
-		__local_irq_disable();
-		step_ok = block->execute(this, reg_state());
-		__local_irq_enable();
-	} while(step_ok);
-
-	return true;
+	return false;
 }
 
 bool CPU::interpret_block()
@@ -255,84 +212,6 @@ void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base
 			block->invalidate();
 		}
 	}*/
-}
-
-GuestBasicBlock* CPU::get_basic_block(uint32_t block_addr)
-{
-	GuestBasicBlock *cache_slot = get_block(block_addr);
-
-	if (cache_slot->block_address() == 0 || cache_slot->block_address() != block_addr) {
-		if (cache_slot->block_address() != 0) {
-			printf("jit: evicting %x\n", cache_slot->block_address());
-			cache_slot->release_memory();
-		}
-
-		if (!compile_basic_block(block_addr, cache_slot)) {
-			return NULL;
-		}
-	}
-
-	/*GuestBasicBlock *cache_slot = &basic_block_cache[0].bb[0];
-	if (cache_slot->block_address() != block_addr) {
-		if (!compile_basic_block(block_addr, cache_slot)) {
-			return NULL;
-		}
-	}*/
-
-	return cache_slot;
-}
-
-bool CPU::compile_basic_block(uint32_t block_addr, GuestBasicBlock *block)
-{
-/*	TranslationContext ctx(cpu_data().guest_data->ir_buffer, cpu_data().guest_data->ir_buffer_size, 0, (uint64_t)cpu_data().guest_data->code_buffer);
-	uint8_t decode_data[128];
-	Decode *insn = (Decode *)&decode_data[0];
-
-	//printf("jit: translating block %08x\n", block_addr);
-	uint32_t pc = block_addr;
-	do {
-		// Attempt to decode the current instruction.
-		if (!decode_instruction_virt(pc, insn)) {
-			printf("cpu: unhandled decode fault @ %08x\n", pc);
-			return false;
-		}
-
-		//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
-
-		// If verification is enabled, emit a PC update and a VERIFY
-		// opcode.
-		if (unlikely(cpu_data().verify_enabled)) {
-			ctx.add_instruction(jit::IRInstructionBuilder::create_streg(jit::IRInstructionBuilder::create_constant32(insn->pc), jit::IRInstructionBuilder::create_constant32(60)));
-			ctx.add_instruction(jit::IRInstructionBuilder::create_verify());
-		}
-
-		// Translate this instruction into the context.
-		if (!jit().translate(insn, ctx)) {
-			printf("jit: instruction translation failed\n");
-			return false;
-		}
-
-		pc += insn->length;
-	} while (!insn->end_of_block);
-
-	// Finish off with a RET.
-	ctx.add_instruction(jit::IRInstructionBuilder::create_ret());
-
-	// TODO: Thread jumps.
-
-	// Compile the translation context, and retrieve a function pointer.
-	GuestBasicBlock::GuestBasicBlockFn fn = ctx.compile();
-
-	// If compilation succeeded, update the GBB structure.
-	if (fn) {
-		block->update(block_addr, fn, 0);
-		return true;
-	} else {
-		block->invalidate();
-		return false;
-	}*/
-	
-	return false;
 }
 
 bool CPU::verify_check()

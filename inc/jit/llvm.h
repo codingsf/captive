@@ -13,6 +13,8 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/PassManager.h>
 
+#include <shared-jit.h>
+
 #include <map>
 
 namespace captive {
@@ -26,7 +28,6 @@ namespace captive {
 
 	namespace jit {
 		class LLVMJITMemoryManager;
-		class Allocator;
 
 		class LLVMJIT : public JIT, public BlockJIT, public RegionJIT {
 		public:
@@ -50,11 +51,11 @@ namespace captive {
 
 				llvm::IRBuilder<>& builder;
 
-				llvm::BasicBlock *alloca_block;
+				llvm::Function *region_fn;
+
 				llvm::BasicBlock *dispatch_block;
 
-				std::map<uint32_t, llvm::BasicBlock *> basic_blocks;
-				std::map<uint32_t, llvm::Value *> vregs;
+				std::map<uint32_t, llvm::BasicBlock *> guest_block_entries;
 
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
@@ -94,6 +95,19 @@ namespace captive {
 				}
 			};
 
+			struct BlockLoweringContext
+			{
+				LoweringContext& parent;
+				llvm::IRBuilder<>& builder;
+
+				llvm::BasicBlock *alloca_block;
+
+				std::map<uint32_t, llvm::Value *> ir_vregs;
+				std::map<uint32_t, llvm::BasicBlock *> ir_blocks;
+
+				BlockLoweringContext(LoweringContext& parent) : parent(parent), builder(parent.builder) { }
+			};
+
 			enum metadata_tags
 			{
 				TAG_CLASS_MEMORY  = 1,
@@ -104,14 +118,16 @@ namespace captive {
 			bool add_pass(llvm::PassManagerBase *pm, llvm::Pass *pass);
 			bool initialise_pass_manager(llvm::PassManagerBase *pm);
 
-			llvm::Value *insert_vreg(LoweringContext& ctx, uint32_t idx, uint8_t size);
-			llvm::Value *value_for_operand(LoweringContext& ctx, const RawOperand* oper);
-			llvm::Type *type_for_operand(LoweringContext& ctx, const RawOperand* oper, bool ptr = false);
-			llvm::Value *vreg_for_operand(LoweringContext& ctx, const RawOperand* oper);
-			llvm::BasicBlock *block_for_operand(LoweringContext& ctx, const RawOperand* oper);
+			llvm::Value *insert_vreg(BlockLoweringContext& ctx, uint32_t idx, uint8_t size);
+			llvm::Value *value_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper);
+			llvm::Type *type_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper, bool ptr = false);
+			llvm::Value *vreg_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper);
+			llvm::BasicBlock *block_for_operand(BlockLoweringContext& ctx, const shared::IROperand* oper);
 
-			bool lower_bytecode(LoweringContext& ctx, const RawBytecode* bc);
-			bool emit_block_control_flow(LoweringContext& ctx, const RawBytecode* bc);
+			bool lower_block(LoweringContext& ctx, const shared::TranslationBlock *block);
+			bool lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRInstruction *insn);
+			bool emit_block_control_flow(BlockLoweringContext& ctx, const shared::IRInstruction *insn);
+			bool emit_interrupt_check(BlockLoweringContext& ctx);
 		};
 	}
 }

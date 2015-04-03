@@ -14,7 +14,7 @@ DECLARE_CONTEXT(JIT);
 using namespace captive::jit;
 using namespace captive::shared;
 
-std::string RawOperand::render() const
+/*std::string RawOperand::render() const
 {
 	switch(type) {
 	case CONSTANT:
@@ -153,7 +153,7 @@ std::string RawBytecode::render() const
 	}
 
 	return str.str();
-}
+}*/
 
 JIT::JIT(util::ThreadPool& worker_threads) : _worker_threads(worker_threads), _shared_memory(NULL)
 {
@@ -222,7 +222,7 @@ static uint64_t do_compile_region(void *odata)
 {
 	RegionAsyncCompilation *data = (RegionAsyncCompilation *)odata;
 
-	RegionCompilationResult result = data->jit()->compile_region(data->region_work_unit());
+	bool result = data->jit()->compile_region(data->region_work_unit());
 	data->completion()(data->region_work_unit(), result, data->completion_data());
 
 	delete data;
@@ -235,57 +235,57 @@ void RegionJIT::compile_region_async(RegionWorkUnit *rwu, region_completion_t co
 	owner().worker_threads().queue_work(do_compile_region, NULL, data);
 }
 
-bool JIT::quick_opt(RawBytecode* bcarr, uint32_t count)
+bool JIT::quick_opt(TranslationBlock* tb)
 {
-	std::set<uint32_t> blocks;
-	std::unordered_multimap<uint32_t, uint32_t> block_succs;
-	std::unordered_multimap<uint32_t, uint32_t> block_preds;
-	std::unordered_map<uint32_t, RawBytecode *> block_terminators;
+	std::set<IRBlockId> blocks;
+	std::unordered_multimap<IRBlockId, IRBlockId> block_succs;
+	std::unordered_multimap<IRBlockId, IRBlockId> block_preds;
+	std::unordered_map<IRBlockId, IRInstruction *> block_terminators;
 
 	// Remove useless instructions, and build a block predecessor/successor map while we're at it.
-	for (uint32_t i = 0; i < count; i++) {
-		RawBytecode *bc = (RawBytecode *)&bcarr[i];
+	for (uint32_t i = 0; i < tb->ir_insn_count; i++) {
+		IRInstruction *insn = (IRInstruction *)&tb->ir_insn[i];
 
-		blocks.insert(bc->block_id);
+		blocks.insert(insn->ir_block);
 
-		switch (bc->insn.type) {
-		case RawInstruction::ADD:
-		case RawInstruction::SUB:
-		case RawInstruction::SAR:
-		case RawInstruction::SHR:
-		case RawInstruction::SHL:
-		case RawInstruction::OR:
-		case RawInstruction::XOR:
-			if (bc->insn.operands[0].type == RawOperand::CONSTANT && bc->insn.operands[0].val == 0) {
-				bc->insn.type = RawInstruction::NOP;
+		switch (insn->type) {
+		case IRInstruction::ADD:
+		case IRInstruction::SUB:
+		case IRInstruction::SAR:
+		case IRInstruction::SHR:
+		case IRInstruction::SHL:
+		case IRInstruction::OR:
+		case IRInstruction::XOR:
+			if (insn->operands[0].type == IROperand::CONSTANT && insn->operands[0].value == 0) {
+				insn->type = IRInstruction::NOP;
 			}
 			break;
 
-		case RawInstruction::MUL:
-		case RawInstruction::DIV:
-			if (bc->insn.operands[0].type == RawOperand::CONSTANT && bc->insn.operands[0].val == 1) {
-				bc->insn.type = RawInstruction::NOP;
+		case IRInstruction::MUL:
+		case IRInstruction::DIV:
+			if (insn->operands[0].type == IROperand::CONSTANT && insn->operands[0].value == 1) {
+				insn->type = IRInstruction::NOP;
 			}
 			break;
 
-		case RawInstruction::JMP:
-			assert(bc->insn.operands[0].type == RawOperand::BLOCK);
+		case IRInstruction::JMP:
+			assert(insn->operands[0].type == IROperand::BLOCK);
 
-			block_succs.emplace((uint32_t)bc->block_id, (uint32_t)bc->insn.operands[0].val);
-			block_preds.emplace((uint32_t)bc->insn.operands[0].val, (uint32_t)bc->block_id);
-			block_terminators[(uint32_t)bc->block_id] = bc;
+			block_succs.emplace((IRBlockId)insn->ir_block, (IRBlockId)insn->operands[0].value);
+			block_preds.emplace((IRBlockId)insn->operands[0].value, (IRBlockId)insn->ir_block);
+			block_terminators[insn->ir_block] = insn;
 
 			break;
 
-		case RawInstruction::BRANCH:
-			assert(bc->insn.operands[1].type == RawOperand::BLOCK);
-			assert(bc->insn.operands[2].type == RawOperand::BLOCK);
+		case IRInstruction::BRANCH:
+			assert(insn->operands[1].type == IROperand::BLOCK);
+			assert(insn->operands[2].type == IROperand::BLOCK);
 
-			block_succs.emplace((uint32_t)bc->block_id, (uint32_t)bc->insn.operands[1].val);
-			block_succs.emplace((uint32_t)bc->block_id, (uint32_t)bc->insn.operands[2].val);
+			block_succs.emplace((IRBlockId)insn->ir_block, (IRBlockId)insn->operands[1].value);
+			block_succs.emplace((IRBlockId)insn->ir_block, (IRBlockId)insn->operands[2].value);
 
-			block_preds.emplace((uint32_t)bc->insn.operands[1].val, (uint32_t)bc->block_id);
-			block_preds.emplace((uint32_t)bc->insn.operands[2].val, (uint32_t)bc->block_id);
+			block_preds.emplace((IRBlockId)insn->operands[1].value, (IRBlockId)insn->ir_block);
+			block_preds.emplace((IRBlockId)insn->operands[2].value, (IRBlockId)insn->ir_block);
 
 			break;
 

@@ -44,6 +44,13 @@ namespace captive {
 					return _block.ir_reg_count++;
 				}
 
+				inline void cancel() {
+					_block.ir_insn_count = 0;
+					_block.ir_reg_count = 0;
+					_block.ir_block_count = 0;
+					_allocator.free(_block.ir_insn);
+				}
+
 			private:
 				SharedMemory& _allocator;
 				shared::TranslationBlock& _block;

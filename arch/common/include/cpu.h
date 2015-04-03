@@ -25,16 +25,14 @@
 namespace captive {
 	namespace shared {
 		struct RegionWorkUnit;
+		struct TranslationBlock;
 	}
 
 	namespace arch {
-		namespace jit {
-			class GuestBasicBlock;
-		}
-
 		namespace profile {
 			class Image;
 			class Region;
+			class Block;
 		}
 
 		class Environment;
@@ -154,23 +152,17 @@ namespace captive {
 				return (Decode *)&decode_cache[((pc >> 2) % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
 			}
 
-			inline jit::GuestBasicBlock *get_block(uint32_t pc) const {
-				return (jit::GuestBasicBlock *)&block_cache[((pc >> 2) % BLOCK_CACHE_ENTRIES) * BLOCK_OBJ_SIZE];
-			}
-
 			bool check_safepoint();
 			bool run_interp();
 			bool run_block_jit();
 			bool run_region_jit();
-
-			jit::GuestBasicBlock *get_basic_block(uint32_t block_addr);
-			bool compile_basic_block(uint32_t block_addr, jit::GuestBasicBlock *block);
 
 			bool handle_pending_action(uint32_t action);
 			bool interpret_block();
 
 			void analyse_regions();
 			void compile_region(profile::Region& rgn);
+			bool compile_block(profile::Block& block, shared::TranslationBlock& tb);
 		};
 	}
 }

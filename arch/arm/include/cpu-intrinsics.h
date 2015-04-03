@@ -75,7 +75,8 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 #define set_cpu_mode(_v) cpu.state.isa_mode = _v
 #define get_cpu_mode() cpu.state.isa_mode
 
-#define trap() do { printf("trap: " __FILE__ " at %d \n", __LINE__); asm volatile ("out %0, $0xff\n" :: "a"(2)); } while(0);
+static inline void trap() { printf("trap: " __FILE__ " at %d \n", __LINE__); asm volatile ("out %0, $0xff\n" :: "a"(2)); }
+
 #define halt_cpu() asm volatile ("out %0, $0xff\n" :: "a"(2))
 
 #define write_device(a, b, c) cpu.env().write_core_device(cpu, a, b, c)
