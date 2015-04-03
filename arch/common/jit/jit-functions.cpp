@@ -41,3 +41,13 @@ extern "C" void cpu_check_interrupts(captive::arch::CPU *cpu)
 		cpu->interpreter().handle_irq(cpu->cpu_data().isr);
 	}
 }
+
+extern "C" void jit_debug1(uint32_t pc)
+{
+	printf("DISPATCH: %x\n", pc);
+}
+
+extern "C" void jit_debug2(uint32_t pc)
+{
+	printf("DO DISPATCH: %x\n", pc);
+}

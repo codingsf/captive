@@ -76,7 +76,7 @@ bool CPU::run_region_jit()
 
 		mmu().set_page_executed(virt_pc);
 
-		if (trace_interval > 100000) {
+		if (trace_interval > 10000) {
 			trace_interval = 0;
 			analyse_regions();
 		} else {
@@ -130,7 +130,7 @@ void CPU::compile_region(Region& rgn)
 		rwu->blocks = (TranslationBlock *)Memory::shared_memory().reallocate(rwu->blocks, sizeof(TranslationBlock) * (rwu->block_count + 1));
 
 		if (!compile_block(*block.second, rwu->blocks[rwu->block_count])) {
-			assert(false);
+			goto fail;
 		}
 
 		rwu->block_count++;
@@ -142,6 +142,15 @@ void CPU::compile_region(Region& rgn)
 	// Make region translation hypercall
 	printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
+	return;
+
+fail:
+	for (uint32_t i = 0; i < rwu->block_count; i++) {
+		Memory::shared_memory().free(rwu->blocks[i].ir_insn);
+	}
+
+	Memory::shared_memory().free(rwu->blocks);
+	Memory::shared_memory().free(rwu);
 }
 
 bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock& tb)
@@ -177,6 +186,7 @@ bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock
 
 		// Translate this instruction into the context.
 		if (!jit().translate(insn, ctx)) {
+			Memory::shared_memory().free(tb.ir_insn);
 			return false;
 		}
 

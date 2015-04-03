@@ -107,7 +107,7 @@ Value *LLVMJIT::insert_vreg(BlockLoweringContext& ctx, uint32_t idx, uint8_t siz
 	default: assert(false); return NULL;
 	}
 
-	Value *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "r" + std::to_string(idx));
+	Value *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "r-" + std::to_string(ctx.tb.block_addr) + "-" + std::to_string(idx));
 
 	ctx.ir_vregs[idx] = vreg_alloc;
 	return vreg_alloc;
@@ -572,7 +572,7 @@ void LLVMJIT::set_aa_metadata(Value *v, metadata_tags tag)
 
 	Instruction *inst = (Instruction *)v;
 	SmallVector<Metadata *, 1> metadata_data;
-	metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
+	metadata_data.push_back(ConstantAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
 
 	inst->setMetadata("cai", MDNode::get(inst->getContext(), metadata_data));
 }
@@ -583,7 +583,7 @@ void LLVMJIT::set_aa_metadata(Value *v, metadata_tags tag, Value *value)
 
 	Instruction *inst = (Instruction *)v;
 	SmallVector<Metadata *, 2> metadata_data;
-	metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
+	metadata_data.push_back(ConstantAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
 	metadata_data.push_back(ValueAsMetadata::get(value));
 
 	inst->setMetadata("cai", MDNode::get(inst->getContext(), metadata_data));
@@ -668,17 +668,16 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 			return AliasAnalysis::NoAlias;
 	} else if (IsIntToPtr(v1) && IsIntToPtr(v2)) {
 		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
-		const MDNode *md2 = ((Instruction *)v1)->getMetadata("cai");
+		const MDNode *md2 = ((Instruction *)v2)->getMetadata("cai");
 
 		if (md1 && md2) {
 			if (md1->getOperand(0).get() == md2->getOperand(0).get()) {
-				// TODO: Fix this mess
-				/*uint32_t aa_class = CONSTVAL(md1->getOperand(0).get());
+				uint32_t aa_class = CONSTVAL(((ConstantAsMetadata *)md1->getOperand(0).get())->getValue());
 
 				if (aa_class == 2) { // Register
 					if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
-						uint32_t reg_offset1 = CONSTVAL(md1->getOperand(1).get());
-						uint32_t reg_offset2 = CONSTVAL(md2->getOperand(1).get());
+						uint32_t reg_offset1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
+						uint32_t reg_offset2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
 
 						// This would break if we got some weird overlapping offsets
 						// but, of course, we never generate rubbish code like that!
@@ -688,7 +687,7 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 							return AliasAnalysis::NoAlias;
 						}
 					}
-				}*/
+				}
 
 				return AliasAnalysis::MayAlias;
 			} else {

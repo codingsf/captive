@@ -32,7 +32,7 @@ uint32_t Region::hot_block_count()
 {
 	uint32_t r = 0;
 	for (auto block : blocks) {
-		if (block.second->interp_count() > 100) {
+		if (block.second->interp_count() > 10) {
 			r++;
 		}
 	}

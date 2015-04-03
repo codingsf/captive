@@ -159,7 +159,7 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_base_address) << ".ll";
-		print_module(filename.str(), region_module);
+		//print_module(filename.str(), region_module);
 	}
 
 	// Optimise
@@ -231,7 +231,7 @@ bool LLVMJIT::lower_block(LoweringContext& ctx, const shared::TranslationBlock* 
 			DEBUG << CONTEXT(LLVMRegionJIT) << "Inserting LLVM BB for IR BB " << block->ir_insn[i].ir_block;
 
 			std::stringstream irb_name;
-			irb_name << "irb-" << std::hex << block->ir_insn[i].ir_block;
+			irb_name << "irb-" << std::hex << block->block_addr << "-" << block->ir_insn[i].ir_block;
 			block_ctx.ir_blocks[block->ir_insn[i].ir_block] = BasicBlock::Create(ctx.builder.getContext(), irb_name.str(), ctx.region_fn);
 		}
 	}
