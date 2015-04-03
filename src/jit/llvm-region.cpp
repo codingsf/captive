@@ -63,7 +63,7 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	// Initialise the lowering context for this region.
 	IRBuilder<> builder(ctx);
 
-	LoweringContext lc(builder);
+	LoweringContext lc(builder, *rwu);
 	lc.vtype = Type::getVoidTy(ctx);
 	lc.i1 = IntegerType::getInt1Ty(ctx);
 	lc.i8 = IntegerType::getInt8Ty(ctx); lc.pi8 = PointerType::get(lc.i8, 0);
@@ -91,7 +91,7 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	// Initialise a pointer to the PC
 	Value *pc_ptr_off = builder.CreateAdd(lc.reg_state, lc.const64(60));
 	lc.pc_ptr = builder.CreateIntToPtr(pc_ptr_off, lc.pi32);
-	set_aa_metadata(lc.pc_ptr, TAG_CLASS_REGISTER);
+	set_aa_metadata(lc.pc_ptr, TAG_CLASS_REGISTER, lc.const64(60));
 
 	// Initialise the virtual base address which this region was entered with
 	lc.virtual_base_address = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
@@ -101,11 +101,16 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	// to do this as a separate pass, so that we can do optimised control-flow out
 	// of one region basic-block, into another.
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
-		lc.guest_block_entries[rwu->blocks[i].block_addr] = BasicBlock::Create(ctx, "gbb", region_fn);
+		DEBUG << CONTEXT(LLVMRegionJIT) << "Creating LLVM BB for Region BB 0x" << std::hex << rwu->blocks[i].block_addr;
+
+		std::stringstream rbb_name;
+		rbb_name << "rbb-" << std::hex << rwu->blocks[i].block_addr;
+		lc.guest_block_entries[rwu->blocks[i].block_addr] = BasicBlock::Create(ctx, rbb_name.str(), region_fn);
 	}
 
 	// Loop over each region basic-block, and lower it to LLVM IR.
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
+		DEBUG << CONTEXT(LLVMRegionJIT) << "Lowering Region BB " << std::hex << rwu->blocks[i].block_addr;
 		if (!lower_block(lc, &rwu->blocks[i])) {
 			return false;
 		}
@@ -154,12 +159,7 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_base_address) << ".ll";
-		std::ofstream file(filename.str());
-		raw_os_ostream str(file);
-
-		PassManager printManager;
-		printManager.add(createPrintModulePass(str, ""));
-		printManager.run(*region_module);
+		print_module(filename.str(), region_module);
 	}
 
 	// Optimise
@@ -174,12 +174,7 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_base_address) << ".opt.ll";
-		std::ofstream file(filename.str());
-		raw_os_ostream str(file);
-
-		PassManager printManager;
-		printManager.add(createPrintModulePass(str, ""));
-		printManager.run(*region_module);
+		print_module(filename.str(), region_module);
 	}
 
 	// Initialise a new MCJIT engine
@@ -221,16 +216,23 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 bool LLVMJIT::lower_block(LoweringContext& ctx, const shared::TranslationBlock* block)
 {
-	BlockLoweringContext block_ctx(ctx);
+	BlockLoweringContext block_ctx(ctx, *block);
 
 	// The alloca block is the start block for this region basic-block.
 	block_ctx.alloca_block = ctx.guest_block_entries[block->block_addr];
+
+	// Do quick IR optimisations
+	//quick_opt(block);
 
 	// Loop over the IR for this RBB and create LLVM basic-blocks to represent
 	// each IR basic-block.
 	for (uint32_t i = 0; i < block->ir_insn_count; i++) {
 		if (block_ctx.ir_blocks.count(block->ir_insn[i].ir_block) == 0) {
-			block_ctx.ir_blocks[block->ir_insn[i].ir_block] = BasicBlock::Create(ctx.builder.getContext(), "bb", ctx.region_fn);
+			DEBUG << CONTEXT(LLVMRegionJIT) << "Inserting LLVM BB for IR BB " << block->ir_insn[i].ir_block;
+
+			std::stringstream irb_name;
+			irb_name << "irb-" << std::hex << block->ir_insn[i].ir_block;
+			block_ctx.ir_blocks[block->ir_insn[i].ir_block] = BasicBlock::Create(ctx.builder.getContext(), irb_name.str(), ctx.region_fn);
 		}
 	}
 
@@ -239,6 +241,8 @@ bool LLVMJIT::lower_block(LoweringContext& ctx, const shared::TranslationBlock* 
 
 	// Loop over the IR and lower the instruction.
 	for (uint32_t i = 0; i < block->ir_insn_count; i++) {
+		DEBUG << CONTEXT(LLVMRegionJIT) << "Lowering IR Instruction from IR BB " << block->ir_insn[i].ir_block << ": " << InstructionPrinter::render_instruction(block->ir_insn[i]);
+
 		ctx.builder.SetInsertPoint(block_ctx.ir_blocks[block->ir_insn[i].ir_block]);
 		if (!lower_ir_instruction(block_ctx, &block->ir_insn[i]))
 			return false;
@@ -248,5 +252,5 @@ bool LLVMJIT::lower_block(LoweringContext& ctx, const shared::TranslationBlock* 
 	ctx.builder.SetInsertPoint(block_ctx.alloca_block);
 	ctx.builder.CreateBr(block_ctx.ir_blocks[0]);
 
-	return false;
+	return true;
 }

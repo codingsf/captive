@@ -23,6 +23,9 @@ namespace captive {
 		struct RegionWorkUnit;
 		struct BlockWorkUnit;
 		struct TranslationBlock;
+
+		struct IRInstruction;
+		struct IROperand;
 	}
 
 	namespace jit {
@@ -86,6 +89,13 @@ namespace captive {
 
 			virtual bool compile_region(shared::RegionWorkUnit *work_unit) = 0;
 			void compile_region_async(shared::RegionWorkUnit *work_unit, region_completion_t completion, void *completion_data);
+		};
+
+		class InstructionPrinter
+		{
+		public:
+			static std::string render_instruction(const shared::IRInstruction& insn);
+			static std::string render_operand(const shared::IROperand& oper);
 		};
 	}
 }

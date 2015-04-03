@@ -5,10 +5,10 @@
  * Created on 11 February 2015, 14:21
  */
 
-#ifndef CPU_INTRINSICS_H
-#define	CPU_INTRINSICS_H
+#if defined(DEFINE_INTRINSICS) && !defined(INTRINSICS_DEFINED)
+#define INTRINSICS_DEFINED
 
-#define TRACE
+//#define TRACE
 
 #include <printf.h>
 #include <env.h>
@@ -141,5 +141,27 @@ define_mem_write_user_func(64, uint64_t)
 //#define mem_write_64_user(_addr, _data) __mem_write_64_user(cpu, _addr, _data)
 #define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)
 
-#endif	/* CPU_INTRINSICS_H */
+#endif
 
+#ifdef UNDEFINE_INTRINSICS
+#undef read_register
+#undef read_register_bank
+#undef write_register
+#undef write_register_bank
+
+#undef enter_user_mode
+#undef enter_kernel_mode
+
+#undef push_interrupt
+#undef pop_interrupt
+#undef pend_interrupt
+
+#undef set_cpu_mode
+#undef get_cpu_mode
+
+#undef halt_cpu
+
+#undef write_device
+#undef read_device
+
+#endif

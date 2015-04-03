@@ -74,3 +74,8 @@ bool ArmCPU::decode_instruction_phys(gpa_t addr, Decode* insn)
 {
 	return ((ArmDecode*)insn)->decode(ArmDecode::arm, addr, (uint8_t *)((uint64_t)addr + 0x100000000));
 }
+
+captive::arch::JumpInfo ArmCPU::get_instruction_jump_info(Decode* insn)
+{
+	return ArmDecode::get_jump_info((ArmDecode *)insn);
+}

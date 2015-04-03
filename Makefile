@@ -12,7 +12,7 @@ export shared-dir := $(top-dir)/shared
 
 out := $(bin-dir)/captive
 src := $(patsubst src/%,$(src-dir)/%,$(shell find src/ | grep -e "\.cpp"))
-obj := $(src:.cpp=.o) $(src-dir)/util/spin-lock.o
+obj := $(src:.cpp=.o)
 dep := $(src:.cpp=.d)
 
 bios := $(bios-dir)/bios.bin.o

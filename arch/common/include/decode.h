@@ -19,6 +19,20 @@ namespace captive {
 			bool end_of_block;
 			bool is_predicated;
 		};
+
+		class JumpInfo
+		{
+		public:
+			enum JumpType
+			{
+				NONE,
+				DIRECT,
+				INDIRECT
+			};
+
+			JumpType type;
+			uint32_t target;
+		};
 	}
 }
 

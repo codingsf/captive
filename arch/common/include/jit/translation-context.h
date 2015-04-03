@@ -30,6 +30,7 @@ namespace captive {
 					ensure_buffer(_block.ir_insn_count + 1);
 
 					_block.ir_insn[_block.ir_insn_count] = instruction;
+					_block.ir_insn[_block.ir_insn_count].ir_block = block_id;
 					_block.ir_insn_count++;
 				}
 

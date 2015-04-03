@@ -183,6 +183,26 @@ bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock
 		pc += insn->length;
 	} while (!insn->end_of_block);
 
+	assert(insn->end_of_block);
+	JumpInfo jump_info = get_instruction_jump_info(insn);
+
+	tb.destination_target = jump_info.target;
+	if (insn->is_predicated) {
+		if (jump_info.type == JumpInfo::DIRECT) {
+			tb.destination_type = TranslationBlock::PREDICATED_DIRECT;
+		} else {
+			tb.destination_type = TranslationBlock::PREDICATED_INDIRECT;
+		}
+
+		tb.fallthrough_target = pc;
+	} else {
+		if (jump_info.type == JumpInfo::DIRECT) {
+			tb.destination_type = TranslationBlock::NON_PREDICATED_DIRECT;
+		} else {
+			tb.destination_type = TranslationBlock::NON_PREDICATED_INDIRECT;
+		}
+	}
+
 	// Finish off with a RET.
 	ctx.add_instruction(IRInstruction::ret());
 

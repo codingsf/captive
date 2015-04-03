@@ -3,6 +3,7 @@
 *.d
 *.arch
 *.a
+*.ll
 nbproject/
 bin/
 bios.bin

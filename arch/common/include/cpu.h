@@ -39,6 +39,7 @@ namespace captive {
 		class MMU;
 		class Interpreter;
 		class Decode;
+		class JumpInfo;
 		class JIT;
 
 		class CPU
@@ -104,6 +105,7 @@ namespace captive {
 		protected:
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
+			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
 
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;

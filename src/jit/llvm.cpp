@@ -37,6 +37,8 @@
 #include <map>
 #include <vector>
 
+#include <fstream>
+
 USE_CONTEXT(JIT)
 DECLARE_CHILD_CONTEXT(LLVM, JIT);
 
@@ -324,7 +326,7 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 		offset = ctx.builder.CreateCast(Instruction::ZExt, offset, ctx.parent.i64);
 
 		Value *regptr = ctx.builder.CreateIntToPtr(ctx.builder.CreateAdd(ctx.parent.reg_state, offset), type_for_operand(ctx, op1, true));
-		set_aa_metadata(regptr, TAG_CLASS_REGISTER);
+		set_aa_metadata(regptr, TAG_CLASS_REGISTER, offset);
 
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(regptr), dst);
 
@@ -341,7 +343,7 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 
 		Value *regptr = ctx.builder.CreateAdd(ctx.parent.reg_state, offset);
 		regptr = ctx.builder.CreateIntToPtr(regptr, type_for_operand(ctx, op0, true));
-		set_aa_metadata(regptr, TAG_CLASS_REGISTER);
+		set_aa_metadata(regptr, TAG_CLASS_REGISTER, offset);
 
 		ctx.builder.CreateStore(val, regptr);
 
@@ -508,7 +510,47 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 
 bool LLVMJIT::emit_block_control_flow(BlockLoweringContext& ctx, const shared::IRInstruction* ir)
 {
-	ctx.builder.CreateBr(ctx.parent.dispatch_block);
+	if (ctx.tb.destination_type == shared::TranslationBlock::NON_PREDICATED_INDIRECT) {
+		ctx.builder.CreateBr(ctx.parent.dispatch_block);
+	} else if (ctx.tb.destination_type == shared::TranslationBlock::PREDICATED_INDIRECT) {
+		// TODO CHAIN IF FT NOT IN REGION
+		if (ctx.parent.guest_block_entries.count(ctx.tb.fallthrough_target) == 0) {
+			ctx.builder.CreateBr(ctx.parent.dispatch_block);
+		} else {
+			Value *target_pc = ctx.builder.CreateLoad(ctx.parent.pc_ptr);
+			ctx.builder.CreateCondBr(ctx.builder.CreateICmpEQ(target_pc, ctx.parent.materialise(ctx.tb.fallthrough_target - ctx.parent.rwu.region_base_address)), ctx.parent.guest_block_entries[ctx.tb.fallthrough_target], ctx.parent.dispatch_block);
+		}
+	} else if (ctx.tb.destination_type == shared::TranslationBlock::NON_PREDICATED_DIRECT) {
+		if (ctx.parent.guest_block_entries.count(ctx.tb.destination_target) == 0) {
+			ctx.builder.CreateBr(ctx.parent.dispatch_block); // TODO CHAIN IF DEST not in region, EXIT OTHERWISE
+		} else {
+			ctx.builder.CreateBr(ctx.parent.guest_block_entries[ctx.tb.destination_target]);
+		}
+	} else if (ctx.tb.destination_type == shared::TranslationBlock::PREDICATED_DIRECT) {
+		BasicBlock *taken, *not_taken;
+
+		if (ctx.parent.guest_block_entries.count(ctx.tb.destination_target) == 0) {
+			// TODO: CHAIN OR OTHERWISE
+			taken = ctx.parent.dispatch_block;
+		} else {
+			taken = ctx.parent.guest_block_entries[ctx.tb.destination_target];
+		}
+
+		if (ctx.parent.guest_block_entries.count(ctx.tb.fallthrough_target) == 0) {
+			// TODO: CHAIN OR OTHERWISE
+			not_taken = ctx.parent.dispatch_block;
+		} else {
+			not_taken = ctx.parent.guest_block_entries[ctx.tb.fallthrough_target];
+		}
+
+		if (taken == not_taken) {
+			ctx.builder.CreateBr(taken);
+		} else {
+			Value *target_pc = ctx.builder.CreateLoad(ctx.parent.pc_ptr);
+			ctx.builder.CreateCondBr(ctx.builder.CreateICmpEQ(target_pc, ctx.parent.materialise(ctx.tb.destination_target - ctx.parent.rwu.region_base_address)), taken, not_taken);
+		}
+	} else { return false; }
+
 	return true;
 }
 
@@ -531,6 +573,18 @@ void LLVMJIT::set_aa_metadata(Value *v, metadata_tags tag)
 	Instruction *inst = (Instruction *)v;
 	SmallVector<Metadata *, 1> metadata_data;
 	metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
+
+	inst->setMetadata("cai", MDNode::get(inst->getContext(), metadata_data));
+}
+
+void LLVMJIT::set_aa_metadata(Value *v, metadata_tags tag, Value *value)
+{
+	assert(v->getValueID() >= Value::InstructionVal);
+
+	Instruction *inst = (Instruction *)v;
+	SmallVector<Metadata *, 2> metadata_data;
+	metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(inst->getContext()), (uint32_t)tag)));
+	metadata_data.push_back(ValueAsMetadata::get(value));
 
 	inst->setMetadata("cai", MDNode::get(inst->getContext(), metadata_data));
 }
@@ -585,6 +639,13 @@ static bool IsAlloca(const Value *v)
 	return (v->getValueID() == Value::InstructionVal + Instruction::Alloca);
 }
 
+static bool IsConstVal(const ::llvm::Value *v)
+{
+	return (v->getValueID() == ::llvm::Instruction::ConstantIntVal);
+}
+
+#define CONSTVAL(a) (assert((a)->getValueID() == Instruction::ConstantIntVal), (((ConstantInt *)(a))->getZExtValue()))
+
 AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, const AliasAnalysis::Location &L2)
 {
 	// First heuristic - really easy.  Taken from SCEV-AA
@@ -599,7 +660,7 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 		// They can't alias, because we've already checked for equality above.
 		return NoAlias;
 	} else if (IsAlloca(v1) || IsAlloca(v2)) {
-		const AllocaInst *alloca = IsAlloca(v1) ? (const AllocaInst *)v1 : (const AllocaInst *)v2;
+		//const AllocaInst *alloca = IsAlloca(v1) ? (const AllocaInst *)v1 : (const AllocaInst *)v2;
 		const Value *other = !IsAlloca(v1) ? v1 : v2;
 
 		// Allocas and IntToPtrs don't alias.
@@ -610,7 +671,25 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 		const MDNode *md2 = ((Instruction *)v1)->getMetadata("cai");
 
 		if (md1 && md2) {
-			if (md1->getOperand(0).get() == md2->getOperand(0)) {
+			if (md1->getOperand(0).get() == md2->getOperand(0).get()) {
+				// TODO: Fix this mess
+				/*uint32_t aa_class = CONSTVAL(md1->getOperand(0).get());
+
+				if (aa_class == 2) { // Register
+					if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
+						uint32_t reg_offset1 = CONSTVAL(md1->getOperand(1).get());
+						uint32_t reg_offset2 = CONSTVAL(md2->getOperand(1).get());
+
+						// This would break if we got some weird overlapping offsets
+						// but, of course, we never generate rubbish code like that!
+						if (reg_offset1 == reg_offset2) {
+							return AliasAnalysis::MustAlias;
+						} else {
+							return AliasAnalysis::NoAlias;
+						}
+					}
+				}*/
+
 				return AliasAnalysis::MayAlias;
 			} else {
 				return AliasAnalysis::NoAlias;
@@ -738,4 +817,14 @@ bool LLVMJIT::initialise_pass_manager(llvm::PassManagerBase* pm)
 #endif
 
 	return true;
+}
+
+void LLVMJIT::print_module(std::string filename, llvm::Module* module)
+{
+	std::ofstream file(filename);
+	raw_os_ostream str(file);
+
+	PassManager printManager;
+	printManager.add(createPrintModulePass(str, ""));
+	printManager.run(*module);
 }

@@ -26,4 +26,6 @@ void captive::logging::configure_logging_contexts()
 			context.second->_parent = NULL;
 		}
 	}
+
+	//registered_logging_contexts.find("LLVMRegionJIT")->second->enable();
 }

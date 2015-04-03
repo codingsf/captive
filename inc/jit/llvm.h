@@ -47,9 +47,10 @@ namespace captive {
 
 			struct LoweringContext
 			{
-				LoweringContext(llvm::IRBuilder<>& _builder) : builder(_builder) { }
+				LoweringContext(llvm::IRBuilder<>& _builder, const shared::RegionWorkUnit& _rwu) : builder(_builder), rwu(_rwu) { }
 
 				llvm::IRBuilder<>& builder;
+				const shared::RegionWorkUnit& rwu;
 
 				llvm::Function *region_fn;
 
@@ -93,19 +94,26 @@ namespace captive {
 				{
 					return (llvm::ConstantInt *)llvm::ConstantInt::get(i64, v);
 				}
+
+				inline llvm::Value *materialise(uint32_t offset)
+				{
+					assert(virtual_base_address);
+					return builder.CreateAdd(virtual_base_address, const32(offset));
+				}
 			};
 
 			struct BlockLoweringContext
 			{
 				LoweringContext& parent;
 				llvm::IRBuilder<>& builder;
+				const shared::TranslationBlock& tb;
 
 				llvm::BasicBlock *alloca_block;
 
 				std::map<uint32_t, llvm::Value *> ir_vregs;
 				std::map<uint32_t, llvm::BasicBlock *> ir_blocks;
 
-				BlockLoweringContext(LoweringContext& parent) : parent(parent), builder(parent.builder) { }
+				BlockLoweringContext(LoweringContext& parent, const shared::TranslationBlock& tb) : parent(parent), builder(parent.builder), tb(tb) { }
 			};
 
 			enum metadata_tags
@@ -115,6 +123,7 @@ namespace captive {
 			};
 
 			void set_aa_metadata(llvm::Value *inst, metadata_tags tag);
+			void set_aa_metadata(llvm::Value *inst, metadata_tags tag, llvm::Value *value);
 			bool add_pass(llvm::PassManagerBase *pm, llvm::Pass *pass);
 			bool initialise_pass_manager(llvm::PassManagerBase *pm);
 
@@ -128,6 +137,8 @@ namespace captive {
 			bool lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRInstruction *insn);
 			bool emit_block_control_flow(BlockLoweringContext& ctx, const shared::IRInstruction *insn);
 			bool emit_interrupt_check(BlockLoweringContext& ctx);
+
+			void print_module(std::string filename, llvm::Module* module);
 		};
 	}
 }
