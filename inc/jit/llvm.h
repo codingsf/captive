@@ -55,11 +55,14 @@ namespace captive {
 				llvm::Function *region_fn;
 
 				llvm::BasicBlock *dispatch_block;
+				llvm::BasicBlock *chain_block;
+				llvm::BasicBlock *exit_block;
 
 				std::map<uint32_t, llvm::BasicBlock *> guest_block_entries;
 
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
+				llvm::Value *region_chain_tbl;
 				llvm::Value *pc_ptr;
 				llvm::Value *virtual_base_address;
 
@@ -95,6 +98,11 @@ namespace captive {
 					return (llvm::ConstantInt *)llvm::ConstantInt::get(i64, v);
 				}
 
+				inline llvm::Value *nullptr8()
+				{
+					return builder.CreateIntToPtr(const64(0), pi8);
+				}
+
 				inline llvm::Value *materialise(uint32_t offset)
 				{
 					assert(virtual_base_address);
@@ -120,6 +128,7 @@ namespace captive {
 			{
 				TAG_CLASS_MEMORY  = 1,
 				TAG_CLASS_REGISTER = 2,
+				TAG_CLASS_ALLOC = 3,
 			};
 
 			void set_aa_metadata(llvm::Value *inst, metadata_tags tag);

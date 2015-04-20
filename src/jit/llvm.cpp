@@ -107,7 +107,8 @@ Value *LLVMJIT::insert_vreg(BlockLoweringContext& ctx, uint32_t idx, uint8_t siz
 	default: assert(false); return NULL;
 	}
 
-	Value *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "r-" + std::to_string(ctx.tb.block_addr) + "-" + std::to_string(idx));
+	AllocaInst *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "r-" + std::to_string(ctx.tb.block_addr) + "-" + std::to_string(idx));
+	set_aa_metadata(vreg_alloc, TAG_CLASS_ALLOC);
 
 	ctx.ir_vregs[idx] = vreg_alloc;
 	return vreg_alloc;
@@ -522,7 +523,16 @@ bool LLVMJIT::emit_block_control_flow(BlockLoweringContext& ctx, const shared::I
 		}
 	} else if (ctx.tb.destination_type == shared::TranslationBlock::NON_PREDICATED_DIRECT) {
 		if (ctx.parent.guest_block_entries.count(ctx.tb.destination_target) == 0) {
-			ctx.builder.CreateBr(ctx.parent.dispatch_block); // TODO CHAIN IF DEST not in region, EXIT OTHERWISE
+			// Okay so we don't know about the branch target - might it be in a
+			// different region?
+
+			if ((ctx.tb.destination_target & ~0xfffULL) != ctx.parent.rwu.region_base_address) {
+				// Aha!  Let's try and chain.
+				ctx.builder.CreateBr(ctx.parent.chain_block);
+			} else {
+				// Nope!  Can't do anything but exit.
+				ctx.builder.CreateBr(ctx.parent.exit_block);
+			}
 		} else {
 			ctx.builder.CreateBr(ctx.parent.guest_block_entries[ctx.tb.destination_target]);
 		}
@@ -530,15 +540,21 @@ bool LLVMJIT::emit_block_control_flow(BlockLoweringContext& ctx, const shared::I
 		BasicBlock *taken, *not_taken;
 
 		if (ctx.parent.guest_block_entries.count(ctx.tb.destination_target) == 0) {
-			// TODO: CHAIN OR OTHERWISE
-			taken = ctx.parent.dispatch_block;
+			if ((ctx.tb.destination_target & ~0xfffULL) != ctx.parent.rwu.region_base_address) {
+				taken = ctx.parent.chain_block;
+			} else {
+				taken = ctx.parent.exit_block;
+			}
 		} else {
 			taken = ctx.parent.guest_block_entries[ctx.tb.destination_target];
 		}
 
 		if (ctx.parent.guest_block_entries.count(ctx.tb.fallthrough_target) == 0) {
-			// TODO: CHAIN OR OTHERWISE
-			not_taken = ctx.parent.dispatch_block;
+			if ((ctx.tb.fallthrough_target & ~0xfffULL) != ctx.parent.rwu.region_base_address) {
+				not_taken = ctx.parent.chain_block;
+			} else {
+				not_taken = ctx.parent.exit_block;
+			}
 		} else {
 			not_taken = ctx.parent.guest_block_entries[ctx.tb.fallthrough_target];
 		}
@@ -639,6 +655,11 @@ static bool IsAlloca(const Value *v)
 	return (v->getValueID() == Value::InstructionVal + Instruction::Alloca);
 }
 
+static bool IsExtractValue(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::ExtractValue);
+}
+
 static bool IsConstVal(const ::llvm::Value *v)
 {
 	return (v->getValueID() == ::llvm::Instruction::ConstantIntVal);
@@ -656,17 +677,25 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 
 	const Value *v1 = L1.Ptr, *v2 = L2.Ptr;
 
-	if (IsAlloca(v1) && IsAlloca(v2)) {
-		// They can't alias, because we've already checked for equality above.
-		return NoAlias;
-	} else if (IsAlloca(v1) || IsAlloca(v2)) {
-		//const AllocaInst *alloca = IsAlloca(v1) ? (const AllocaInst *)v1 : (const AllocaInst *)v2;
-		const Value *other = !IsAlloca(v1) ? v1 : v2;
+	// First, if we've got two instructions...
+	if (IsInstr(v1) && IsInstr(v2)) {
+		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
+		const MDNode *md2 = ((Instruction *)v2)->getMetadata("cai");
 
-		// Allocas and IntToPtrs don't alias.
-		if (IsIntToPtr(other))
-			return AliasAnalysis::NoAlias;
-	} else if (IsIntToPtr(v1) && IsIntToPtr(v2)) {
+		// And they both have metadata...
+		if (md1 && md2) {
+			// And the metadata has different tags...
+			if (md1->getOperand(0).get() != md2->getOperand(0).get()) {
+				// Then they definitely DO NOT alias!
+				return AliasAnalysis::NoAlias;
+			}
+		}
+	}
+
+	if (IsAlloca(v1) || IsAlloca(v2)) {
+		// They can't alias with anything, because we've already checked for equality above.
+		return NoAlias;
+	} else if ((IsIntToPtr(v1) || IsBitCast(v1)) && (IsIntToPtr(v2) || IsBitCast(v2))) {
 		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
 		const MDNode *md2 = ((Instruction *)v2)->getMetadata("cai");
 
@@ -714,17 +743,28 @@ bool CaptiveAA::runOnFunction(llvm::Function &F)
 
 	for (auto& bb : F) {
 		for (auto& insn : bb) {
+			if (insn.getMetadata("cai") != NULL) continue;
+
 			if (IsBitCast(&insn)) {
 				BitCastInst *bc = (BitCastInst *)&insn;
 
-				if (bc->getOperand(0) == &(F.getArgumentList().back())) {
+				// FIXME:  HACKY HACK MCHACK
+				if (bc->getOperand(0)->getName() == "reg_state") {
 					changed = true;
 
-					SmallVector<Metadata *, 1> metadata_data;
+					SmallVector<Metadata *, 2> metadata_data;
 					metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(bc->getContext()), 2)));
+					metadata_data.push_back(ConstantAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(bc->getContext()), 0)));
 
 					bc->setMetadata("cai", MDNode::get(bc->getContext(), metadata_data));
 				}
+			} else if (IsAlloca(&insn)) {
+				changed = true;
+
+				SmallVector<Metadata *, 1> metadata_data;
+				metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(insn.getContext()), 3)));
+
+				insn.setMetadata("cai", MDNode::get(insn.getContext(), metadata_data));
 			}
 		}
 	}
