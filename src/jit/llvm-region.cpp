@@ -143,8 +143,13 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 	// Only add entry blocks into the switch statement.
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
-		if (rwu->blocks[i].is_entry) {
-			dispatcher->addCase(lc.const32(rwu->blocks[i].block_addr & 0xfff), lc.guest_block_entries[rwu->blocks[i].block_addr]);
+		BasicBlock *gbe = lc.guest_block_entries[rwu->blocks[i].block_addr];
+
+		// Entry blocks should belong to the dispatcher, as should blocks
+		// that have no uses.  This is because unused basic blocks are probably
+		// indirect branch targets.
+		if (rwu->blocks[i].is_entry || gbe->getNumUses() == 0) {
+			dispatcher->addCase(lc.const32(rwu->blocks[i].block_addr & 0xfff), gbe);
 		}
 	}
 
