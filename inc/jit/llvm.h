@@ -129,6 +129,7 @@ namespace captive {
 				TAG_CLASS_MEMORY  = 1,
 				TAG_CLASS_REGISTER = 2,
 				TAG_CLASS_ALLOC = 3,
+				TAG_CLASS_CHAIN = 4,
 			};
 
 			void set_aa_metadata(llvm::Value *inst, metadata_tags tag);

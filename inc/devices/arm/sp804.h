@@ -29,8 +29,10 @@ namespace captive {
 
 				void tick(uint32_t period);
 
-				virtual std::string name() const override { return "sp804"; }
+				std::string name() const override { return "sp804"; }
 
+				const std::vector<RegisterDescriptor> registers() const;
+				
 			private:
 				void update_irq();
 

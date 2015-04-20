@@ -195,6 +195,7 @@ void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base
 	if (virt_page_base_addr > (va_t)0x100000000) return;
 
 	profile_image().invalidate((gpa_t)((uint64_t)phys_page_base_addr & 0xffffffffULL));
+	jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
 
 	// Evict entries from the decode cache and block cache
 	/*uint32_t page_base = (uint32_t)(uint64_t)page_base_addr;

@@ -41,6 +41,8 @@ namespace captive {
 		class Guest : public GPAResolver
 		{
 		public:
+			typedef void (*memory_callback_fn_t)(gpa_t gpa);
+
 			Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config);
 			virtual ~Guest();
 			virtual bool init();

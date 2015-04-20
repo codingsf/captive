@@ -17,6 +17,17 @@ SP804::~SP804()
 
 }
 
+const std::vector<captive::devices::RegisterDescriptor> SP804::registers() const
+{
+	std::vector<captive::devices::RegisterDescriptor> regs;
+
+	//regs.push_back((captive::devices::RegisterDescriptor) { 0x0c, 4 });
+	//regs.push_back((captive::devices::RegisterDescriptor) { 0x2c, 4 });
+
+	return regs;
+}
+
+
 bool SP804::read(uint64_t off, uint8_t len, uint64_t& data)
 {
 	if (Primecell::read(off, len, data))

@@ -11,3 +11,8 @@ Device::~Device()
 {
 
 }
+
+const std::vector<RegisterDescriptor> Device::registers() const
+{
+	return std::vector<RegisterDescriptor>(0);
+}

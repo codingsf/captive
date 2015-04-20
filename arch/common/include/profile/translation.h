@@ -26,6 +26,8 @@ namespace captive {
 
 				inline uint32_t execute(CPU& cpu) { return _fn(&cpu.jit_state); }
 
+				inline void *fn_ptr() const { return (void *)_fn; }
+
 			private:
 				translation_fn_t _fn;
 			};

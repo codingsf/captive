@@ -22,6 +22,8 @@
 
 #include <linux/kvm.h>
 
+extern void MMIOThreadTrampoline(void *);
+
 namespace captive {
 	namespace devices {
 		class Device;
@@ -34,6 +36,8 @@ namespace captive {
 
 			class KVMGuest : public Guest {
 				friend class KVMCpu;
+				friend void ::MMIOThreadTrampoline(void *);
+
 			public:
 				KVMGuest(KVM& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
@@ -75,7 +79,7 @@ namespace captive {
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
-				int fd, irq_fd;
+				int fd, irq_fd, mmio_fd;
 				int next_cpu_id;
 				int next_slot_idx;
 
@@ -107,6 +111,9 @@ namespace captive {
 				bool prepare_guest_memory();
 				bool attach_guest_devices();
 				devices::Device *lookup_device(uint64_t addr);
+
+				bool attach_memory_callback(gpa_t gpa, uint8_t size, memory_callback_fn_t callback);
+				void mmio_thread();
 
 				bool install_bios();
 				bool install_initial_pgt();

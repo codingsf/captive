@@ -9,11 +9,14 @@
 #include <shmem.h>
 #include <verify.h>
 
+#include <thread>
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/eventfd.h>
+#include <sys/epoll.h>
 #include <linux/kvm.h>
 
 USE_CONTEXT(Guest);
@@ -91,6 +94,11 @@ KVMGuest::~KVMGuest()
 	close(fd);
 }
 
+void MMIOThreadTrampoline(void *state)
+{
+	((KVMGuest *)state)->mmio_thread();
+}
+
 bool KVMGuest::init()
 {
 	if (!Guest::init())
@@ -114,6 +122,8 @@ bool KVMGuest::init()
 
 	if (!attach_guest_devices())
 		return false;
+
+	auto x = new std::thread(MMIOThreadTrampoline, this);
 
 	_initialised = true;
 	return true;
@@ -187,6 +197,10 @@ bool KVMGuest::attach_guest_devices()
 
 		device.device().attach(*this);
 
+		for (const auto& rd : device.device().registers()) {
+			attach_memory_callback(device.base_address() + rd.offset, rd.size, NULL);
+		}
+
 		dev_desc desc;
 		desc.cfg = &device;
 		desc.dev = &device.device();
@@ -259,6 +273,14 @@ bool KVMGuest::prepare_guest_irq()
 
 bool KVMGuest::prepare_guest_memory()
 {
+	DEBUG << CONTEXT(Guest) << "Creating MMIO event fd";
+
+	mmio_fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (mmio_fd < 0) {
+		ERROR << CONTEXT(Guest) << "Unable to create MMIO event fd";
+		return false;
+	}
+
 	// Allocate defined memory regions
 	for (uint32_t i = 0; i < sizeof(guest_memory_regions) / sizeof(guest_memory_regions[0]); i++) {
 		DEBUG << CONTEXT(Guest) << "Allocating memory region: " << guest_memory_regions[i].name
@@ -693,4 +715,67 @@ bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 void KVMGuest::do_guest_printf()
 {
 	fprintf(stderr, "%s", (const char *)per_guest_data->printf_buffer.base_address);
+}
+
+bool KVMGuest::attach_memory_callback(gpa_t gpa, uint8_t size, memory_callback_fn_t callback)
+{
+	fprintf(stderr, "MEMORY CALLBACK: %x %d\n", gpa, size);
+
+	struct kvm_ioeventfd ioev;
+	ioev.addr = gpa | 0x100000000;
+	ioev.len = size;
+	ioev.fd = mmio_fd;
+	ioev.flags = 0;
+	ioev.datamatch = 0;
+
+	if (vmioctl(KVM_IOEVENTFD, &ioev)) {
+		ERROR << "Unable to install IO event fd";
+		return false;
+	}
+
+	return true;
+}
+
+void KVMGuest::mmio_thread()
+{
+	int efd = epoll_create1(0);
+
+	if (efd < 0) {
+		ERROR << "Unable to create EPOLL fd";
+		return;
+	}
+
+	struct epoll_event evt;
+	struct epoll_event evts[1];
+
+	evt.events = EPOLLIN;
+	if (epoll_ctl(efd, EPOLL_CTL_ADD, mmio_fd, &evt)) {
+		ERROR << "Unable to add MMIO fd to EPOLL fd";
+		return;
+	}
+
+	while (true) {
+		int n = epoll_wait(efd, evts, 1, -1);
+
+		for (int i = 0; i < n; i++) {
+			if (evts[i].events & EPOLLERR) {
+				ERROR << "FD has EPOLL error";
+				return;
+			}
+
+			uint64_t x = 0;
+			int n = read(mmio_fd, &x, sizeof(x));
+			if (n < 0) {
+				if (errno == EAGAIN) continue;
+
+				ERROR << "FD has read error";
+				return;
+			} else if (n == 0) {
+				ERROR << "FD has shut down";
+				return;
+			}
+
+			fprintf(stderr, "*** chamone %d %lx\n", n, x);
+		}
+	}
 }

@@ -169,15 +169,32 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 	// Build the chainer
 	builder.SetInsertPoint(chain_block);
-	Value *chain_destination = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
+	Value *chain_destination = builder.CreateLShr(builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL), 12);
 	Value *chain_slot = builder.CreateGEP(lc.region_chain_tbl, { chain_destination });
+	set_aa_metadata(chain_slot, TAG_CLASS_CHAIN);
 	Value *chain_dest = builder.CreateLoad(chain_slot);
 
 	BasicBlock *do_chain_block = BasicBlock::Create(ctx, "do_chain", region_fn);
 	builder.CreateCondBr(builder.CreateICmpEQ(chain_dest, lc.nullptr8()), exit_block, do_chain_block);
 
 	builder.SetInsertPoint(do_chain_block);
-	builder.CreateCall()->setTailCall(true);
+
+	chain_dest = builder.CreateCast(Instruction::BitCast, chain_dest, fn->getPointerTo(0));
+
+	/*{
+		std::vector<Type *> params;
+		params.push_back(lc.i32);
+
+		FunctionType *fntype = FunctionType::get(lc.vtype, params, false);
+		Constant *fn = region_module->getOrInsertFunction("jit_debug1", fntype);
+		builder.CreateCall(fn, builder.CreateLoad(lc.pc_ptr));
+	}*/
+
+
+	CallInst *chain_call = builder.CreateCall(chain_dest, jit_state_ptr_val);
+	chain_call->setTailCall(true);
+
+	builder.CreateRet(chain_call);
 
 	// Verify
 	{

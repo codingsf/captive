@@ -66,6 +66,8 @@ bool CPU::run_region_jit()
 		if (block.has_translation()) {
 			prev_pc = 0;
 
+			jit_state.region_chaining_table[block.owner().address() >> 12] = block.translation()->fn_ptr();
+
 			_exec_txl = true;
 			step_ok = (bool)block.translation()->execute(*this);
 			_exec_txl = false;
@@ -224,6 +226,8 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 	printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
 
 	Region& rgn = profile_image().get_region(rwu->region_base_address);
+
+	jit_state.region_chaining_table[rgn.address() >> 12] = (void *)rwu->function_addr;
 
 	if (rwu->function_addr) {
 		if (rwu->work_unit_id < rgn.generation()) {

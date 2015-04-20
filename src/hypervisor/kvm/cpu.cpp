@@ -172,6 +172,8 @@ bool KVMCpu::run()
 				if (dev != NULL) {
 					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct)))
 						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
+					/*else
+						fprintf(stderr, "dev %x\n", coverted_pa);*/
 					break;
 				} else {
 					ERROR << CONTEXT(CPU) << "Device Not Found: " << std::hex << converted_pa;
@@ -232,15 +234,16 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 	//DEBUG << CONTEXT(CPU) << "Handling Device Access: is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
 
 	if (rs.mmio.is_write) {
-		uint64_t masked_data = *(uint64_t *)&rs.mmio.data[0];
+		/*uint64_t masked_data = *(uint64_t *)&rs.mmio.data[0];
 
 		if (rs.mmio.len < 8) {
 			masked_data &= (1ULL << (rs.mmio.len * 8)) - 1;
 		}
 
-		return device->write(offset, rs.mmio.len, masked_data);
+		return device->write(offset, rs.mmio.len, masked_data);*/
+		return device->write(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);
 	} else {
-		uint64_t masked_data;
+		/*uint64_t masked_data;
 		if (!device->read(offset, rs.mmio.len, masked_data))
 			return false;
 
@@ -248,7 +251,10 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 			masked_data &= (1ULL << (rs.mmio.len * 8)) - 1;
 		}
 
-		*(uint64_t *)&rs.mmio.data[0] = masked_data;
+		*(uint64_t *)&rs.mmio.data[0] = masked_data;*/
+
+		if (!device->read(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]))
+			return false;
 		return true;
 	}
 }

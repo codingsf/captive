@@ -16,7 +16,7 @@ namespace captive {
 		namespace timers {
 			class TickSource;
 		}
-		
+
 		namespace arm {
 			class SP810 : public Primecell
 			{
@@ -27,7 +27,7 @@ namespace captive {
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
-				virtual std::string name() const { return "sp810"; }
+				std::string name() const { return "sp810"; }
 
 			private:
 				typedef std::chrono::high_resolution_clock clock_t;
