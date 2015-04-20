@@ -46,20 +46,6 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	LLVMContext ctx;
 	Module *region_module = new Module("region", ctx);
 
-	std::vector<Type *> params;
-	params.push_back(IntegerType::getInt8PtrTy(ctx));
-	params.push_back(IntegerType::getInt8PtrTy(ctx));
-
-	FunctionType *fn = FunctionType::get(IntegerType::getInt32Ty(ctx), params, false);
-	Function *region_fn = Function::Create(fn, GlobalValue::ExternalLinkage, "region", region_module);
-
-	region_fn->addFnAttr(Attribute::NoRedZone);
-
-	// Create some structural blocks
-	BasicBlock *entry_block = BasicBlock::Create(ctx, "entry", region_fn);
-	BasicBlock *dispatch_block = BasicBlock::Create(ctx, "dispatch", region_fn);
-	BasicBlock *exit_block = BasicBlock::Create(ctx, "exit", region_fn);
-
 	// Initialise the lowering context for this region.
 	IRBuilder<> builder(ctx);
 
@@ -71,6 +57,32 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	lc.i32 = IntegerType::getInt32Ty(ctx); lc.pi32 = PointerType::get(lc.i32, 0);
 	lc.i64 = IntegerType::getInt64Ty(ctx); lc.pi64 = PointerType::get(lc.i64, 0);
 
+	std::vector<Type *> jit_state_elements;
+	jit_state_elements.push_back(lc.pi8);
+	jit_state_elements.push_back(lc.pi8);
+	jit_state_elements.push_back(lc.i32);
+	jit_state_elements.push_back(lc.pi8->getPointerTo(0));
+
+	Type *jit_state_type = StructType::get(ctx, jit_state_elements);
+	PointerType *jit_state_ptr_type = jit_state_type->getPointerTo(0);
+
+	std::vector<Type *> params;
+	params.push_back(jit_state_ptr_type);
+
+	FunctionType *fn = FunctionType::get(lc.i32, params, false);
+	Function *region_fn = Function::Create(fn, GlobalValue::ExternalLinkage, "region", region_module);
+
+	region_fn->addFnAttr(Attribute::NoRedZone);
+
+	Function::ArgumentListType& args = region_fn->getArgumentList();
+	Value *jit_state_ptr_val = &args.front();
+
+	// Create some structural blocks
+	BasicBlock *entry_block = BasicBlock::Create(ctx, "entry", region_fn);
+	BasicBlock *dispatch_block = BasicBlock::Create(ctx, "dispatch", region_fn);
+	BasicBlock *chain_block = BasicBlock::Create(ctx, "chain", region_fn);
+	BasicBlock *exit_block = BasicBlock::Create(ctx, "exit", region_fn);
+
 	// Implement the exit block
 	builder.SetInsertPoint(exit_block);
 	builder.CreateRet(lc.const32(1));
@@ -78,15 +90,17 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	// Fill in some useful values
 	lc.region_fn = region_fn;
 	lc.dispatch_block = dispatch_block;
-
-	Function::ArgumentListType& args = region_fn->getArgumentList();
-	lc.cpu_obj = &args.front();
+	lc.chain_block = chain_block;
+	lc.exit_block = exit_block;
 
 	// Implement the entry block
 	builder.SetInsertPoint(entry_block);
 
 	// Initialise a pointer to the register state
-	lc.reg_state = builder.CreatePtrToInt(args.getNext(&args.front()), lc.i64);
+	Value *jit_state_val = builder.CreateLoad(jit_state_ptr_val);
+	lc.cpu_obj = builder.CreateExtractValue(jit_state_val, {0}, "cpu_object");
+	lc.reg_state = builder.CreatePtrToInt(builder.CreateExtractValue(jit_state_val, {1}, "reg_state"), lc.i64);
+	lc.region_chain_tbl = builder.CreateExtractValue(jit_state_val, {3}, "chain_tbl");
 
 	// Initialise a pointer to the PC
 	Value *pc_ptr_off = builder.CreateAdd(lc.reg_state, lc.const64(60));
@@ -129,8 +143,8 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 
 	// If the region bases are equal, then we can try and dispatch - we might have
 	// a translation for that block.  Otherwise, if it's a different region, then
-	// we must exit.  TODO: Implement region chaining
-	builder.CreateCondBr(builder.CreateICmpNE(pc_region, lc.virtual_base_address), exit_block, do_dispatch_block);
+	// we can try and chain.
+	builder.CreateCondBr(builder.CreateICmpEQ(pc_region, lc.virtual_base_address), do_dispatch_block, chain_block);
 
 	// Now, build the actual dispatcher
 	builder.SetInsertPoint(do_dispatch_block);
@@ -152,6 +166,18 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 			dispatcher->addCase(lc.const32(rwu->blocks[i].block_addr & 0xfff), gbe);
 		}
 	}
+
+	// Build the chainer
+	builder.SetInsertPoint(chain_block);
+	Value *chain_destination = builder.CreateAnd(builder.CreateLoad(lc.pc_ptr), ~0xfffULL);
+	Value *chain_slot = builder.CreateGEP(lc.region_chain_tbl, { chain_destination });
+	Value *chain_dest = builder.CreateLoad(chain_slot);
+
+	BasicBlock *do_chain_block = BasicBlock::Create(ctx, "do_chain", region_fn);
+	builder.CreateCondBr(builder.CreateICmpEQ(chain_dest, lc.nullptr8()), exit_block, do_chain_block);
+
+	builder.SetInsertPoint(do_chain_block);
+	builder.CreateCall()->setTailCall(true);
 
 	// Verify
 	{

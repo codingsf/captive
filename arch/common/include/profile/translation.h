@@ -19,12 +19,12 @@ namespace captive {
 			class Translation
 			{
 			public:
-				typedef uint32_t (*translation_fn_t)(void *, void *);
+				typedef uint32_t (*translation_fn_t)(void *jit_state);
 
 				Translation(translation_fn_t fn) : _fn(fn) { }
 				~Translation() { Memory::shared_memory().free((void *)_fn); }
 
-				uint32_t execute(CPU& cpu) { return _fn(&cpu, cpu.reg_state()); }
+				inline uint32_t execute(CPU& cpu) { return _fn(&cpu.jit_state); }
 
 			private:
 				translation_fn_t _fn;

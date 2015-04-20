@@ -33,6 +33,7 @@ namespace captive {
 			class Image;
 			class Region;
 			class Block;
+			class Translation;
 		}
 
 		class Environment;
@@ -44,6 +45,8 @@ namespace captive {
 
 		class CPU
 		{
+			friend class profile::Translation;
+
 		public:
 			CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data);
 			virtual ~CPU();
@@ -122,7 +125,7 @@ namespace captive {
 				void *cpu;
 				void *registers;
 				uint32_t registers_size;
-				void *region_chaining_table;
+				void **region_chaining_table;
 			} jit_state;
 
 		private:

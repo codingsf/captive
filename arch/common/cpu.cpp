@@ -30,7 +30,7 @@ CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_da
 	memset(block_cache, 0xff, sizeof(block_cache));
 
 	jit_state.cpu = this;
-	jit_state.region_chaining_table = malloc(sizeof(void *) * 0x100000);
+	jit_state.region_chaining_table = (void **)malloc(sizeof(void *) * 0x100000);
 }
 
 CPU::~CPU()
