@@ -23,7 +23,8 @@ namespace captive {
 				NONE,
 				READ_FAULT,
 				WRITE_FAULT,
-				FETCH_FAULT
+				FETCH_FAULT,
+				DEVICE_FAULT
 			};
 
 			enum access_type {
@@ -37,9 +38,15 @@ namespace captive {
 				ACCESS_KERNEL,
 			};
 
+			enum fault_reason {
+				REASON_PAGE_INVALID,
+				REASON_PERMISSIONS_FAIL
+			};
+
 			struct access_info {
 				enum access_type type;
 				enum access_mode mode;
+				enum fault_reason reason;
 
 				inline bool is_read() const { return type == ACCESS_READ; }
 				inline bool is_write() const { return type == ACCESS_WRITE; }
@@ -60,7 +67,7 @@ namespace captive {
 			void cpu_privilege_change(bool kernel_mode);
 			void set_page_executed(gva_t va);
 
-			bool handle_fault(gva_t va, const access_info& info, resolution_fault& fault);
+			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault);
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 
 			inline void flush() {
@@ -86,6 +93,12 @@ namespace captive {
 			inline pa_t gpa_to_hpa(gpa_t gpa) const {
 				return (pa_t)(0x100000000ULL | (uint64_t)gpa);
 			}
+
+			inline gpa_t hpa_to_gpa(pa_t gpa) const {
+				return (gpa_t)((uint64_t)gpa & 0xffffffffULL);
+			}
+
+			bool is_device(gpa_t gpa);
 
 		protected:
 			bool clear_vma();

@@ -275,9 +275,9 @@ bool KVMGuest::prepare_guest_memory()
 {
 	DEBUG << CONTEXT(Guest) << "Creating MMIO event fd";
 
-	mmio_fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
-	if (mmio_fd < 0) {
-		ERROR << CONTEXT(Guest) << "Unable to create MMIO event fd";
+	mmio_epoll_fd = epoll_create1(0);
+	if (mmio_epoll_fd < 0) {
+		ERROR << CONTEXT(Guest) << "Unable to create MMIO epoll fd";
 		return false;
 	}
 
@@ -481,7 +481,7 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x200000, pa += 0x200000) {
 		map_huge_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
-
+	
 	return true;
 }
 
@@ -719,63 +719,87 @@ void KVMGuest::do_guest_printf()
 
 bool KVMGuest::attach_memory_callback(gpa_t gpa, uint8_t size, memory_callback_fn_t callback)
 {
-	fprintf(stderr, "MEMORY CALLBACK: %x %d\n", gpa, size);
-
 	struct kvm_ioeventfd ioev;
-	ioev.addr = gpa | 0x100000000;
+	ioev.addr = gpa | 0x100000000ULL;
 	ioev.len = size;
-	ioev.fd = mmio_fd;
-	ioev.flags = 0;
+	ioev.fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+
+	if (ioev.fd < 0) {
+		ERROR << "Unable to create event fd for memory callback";
+		return false;
+	}
+
+	ioev.flags = KVM_IOEVENTFD_FLAG_DATAMATCH;
 	ioev.datamatch = 0;
 
 	if (vmioctl(KVM_IOEVENTFD, &ioev)) {
+		close(ioev.fd);
 		ERROR << "Unable to install IO event fd";
 		return false;
 	}
+
+	struct memory_callback *cb = new struct memory_callback();
+	cb->gpa = gpa;
+	cb->callback = callback;
+	cb->event_fd = ioev.fd;
+
+	struct epoll_event evt;
+	evt.events = EPOLLIN;
+	evt.data.ptr = cb;
+
+	if (epoll_ctl(mmio_epoll_fd, EPOLL_CTL_ADD, ioev.fd, &evt)) {
+		close(ioev.fd);
+		ERROR << "Unable to add MMIO fd to EPOLL fd";
+		return false;
+	}
+
+	ERROR << CONTEXT(Guest) << "Installed memory callback for " << std::hex << gpa << ":" << size << ", with event fd=" << std::dec << ioev.fd;
 
 	return true;
 }
 
 void KVMGuest::mmio_thread()
 {
-	int efd = epoll_create1(0);
-
-	if (efd < 0) {
-		ERROR << "Unable to create EPOLL fd";
-		return;
-	}
-
-	struct epoll_event evt;
-	struct epoll_event evts[1];
-
-	evt.events = EPOLLIN;
-	if (epoll_ctl(efd, EPOLL_CTL_ADD, mmio_fd, &evt)) {
-		ERROR << "Unable to add MMIO fd to EPOLL fd";
-		return;
-	}
+	struct epoll_event evts[16];
 
 	while (true) {
-		int n = epoll_wait(efd, evts, 1, -1);
+		int n = epoll_wait(mmio_epoll_fd, evts, (sizeof(evts) / sizeof(evts[0])), -1);
 
 		for (int i = 0; i < n; i++) {
+			struct memory_callback *cb = (struct memory_callback *)evts[i].data.ptr;
+
 			if (evts[i].events & EPOLLERR) {
 				ERROR << "FD has EPOLL error";
-				return;
+
+				close(cb->event_fd);
+				delete cb;
+				continue;
+			}
+
+			devices::Device *dev = lookup_device(cb->gpa);
+			if (dev) {
+				dev->write(cb->gpa & ~0xfffULL, 4, 0);
 			}
 
 			uint64_t x = 0;
-			int n = read(mmio_fd, &x, sizeof(x));
+			int n = read(cb->event_fd, &x, sizeof(x));
 			if (n < 0) {
 				if (errno == EAGAIN) continue;
 
 				ERROR << "FD has read error";
-				return;
+
+				close(cb->event_fd);
+				delete cb;
+				continue;
 			} else if (n == 0) {
 				ERROR << "FD has shut down";
-				return;
+
+				close(cb->event_fd);
+				delete cb;
+				continue;
 			}
 
-			fprintf(stderr, "*** chamone %d %lx\n", n, x);
+			//fprintf(stderr, "*** MEMORY WRITE @ %p\n", cb->gpa);
 		}
 	}
 }

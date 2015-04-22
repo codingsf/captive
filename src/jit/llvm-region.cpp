@@ -162,9 +162,9 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 		// Entry blocks should belong to the dispatcher, as should blocks
 		// that have no uses.  This is because unused basic blocks are probably
 		// indirect branch targets.
-		if (rwu->blocks[i].is_entry || gbe->getNumUses() == 0) {
+		//if (rwu->blocks[i].is_entry || gbe->getNumUses() == 0) {
 			dispatcher->addCase(lc.const32(rwu->blocks[i].block_addr & 0xfff), gbe);
-		}
+		//}
 	}
 
 	// Build the chainer

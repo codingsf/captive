@@ -49,13 +49,13 @@ namespace captive {
 	class LogStream : public std::stringstream
 	{
 	public:
-		explicit LogStream() : _ctx(NULL), _level(LL_DEBUG)
+		explicit LogStream() : _ctx(NULL), _level(LL_DEBUG), _force_enabled(false)
 		{
 		}
 
 		~LogStream()
 		{
-			if (_level >= LL_ERROR || !_ctx || _ctx->enabled()) {
+			if (_force_enabled || _level >= LL_ERROR || !_ctx || _ctx->enabled()) {
 				std::cerr << level_text(_level) << ": " << (_ctx != NULL ? _ctx->name() : "?") << ": " << this->str() << std::endl;
 			}
 		}
@@ -92,9 +92,15 @@ namespace captive {
 			}
 		}
 
+		inline void force_enabled(bool enabled)
+		{
+			_force_enabled = enabled;
+		}
+
 	private:
 		const logging::LogContext *_ctx;
 		log_level _level;
+		bool _force_enabled;
 	};
 
 	struct __set_level {
@@ -130,6 +136,23 @@ namespace captive {
 		((LogStream&)__os).context(__f.ctx);
 		return __os;
 	}
+
+	struct __set_enabled {
+		bool enabled;
+	};
+
+	inline __set_enabled set_enabled(bool enabled)
+	{
+		return { enabled };
+	}
+
+	template<typename _CharT, typename _Traits>
+	inline std::basic_ostream<_CharT, _Traits>&
+	operator<<(std::basic_ostream<_CharT, _Traits>& __os, __set_enabled __f)
+	{
+		((LogStream&)__os).force_enabled(__f.enabled);
+		return __os;
+	}
 }
 
 #define LOG() captive::LogStream()
@@ -139,6 +162,8 @@ namespace captive {
 #define WARNING LOG() << captive::set_level(captive::LogStream::LL_WARNING)
 
 #define CONTEXT(_ctx) captive::set_context(captive::logging::LogContext##_ctx)
+#define ENABLE captive::set_enabled(true)
+#define DISABLE captive::set_enabled(false)
 
 #define ___STR(a) #a
 #define __STR(a) ___STR(a)

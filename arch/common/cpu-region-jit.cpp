@@ -94,6 +94,7 @@ bool CPU::run_region_jit()
 		if (block.owner().status() == Region::NOT_IN_TRANSLATION)
 			block.inc_interp_count();
 
+		//printf("interpret: %x %d %d %d\n", virt_pc, block.owner().status(), block.owner().generation(), block.owner().hot_block_count());
 		step_ok = interpret_block();
 	} while(step_ok);
 
@@ -103,7 +104,7 @@ bool CPU::run_region_jit()
 void CPU::analyse_regions()
 {
 	for (auto region : profile_image()) {
-		if (region.second->hot_block_count() > 20 && region.second->status() != Region::IN_TRANSLATION) {
+		if (region.second->hot_block_count() > 1 && region.second->status() != Region::IN_TRANSLATION) {
 			compile_region(*region.second);
 			region.second->reset_heat();
 		}
@@ -142,7 +143,7 @@ void CPU::compile_region(Region& rgn)
 	rwu->valid = true;
 
 	// Make region translation hypercall
-	printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
+	//printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
 	return;
 
@@ -223,7 +224,7 @@ bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 {
-	printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
+	//printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
 
 	Region& rgn = profile_image().get_region(rwu->region_base_address);
 
@@ -231,7 +232,7 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 
 	if (rwu->function_addr) {
 		if (rwu->work_unit_id < rgn.generation()) {
-			printf("jit: discarding stale translation, rwu %08x gen=%d cur gen=%d\n", rwu->region_base_address, rwu->work_unit_id, rgn.generation());
+			//printf("jit: discarding stale translation, rwu %08x gen=%d cur gen=%d\n", rwu->region_base_address, rwu->work_unit_id, rgn.generation());
 			Memory::shared_memory().free((void *)rwu->function_addr);
 		} else {
 			Translation *txln = new Translation((Translation::translation_fn_t)rwu->function_addr);
@@ -240,10 +241,11 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 
 			// Only register entry blocks
 			for (int i = 0; i < rwu->block_count; i++) {
-				if (rwu->blocks[i].is_entry) {
-					//printf("jit: registering block %08x\n", rwu->blocks->descriptors[i].block_addr);
+				//printf("jit: considering block %08x\n", rwu->blocks[i].block_addr);
+				//if (rwu->blocks[i].is_entry) {
+					//printf("jit: registering block %08x\n", rwu->blocks[i].block_addr);
 					rgn.get_block(rwu->blocks[i].block_addr).translation(txln);
-				}
+				//}
 			}
 		}
 	}

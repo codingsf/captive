@@ -72,7 +72,7 @@ void MMU::cpu_privilege_change(bool kernel_mode)
 	clear_vma();
 }
 
-bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& fault)
+bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
@@ -127,11 +127,19 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
 			base->entries[i].present(false);
+			base->entries[i].device(false);
 			base->entries[i].allow_user(false);
 		}
 
 		// Set the PRESENT flag for the page table.
 		pd->present(true);
+	}
+
+	// If the fault happened because of a device access, catch this early
+	// before we go over the lookup rigmaroll.
+	if (pt->device()) {
+		out_pa = (gpa_t)((pt->base_address() & 0xffffffff) | (va & 0xfff));
+		goto handle_device;
 	}
 
 	if (info.is_write() && pt->executed()) {
@@ -155,6 +163,12 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 		pt->present(true);
 		pt->allow_user(true);
 		pt->writable(true);
+		pt->device(is_device((gpa_t)va));
+
+		if (pt->device()) {
+			out_pa = (gpa_t)va;
+			goto handle_device;
+		}
 	} else {
 		gpa_t pa;
 		if (!resolve_gpa(va, pa, info, fault)) {
@@ -170,14 +184,34 @@ bool MMU::handle_fault(gva_t va, const access_info& info, resolution_fault& faul
 			pt->present(true);
 			pt->allow_user(info.is_user());
 			pt->writable(info.is_write());
+			pt->device(is_device(pa));
+
+			if (pt->device()) {
+				out_pa = pa;
+				goto handle_device;
+			}
 
 			//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
 		} else {
 			pt->present(false);
+			pt->device(false);
 			//printf("mmu: %08x fault: va=%08x access-type=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[mem_access_type], mem_fault_types[fault]);
 		}
 	}
 
 	Memory::flush_page((va_t)(uint64_t)va);
 	return true;
+
+handle_device:
+	Memory::flush_page((va_t)(uint64_t)va);
+	fault = DEVICE_FAULT;
+
+	return true;
+}
+
+bool MMU::is_device(gpa_t gpa)
+{
+	if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
+	if (gpa >= 0x101e3000 && gpa < 0x101e4000) return true;
+	return false;
 }

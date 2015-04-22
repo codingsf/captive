@@ -3,8 +3,47 @@
 #include <env.h>
 #include <cpu.h>
 #include <mmu.h>
+#include <x86/decode.h>
 
 using namespace captive::arch;
+
+static inline bool is_prefix(uint8_t bc)
+{
+	return bc == 0x67 || bc == 0x66;
+}
+
+static void handle_device_fault(struct mcontext *mctx, gpa_t dev_addr)
+{
+	printf("fault: device fault rip=%lx\n", mctx->rip);
+
+	printf("code: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%02x ", ((uint8_t *)mctx->rip)[i]);
+	}
+	printf("\n");
+
+	captive::arch::x86::MemoryInstruction inst;
+	assert(decode_memory_instruction((const uint8_t *)mctx->rip, inst));
+
+	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
+		uint32_t value;
+
+		switch (inst.Source.reg) {
+		case x86::Operand::R_ESI: value = mctx->rsi; break;
+		default: abort();
+		}
+
+		printf("device write: addr=%x, value=%u\n", dev_addr, value);
+		abort();
+	} else if (inst.Dest.type == x86::Operand::TYPE_REGISTER) {
+		printf("device read: src=%d, dst=%d\n", inst.Source.immed_val, inst.Dest.immed_val);
+	} else {
+		abort();
+	}
+
+	// Skip over the instruction
+	mctx->rip += inst.length;
+}
 
 #define PF_PRESENT	(1 << 0)
 #define PF_WRITE	(1 << 1)
@@ -30,6 +69,14 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 			//info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
 			info.mode = core->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 
+			if (code & PF_PRESENT) {
+				// Detect the fault as being because the accessed page is invalid
+				info.reason = MMU::REASON_PAGE_INVALID;
+			} else {
+				// Detect the fault as being because a permissions check failed
+				info.reason = MMU::REASON_PERMISSIONS_FAIL;
+			}
+
 			if (va == core->read_pc() && !(code & PF_WRITE)) {
 				// Detect a fetch
 				info.type = MMU::ACCESS_FETCH;
@@ -43,9 +90,15 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 			}
 
 			// Get the core's MMU to handle the fault.
-			if (core->mmu().handle_fault((gva_t)va, info, fault)) {
+			gpa_t out_pa;
+			if (core->mmu().handle_fault((gva_t)va, out_pa, info, fault)) {
 				// If we got this far, then the fault was handled by the core's logic.
 				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%d\n", va, code, core->read_pc(), fault, info.mode);
+
+				if (fault == MMU::DEVICE_FAULT) {
+					handle_device_fault(mctx, out_pa);
+					return 0;
+				}
 
 				// Return TRUE if we need to return to the safe-point, i.e. to do a side
 				// exit from the currently executing guest instruction.

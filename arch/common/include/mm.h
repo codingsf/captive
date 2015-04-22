@@ -37,7 +37,8 @@ namespace captive {
 				GLOBAL		= 1 << 8,
 
 				// CUSTOM
-				EXECUTED	= 1 << 9
+				EXECUTED	= 1 << 9,
+				DEVICE		= 1 << 10
 			};
 
 			uint64_t data;
@@ -57,6 +58,9 @@ namespace captive {
 
 			inline bool executed() const { return get_flag(EXECUTED); }
 			inline void executed(bool v) { set_flag(EXECUTED, v); }
+
+			inline bool device() const { return get_flag(DEVICE); }
+			inline void device(bool v) { set_flag(DEVICE, v); }
 
 			inline bool get_flag(entry_flags_t flag) const {
 				return (flags() & (uint16_t)flag) == (uint16_t)flag;
