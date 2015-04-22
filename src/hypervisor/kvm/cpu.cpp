@@ -157,6 +157,18 @@ bool KVMCpu::run()
 				}
 			} else if (cpu_run_struct->io.port == 0xfd) {
 				dump_regs();
+			} else if (cpu_run_struct->io.port == 0xf0) {
+				devices::Device *dev = kvm_guest.lookup_device(per_cpu_data().device_address);
+				if (dev != NULL) {
+					// TODO: FIXME: HACK
+					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
+						// Device Write
+						dev->write(per_cpu_data().device_address & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
+					} else {
+						// Device Read
+						dev->read(per_cpu_data().device_address & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
+					}
+				}
 			} else {
 				run_cpu = false;
 				DEBUG << CONTEXT(CPU) << "EXIT IO "
@@ -170,6 +182,8 @@ bool KVMCpu::run()
 				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
 				if (dev != NULL) {
+					//fprintf(stderr, "device access %x\n", converted_pa);
+
 					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct)))
 						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
 					/*else
@@ -403,7 +417,6 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 
 		return true;
 	}
-
 	}
 
 	return false;

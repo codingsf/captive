@@ -163,7 +163,11 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pt->present(true);
 		pt->allow_user(true);
 		pt->writable(true);
-		pt->device(is_device((gpa_t)va));
+
+		if (is_device((gpa_t)va)) {
+			pt->device(true);
+			pt->present(false);
+		}
 
 		if (pt->device()) {
 			out_pa = (gpa_t)va;
@@ -184,9 +188,11 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 			pt->present(true);
 			pt->allow_user(info.is_user());
 			pt->writable(info.is_write());
-			pt->device(is_device(pa));
 
-			if (pt->device()) {
+			if (is_device(pa)) {
+				pt->device(true);
+				pt->present(false);
+
 				out_pa = pa;
 				goto handle_device;
 			}
@@ -213,5 +219,10 @@ bool MMU::is_device(gpa_t gpa)
 {
 	if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
 	if (gpa >= 0x101e3000 && gpa < 0x101e4000) return true;
+	if (gpa >= 0x10140000 && gpa < 0x10141000) return true;
+	if (gpa >= 0x10000000 && gpa < 0x10001000) return true;
+	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;
+	//if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
+
 	return false;
 }

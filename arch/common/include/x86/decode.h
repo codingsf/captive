@@ -40,6 +40,31 @@ namespace captive {
 					R_EBP,
 					R_ESI,
 					R_EDI,
+
+					R_AX,
+					R_BX,
+					R_CX,
+					R_DX,
+					R_SP,
+					R_BP,
+					R_SI,
+					R_DI,
+
+					R_AH,
+					R_BH,
+					R_CH,
+					R_DH,
+					R_AL,
+					R_BL,
+					R_CL,
+					R_DL,
+
+					R_SPL,
+					R_BPL,
+					R_SIL,
+					R_DIL,
+
+					R_Z,
 				};
 
 				union {
@@ -47,7 +72,9 @@ namespace captive {
 					reg_idx reg;
 					struct {
 						reg_idx base_reg_idx;
-						uint32_t displacement;
+						reg_idx index_reg_idx;
+						uint8_t scale;
+						int32_t displacement;
 					} mem;
 				};
 			};
@@ -55,9 +82,11 @@ namespace captive {
 			struct MemoryInstruction
 			{
 				uint8_t length;
+				uint8_t data_size;
 				
 				enum {
 					I_MOV,
+					I_MOVZX,
 				} type;
 
 				struct Operand Source;

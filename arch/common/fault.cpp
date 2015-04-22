@@ -7,36 +7,57 @@
 
 using namespace captive::arch;
 
-static inline bool is_prefix(uint8_t bc)
+static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr)
 {
-	return bc == 0x67 || bc == 0x66;
-}
-
-static void handle_device_fault(struct mcontext *mctx, gpa_t dev_addr)
-{
-	printf("fault: device fault rip=%lx\n", mctx->rip);
+	/*printf("fault: device fault rip=%lx\n", mctx->rip);
 
 	printf("code: ");
 	for (int i = 0; i < 8; i++) {
 		printf("%02x ", ((uint8_t *)mctx->rip)[i]);
 	}
-	printf("\n");
+	printf("\n");*/
+
+	core->cpu_data().device_address = dev_addr;
 
 	captive::arch::x86::MemoryInstruction inst;
 	assert(decode_memory_instruction((const uint8_t *)mctx->rip, inst));
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
-		uint32_t value;
-
 		switch (inst.Source.reg) {
-		case x86::Operand::R_ESI: value = mctx->rsi; break;
+		case x86::Operand::R_EAX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rax)); break;
+		case x86::Operand::R_EBX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rbx)); break;
+		case x86::Operand::R_ECX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rcx)); break;
+		case x86::Operand::R_EDX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdx)); break;
+		case x86::Operand::R_ESI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rsi)); break;
+		case x86::Operand::R_EDI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdi)); break;
+
+		case x86::Operand::R_AX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rax)); break;
+		case x86::Operand::R_BX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rbx)); break;
+		case x86::Operand::R_CX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rcx)); break;
+		case x86::Operand::R_DX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdx)); break;
+		case x86::Operand::R_SI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rsi)); break;
+		case x86::Operand::R_DI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdi)); break;
+
+		case x86::Operand::R_AL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rax)); break;
+		case x86::Operand::R_BL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rbx)); break;
+		case x86::Operand::R_CL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rcx)); break;
+		case x86::Operand::R_DL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rdx)); break;
+
 		default: abort();
 		}
+	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
+		uint32_t value;
+		asm volatile("inl $0xf0, %0\n" : "=a"(value));
 
-		printf("device write: addr=%x, value=%u\n", dev_addr, value);
-		abort();
-	} else if (inst.Dest.type == x86::Operand::TYPE_REGISTER) {
-		printf("device read: src=%d, dst=%d\n", inst.Source.immed_val, inst.Dest.immed_val);
+		switch (inst.Dest.reg) {
+		case x86::Operand::R_EAX: mctx->rax = value; break;
+		case x86::Operand::R_EBX: mctx->rbx = value; break;
+		case x86::Operand::R_ECX: mctx->rcx = value; break;
+		case x86::Operand::R_EDX: mctx->rdx = value; break;
+		case x86::Operand::R_ESI: mctx->rsi = value; break;
+		case x86::Operand::R_EDI: mctx->rdi = value; break;
+		default: abort();
+		}
 	} else {
 		abort();
 	}
@@ -96,7 +117,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%d\n", va, code, core->read_pc(), fault, info.mode);
 
 				if (fault == MMU::DEVICE_FAULT) {
-					handle_device_fault(mctx, out_pa);
+					handle_device_fault(core, mctx, out_pa);
 					return 0;
 				}
 

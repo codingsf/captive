@@ -97,6 +97,8 @@ namespace captive {
 		bool verify_enabled;
 		uint32_t verify_tid;
 
+		uint32_t device_address;
+
 		lock::SpinLock rwu_ready_queue_lock;
 		queue::QueueItem *rwu_ready_queue;
 	};
