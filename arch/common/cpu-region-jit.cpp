@@ -45,6 +45,8 @@ bool CPU::run_region_jit()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
+		mmu().set_page_executed(virt_pc);
+
 		MMU::access_info info;
 		info.mode = kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 		info.type = MMU::ACCESS_FETCH;
@@ -66,7 +68,7 @@ bool CPU::run_region_jit()
 		if (block.has_translation()) {
 			prev_pc = 0;
 
-			jit_state.region_chaining_table[block.owner().address() >> 12] = block.translation()->fn_ptr();
+			//jit_state.region_chaining_table[block.owner().address() >> 12] = block.translation()->fn_ptr();
 
 			_exec_txl = true;
 			step_ok = (bool)block.translation()->execute(*this);
@@ -75,8 +77,6 @@ bool CPU::run_region_jit()
 		} else {
 			block.owner().add_virtual_base(virt_pc);
 		}
-
-		mmu().set_page_executed(virt_pc);
 
 		if (trace_interval > 10000) {
 			trace_interval = 0;
@@ -94,7 +94,6 @@ bool CPU::run_region_jit()
 		if (block.owner().status() == Region::NOT_IN_TRANSLATION)
 			block.inc_interp_count();
 
-		//printf("interpret: %x %d %d %d\n", virt_pc, block.owner().status(), block.owner().generation(), block.owner().hot_block_count());
 		step_ok = interpret_block();
 	} while(step_ok);
 
@@ -105,6 +104,11 @@ void CPU::analyse_regions()
 {
 	for (auto region : profile_image()) {
 		if (region.second->hot_block_count() > 1 && region.second->status() != Region::IN_TRANSLATION) {
+			/*for (auto vaddr : region.second->virtual_bases()) {
+				//printf("marking %08x as executed in %08x\n", vaddr, region.second->address());
+
+			}*/
+
 			compile_region(*region.second);
 			region.second->reset_heat();
 		}
@@ -120,8 +124,9 @@ void CPU::compile_region(Region& rgn)
 	RegionWorkUnit *rwu = (RegionWorkUnit *)Memory::shared_memory().allocate(sizeof(RegionWorkUnit), SharedMemory::ZERO);
 	assert(rwu);
 
-	rgn.set_work_unit(rwu);
+	rgn.inc_generation();
 
+	rwu->region_object = &rgn;
 	rwu->region_base_address = (uint32_t)rgn.address();
 	rwu->work_unit_id = rgn.generation();
 
@@ -143,7 +148,7 @@ void CPU::compile_region(Region& rgn)
 	rwu->valid = true;
 
 	// Make region translation hypercall
-	//printf("jit: dispatching region %08x rwu=%p\n", rwu->region_base_address, rwu);
+	//printf("jit: dispatching region %08x rwu=%p gen=%d\n", rwu->region_base_address, rwu, rgn.generation());
 	asm volatile("out %0, $0xff" :: "a"(8), "D"((uint64_t)rwu));
 	return;
 
@@ -224,39 +229,54 @@ bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 {
-	//printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
+	Region& rgn = *((Region *)rwu->region_object);
 
-	Region& rgn = profile_image().get_region(rwu->region_base_address);
+	if (rgn.valid()) {
+		//printf("jit: register region %08x rwu=%p fn=%lx gen=%d\n", rwu->region_base_address, rwu, rwu->function_addr, rwu->work_unit_id);
+		//jit_state.region_chaining_table[rgn.address() >> 12] = (void *)rwu->function_addr;
 
-	jit_state.region_chaining_table[rgn.address() >> 12] = (void *)rwu->function_addr;
+		if (rgn.translation()) {
+			// TODO: FIXME: Do this.
+			//printf("jit: deleting old translation\n");
+		}
 
-	if (rwu->function_addr) {
-		if (rwu->work_unit_id < rgn.generation()) {
-			//printf("jit: discarding stale translation, rwu %08x gen=%d cur gen=%d\n", rwu->region_base_address, rwu->work_unit_id, rgn.generation());
-			Memory::shared_memory().free((void *)rwu->function_addr);
-		} else {
-			Translation *txln = new Translation((Translation::translation_fn_t)rwu->function_addr);
+		if (rwu->function_addr) {
+			if (rwu->work_unit_id < rgn.generation()) {
+				//printf("jit: discarding stale translation, rwu %08x gen=%d cur gen=%d\n", rwu->region_base_address, rwu->work_unit_id, rgn.generation());
+				Memory::shared_memory().free((void *)rwu->function_addr);
+			} else {
+				Translation *txln = new Translation((Translation::translation_fn_t)rwu->function_addr);
 
-			rgn.translation(txln);
+				rgn.translation(txln);
 
-			// Only register entry blocks
-			for (int i = 0; i < rwu->block_count; i++) {
-				//printf("jit: considering block %08x\n", rwu->blocks[i].block_addr);
-				//if (rwu->blocks[i].is_entry) {
-					//printf("jit: registering block %08x\n", rwu->blocks[i].block_addr);
-					rgn.get_block(rwu->blocks[i].block_addr).translation(txln);
-				//}
+				// Only register entry blocks
+				for (int i = 0; i < rwu->block_count; i++) {
+					//printf("jit: considering block %08x\n", rwu->blocks[i].block_addr);
+					//if (rwu->blocks[i].is_entry) {
+						//printf("jit: registering block %08x\n", rwu->blocks[i].block_addr);
+						rgn.get_block(rwu->blocks[i].block_addr).translation(txln);
+					//}
+				}
 			}
 		}
+
+		rgn.status(Region::NOT_IN_TRANSLATION);
+	} else {
+		//printf("jit: discard region %08x\n", rwu->region_base_address);
+
+		if (rwu->function_addr) {
+			Memory::shared_memory().free((void *)rwu->function_addr);
+		}
+
+		// TODO: FIXME: delete region?
 	}
 
-	rgn.set_work_unit(NULL);
-
+	// Release memory
+	// TODO: FIXME: Check that this is everything to be released for the RWU
 	for (int i = 0; i < rwu->block_count; i++) {
 		Memory::shared_memory().free(rwu->blocks[i].ir_insn);
 	}
 
 	Memory::shared_memory().free(rwu->blocks);
-
-	rgn.status(Region::NOT_IN_TRANSLATION);
+	Memory::shared_memory().free(rwu);
 }

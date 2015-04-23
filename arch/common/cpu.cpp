@@ -176,9 +176,9 @@ bool CPU::interpret_block()
 		}
 
 		// Execute the instruction, with interrupts disabled.
-		__local_irq_disable();
+		//__local_irq_disable();
 		step_ok = interpreter().step_single(insn);
-		__local_irq_enable();
+		//__local_irq_enable();
 
 		// Increment the instruction counter.
 		inc_insns_executed();
@@ -196,26 +196,6 @@ void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base
 
 	profile_image().invalidate((gpa_t)((uint64_t)phys_page_base_addr & 0xffffffffULL));
 	jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
-
-	// Evict entries from the decode cache and block cache
-	/*uint32_t page_base = (uint32_t)(uint64_t)page_base_addr;
-	for (uint32_t pc = page_base; pc < page_base + 0x1000; pc += 4) {
-		Decode *decode = get_decode(pc);
-
-		if (decode->pc == pc) {
-			decode->pc = 0xffffffff;
-		}
-
-		GuestBasicBlock *block = get_block(pc);
-
-		if (block->block_address() == pc) {
-			if (block->valid()) {
-				block->release_memory();
-			}
-
-			block->invalidate();
-		}
-	}*/
 }
 
 bool CPU::verify_check()

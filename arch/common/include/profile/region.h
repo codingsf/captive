@@ -30,6 +30,7 @@ namespace captive {
 				{
 					NOT_IN_TRANSLATION,
 					IN_TRANSLATION,
+					INVALID
 				};
 
 				typedef std::map<gpa_t, Block *> block_map_t;
@@ -52,8 +53,10 @@ namespace captive {
 				inline block_map_t::iterator end() { return blocks.end(); }
 
 				inline uint32_t generation() const { return _generation; }
+				inline void inc_generation() { _generation++; }
 
 				void invalidate();
+				void invalidate_vaddr();
 				void reset_heat();
 
 				inline void add_virtual_base(gva_t address)
@@ -67,10 +70,7 @@ namespace captive {
 				inline void translation(Translation *txln) { _txln = txln; }
 				inline Translation *translation() const { return _txln; }
 
-				inline void set_work_unit(shared::RegionWorkUnit *rwu)
-				{
-					_rwu = rwu;
-				}
+				inline bool valid() const { return _status != INVALID; }
 
 			private:
 				Image& _owner;
@@ -78,7 +78,6 @@ namespace captive {
 				Status _status;
 				uint32_t _generation;
 				Translation *_txln;
-				shared::RegionWorkUnit *_rwu;
 
 				block_map_t blocks;
 				vaddr_set_t vaddrs;

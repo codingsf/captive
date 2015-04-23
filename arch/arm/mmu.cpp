@@ -3,6 +3,7 @@
 #include <arm-env.h>
 #include <mm.h>
 #include <printf.h>
+#include <profile/image.h>
 
 using namespace captive::arch;
 using namespace captive::arch::arm;
@@ -38,6 +39,7 @@ bool ArmMMU::enable()
 	if (_enabled) return true;
 
 	clear_vma();
+	cpu().profile_image().invalidate();
 
 	_enabled = true;
 	//printf("mmu: enabled\n");
@@ -49,6 +51,7 @@ bool ArmMMU::disable()
 	if (!_enabled) return true;
 
 	clear_vma();
+	cpu().profile_image().invalidate();
 
 	_enabled = false;
 	//printf("mmu: disabled\n");

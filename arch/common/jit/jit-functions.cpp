@@ -51,3 +51,39 @@ extern "C" void jit_debug2(uint32_t pc)
 {
 	printf("DO DISPATCH: %x\n", pc);
 }
+
+extern "C" void mem_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t val)
+{
+	*((volatile uint8_t *)(uint64_t)addr) = val;
+}
+
+extern "C" void mem_write16(captive::arch::CPU *cpu, uint32_t addr, uint16_t val)
+{
+	*((volatile uint16_t *)(uint64_t)addr) = val;
+}
+
+extern "C" void mem_write32(captive::arch::CPU *cpu, uint32_t addr, uint32_t val)
+{
+	*((volatile uint32_t *)(uint64_t)addr) = val;
+}
+
+extern "C" void mem_user_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t val)
+{
+	cpu->emulate_user_mode_begin();
+	*((volatile uint8_t *)(uint64_t)addr) = val;
+	cpu->emulate_user_mode_end();
+}
+
+extern "C" void mem_user_write16(captive::arch::CPU *cpu, uint32_t addr, uint16_t val)
+{
+	cpu->emulate_user_mode_begin();
+	*((volatile uint16_t *)(uint64_t)addr) = val;
+	cpu->emulate_user_mode_end();
+}
+
+extern "C" void mem_user_write32(captive::arch::CPU *cpu, uint32_t addr, uint32_t val)
+{
+	cpu->emulate_user_mode_begin();
+	*((volatile uint32_t *)(uint64_t)addr) = val;
+	cpu->emulate_user_mode_end();
+}

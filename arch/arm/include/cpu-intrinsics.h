@@ -122,9 +122,9 @@ define_mem_read_user_func(64, uint64_t)
 
 #define define_mem_write_user_func(_size, _type) static inline void __mem_write_##_size ## _user(captive::arch::CPU& cpu, uint32_t addr, _type data) \
 { \
-	if (cpu.kernel_mode()) { switch_to_user_mode(); } \
+	cpu.emulate_user_mode_begin(); \
 	mem_write_##_size(addr, data); \
-	if (cpu.kernel_mode()) { switch_to_kernel_mode(); } \
+	cpu.emulate_user_mode_end(); \
 }
 
 define_mem_write_user_func(8, uint8_t)

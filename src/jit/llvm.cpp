@@ -369,15 +369,38 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 	}
 
 	case shared::IRInstruction::WRITE_MEM:
+	case shared::IRInstruction::WRITE_MEM_USER:
 	{
 		Value *addr = value_for_operand(ctx, op1), *src = value_for_operand(ctx, op0);
 
 		assert(addr && src);
 
-		Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
-		set_aa_metadata(memptr, TAG_CLASS_MEMORY);
+		if (ir->type == shared::IRInstruction::WRITE_MEM) {
+			Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
+			set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
-		ctx.builder.CreateStore(src, memptr, true);
+			ctx.builder.CreateStore(src, memptr, true);
+		} else {
+			Type *src_type = type_for_operand(ctx, op0, false);
+
+			std::vector<Type *> params;
+			params.push_back(ctx.parent.pi8);
+			params.push_back(ctx.parent.i32);
+			params.push_back(src_type);
+
+			FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
+
+			Constant *fn = NULL;
+			if (src_type == ctx.parent.i8) {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write8", fntype);
+			} else if (src_type == ctx.parent.i16) {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write16", fntype);
+			} else {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write32", fntype);
+			}
+
+			ctx.builder.CreateCall3(fn, ctx.parent.cpu_obj, addr, src);
+		}
 
 		return true;
 	}

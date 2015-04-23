@@ -85,6 +85,18 @@ namespace captive {
 				}
 			}
 
+			inline bool emulating_user_mode() const { return local_state._emulate_user_mode; }
+
+			inline void emulate_user_mode_begin()
+			{
+				local_state._emulate_user_mode = true;
+			}
+
+			inline void emulate_user_mode_end()
+			{
+				local_state._emulate_user_mode = false;
+			}
+
 			inline bool executing_translation() const { return _exec_txl; }
 
 			void invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr);
@@ -120,7 +132,8 @@ namespace captive {
 			Trace *_trace;
 
 			struct {
-				bool _kernel_mode;
+				volatile bool _kernel_mode;
+				volatile bool _emulate_user_mode;
 				uint32_t last_exception_action;
 			} local_state;
 
@@ -140,13 +153,13 @@ namespace captive {
 			inline void ensure_privilege_mode()
 			{
 				// Switch x86 privilege mode, to match the mode of the emulated processor
-				if (kernel_mode() && !in_kernel_mode()) {
+				/*if (kernel_mode() && !in_kernel_mode()) {
 					//printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
-//					switch_to_kernel_mode();
+					switch_to_kernel_mode();
 				} else if (!kernel_mode() && !in_user_mode()) {
 					//printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
-//					switch_to_user_mode();
-				}
+					switch_to_user_mode();
+				}*/
 			}
 
 			static CPU *current_cpu;

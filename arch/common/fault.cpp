@@ -88,14 +88,14 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 			// Prepare an access_info structure to describe the memory access
 			// to the MMU.
 			//info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
-			info.mode = core->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+			info.mode = (core->kernel_mode() && !core->emulating_user_mode()) ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 
 			if (code & PF_PRESENT) {
-				// Detect the fault as being because the accessed page is invalid
-				info.reason = MMU::REASON_PAGE_INVALID;
-			} else {
 				// Detect the fault as being because a permissions check failed
 				info.reason = MMU::REASON_PERMISSIONS_FAIL;
+			} else {
+				// Detect the fault as being because the accessed page is invalid
+				info.reason = MMU::REASON_PAGE_INVALID;
 			}
 
 			if (va == core->read_pc() && !(code & PF_WRITE)) {

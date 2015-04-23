@@ -29,6 +29,7 @@ Region& Image::get_region(gpa_t gpa)
 	if (f == regions.end()) {
 		Region *rgn = new Region(*this, region_base_address);
 		regions[region_base_address] = rgn;
+
 		return *rgn;
 	} else {
 		return *(f->second);
@@ -37,14 +38,33 @@ Region& Image::get_region(gpa_t gpa)
 
 void Image::invalidate()
 {
-	printf("profile: invalidating all regions\n");
-	
+	//printf("profile: invalidating all regions\n");
+
 	for (auto rgn : regions) {
 		rgn.second->invalidate();
+	}
+
+	regions.clear();
+}
+
+void Image::invalidate_vaddr()
+{
+	for (auto rgn : regions) {
+		rgn.second->invalidate_vaddr();
 	}
 }
 
 void Image::invalidate(gpa_t gpa)
 {
-	get_region(gpa).invalidate();
+	gpa_t region_base_address = gpa & ~0xfffULL;
+
+	//printf("profile: invalidating region %08x\n", region_base_address);
+
+	region_map_t::iterator f = regions.find(region_base_address);
+	if (f != regions.end()) {
+		Region& rgn = *(f->second);
+		rgn.invalidate();
+
+		regions.erase(f);
+	}
 }

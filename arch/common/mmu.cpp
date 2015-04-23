@@ -142,7 +142,9 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		goto handle_device;
 	}
 
-	if (info.is_write() && pt->executed()) {
+	if (pt->present() && info.is_write() && pt->executed()) {
+		//printf("mmu: execution fault phys=%08x, virt=%08x jit=%d\n", pt->base_address(), va, _cpu.executing_translation());
+
 		// Clear the EXECUTED flag and invalidate the page, so that translations
 		// can be discarded.
 		pt->executed(false);

@@ -30,6 +30,7 @@ namespace captive {
 
 				void invalidate(gpa_t gpa);
 				void invalidate();
+				void invalidate_vaddr();
 
 				region_map_t::iterator begin() { return regions.begin(); }
 				region_map_t::iterator end() { return regions.end(); }

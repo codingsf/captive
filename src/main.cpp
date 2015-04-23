@@ -260,7 +260,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-
 	CPU *cpu = NULL;
 	if (verify_enabled()) {
 		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);

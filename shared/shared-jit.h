@@ -105,6 +105,8 @@ namespace captive {
 				WRITE_REG,
 				READ_MEM,
 				WRITE_MEM,
+				READ_MEM_USER,
+				WRITE_MEM_USER,
 
 				CALL,
 				JMP,
@@ -393,6 +395,22 @@ namespace captive {
 				return IRInstruction(WRITE_MEM, src, offset);
 			}
 
+			static IRInstruction ldmem_user(IROperand offset, IROperand dst)
+			{
+				assert(offset.is_constant() || offset.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(READ_MEM_USER, offset, dst);
+			}
+
+			static IRInstruction stmem_user(IROperand src, IROperand offset)
+			{
+				assert(offset.is_constant() || offset.is_vreg());
+				assert(src.is_constant() || src.is_vreg());
+
+				return IRInstruction(WRITE_MEM_USER, src, offset);
+			}
+
 			static IRInstruction write_device(IROperand dev, IROperand reg, IROperand val)
 			{
 				assert(dev.is_constant() || dev.is_vreg());
@@ -525,7 +543,7 @@ namespace captive {
 			uint64_t function_addr;
 
 			bool valid;
-
+			void *region_object;
 
 			uint32_t block_count;
 			TranslationBlock *blocks;

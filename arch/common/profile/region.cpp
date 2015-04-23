@@ -5,7 +5,7 @@
 
 using namespace captive::arch::profile;
 
-Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION), _generation(0), _txln(NULL), _rwu(NULL)
+Region::Region(Image& owner, gpa_t address) : _owner(owner), _address(address), _status(NOT_IN_TRANSLATION), _generation(0), _txln(NULL)
 {
 
 }
@@ -49,25 +49,17 @@ void Region::reset_heat()
 
 void Region::invalidate()
 {
-	_status = NOT_IN_TRANSLATION;
-
-	if (_rwu) {
-		_rwu->valid = false;
-		_rwu = NULL;
-	}
+	_status = INVALID;
 
 	if (_txln) {
+		printf("region: deleting translation\n");
 		// FIXME: TODO
 		//delete _txln;
 		_txln = NULL;
 	}
+}
 
-	_generation++;
-
-	for (auto block : blocks) {
-		delete block.second;
-	}
-
-	blocks.clear();
+void Region::invalidate_vaddr()
+{
 	vaddrs.clear();
 }
