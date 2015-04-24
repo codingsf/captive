@@ -22,9 +22,9 @@ bool CPU::run_region_jit()
 
 	printf("cpu: starting region-jit cpu execution\n");
 
-	if (!check_safepoint()) {
+	/*if (!check_safepoint()) {
 		return false;
-	}
+	}*/
 
 	gpa_t prev_pc = 0;
 	do {
@@ -252,10 +252,10 @@ void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
 				// Only register entry blocks
 				for (int i = 0; i < rwu->block_count; i++) {
 					//printf("jit: considering block %08x\n", rwu->blocks[i].block_addr);
-					//if (rwu->blocks[i].is_entry) {
+					if (rwu->blocks[i].is_entry) {
 						//printf("jit: registering block %08x\n", rwu->blocks[i].block_addr);
 						rgn.get_block(rwu->blocks[i].block_addr).translation(txln);
-					//}
+					}
 				}
 			}
 		}

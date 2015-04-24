@@ -67,6 +67,27 @@ extern "C" void mem_read32(captive::arch::CPU *cpu, uint32_t addr, uint32_t *val
 	*val = *((volatile uint32_t *)(uint64_t)addr);
 }
 
+extern "C" void mem_user_read8(captive::arch::CPU *cpu, uint32_t addr, uint8_t *val)
+{
+	cpu->emulate_user_mode_begin();
+	*val = *((volatile uint8_t *)(uint64_t)addr);
+	cpu->emulate_user_mode_end();
+}
+
+extern "C" void mem_user_read16(captive::arch::CPU *cpu, uint32_t addr, uint16_t *val)
+{
+	cpu->emulate_user_mode_begin();
+	*val = *((volatile uint16_t *)(uint64_t)addr);
+	cpu->emulate_user_mode_end();
+}
+
+extern "C" void mem_user_read32(captive::arch::CPU *cpu, uint32_t addr, uint32_t *val)
+{
+	cpu->emulate_user_mode_begin();
+	*val = *((volatile uint32_t *)(uint64_t)addr);
+	cpu->emulate_user_mode_end();
+}
+
 extern "C" void mem_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t val)
 {
 	*((volatile uint8_t *)(uint64_t)addr) = val;

@@ -62,6 +62,9 @@ bool CPU::run()
 {
 	switch (_per_cpu_data->execution_mode) {
 	case 0:
+		printf("cpu: starting interpretive cpu execution\n");
+		//trace().enable();
+
 		return run_interp();
 	case 1:
 		return run_block_jit();
@@ -72,7 +75,7 @@ bool CPU::run()
 	}
 }
 
-bool CPU::check_safepoint()
+bool CPU::run_interp()
 {
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
@@ -101,18 +104,12 @@ bool CPU::check_safepoint()
 	// Make sure we're operating in the correct mode
 	ensure_privilege_mode();
 
-	return true;
+	return run_interp_safepoint();
 }
 
-bool CPU::run_interp()
+bool CPU::run_interp_safepoint()
 {
 	bool step_ok = true;
-
-	printf("cpu: starting interpretive cpu execution\n");
-
-	if (!check_safepoint()) {
-		return false;
-	}
 
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
@@ -154,7 +151,10 @@ bool CPU::interpret_block()
 		// Get the address of the next instruction to execute
 		uint32_t pc = read_pc();
 
+		//printf("insn=%08x\n", pc);
 		assert_privilege_mode();
+
+		//printf("executing block in %s mode\n", in_kernel_mode() ? "kernel" : "user");
 
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);

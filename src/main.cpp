@@ -104,6 +104,7 @@ int main(int argc, char **argv)
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	//cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x10000000, 0x100000000-0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x40000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x60000000, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x80000000, 0x60000000));
 
 	devices::arm::ArmCpuIRQController *cpu_irq = new devices::arm::ArmCpuIRQController();
@@ -265,7 +266,7 @@ int main(int argc, char **argv)
 		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
 		cpu = guest->create_cpu(cpu_cfg);
 	} else {
-		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::RegionJIT);
+		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::Interpreter);
 		cpu = guest->create_cpu(cpu_cfg);
 	}
 

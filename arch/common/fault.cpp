@@ -70,6 +70,22 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 #define PF_WRITE	(1 << 1)
 #define PF_USER_MODE	(1 << 2)
 
+static const char *info_modes[] = {
+	"user",
+	"kernel"
+};
+
+static const char *info_reasons[] = {
+	"page invalid",
+	"permissions failure"
+};
+
+static const char *info_types[] = {
+	"read",
+	"write",
+	"fetch"
+};
+
 extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 {
 	uint64_t code = mctx->extra;
@@ -87,8 +103,8 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 
 			// Prepare an access_info structure to describe the memory access
 			// to the MMU.
-			//info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
-			info.mode = (core->kernel_mode() && !core->emulating_user_mode()) ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+			info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
+			//info.mode = (core->kernel_mode() && !core->emulating_user_mode()) ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 
 			if (code & PF_PRESENT) {
 				// Detect the fault as being because a permissions check failed
@@ -114,7 +130,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 			gpa_t out_pa;
 			if (core->mmu().handle_fault((gva_t)va, out_pa, info, fault)) {
 				// If we got this far, then the fault was handled by the core's logic.
-				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%d\n", va, code, core->read_pc(), fault, info.mode);
+				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%s, type=%s, reason=%s\n", va, code, core->read_pc(), fault, info_modes[info.mode], info_types[info.type], info_reasons[info.reason]);
 
 				if (fault == MMU::DEVICE_FAULT) {
 					handle_device_fault(core, mctx, out_pa);

@@ -162,9 +162,9 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 		// Entry blocks should belong to the dispatcher, as should blocks
 		// that have no uses.  This is because unused basic blocks are probably
 		// indirect branch targets.
-		//if (rwu->blocks[i].is_entry || gbe->getNumUses() == 0) {
+		if (rwu->blocks[i].is_entry || gbe->getNumUses() == 0) {
 			dispatcher->addCase(lc.const32(rwu->blocks[i].block_addr & 0xfff), gbe);
-		//}
+		}
 	}
 
 	// Build the chainer
@@ -222,7 +222,7 @@ bool LLVMJIT::compile_region(RegionWorkUnit *rwu)
 	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_base_address) << ".opt.ll";
-		//print_module(filename.str(), region_module);
+		print_module(filename.str(), region_module);
 	}
 
 	// Initialise a new MCJIT engine

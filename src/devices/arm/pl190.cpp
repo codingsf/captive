@@ -51,6 +51,9 @@ bool PL190::read(uint64_t off, uint8_t len, uint64_t& data)
 	case 0x18:
 		data = soft_status;
 		break;
+	case 0x24:
+		data = 0;
+		break;
 	case 0x30:
 		data = read_var();
 		break;

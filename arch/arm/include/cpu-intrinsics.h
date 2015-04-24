@@ -8,7 +8,7 @@
 #if defined(DEFINE_INTRINSICS) && !defined(INTRINSICS_DEFINED)
 #define INTRINSICS_DEFINED
 
-//#define TRACE
+#define TRACE
 
 #include <printf.h>
 #include <env.h>
@@ -111,20 +111,20 @@ define_mem_read_user_func(16, uint16_t)
 define_mem_read_user_func(32, uint32_t)
 define_mem_read_user_func(64, uint64_t)
 
-//#define mem_read_8_user(_addr) __mem_read_8_user(cpu, _addr)
-#define mem_read_8_user(_addr) mem_read_8(_addr)
-//#define mem_read_16_user(_addr) __mem_read_16_user(cpu, _addr)
-#define mem_read_16_user(_addr) mem_read_16(_addr)
-//#define mem_read_32_user(_addr) __mem_read_32_user(cpu, _addr)
-#define mem_read_32_user(_addr) mem_read_32(_addr)
-//#define mem_read_64_user(_addr) __mem_read_64_user(cpu, _addr)
-#define mem_read_64_user(_addr) mem_read_64(_addr)
+#define mem_read_8_user(_addr) __mem_read_8_user(cpu, _addr)
+//#define mem_read_8_user(_addr) mem_read_8(_addr)
+#define mem_read_16_user(_addr) __mem_read_16_user(cpu, _addr)
+//#define mem_read_16_user(_addr) mem_read_16(_addr)
+#define mem_read_32_user(_addr) __mem_read_32_user(cpu, _addr)
+//#define mem_read_32_user(_addr) mem_read_32(_addr)
+#define mem_read_64_user(_addr) __mem_read_64_user(cpu, _addr)
+//#define mem_read_64_user(_addr) mem_read_64(_addr)
 
 #define define_mem_write_user_func(_size, _type) static inline void __mem_write_##_size ## _user(captive::arch::CPU& cpu, uint32_t addr, _type data) \
 { \
-	cpu.emulate_user_mode_begin(); \
+	if (cpu.kernel_mode()) { switch_to_user_mode(); } \
 	mem_write_##_size(addr, data); \
-	cpu.emulate_user_mode_end(); \
+	if (cpu.kernel_mode()) { switch_to_kernel_mode(); } \
 }
 
 define_mem_write_user_func(8, uint8_t)
@@ -132,14 +132,14 @@ define_mem_write_user_func(16, uint16_t)
 define_mem_write_user_func(32, uint32_t)
 define_mem_write_user_func(64, uint64_t)
 
-//#define mem_write_8_user(_addr, _data) __mem_write_8_user(cpu, _addr, _data)
-#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)
-//#define mem_write_16_user(_addr, _data) __mem_write_16_user(cpu, _addr, _data)
-#define mem_write_16_user(_addr, _data) mem_write_16(_addr, _data)
-//#define mem_write_32_user(_addr, _data) __mem_write_32_user(cpu, _addr, _data)
-#define mem_write_32_user(_addr, _data) mem_write_32(_addr, _data)
-//#define mem_write_64_user(_addr, _data) __mem_write_64_user(cpu, _addr, _data)
-#define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)
+#define mem_write_8_user(_addr, _data) __mem_write_8_user(cpu, _addr, _data)
+//#define mem_write_8_user(_addr, _data) mem_write_8(_addr, _data)
+#define mem_write_16_user(_addr, _data) __mem_write_16_user(cpu, _addr, _data)
+//#define mem_write_16_user(_addr, _data) mem_write_16(_addr, _data)
+#define mem_write_32_user(_addr, _data) __mem_write_32_user(cpu, _addr, _data)
+//#define mem_write_32_user(_addr, _data) mem_write_32(_addr, _data)
+#define mem_write_64_user(_addr, _data) __mem_write_64_user(cpu, _addr, _data)
+//#define mem_write_64_user(_addr, _data) mem_write_64(_addr, _data)
 
 #endif
 

@@ -69,7 +69,7 @@ bool MMU::clear_vma()
 
 void MMU::cpu_privilege_change(bool kernel_mode)
 {
-	clear_vma();
+	//clear_vma();
 }
 
 bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault)
@@ -219,11 +219,11 @@ handle_device:
 
 bool MMU::is_device(gpa_t gpa)
 {
-	if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
+	/*if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
 	if (gpa >= 0x101e3000 && gpa < 0x101e4000) return true;
 	if (gpa >= 0x10140000 && gpa < 0x10141000) return true;
 	if (gpa >= 0x10000000 && gpa < 0x10001000) return true;
-	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;
+	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;*/
 	//if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
 
 	return false;

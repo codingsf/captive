@@ -57,6 +57,9 @@ void Trace::end_record()
 		case trace_action::REG_READ:
 			printf("(R[%s] => %08x)", action.reg_read.reg_id, action.reg_read.value);
 			break;
+		case trace_action::MESSAGE:
+			printf("\"%s\"", action.message.msg);
+			break;
 		default:
 			printf("(?)");
 			break;

@@ -154,7 +154,15 @@ extern "C" {
 
 	void handle_trap_gpf(struct mcontext *mctx)
 	{
-		printf("general protection fault: rip=0x%lx, code=0x%x\n", mctx->rip, mctx->extra);
+		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
+
+		if (cpu) {
+			if (cpu->trace().enabled()) {
+				cpu->trace().end_record();
+			}
+		}
+
+		printf("general protection fault: rip=0x%lx, code=0x%x, pc=0x%08x\n", mctx->rip, mctx->extra, cpu ? cpu->read_pc() : 0);
 		dump_stack();
 		abort();
 	}
