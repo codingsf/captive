@@ -352,11 +352,13 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 	}
 
 	case shared::IRInstruction::READ_MEM:
+	case shared::IRInstruction::READ_MEM_USER:
 	{
 		Value *addr = value_for_operand(ctx, op0), *dst = vreg_for_operand(ctx, op1);
-
 		assert(addr && dst);
 
+		if (ir->type == shared::IRInstruction::READ_MEM) {
+#ifdef FAST_MEMORY_OP
 		Type *memptrtype = type_for_operand(ctx, op1, true);
 		assert(memptrtype);
 
@@ -364,7 +366,30 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 		set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
 		ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr, true), dst);
+#else
+			Type *dst_type = type_for_operand(ctx, op1, true);
 
+			std::vector<Type *> params;
+			params.push_back(ctx.parent.pi8);
+			params.push_back(ctx.parent.i32);
+			params.push_back(dst_type);
+
+			FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
+
+			Constant *fn = NULL;
+			if (dst_type == ctx.parent.pi8) {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_read8", fntype);
+			} else if (dst_type == ctx.parent.pi16) {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_read16", fntype);
+			} else {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_read32", fntype);
+			}
+
+			ctx.builder.CreateCall3(fn, ctx.parent.cpu_obj, addr, dst);
+#endif
+		} else {
+			assert(false);
+		}
 		return true;
 	}
 
@@ -376,10 +401,32 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 		assert(addr && src);
 
 		if (ir->type == shared::IRInstruction::WRITE_MEM) {
+#ifdef FAST_MEMORY_OP
 			Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
 			set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
 			ctx.builder.CreateStore(src, memptr, true);
+#else
+			Type *src_type = type_for_operand(ctx, op0, false);
+
+			std::vector<Type *> params;
+			params.push_back(ctx.parent.pi8);
+			params.push_back(ctx.parent.i32);
+			params.push_back(src_type);
+
+			FunctionType *fntype = FunctionType::get(ctx.parent.vtype, params, false);
+
+			Constant *fn = NULL;
+			if (src_type == ctx.parent.i8) {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_write8", fntype);
+			} else if (src_type == ctx.parent.i16) {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_write16", fntype);
+			} else {
+				fn = ctx.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_write32", fntype);
+			}
+
+			ctx.builder.CreateCall3(fn, ctx.parent.cpu_obj, addr, src);
+#endif
 		} else {
 			Type *src_type = type_for_operand(ctx, op0, false);
 
