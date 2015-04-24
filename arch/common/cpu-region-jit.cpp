@@ -17,14 +17,42 @@ using namespace captive::arch::profile;
 
 bool CPU::run_region_jit()
 {
-	bool step_ok = true;
-	int trace_interval = 0;
-
 	printf("cpu: starting region-jit cpu execution\n");
 
-	/*if (!check_safepoint()) {
-		return false;
-	}*/
+	// Create a safepoint for returning from a memory access fault
+	int rc = record_safepoint(&cpu_safepoint);
+	if (rc > 0) {
+		// Reset the executing translation flag.
+		_exec_txl = false;
+
+		// If the return code is greater than zero, then we returned
+		// from a fault.
+
+		// If we're tracing, add a descriptive message, and close the
+		// trace packet.
+		if (unlikely(trace().enabled())) {
+			trace().add_str("memory exception taken");
+			trace().end_record();
+		}
+
+		// Instruct the interpreter to handle the memory fault, passing
+		// in the the type of fault.
+		interpreter().handle_memory_fault((MMU::resolution_fault)rc);
+
+		// Make sure interrupts are enabled.
+		__local_irq_enable();
+	}
+
+	// Make sure we're operating in the correct mode
+	ensure_privilege_mode();
+
+	return run_region_jit_safepoint();
+}
+
+bool CPU::run_region_jit_safepoint()
+{
+	bool step_ok = true;
+	int trace_interval = 0;
 
 	gpa_t prev_pc = 0;
 	do {
