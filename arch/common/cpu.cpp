@@ -145,6 +145,10 @@ bool CPU::interpret_block()
 {
 	bool step_ok = false;
 
+	// Make sure we're in the correct privilege mode to execute this block
+	// of code.
+	ensure_privilege_mode();
+
 	// Now, execute one basic-block of instructions.
 	Decode *insn;
 	do {

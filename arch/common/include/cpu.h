@@ -184,6 +184,7 @@ namespace captive {
 			bool run_interp_safepoint();
 			bool run_block_jit();
 			bool run_region_jit();
+			bool run_region_jit_safepoint();
 
 			bool handle_pending_action(uint32_t action);
 			bool interpret_block();

@@ -8,7 +8,7 @@
 #if defined(DEFINE_INTRINSICS) && !defined(INTRINSICS_DEFINED)
 #define INTRINSICS_DEFINED
 
-#define TRACE
+//#define TRACE
 
 #include <printf.h>
 #include <env.h>

@@ -12,6 +12,8 @@
 #include <printf.h>
 #include <shmem.h>
 
+#include <priv.h>
+
 #define packed __attribute__((packed))
 
 namespace captive {

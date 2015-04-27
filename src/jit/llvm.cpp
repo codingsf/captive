@@ -137,6 +137,8 @@ BasicBlock *LLVMJIT::block_for_operand(BlockLoweringContext& ctx, const shared::
 	}
 }
 
+#define FAST_MEMORY_OP
+
 bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRInstruction *ir)
 {
 	// DEBUG << "Lowering: " << bc->render();

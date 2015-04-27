@@ -69,23 +69,23 @@ extern "C" void mem_read32(captive::arch::CPU *cpu, uint32_t addr, uint32_t *val
 
 extern "C" void mem_user_read8(captive::arch::CPU *cpu, uint32_t addr, uint8_t *val)
 {
-	cpu->emulate_user_mode_begin();
+	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*val = *((volatile uint8_t *)(uint64_t)addr);
-	cpu->emulate_user_mode_end();
+	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_read16(captive::arch::CPU *cpu, uint32_t addr, uint16_t *val)
 {
-	cpu->emulate_user_mode_begin();
+	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*val = *((volatile uint16_t *)(uint64_t)addr);
-	cpu->emulate_user_mode_end();
+	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_read32(captive::arch::CPU *cpu, uint32_t addr, uint32_t *val)
 {
-	cpu->emulate_user_mode_begin();
+	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*val = *((volatile uint32_t *)(uint64_t)addr);
-	cpu->emulate_user_mode_end();
+	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t val)
@@ -105,21 +105,21 @@ extern "C" void mem_write32(captive::arch::CPU *cpu, uint32_t addr, uint32_t val
 
 extern "C" void mem_user_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t val)
 {
-	cpu->emulate_user_mode_begin();
+	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*((volatile uint8_t *)(uint64_t)addr) = val;
-	cpu->emulate_user_mode_end();
+	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_write16(captive::arch::CPU *cpu, uint32_t addr, uint16_t val)
 {
-	cpu->emulate_user_mode_begin();
+	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*((volatile uint16_t *)(uint64_t)addr) = val;
-	cpu->emulate_user_mode_end();
+	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_write32(captive::arch::CPU *cpu, uint32_t addr, uint32_t val)
 {
-	cpu->emulate_user_mode_begin();
+	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*((volatile uint32_t *)(uint64_t)addr) = val;
-	cpu->emulate_user_mode_end();
+	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
 }

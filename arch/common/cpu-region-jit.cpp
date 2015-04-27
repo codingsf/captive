@@ -3,6 +3,7 @@
 #include <decode.h>
 #include <disasm.h>
 #include <jit.h>
+#include <safepoint.h>
 #include <jit/translation-context.h>
 #include <shared-memory.h>
 #include <shared-jit.h>
@@ -10,6 +11,8 @@
 #include <profile/region.h>
 #include <profile/block.h>
 #include <profile/translation.h>
+
+extern safepoint_t cpu_safepoint;
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
@@ -43,9 +46,6 @@ bool CPU::run_region_jit()
 		__local_irq_enable();
 	}
 
-	// Make sure we're operating in the correct mode
-	ensure_privilege_mode();
-
 	return run_region_jit_safepoint();
 }
 
@@ -56,6 +56,9 @@ bool CPU::run_region_jit_safepoint()
 
 	gpa_t prev_pc = 0;
 	do {
+		// We need to be in kernel mode to do some accounting.
+		switch_to_kernel_mode();
+
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
@@ -73,6 +76,7 @@ bool CPU::run_region_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
+		// Update the executed bit on the page we're about to execute.
 		mmu().set_page_executed(virt_pc);
 
 		MMU::access_info info;
@@ -81,16 +85,19 @@ bool CPU::run_region_jit_safepoint()
 
 		MMU::resolution_fault fault;
 
+		// Grab the GPA for the GVA of the PC.
 		if (!mmu().resolve_gpa(virt_pc, phys_pc, info, fault, false)) {
 			return false;
 		}
 
+		// If we faulted on the fetch, go via the interpreter to sort it out.
 		if (fault != MMU::NONE) {
 			prev_pc = phys_pc;
 			step_ok = interpret_block();
 			continue;
 		}
 
+		// Obtain the block descriptor for the BB we're about to execute.
 		Block& block = profile_image().get_block(phys_pc);
 
 		if (block.has_translation()) {
@@ -98,13 +105,21 @@ bool CPU::run_region_jit_safepoint()
 
 			//jit_state.region_chaining_table[block.owner().address() >> 12] = block.translation()->fn_ptr();
 
+			// Make sure we're in the correct privilege mode for execution.
+			ensure_privilege_mode();
+
 			_exec_txl = true;
 			step_ok = (bool)block.translation()->execute(*this);
 			_exec_txl = false;
+
+			// After executing the block, spin around to start all over again.
 			continue;
 		} else {
 			block.owner().add_virtual_base(virt_pc);
 		}
+
+		// We need to be back in kernel mode to do some accounting.
+		switch_to_kernel_mode();
 
 		if (trace_interval > 10000) {
 			trace_interval = 0;
