@@ -11,20 +11,16 @@
 #include <define.h>
 #include <string.h>
 #include <lock.h>
+#include <allocator.h>
 
 namespace captive {
 	namespace arch {
-		class SharedMemory
+		class SharedMemory : public Allocator
 		{
 		public:
-			enum alloc_flags_t {
-				NONE = 0,
-				ZERO = 1
-			};
-
 			SharedMemory(void *arena, uint64_t arena_size);
 
-			inline void *allocate(size_t size, alloc_flags_t flags = NONE)
+			virtual void *allocate(size_t size, alloc_flags_t flags = NONE) override
 			{
 				uint64_t addr;
 				asm volatile ("out %2, $0xff" : "=a"(addr) : "D"(size), "a"(10));
@@ -36,14 +32,14 @@ namespace captive {
 				return (void *)addr;
 			}
 
-			inline void *reallocate(void *p, size_t size)
+			virtual void *reallocate(void *p, size_t size) override
 			{
 				uint64_t addr;
 				asm volatile ("out %3, $0xff" : "=a"(addr) : "D"(p), "S"(size), "a"(11));
 				return (void *)addr;
 			}
 
-			inline void free(void *p)
+			virtual void free(void *p) override
 			{
 				asm volatile ("out %1, $0xff" : : "D"(p), "a"(12));
 			}

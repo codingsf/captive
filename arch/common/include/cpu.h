@@ -14,13 +14,11 @@
 #include <shmem.h>
 #include <priv.h>
 
+#include <map>
+
 #define DECODE_CACHE_SIZE	8192
 #define DECODE_OBJ_SIZE		128
 #define DECODE_CACHE_ENTRIES	(DECODE_CACHE_SIZE / DECODE_OBJ_SIZE)
-
-#define BLOCK_CACHE_SIZE	32768
-#define BLOCK_OBJ_SIZE		16
-#define BLOCK_CACHE_ENTRIES	(BLOCK_CACHE_SIZE / BLOCK_OBJ_SIZE)
 
 namespace captive {
 	namespace shared {
@@ -34,6 +32,10 @@ namespace captive {
 			class Region;
 			class Block;
 			class Translation;
+		}
+
+		namespace jit {
+			typedef uint32_t (*block_txln_fn)(void *);
 		}
 
 		class Environment;
@@ -164,7 +166,6 @@ namespace captive {
 
 			static CPU *current_cpu;
 
-
 			profile::Image& _profile_image;
 			bool _should_flush_decode_cache;
 
@@ -174,15 +175,18 @@ namespace captive {
 			bool _exec_txl;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
-			uint8_t block_cache[BLOCK_CACHE_SIZE];
 
 			inline Decode *get_decode(uint32_t pc) const {
 				return (Decode *)&decode_cache[((pc >> 2) % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
 			}
 
+			typedef std::map<uint32_t, jit::block_txln_fn> block_txln_cache_t;
+			block_txln_cache_t block_txln_cache;
+
 			bool run_interp();
 			bool run_interp_safepoint();
 			bool run_block_jit();
+			bool run_block_jit_safepoint();
 			bool run_region_jit();
 			bool run_region_jit_safepoint();
 
@@ -192,6 +196,7 @@ namespace captive {
 			void analyse_regions();
 			void compile_region(profile::Region& rgn);
 			bool compile_block(profile::Block& block, shared::TranslationBlock& tb);
+			bool translate_block(uint32_t va, shared::TranslationBlock& tb);
 		};
 	}
 }

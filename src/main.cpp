@@ -266,7 +266,7 @@ int main(int argc, char **argv)
 		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
 		cpu = guest->create_cpu(cpu_cfg);
 	} else {
-		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::RegionJIT);
+		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::BlockJIT);
 		cpu = guest->create_cpu(cpu_cfg);
 	}
 

@@ -9,18 +9,16 @@
 #define	TRANSLATION_CONTEXT_H
 
 #include <define.h>
-#include <shared-memory.h>
+#include <allocator.h>
 #include <shared-jit.h>
 
 namespace captive {
 	namespace arch {
-		class SharedMemory;
-
 		namespace jit {
 			class TranslationContext
 			{
 			public:
-				TranslationContext(SharedMemory& allocator, shared::TranslationBlock& block);
+				TranslationContext(Allocator& allocator, shared::TranslationBlock& block);
 
 				inline void add_instruction(const shared::IRInstruction& instruction) {
 					add_instruction(_current_block_id, instruction);
@@ -53,7 +51,7 @@ namespace captive {
 				}
 
 			private:
-				SharedMemory& _allocator;
+				Allocator& _allocator;
 				shared::TranslationBlock& _block;
 
 				shared::IRBlockId _current_block_id;

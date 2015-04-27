@@ -1,10 +1,8 @@
 #include <jit/translation-context.h>
-#include <shared-memory.h>
-#include <printf.h>
 
 using namespace captive::arch::jit;
 
-TranslationContext::TranslationContext(SharedMemory& allocator, shared::TranslationBlock& block)
+TranslationContext::TranslationContext(Allocator& allocator, shared::TranslationBlock& block)
 	: _allocator(allocator), _block(block), _current_block_id(0), _ir_insn_buffer_size(0x1000)
 {
 	block.ir_insn = (shared::IRInstruction *)allocator.allocate(_ir_insn_buffer_size);

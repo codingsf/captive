@@ -26,9 +26,6 @@ CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_da
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
 
-	// Initialise the block cache
-	memset(block_cache, 0xff, sizeof(block_cache));
-
 	jit_state.cpu = this;
 	jit_state.region_chaining_table = (void **)malloc(sizeof(void *) * 0x100000);
 }
@@ -62,9 +59,6 @@ bool CPU::run()
 {
 	switch (_per_cpu_data->execution_mode) {
 	case 0:
-		printf("cpu: starting interpretive cpu execution\n");
-		//trace().enable();
-
 		return run_interp();
 	case 1:
 		return run_block_jit();
@@ -77,6 +71,8 @@ bool CPU::run()
 
 bool CPU::run_interp()
 {
+	printf("cpu: starting interpretive cpu execution\n");
+
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
@@ -130,15 +126,6 @@ bool CPU::run_interp_safepoint()
 	} while(step_ok);
 
 	return true;
-}
-
-bool CPU::run_block_jit()
-{
-	bool step_ok = true;
-
-	printf("cpu: starting block-jit cpu execution\n");
-
-	return false;
 }
 
 bool CPU::interpret_block()
