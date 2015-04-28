@@ -28,8 +28,18 @@ static inline uint64_t rdmsr(uint32_t msr_id)
 	return (uint64_t)low | ((uint64_t)high << 32);
 }
 
+extern void (*__init_array_start []) (void);
+extern void (*__init_array_end []) (void);
+
 static void call_static_constructors()
 {
+	size_t size = __init_array_end - __init_array_start;
+
+	printf("calling static constructors\n");
+	for (int i = 0; i < size; i++) {
+		printf("running constructor %p\n", *__init_array_start[i]);
+		(*__init_array_start[i])();
+	}
 }
 
 //static uint32_t volatile * const lapic = (uint32_t volatile * const)0x280002000;

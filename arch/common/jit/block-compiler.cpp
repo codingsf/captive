@@ -72,14 +72,17 @@ static const char *ir_type_names[] = {
 bool BlockCompiler::compile(shared::TranslationBlock& tb, block_txln_fn& fn)
 {
 	if (!optimise(tb)) {
+		printf("jit: optimisation failed\n");
 		return false;
 	}
 
 	if (!allocate(tb)) {
+		printf("jit: register allocation failed\n");
 		return false;
 	}
 
 	if (!lower(tb, fn)) {
+		printf("jit: instruction lowering failed\n");
 		return false;
 	}
 
@@ -163,8 +166,8 @@ bool BlockCompiler::lower(shared::TranslationBlock& tb, block_txln_fn& fn)
 	LocalMemory allocator;
 	X86Encoder encoder(allocator);
 
-	encoder.push(Operand::reg(Operand::R_RBP));
-	encoder.mov(Operand::reg(Operand::R_RSP), Operand::reg(Operand::R_RBP));
+	//encoder.push(REG_RBP);
+	//encoder.mov(REG_RSP, REG_RBP);
 
 	for (uint32_t i = 0; i < tb.ir_insn_count; i++) {
 		printf("ir: %d: %s\n", tb.ir_insn[i].ir_block, ir_type_names[tb.ir_insn[i].type]);
@@ -176,8 +179,8 @@ bool BlockCompiler::lower(shared::TranslationBlock& tb, block_txln_fn& fn)
 		case IRInstruction::NOP: break;
 
 		case IRInstruction::RET:
-			encoder.e_xor(Operand::reg(Operand::R_RAX), Operand::reg(Operand::R_RAX));
-			encoder.leave();
+			encoder.xorr(REG_RAX, REG_RAX);
+			//encoder.leave();
 			encoder.ret();
 			break;
 
@@ -187,6 +190,7 @@ bool BlockCompiler::lower(shared::TranslationBlock& tb, block_txln_fn& fn)
 		}
 	}
 
+	printf("jit: encoding complete, buffer=%p, size=%d\n", encoder.get_buffer(), encoder.get_buffer_size());
 	fn = (block_txln_fn)encoder.get_buffer();
 	return true;
 }
