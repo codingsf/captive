@@ -8,8 +8,11 @@
 #ifndef IR_H
 #define	IR_H
 
+#include <define.h>
 #include <shared-jit.h>
 #include <map>
+#include <list>
+#include <vector>
 
 namespace captive {
 	namespace arch {
@@ -21,30 +24,42 @@ namespace captive {
 			class IRRegister
 			{
 			public:
-				IRRegister(IRContext& owner, uint8_t width) : _owner(owner), _width(width) { }
+				IRRegister(IRContext& owner, shared::IRRegId id, uint8_t width) : _owner(owner), _id(id), _width(width) { }
 
-				IRContext& owner() const { return _owner; }
-				uint8_t width() const { return _width; }
+				inline IRContext& owner() const { return _owner; }
+				inline shared::IRRegId id() const { return _id; }
+				inline uint8_t width() const { return _width; }
 
 			private:
 				IRContext& _owner;
+				shared::IRRegId _id;
 				uint8_t _width;
 			};
 
 			class IROperand
 			{
+				friend class IRInstruction;
+
 			public:
 				enum OperandType
 				{
 					Register,
 					Constant,
 					Block,
-					Function
+					Function,
+					PC
 				};
 
-				IROperand() { }
+				IROperand() : _owner(NULL) { }
 
 				virtual OperandType type() const = 0;
+
+				virtual void dump() const;
+
+			private:
+				IRInstruction *_owner;
+
+				inline void attach(IRInstruction& owner) { _owner = &owner; }
 			};
 
 			class IRRegisterOperand : public IROperand
@@ -56,6 +71,8 @@ namespace captive {
 
 				IRRegister& reg() const { return _rg; }
 
+				void dump() const override;
+
 			private:
 				IRRegister& _rg;
 			};
@@ -66,6 +83,8 @@ namespace captive {
 				IRConstantOperand(uint64_t value, uint8_t width) : _value(value), _width(width) { }
 
 				OperandType type() const override { return Constant; }
+
+				void dump() const override;
 
 			private:
 				uint64_t _value;
@@ -90,8 +109,18 @@ namespace captive {
 
 				OperandType type() const override { return Function; }
 
+				void dump() const override;
+
 			private:
 				void *_fnp;
+			};
+
+			class IRPCOperand : public IROperand
+			{
+			public:
+				IRPCOperand() { }
+
+				OperandType type() const override { return PC; }
 			};
 
 			class IRInstruction
@@ -104,7 +133,8 @@ namespace captive {
 					Call
 				};
 
-				IRInstruction() : _owner(NULL) { }
+				IRInstruction() { }
+				~IRInstruction();
 
 				virtual InstructionTypes type() const = 0;
 
@@ -112,9 +142,12 @@ namespace captive {
 				inline const std::vector<IRRegister *>& uses() const { return _uses; }
 				inline const std::vector<IRRegister *>& defs() const { return _defs; }
 
+				virtual void dump() const;
+
 			protected:
 				inline void add_input_operand(IROperand& operand)
 				{
+					operand.attach(*this);
 					_all_operands.push_back(&operand);
 
 					if (operand.type() == IROperand::Register)
@@ -123,17 +156,21 @@ namespace captive {
 
 				inline void add_output_operand(IRRegisterOperand& operand)
 				{
+					operand.attach(*this);
 					_all_operands.push_back(&operand);
 					_defs.push_back(&operand.reg());
 				}
 
 				inline void add_input_output_operand(IRRegisterOperand& operand)
 				{
+					operand.attach(*this);
 					_all_operands.push_back(&operand);
 
 					_uses.push_back(&operand.reg());
 					_defs.push_back(&operand.reg());
 				}
+
+				virtual const char *mnemonic() const = 0;
 
 			private:
 				inline void attach(IRBlock& owner) { _owner = &owner; }
@@ -195,6 +232,9 @@ namespace captive {
 					{
 						add_input_operand(operand);
 					}
+
+				protected:
+					const char* mnemonic() const override { return "call"; }
 				};
 			}
 		}

@@ -21,6 +21,8 @@ namespace captive {
 			typedef uint32_t (*block_txln_fn)(void *);
 
 			class IRContext;
+			class IRInstruction;
+			class IROperand;
 
 			class BlockCompiler
 			{
@@ -33,6 +35,9 @@ namespace captive {
 				bool optimise(IRContext& ctx);
 				bool allocate(IRContext& ctx);
 				bool lower(IRContext& ctx, block_txln_fn& fn);
+
+				IRInstruction *instruction_from_shared(IRContext& ctx, const shared::IRInstruction *insn);
+				IROperand *operand_from_shared(IRContext& ctx, const shared::IROperand *operand);
 			};
 		}
 	}

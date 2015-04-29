@@ -16,7 +16,7 @@ BlockCompiler::BlockCompiler()
 
 bool BlockCompiler::compile(shared::TranslationBlock& tb, block_txln_fn& fn)
 {
-	IRContext& ctx;
+	IRContext ctx;
 
 	if (!build(tb, ctx)) {
 		printf("jit: analysis failed\n");
@@ -44,18 +44,16 @@ bool BlockCompiler::compile(shared::TranslationBlock& tb, block_txln_fn& fn)
 bool BlockCompiler::build(shared::TranslationBlock& tb, IRContext& ctx)
 {
 	for (uint32_t idx = 0; idx < tb.ir_insn_count; idx++) {
-		shared::IRInstruction *insn = &tb.ir_insn[idx];
+		shared::IRInstruction *shared_insn = &tb.ir_insn[idx];
 
-		IRBlock& block = ctx.get_block_by_id(insn->ir_block);
-		switch (insn->type) {
-		case shared::IRInstruction::CALL:
-			block.append_instruction(new instructions::IRCallInstruction(new IRFunctionOperand((void *)insn->operands[0].value)));
-			break;
+		IRBlock& block = ctx.get_block_by_id(shared_insn->ir_block);
+		IRInstruction *insn = instruction_from_shared(ctx, shared_insn);
 
-		default:
-			printf("jit: unsupported instruction type %d\n", insn->type);
-			return false;
-		}
+		printf("jit: instruction: ");
+		insn->dump();
+		printf("\n");
+
+		block.append_instruction(*insn);
 	}
 
 	return false;
@@ -96,4 +94,53 @@ bool BlockCompiler::lower(IRContext& ctx, block_txln_fn& fn)
 	}
 
 	return true;
+}
+
+IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shared::IRInstruction* insn)
+{
+	switch (insn->type) {
+	case shared::IRInstruction::CALL:
+	{
+		IRFunctionOperand *fno = (IRFunctionOperand *)operand_from_shared(ctx, &insn->operands[0]);
+		assert(fno->type() == IROperand::Function);
+
+		instructions::IRCallInstruction *calli = new instructions::IRCallInstruction(*fno);
+
+		for (int i = 1; i < 6; i++) {
+			if (insn->operands[i].type != shared::IROperand::NONE) {
+				calli->add_argument(*operand_from_shared(ctx, &insn->operands[i]));
+			}
+		}
+
+		return calli;
+	}
+
+	default:
+		printf("jit: unsupported instruction type %d\n", insn->type);
+		assert(false);
+	}
+}
+
+IROperand* BlockCompiler::operand_from_shared(IRContext& ctx, const shared::IROperand* operand)
+{
+	switch (operand->type) {
+	case shared::IROperand::BLOCK:
+		return new IRBlockOperand(ctx.get_block_by_id((shared::IRBlockId)operand->value));
+
+	case shared::IROperand::CONSTANT:
+		return new IRConstantOperand(operand->value, operand->size);
+
+	case shared::IROperand::FUNC:
+		return new IRFunctionOperand((void *)operand->value);
+
+	case shared::IROperand::PC:
+		return new IRPCOperand();
+
+	case shared::IROperand::VREG:
+		return new IRRegisterOperand(ctx.get_register_by_id((shared::IRRegId)operand->value, operand->size));
+
+	default:
+		printf("jit: unsupported operand type %d\n", operand->type);
+		assert(false);
+	}
 }
