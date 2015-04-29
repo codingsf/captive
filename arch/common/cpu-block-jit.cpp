@@ -81,6 +81,8 @@ bool CPU::run_block_jit_safepoint()
 				return false;
 			}
 
+			// TODO: FIXME: release TB memory
+
 			printf("jit: executing fresh block %p\n", fn);
 			block_txln_cache[pc] = fn;
 			step_ok = (fn(&jit_state) == 0);

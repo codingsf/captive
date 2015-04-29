@@ -23,17 +23,17 @@ bool BlockCompiler::compile(shared::TranslationBlock& tb, block_txln_fn& fn)
 		return false;
 	}
 
-	if (!optimise(tb)) {
+	if (!optimise(ctx)) {
 		printf("jit: optimisation failed\n");
 		return false;
 	}
 
-	if (!allocate(tb)) {
+	if (!allocate(ctx)) {
 		printf("jit: register allocation failed\n");
 		return false;
 	}
 
-	if (!lower(tb, fn)) {
+	if (!lower(ctx, fn)) {
 		printf("jit: instruction lowering failed\n");
 		return false;
 	}
@@ -47,6 +47,15 @@ bool BlockCompiler::build(shared::TranslationBlock& tb, IRContext& ctx)
 		shared::IRInstruction *insn = &tb.ir_insn[idx];
 
 		IRBlock& block = ctx.get_block_by_id(insn->ir_block);
+		switch (insn->type) {
+		case shared::IRInstruction::CALL:
+			block.append_instruction(new instructions::IRCallInstruction(new IRFunctionOperand((void *)insn->operands[0].value)));
+			break;
+
+		default:
+			printf("jit: unsupported instruction type %d\n", insn->type);
+			return false;
+		}
 	}
 
 	return false;
