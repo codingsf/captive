@@ -139,9 +139,46 @@ namespace captive {
 			public:
 				enum InstructionTypes
 				{
+					Nop,
+					Trap,
+
 					Call,
 					Jump,
-					Return
+					Branch,
+					Return,
+
+					Move,
+					ConditionalMove,
+					LoadPC,
+
+					SignExtend,
+					ZeroExtend,
+					Truncate,
+
+					ReadRegister,
+					WriteRegister,
+					ReadMemory,
+					WriteMemory,
+					ReadUserMemory,
+					WriteUserMemory,
+					ReadDevice,
+					WriteDevice,
+					SetCPUMode,
+
+					Add,
+					Sub,
+					Mul,
+					Div,
+					Mod,
+
+					ShiftLeft,
+					ShiftRight,
+					ArithmeticShiftRight,
+					CountLeadingZeroes,
+
+					BitwiseAnd,
+					BitwiseOr,
+					BitwiseXor,
 				};
 
 				IRInstruction() { }
@@ -243,6 +280,26 @@ namespace captive {
 			};
 
 			namespace instructions {
+				class IRNopInstruction : public IRInstruction
+				{
+				public:
+					IRNopInstruction() { }
+					IRInstruction::InstructionTypes type() const override { return Nop; }
+
+				protected:
+					const char* mnemonic() const override { return "nop"; }
+				};
+
+				class IRTrapInstruction : public IRInstruction
+				{
+				public:
+					IRTrapInstruction() { }
+					IRInstruction::InstructionTypes type() const override { return Trap; }
+
+				protected:
+					const char* mnemonic() const override { return "trap"; }
+				};
+
 				class IRCallInstruction : public IRInstruction
 				{
 				public:
@@ -280,6 +337,22 @@ namespace captive {
 					const char* mnemonic() const override { return "jump"; }
 				};
 
+				class IRBranchInstruction : public IRInstruction
+				{
+				public:
+					IRBranchInstruction(IROperand& cond, IRBlockOperand& true_target, IRBlockOperand& false_target)
+					{
+						add_input_operand(cond);
+						add_input_operand(true_target);
+						add_input_operand(false_target);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return Branch; }
+
+				protected:
+					const char* mnemonic() const override { return "branch"; }
+				};
+
 				class IRRetInstruction : public IRInstruction
 				{
 				public:
@@ -288,6 +361,339 @@ namespace captive {
 
 				protected:
 					const char* mnemonic() const override { return "ret"; }
+				};
+
+				class IRMovInstruction : public IRInstruction
+				{
+				public:
+					IRMovInstruction(IROperand& src, IRRegisterOperand& dest)
+					{
+						add_input_operand(src);
+						add_output_operand(dest);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return Move; }
+
+				protected:
+					const char* mnemonic() const override { return "mov"; }
+				};
+
+				class IRCondMovInstruction : public IRInstruction
+				{
+				public:
+					IRCondMovInstruction(IROperand& cond, IROperand& src, IRRegisterOperand& dest)
+					{
+						add_input_operand(cond);
+						add_input_operand(src);
+						add_output_operand(dest);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ConditionalMove; }
+
+				protected:
+					const char* mnemonic() const override { return "cmov"; }
+				};
+
+				class IRLoadPCInstruction : public IRInstruction
+				{
+				public:
+					IRLoadPCInstruction(IRRegisterOperand& dest)
+					{
+						add_output_operand(dest);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return LoadPC; }
+
+				protected:
+					const char* mnemonic() const override { return "ldpc"; }
+				};
+
+				class IRSXInstruction : public IRInstruction
+				{
+				public:
+					IRSXInstruction(IROperand& src, IRRegisterOperand& dest)
+					{
+						add_input_operand(src);
+						add_output_operand(dest);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return SignExtend; }
+
+				protected:
+					const char* mnemonic() const override { return "sx"; }
+				};
+
+				class IRZXInstruction : public IRInstruction
+				{
+				public:
+					IRZXInstruction(IROperand& src, IRRegisterOperand& dest)
+					{
+						add_input_operand(src);
+						add_output_operand(dest);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ZeroExtend; }
+
+				protected:
+					const char* mnemonic() const override { return "zx"; }
+				};
+
+				class IRTruncInstruction : public IRInstruction
+				{
+				public:
+					IRTruncInstruction(IROperand& src, IRRegisterOperand& dest)
+					{
+						add_input_operand(src);
+						add_output_operand(dest);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return Truncate; }
+
+				protected:
+					const char* mnemonic() const override { return "trunc"; }
+				};
+
+				class IRReadRegisterInstruction : public IRInstruction
+				{
+				public:
+					IRReadRegisterInstruction(IROperand& offset, IRRegisterOperand& storage) : _offset(offset), _storage(storage)
+					{
+						add_input_operand(offset);
+						add_output_operand(storage);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ReadRegister; }
+
+					IROperand& offset() const { return _offset; }
+					IRRegisterOperand& storage() const { return _storage; }
+
+				protected:
+					const char* mnemonic() const override { return "ldreg"; }
+
+				private:
+					IROperand& _offset;
+					IRRegisterOperand& _storage;
+				};
+
+				class IRWriteRegisterInstruction : public IRInstruction
+				{
+				public:
+					IRWriteRegisterInstruction(IROperand& value, IROperand& offset)
+					{
+						add_input_operand(value);
+						add_input_operand(offset);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return WriteRegister; }
+
+				protected:
+					const char* mnemonic() const override { return "streg"; }
+				};
+
+				class IRReadMemoryInstruction : public IRInstruction
+				{
+				public:
+					IRReadMemoryInstruction(IROperand& offset, IRRegisterOperand& storage)
+					{
+						add_input_operand(offset);
+						add_output_operand(storage);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ReadMemory; }
+
+				protected:
+					const char* mnemonic() const override { return "ldmem"; }
+				};
+
+				class IRWriteMemoryInstruction : public IRInstruction
+				{
+				public:
+					IRWriteMemoryInstruction(IROperand& value, IROperand& offset)
+					{
+						add_input_operand(value);
+						add_input_operand(offset);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return WriteMemory; }
+
+				protected:
+					const char* mnemonic() const override { return "stmem"; }
+				};
+
+				class IRReadUserMemoryInstruction : public IRReadMemoryInstruction
+				{
+				public:
+					IRReadUserMemoryInstruction(IROperand& offset, IRRegisterOperand& storage) : IRReadMemoryInstruction(offset, storage) { }
+
+					IRInstruction::InstructionTypes type() const override { return ReadUserMemory; }
+
+				protected:
+					const char* mnemonic() const override { return "ldmem-user"; }
+				};
+
+				class IRWriteUserMemoryInstruction : public IRWriteMemoryInstruction
+				{
+				public:
+					IRWriteUserMemoryInstruction(IROperand& value, IROperand& offset) : IRWriteMemoryInstruction(value, offset) { }
+
+					IRInstruction::InstructionTypes type() const override { return WriteUserMemory; }
+
+				protected:
+					const char* mnemonic() const override { return "stmem-user"; }
+				};
+
+				class IRSetCpuModeInstruction : public IRInstruction
+				{
+				public:
+					IRSetCpuModeInstruction(IROperand& new_mode) { add_input_operand(new_mode); }
+
+					IRInstruction::InstructionTypes type() const override { return SetCPUMode; }
+
+				protected:
+					const char* mnemonic() const override { return "set-cpu-mode"; }
+				};
+
+				class IRArithmeticInstruction : public IRInstruction
+				{
+				public:
+					IRArithmeticInstruction(IROperand& src, IRRegisterOperand& dest)
+					{
+						add_input_operand(src);
+						add_input_output_operand(dest);
+					}
+				};
+
+				class IRAddInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRAddInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return Add; }
+
+				protected:
+					const char* mnemonic() const override { return "add"; }
+				};
+
+				class IRSubInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRSubInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return Sub; }
+
+				protected:
+					const char* mnemonic() const override { return "sub"; }
+				};
+
+				class IRMulInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRMulInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return Mul; }
+
+				protected:
+					const char* mnemonic() const override { return "mul"; }
+				};
+
+				class IRDivInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRDivInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return Div; }
+
+				protected:
+					const char* mnemonic() const override { return "div"; }
+				};
+
+				class IRModInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRModInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return Mod; }
+
+				protected:
+					const char* mnemonic() const override { return "mod"; }
+				};
+
+				class IRBitwiseAndInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRBitwiseAndInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return BitwiseAnd; }
+
+				protected:
+					const char* mnemonic() const override { return "and"; }
+				};
+
+				class IRBitwiseOrInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRBitwiseOrInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return BitwiseOr; }
+
+				protected:
+					const char* mnemonic() const override { return "or"; }
+				};
+
+				class IRBitwiseXorInstruction : public IRArithmeticInstruction
+				{
+				public:
+					IRBitwiseXorInstruction(IROperand& src, IRRegisterOperand& dest) : IRArithmeticInstruction(src, dest) { }
+
+					IRInstruction::InstructionTypes type() const override { return BitwiseXor; }
+
+				protected:
+					const char* mnemonic() const override { return "xor"; }
+				};
+
+				class IRShiftLeftInstruction : public IRInstruction
+				{
+				public:
+					IRShiftLeftInstruction(IROperand& amt, IRRegisterOperand& operand)
+					{
+						add_input_operand(amt);
+						add_input_operand(operand);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ShiftLeft; }
+
+				protected:
+					const char* mnemonic() const override { return "shl"; }
+				};
+
+				class IRShiftRightInstruction : public IRInstruction
+				{
+				public:
+					IRShiftRightInstruction(IROperand& amt, IRRegisterOperand& operand)
+					{
+						add_input_operand(amt);
+						add_input_operand(operand);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ShiftRight; }
+
+				protected:
+					const char* mnemonic() const override { return "shr"; }
+				};
+
+				class IRArithmeticShiftRightInstruction : public IRInstruction
+				{
+				public:
+					IRArithmeticShiftRightInstruction(IROperand& amt, IRRegisterOperand& operand)
+					{
+						add_input_operand(amt);
+						add_input_operand(operand);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ArithmeticShiftRight; }
+
+				protected:
+					const char* mnemonic() const override { return "sar"; }
 				};
 			}
 		}

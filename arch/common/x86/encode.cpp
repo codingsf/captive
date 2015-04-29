@@ -189,12 +189,20 @@ void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
 
 	if (rm.displacement == 0) {
 		mod = 0;
+	} else if (rm.displacement < 128 && rm.displacement > -127) {
+		mod = 1;
 	} else {
-		assert(false);
+		mod = 2;
 	}
 
 	mreg = reg.raw_index;
 	mrm = rm.base.raw_index;
 
 	emit8((mod & 3) << 6 | (mreg & 7) << 3 | (mrm & 7));
+
+	if (mod == 1) {
+		emit8(rm.displacement);
+	} else if (mod == 2) {
+		emit32(rm.displacement);
+	}
 }

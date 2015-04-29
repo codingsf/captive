@@ -146,6 +146,21 @@ bool BlockCompiler::lower_block(IRBlock& block, x86::X86Encoder& encoder, std::m
 			break;
 		}
 
+		case IRInstruction::ReadRegister:
+		{
+			instructions::IRReadRegisterInstruction *rri = (instructions::IRReadRegisterInstruction *)insn;
+
+			encoder.mov(X86Memory::get(REG_R14, 8), REG_RBX);
+
+			if (rri->offset().type() == IROperand::Constant) {
+				encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), REG_RBX);
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+
 		case IRInstruction::Return:
 			encoder.pop(REG_RBX);
 			encoder.pop(REG_R15);
@@ -188,6 +203,94 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 
 	case shared::IRInstruction::RET:
 		return new instructions::IRRetInstruction();
+
+	case shared::IRInstruction::MOV:
+	{
+		IROperand *src = operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *dst = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+
+		assert(dst->type() == IROperand::Register);
+
+		return new instructions::IRMovInstruction(*src, *dst);
+	}
+
+	case shared::IRInstruction::READ_REG:
+	{
+		IROperand *offset = operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *storage = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+		assert(storage->type() == IROperand::Register);
+
+		return new instructions::IRReadRegisterInstruction(*offset, *storage);
+	}
+
+	case shared::IRInstruction::WRITE_REG:
+	{
+		IROperand *value = operand_from_shared(ctx, &insn->operands[0]);
+		IROperand *offset = operand_from_shared(ctx, &insn->operands[1]);
+
+		return new instructions::IRWriteRegisterInstruction(*value, *offset);
+	}
+
+	case shared::IRInstruction::ZX:
+	case shared::IRInstruction::SX:
+	case shared::IRInstruction::TRUNC:
+	{
+		IROperand *from = operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *to = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+		assert(to->type() == IROperand::Register);
+
+		switch (insn->type) {
+		case shared::IRInstruction::ZX: return new instructions::IRZXInstruction(*from, *to);
+		case shared::IRInstruction::SX: return new instructions::IRSXInstruction(*from, *to);
+		case shared::IRInstruction::TRUNC: return new instructions::IRTruncInstruction(*from, *to);
+		}
+	}
+
+	case shared::IRInstruction::AND:
+	case shared::IRInstruction::OR:
+	case shared::IRInstruction::XOR:
+	case shared::IRInstruction::ADD:
+	case shared::IRInstruction::SUB:
+	case shared::IRInstruction::MUL:
+	case shared::IRInstruction::DIV:
+	case shared::IRInstruction::MOD:
+	case shared::IRInstruction::SHR:
+	case shared::IRInstruction::SHL:
+	case shared::IRInstruction::SAR:
+	{
+		IROperand *src = operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *dst = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+
+		assert(dst->type() == IROperand::Register);
+
+		switch (insn->type) {
+		case shared::IRInstruction::AND:
+			return new instructions::IRBitwiseAndInstruction(*src, *dst);
+		case shared::IRInstruction::OR:
+			return new instructions::IRBitwiseOrInstruction(*src, *dst);
+		case shared::IRInstruction::XOR:
+			return new instructions::IRBitwiseXorInstruction(*src, *dst);
+		case shared::IRInstruction::ADD:
+			return new instructions::IRAddInstruction(*src, *dst);
+		case shared::IRInstruction::SUB:
+			return new instructions::IRSubInstruction(*src, *dst);
+		case shared::IRInstruction::MUL:
+			return new instructions::IRMulInstruction(*src, *dst);
+		case shared::IRInstruction::DIV:
+			return new instructions::IRDivInstruction(*src, *dst);
+		case shared::IRInstruction::MOD:
+			return new instructions::IRModInstruction(*src, *dst);
+		case shared::IRInstruction::SHL:
+			return new instructions::IRShiftLeftInstruction(*src, *dst);
+		case shared::IRInstruction::SHR:
+			return new instructions::IRShiftRightInstruction(*src, *dst);
+		case shared::IRInstruction::SAR:
+			return new instructions::IRArithmeticShiftRightInstruction(*src, *dst);
+		}
+	}
+
+	case shared::IRInstruction::SET_CPU_MODE:
+		return new instructions::IRSetCpuModeInstruction(*operand_from_shared(ctx, &insn->operands[0]));
 
 	default:
 		printf("jit: unsupported instruction type %d\n", insn->type);
