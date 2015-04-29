@@ -53,6 +53,10 @@ void X86Encoder::pop(const X86Register& reg)
 			emit8(0x66);
 		}
 
+		if (reg.hireg) {
+			encode_rex_prefix(true, false, false, false);
+		}
+
 		emit8(0x58 + reg.raw_index);
 	} else {
 		assert(false);
@@ -134,6 +138,13 @@ void X86Encoder::call(const X86Register& reg)
 	encode_mod_reg_rm(REG_RDX, reg);
 }
 
+void X86Encoder::jmp_reloc(uint32_t& reloc_offset)
+{
+	emit8(0xe9);
+	reloc_offset = _write_offset;
+	emit32(0);
+}
+
 void X86Encoder::ret()
 {
 	emit8(0xc3);
@@ -142,6 +153,11 @@ void X86Encoder::ret()
 void X86Encoder::leave()
 {
 	emit8(0xc9);
+}
+
+void X86Encoder::hlt()
+{
+	emit8(0xf4);
 }
 
 void X86Encoder::encode_rex_prefix(bool b, bool x, bool r, bool w)

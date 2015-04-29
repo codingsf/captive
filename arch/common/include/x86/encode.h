@@ -77,8 +77,13 @@ namespace captive {
 
 				void xorr(const X86Register src, const X86Register& dest);
 
+				void jmp_reloc(uint32_t& reloc_offset);
+
 				void leave();
 				void ret();
+				void hlt();
+
+				uint32_t current_offset() const { return _write_offset; }
 
 			private:
 				Allocator& _alloc;
@@ -99,6 +104,16 @@ namespace captive {
 				{
 					ensure_buffer();
 					_buffer[_write_offset++] = b;
+				}
+
+				inline void emit32(uint64_t v)
+				{
+					ensure_buffer();
+
+					_buffer[_write_offset++] = v & 0xff;
+					_buffer[_write_offset++] = (v >> 8) & 0xff;
+					_buffer[_write_offset++] = (v >> 16) & 0xff;
+					_buffer[_write_offset++] = (v >> 24) & 0xff;
 				}
 
 				inline void emit64(uint64_t v)

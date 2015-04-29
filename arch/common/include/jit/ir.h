@@ -86,6 +86,9 @@ namespace captive {
 
 				void dump() const override;
 
+				uint64_t value() const { return _value; }
+				uint8_t width() const { return _width; }
+
 			private:
 				uint64_t _value;
 				uint8_t _width;
@@ -98,6 +101,10 @@ namespace captive {
 
 				OperandType type() const override { return Block; }
 
+				void dump() const override;
+
+				IRBlock& block() const { return _block; }
+
 			private:
 				IRBlock& _block;
 			};
@@ -108,6 +115,8 @@ namespace captive {
 				IRFunctionOperand(void *fnp) : _fnp(fnp) { }
 
 				OperandType type() const override { return Function; }
+
+				void *ptr() const { return _fnp; }
 
 				void dump() const override;
 
@@ -130,7 +139,9 @@ namespace captive {
 			public:
 				enum InstructionTypes
 				{
-					Call
+					Call,
+					Jump,
+					Return
 				};
 
 				IRInstruction() { }
@@ -184,8 +195,10 @@ namespace captive {
 			class IRBlock
 			{
 			public:
-				IRBlock(IRContext& owner) : _owner(owner) { }
+				IRBlock(IRContext& owner, shared::IRBlockId id) : _owner(owner), _id(id) { }
 				~IRBlock();
+
+				shared::IRBlockId id() const { return _id; }
 
 				inline const std::list<IRInstruction *>& instructions() const { return _instructions; }
 
@@ -197,6 +210,7 @@ namespace captive {
 
 			private:
 				IRContext& _owner;
+				shared::IRBlockId _id;
 				std::list<IRInstruction *> _instructions;
 			};
 
@@ -206,8 +220,19 @@ namespace captive {
 				IRContext();
 				~IRContext();
 
+				inline const std::vector<IRBlock *> blocks() const
+				{
+					std::vector<IRBlock *> ret;
+					for (auto block : _blocks) {
+						ret.push_back(block.second);
+					}
+					return ret;
+				}
+
 				IRBlock& get_block_by_id(shared::IRBlockId id);
 				IRRegister& get_register_by_id(shared::IRRegId id, uint8_t width);
+
+				void dump() const;
 
 			private:
 				typedef std::map<shared::IRBlockId, IRBlock *> block_map_t;
@@ -231,10 +256,38 @@ namespace captive {
 					inline void add_argument(IROperand& operand)
 					{
 						add_input_operand(operand);
+						_args.push_back(&operand);
 					}
+
+					inline const std::vector<IROperand *>& arguments() const { return _args; }
 
 				protected:
 					const char* mnemonic() const override { return "call"; }
+
+				private:
+					std::vector<IROperand *> _args;
+				};
+
+				class IRJumpInstruction : public IRInstruction
+				{
+				public:
+					IRJumpInstruction(IRBlockOperand& target) { add_input_operand(target); }
+					IRInstruction::InstructionTypes type() const override { return Jump; }
+
+					IRBlockOperand& target() { return *((IRBlockOperand *)operands().front()); }
+
+				protected:
+					const char* mnemonic() const override { return "jump"; }
+				};
+
+				class IRRetInstruction : public IRInstruction
+				{
+				public:
+					IRRetInstruction() { }
+					IRInstruction::InstructionTypes type() const override { return Return; }
+
+				protected:
+					const char* mnemonic() const override { return "ret"; }
 				};
 			}
 		}

@@ -417,6 +417,25 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 
 		return true;
 	}
+
+	case 15: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
+		FILE *f = fopen("code.bin", "wb");
+
+		uint64_t gpa = regs.rdi & 0xfffffff;
+		gpa += 0x040000000ULL;
+
+		void *ptr = kvm_guest.get_phys_buffer(gpa);
+
+		if (ptr) {
+			fwrite(ptr, regs.rsi, 1, f);
+		}
+
+		fclose(f);
+		return true;
+	}
 	}
 
 	return false;

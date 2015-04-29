@@ -18,7 +18,7 @@ IRBlock& IRContext::get_block_by_id(shared::IRBlockId id)
 {
 	block_map_t::iterator iter = _blocks.find(id);
 	if (iter == _blocks.end()) {
-		IRBlock *new_block = new IRBlock(*this);
+		IRBlock *new_block = new IRBlock(*this, id);
 		_blocks[id] = new_block;
 		return *new_block;
 	} else {
@@ -36,6 +36,18 @@ IRRegister& IRContext::get_register_by_id(shared::IRRegId id, uint8_t width)
 	} else {
 		assert(iter->second->width() == width);
 		return *(iter->second);
+	}
+}
+
+void IRContext::dump() const
+{
+	for (auto block : _blocks) {
+		printf("block %d:\n", block.second->id());
+		for (auto insn : block.second->instructions()) {
+			printf("  ");
+			insn->dump();
+			printf("\n");
+		}
 	}
 }
 
@@ -87,4 +99,9 @@ void IRConstantOperand::dump() const
 void IRFunctionOperand::dump() const
 {
 	printf("*%p", _fnp);
+}
+
+void IRBlockOperand::dump() const
+{
+	printf("b%d", _block.id());
 }

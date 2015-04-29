@@ -481,7 +481,7 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x200000, pa += 0x200000) {
 		map_huge_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
 	}
-	
+
 	return true;
 }
 
@@ -702,7 +702,7 @@ void KVMGuest::map_huge_page(uint64_t va, uint64_t pa, uint32_t flags)
 bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 {
 	for (auto pmr : gpm) {
-		if (gpa >= pmr.cfg->base_address() && gpa <= (pmr.cfg->base_address() + pmr.cfg->size())) {
+		if (gpa >= pmr.cfg->base_address() && gpa < (pmr.cfg->base_address() + pmr.cfg->size())) {
 			uint64_t offset = (uint64_t)gpa - (uint64_t)pmr.cfg->base_address();
 			out_addr = (void *)((uint64_t)pmr.vmr->host_buffer + offset);
 			return true;
