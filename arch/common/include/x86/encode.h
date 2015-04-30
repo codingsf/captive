@@ -21,6 +21,8 @@ namespace captive {
 				uint8_t size;
 				uint8_t raw_index;
 				bool hireg;
+
+				inline bool operator==(const X86Register& other) const { return other.size == size && other.raw_index == raw_index && other.hireg == hireg; }
 			};
 
 			extern X86Register REG_RAX, REG_EAX, REG_AX, REG_AL;
@@ -78,8 +80,10 @@ namespace captive {
 				void mov(const X86Register& src, const X86Register& dst);
 				void mov(const X86Memory& src, const X86Register& dst);
 				void mov(const X86Register& src, const X86Memory& dst);
-
 				void mov(uint64_t src, const X86Register& dst);
+
+				void andd(uint32_t val, const X86Register& dst);
+				void andd(uint32_t val, const X86Memory& dst);
 
 				void xorr(const X86Register src, const X86Register& dest);
 
@@ -88,6 +92,7 @@ namespace captive {
 				void leave();
 				void ret();
 				void hlt();
+				void nop();
 
 				uint32_t current_offset() const { return _write_offset; }
 
@@ -136,7 +141,9 @@ namespace captive {
 					_buffer[_write_offset++] = (v >> 56) & 0xff;
 				}
 
+				void encode_mod_reg_rm(uint8_t mreg, const X86Register& rm);
 				void encode_mod_reg_rm(const X86Register& reg, const X86Register& rm);
+				void encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm);
 				void encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm);
 
 				void encode_rex_prefix(bool b, bool x, bool r, bool w);

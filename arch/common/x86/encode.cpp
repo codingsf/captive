@@ -25,6 +25,12 @@ X86Register REG_R15(8, 7, true), REG_R15D(4, 7, true), REG_R15W(2, 7, true), REG
 X86Register REG_RIZ(0, 0);
 } } }
 
+#define REX	0x40
+#define REX_B	0x41
+#define REX_X	0x42
+#define REX_R	0x44
+#define REX_W	0x48
+
 X86Encoder::X86Encoder(Allocator& allocator) : _alloc(allocator), _buffer(NULL), _buffer_size(0), _write_offset(0)
 {
 }
@@ -80,15 +86,15 @@ void X86Encoder::mov(const X86Register& src, const X86Register& dst)
 	uint8_t rex = 0;
 
 	if (src.size == 8) {
-		rex |= 0x48;
+		rex |= REX_W;
 	}
 
 	if (src.hireg) {
-		rex |= 0x44;
+		rex |= REX_R;
 	}
 
 	if (dst.hireg) {
-		rex |= 0x41;
+		rex |= REX_B;
 	}
 
 	if (rex) {
@@ -104,15 +110,15 @@ void X86Encoder::mov(const X86Memory& src, const X86Register& dst)
 	uint8_t rex = 0;
 
 	if (dst.size == 8) {
-		rex |= 0x48;
+		rex |= REX_W;
 	}
 
 	if (dst.hireg) {
-		rex |= 0x44;
+		rex |= REX_R;
 	}
 
 	if (src.base.hireg) {
-		rex |= 0x41;
+		rex |= REX_B;
 	}
 
 	if (rex) {
@@ -128,15 +134,15 @@ void X86Encoder::mov(const X86Register& src, const X86Memory& dst)
 	uint8_t rex = 0;
 
 	if (src.size == 8) {
-		rex |= 0x48;
+		rex |= REX_W;
 	}
 
 	if (src.hireg) {
-		rex |= 0x44;
+		rex |= REX_R;
 	}
 
 	if (dst.base.hireg) {
-		rex |= 0x41;
+		rex |= REX_B;
 	}
 
 	if (rex) {
@@ -154,6 +160,29 @@ void X86Encoder::mov(uint64_t src, const X86Register& dst)
 
 	emit8(0xb8 + dst.raw_index);
 	emit64(src);
+}
+
+void X86Encoder::andd(uint32_t val, const X86Memory& dst)
+{
+	if (val < 256) {
+		emit8(0x83);
+		encode_mod_reg_rm(4, dst);
+		emit8(val);
+	} else {
+		emit8(0x81);
+		encode_mod_reg_rm(4, dst);
+		emit32(val);
+	}
+}
+
+void X86Encoder::andd(uint32_t val, const X86Register& dst)
+{
+	if (val < 256) {
+		emit8(0x83);
+		encode_mod_reg_rm(4, dst);
+	} else {
+		assert(false);
+	}
 }
 
 void X86Encoder::call(const X86Register& reg)
@@ -184,6 +213,11 @@ void X86Encoder::hlt()
 	emit8(0xf4);
 }
 
+void X86Encoder::nop()
+{
+	emit8(0x90);
+}
+
 void X86Encoder::encode_rex_prefix(bool b, bool x, bool r, bool w)
 {
 	uint8_t rex = 0x40;
@@ -196,20 +230,24 @@ void X86Encoder::encode_rex_prefix(bool b, bool x, bool r, bool w)
 	emit8(rex);
 }
 
-void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Register& rm)
+void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Register& rm)
 {
-	uint8_t mod, mreg, mrm;
+	uint8_t mod, mrm;
 
 	mod = 3;
-	mreg = reg.raw_index;
 	mrm = rm.raw_index;
 
 	emit8((mod & 3) << 6 | (mreg & 7) << 3 | (mrm & 7));
 }
 
-void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
+void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Register& rm)
 {
-	uint8_t mod, mreg, mrm;
+	encode_mod_reg_rm(reg.raw_index, rm);
+}
+
+void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
+{
+	uint8_t mod, mrm;
 
 	if (rm.displacement == 0) {
 		mod = 0;
@@ -219,8 +257,13 @@ void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
 		mod = 2;
 	}
 
-	mreg = reg.raw_index;
 	mrm = rm.base.raw_index;
+
+	if (rm.base == REG_RSP) assert(false);
+
+	if (mod == 0 && rm.base == REG_RBP) {
+		mod = 1;
+	}
 
 	emit8((mod & 3) << 6 | (mreg & 7) << 3 | (mrm & 7));
 
@@ -229,4 +272,9 @@ void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
 	} else if (mod == 2) {
 		emit32(rm.displacement);
 	}
+}
+
+void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
+{
+	encode_mod_reg_rm(reg.raw_index, rm);
 }

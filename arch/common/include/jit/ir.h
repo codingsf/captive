@@ -200,7 +200,7 @@ namespace captive {
 					BitwiseXor,
 				};
 
-				IRInstruction() { }
+				IRInstruction() : _owner(NULL), _next(NULL) { }
 				~IRInstruction();
 
 				virtual InstructionTypes type() const = 0;
@@ -210,6 +210,8 @@ namespace captive {
 				inline const std::vector<IRRegister *>& defs() const { return _defs; }
 
 				virtual void dump() const;
+
+				inline IRInstruction *next() const { return _next; }
 
 			protected:
 				inline void add_input_operand(IROperand& operand)
@@ -240,9 +242,10 @@ namespace captive {
 				virtual const char *mnemonic() const = 0;
 
 			private:
-				inline void attach(IRBlock& owner) { _owner = &owner; }
+				inline void attach(IRBlock& owner) { _owner = &owner; _next = NULL; }
 
 				IRBlock *_owner;
+				IRInstruction *_next;
 
 				std::list<IROperand *> _all_operands;
 				std::vector<IRRegister *> _uses, _defs;
@@ -260,7 +263,12 @@ namespace captive {
 
 				void append_instruction(IRInstruction& insn)
 				{
+					if (_instructions.size() > 0) {
+						_instructions.back()->_next = &insn;
+					}
+					
 					_instructions.push_back(&insn);
+
 					insn.attach(*this);
 				}
 
@@ -385,7 +393,7 @@ namespace captive {
 				class IRMovInstruction : public IRInstruction
 				{
 				public:
-					IRMovInstruction(IROperand& src, IRRegisterOperand& dest)
+					IRMovInstruction(IROperand& src, IRRegisterOperand& dest) : _src(src), _dst(dest)
 					{
 						add_input_operand(src);
 						add_output_operand(dest);
@@ -393,8 +401,15 @@ namespace captive {
 
 					IRInstruction::InstructionTypes type() const override { return Move; }
 
+					inline IROperand& source() const { return _src; }
+					inline IRRegisterOperand& destination() const { return _dst; }
+
 				protected:
 					const char* mnemonic() const override { return "mov"; }
+
+				private:
+					IROperand& _src;
+					IRRegisterOperand& _dst;
 				};
 
 				class IRCondMovInstruction : public IRInstruction
@@ -575,11 +590,18 @@ namespace captive {
 				class IRArithmeticInstruction : public IRInstruction
 				{
 				public:
-					IRArithmeticInstruction(IROperand& src, IRRegisterOperand& dest)
+					IRArithmeticInstruction(IROperand& src, IRRegisterOperand& dest) : _src(src), _dst(dest)
 					{
 						add_input_operand(src);
 						add_input_output_operand(dest);
 					}
+
+					IROperand& source() const { return _src; }
+					IRRegisterOperand& destination() const { return _dst; }
+
+				private:
+					IROperand& _src;
+					IRRegisterOperand& _dst;
 				};
 
 				class IRAddInstruction : public IRArithmeticInstruction

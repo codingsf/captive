@@ -30,6 +30,15 @@ namespace captive {
 			class IROperand;
 			class IRBlock;
 
+			struct X86Context
+			{
+				x86::X86Encoder& encoder;
+				std::map<uint32_t, shared::IRBlockId> block_relocations;
+				std::map<uint64_t, x86::X86Register *> register_assignments;
+
+				X86Context(x86::X86Encoder& encoder) : encoder(encoder) { }
+			};
+
 			class BlockCompiler
 			{
 			public:
@@ -37,16 +46,17 @@ namespace captive {
 				bool compile(shared::TranslationBlock& tb, block_txln_fn& fn);
 
 			private:
+				bool pre_optimise(shared::TranslationBlock& tb);
 				bool build(shared::TranslationBlock& tb, IRContext& ctx);
 				bool optimise(IRContext& ctx);
-				bool allocate(IRContext& ctx);
-				bool lower_context(IRContext& ctx, block_txln_fn& fn);
-				bool lower_block(IRBlock& block, x86::X86Encoder& encoder, std::map<uint32_t, shared::IRBlockId>& block_relocations, const std::map<uint64_t, x86::X86Register *>& reg_asn);
+				bool allocate(IRContext& ctx, uint32_t& max_stack);
+				bool lower_context(IRContext& ctx, uint32_t max_stack, block_txln_fn& fn);
+				bool lower_block(IRBlock& block, X86Context& ctx);
 
 				IRInstruction *instruction_from_shared(IRContext& ctx, const shared::IRInstruction *insn);
 				IROperand *operand_from_shared(IRContext& ctx, const shared::IROperand *operand);
 
-				void encode_operand_to_reg(x86::X86Encoder& encoder, IROperand& operand, x86::X86Register& reg);
+				void encode_operand_to_reg(X86Context& ctx, IROperand& operand, x86::X86Register& reg);
 			};
 		}
 	}
