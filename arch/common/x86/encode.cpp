@@ -123,6 +123,30 @@ void X86Encoder::mov(const X86Memory& src, const X86Register& dst)
 	encode_mod_reg_rm(dst, src);
 }
 
+void X86Encoder::mov(const X86Register& src, const X86Memory& dst)
+{
+	uint8_t rex = 0;
+
+	if (src.size == 8) {
+		rex |= 0x48;
+	}
+
+	if (src.hireg) {
+		rex |= 0x44;
+	}
+
+	if (dst.base.hireg) {
+		rex |= 0x41;
+	}
+
+	if (rex) {
+		emit8(rex);
+	}
+
+	emit8(0x89);
+	encode_mod_reg_rm(src, dst);
+}
+
 void X86Encoder::mov(uint64_t src, const X86Register& dst)
 {
 	assert(dst.size == 8);

@@ -41,7 +41,7 @@ namespace captive {
 				bool optimise(IRContext& ctx);
 				bool allocate(IRContext& ctx);
 				bool lower_context(IRContext& ctx, block_txln_fn& fn);
-				bool lower_block(IRBlock& block, x86::X86Encoder& encoder, std::map<uint32_t, shared::IRBlockId>& block_relocations);
+				bool lower_block(IRBlock& block, x86::X86Encoder& encoder, std::map<uint32_t, shared::IRBlockId>& block_relocations, const std::map<uint64_t, x86::X86Register *>& reg_asn);
 
 				IRInstruction *instruction_from_shared(IRContext& ctx, const shared::IRInstruction *insn);
 				IROperand *operand_from_shared(IRContext& ctx, const shared::IROperand *operand);

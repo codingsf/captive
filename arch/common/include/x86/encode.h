@@ -44,19 +44,19 @@ namespace captive {
 			struct X86Memory
 			{
 				uint8_t scale;
-				X86Register& index;
-				X86Register& base;
+				const X86Register& index;
+				const X86Register& base;
 				int32_t displacement;
 
-				X86Memory(X86Register& _base) : scale(0), index(REG_RIZ), base(_base), displacement(0) { }
-				X86Memory(X86Register& _base, int32_t disp) : scale(0), index(REG_RIZ), base(_base), displacement(disp) { }
+				X86Memory(const X86Register& _base) : scale(0), index(REG_RIZ), base(_base), displacement(0) { }
+				X86Memory(const X86Register& _base, int32_t disp) : scale(0), index(REG_RIZ), base(_base), displacement(disp) { }
 
-				static X86Memory get(X86Register& base)
+				static X86Memory get(const X86Register& base)
 				{
 					return X86Memory(base);
 				}
 
-				static X86Memory get(X86Register& base, int32_t disp)
+				static X86Memory get(const X86Register& base, int32_t disp)
 				{
 					return X86Memory(base, disp);
 				}

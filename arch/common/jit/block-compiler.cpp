@@ -65,6 +65,16 @@ bool BlockCompiler::optimise(IRContext& ctx)
 
 bool BlockCompiler::allocate(IRContext& ctx)
 {
+	for (auto block : ctx.blocks()) {
+		for (auto insn : block->instructions()) {
+			for (auto oper : insn->operands()) {
+				if (oper->type() == IROperand::Register) {
+					IRRegisterOperand *ro = (IRRegisterOperand *)oper;
+					ro->allocate(IRRegisterOperand::Stack, ro->reg().id() * 4);
+				}
+			}
+		}
+	}
 	return true;
 }
 
@@ -80,12 +90,18 @@ bool BlockCompiler::lower_context(IRContext& ctx, block_txln_fn& fn)
 	encoder.push(REG_RBX);
 	encoder.mov(REG_RDI, REG_R15);
 
+	std::map<uint64_t, X86Register *> register_assignments;
+	register_assignments[0] = &REG_RAX;
+	register_assignments[1] = &REG_RCX;
+	register_assignments[2] = &REG_RDX;
+	register_assignments[3] = &REG_RSI;
+
 	std::map<shared::IRBlockId, uint32_t> native_block_offsets;
 	std::map<uint32_t, shared::IRBlockId> block_relocations;
 	for (auto block : ctx.blocks()) {
 		native_block_offsets[block->id()] = encoder.current_offset();
 
-		if (!lower_block(*block, encoder, block_relocations)) {
+		if (!lower_block(*block, encoder, block_relocations, register_assignments)) {
 			printf("jit: block encoding failed\n");
 			return false;
 		}
@@ -112,7 +128,7 @@ bool BlockCompiler::lower_context(IRContext& ctx, block_txln_fn& fn)
 	return true;
 }
 
-bool BlockCompiler::lower_block(IRBlock& block, x86::X86Encoder& encoder, std::map<uint32_t, shared::IRBlockId>& block_relocations)
+bool BlockCompiler::lower_block(IRBlock& block, x86::X86Encoder& encoder, std::map<uint32_t, shared::IRBlockId>& block_relocations, const std::map<uint64_t, X86Register *>& reg_asn)
 {
 	for (auto insn : block.instructions()) {
 		switch (insn->type()) {
@@ -153,7 +169,16 @@ bool BlockCompiler::lower_block(IRBlock& block, x86::X86Encoder& encoder, std::m
 			encoder.mov(X86Memory::get(REG_R14, 8), REG_RBX);
 
 			if (rri->offset().type() == IROperand::Constant) {
-				encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), REG_RBX);
+
+				if (rri->storage().allocation_class() == IRRegisterOperand::Register) {
+					auto f = reg_asn.find(rri->storage().allocation_data());
+					encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), *(f->second));
+				} else if (rri->storage().allocation_class() == IRRegisterOperand::Stack) {
+					encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), REG_RBX);
+					encoder.mov(REG_RBX, X86Memory::get(REG_RBP, rri->storage().allocation_data()));
+				} else {
+					assert(false);
+				}
 			} else {
 				assert(false);
 			}

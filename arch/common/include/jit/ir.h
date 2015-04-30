@@ -65,16 +65,35 @@ namespace captive {
 			class IRRegisterOperand : public IROperand
 			{
 			public:
-				IRRegisterOperand(IRRegister& rg) : _rg(rg) { }
+				enum RegisterAllocationClass
+				{
+					None,
+					Register,
+					Stack,
+				};
 
-				OperandType type() const override { return Register; }
+				IRRegisterOperand(IRRegister& rg) : _rg(rg), _alloc_class(None), _alloc_data(0) { }
+
+				OperandType type() const override { return IROperand::Register; }
 
 				IRRegister& reg() const { return _rg; }
 
 				void dump() const override;
 
+				void allocate(RegisterAllocationClass alloc_class, uint64_t value)
+				{
+					_alloc_class = alloc_class;
+					_alloc_data = value;
+				}
+
+				inline RegisterAllocationClass allocation_class() const { return _alloc_class; }
+				inline uint64_t allocation_data() const { return _alloc_data; }
+
 			private:
 				IRRegister& _rg;
+
+				RegisterAllocationClass _alloc_class;
+				uint64_t _alloc_data;
 			};
 
 			class IRConstantOperand : public IROperand
