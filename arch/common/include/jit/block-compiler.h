@@ -10,6 +10,7 @@
 
 #include <define.h>
 #include <shared-jit.h>
+#include <x86/encode.h>
 
 #include <map>
 #include <vector>
@@ -37,6 +38,16 @@ namespace captive {
 				std::map<uint64_t, x86::X86Register *> register_assignments;
 
 				X86Context(x86::X86Encoder& encoder) : encoder(encoder) { }
+
+				x86::X86Register& get_assigned_register(uint64_t data)
+				{
+					return *(register_assignments.find(data)->second);
+				}
+
+				x86::X86Memory get_stack_mem(uint32_t slot)
+				{
+					return x86::X86Memory(REG_RBP, slot);
+				}
 			};
 
 			class BlockCompiler
@@ -56,6 +67,7 @@ namespace captive {
 				IRInstruction *instruction_from_shared(IRContext& ctx, const shared::IRInstruction *insn);
 				IROperand *operand_from_shared(IRContext& ctx, const shared::IROperand *operand);
 
+				void load_state_field(X86Context& ctx, uint32_t slot, x86::X86Register& reg);
 				void encode_operand_to_reg(X86Context& ctx, IROperand& operand, x86::X86Register& reg);
 			};
 		}

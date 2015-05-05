@@ -1,7 +1,6 @@
 #include <jit/block-compiler.h>
 #include <jit/translation-context.h>
 #include <jit/ir.h>
-#include <x86/encode.h>
 #include <shared-jit.h>
 #include <local-memory.h>
 #include <printf.h>
@@ -159,7 +158,7 @@ bool BlockCompiler::lower_block(IRBlock& block, X86Context& ctx)
 		case IRInstruction::Call:
 		{
 			instructions::IRCallInstruction *calli = (instructions::IRCallInstruction *)insn;
-			ctx.encoder.mov(X86Memory::get(REG_R15), REG_RDI);
+			load_state_field(ctx, 0, REG_RDI);
 
 			const std::vector<IROperand *>& args = calli->arguments();
 			if (args.size() > 0)  {
@@ -190,13 +189,10 @@ bool BlockCompiler::lower_block(IRBlock& block, X86Context& ctx)
 		{
 			instructions::IRReadRegisterInstruction *rri = (instructions::IRReadRegisterInstruction *)insn;
 
-			ctx.encoder.mov(X86Memory::get(REG_R14, 8), REG_RBX);
-
+			load_state_field(ctx, 8, REG_RBX);
 			if (rri->offset().type() == IROperand::Constant) {
-
 				if (rri->storage().allocation_class() == IRRegisterOperand::Register) {
-					auto f = reg_asn.find(rri->storage().allocation_data());
-					ctx.encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), *(f->second));
+					ctx.encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), ctx.get_assigned_register(rri->storage().allocation_data()));
 				} else if (rri->storage().allocation_class() == IRRegisterOperand::Stack) {
 					ctx.encoder.mov(X86Memory::get(REG_RBX, ((IRConstantOperand&)rri->offset()).value()), REG_RBX);
 					ctx.encoder.mov(REG_RBX, X86Memory::get(REG_RBP, rri->storage().allocation_data()));
@@ -461,6 +457,11 @@ IROperand* BlockCompiler::operand_from_shared(IRContext& ctx, const shared::IROp
 	}
 }
 
+void BlockCompiler::load_state_field(X86Context& ctx, uint32_t slot, x86::X86Register& reg)
+{
+	ctx.encoder.mov(X86Memory::get(REG_R15, slot), reg);
+}
+
 void BlockCompiler::encode_operand_to_reg(X86Context& ctx, IROperand& operand, x86::X86Register& reg)
 {
 	switch (operand.type()) {
@@ -473,9 +474,10 @@ void BlockCompiler::encode_operand_to_reg(X86Context& ctx, IROperand& operand, x
 		IRRegisterOperand& regop = (IRRegisterOperand&)operand;
 		switch (regop.allocation_class()) {
 		case IRRegisterOperand::Stack:
-			ctx.encoder.mov(X86Memory::get(REG_RBP, regop.allocation_data()), reg);
+			ctx.encoder.mov(ctx.get_stack_mem(regop.allocation_data()), reg);
 			break;
 		case IRRegisterOperand::Register:
+			ctx.encoder.mov(ctx.get_assigned_register(regop.allocation_data()), reg);
 			break;
 		default:
 			assert(false);
