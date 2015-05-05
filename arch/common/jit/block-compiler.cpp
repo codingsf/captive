@@ -87,6 +87,11 @@ bool BlockCompiler::build()
 		}
 	}
 
+	// Build instruction register liveness analysis
+	for (auto block : ir.blocks()) {
+		block->calculate_liveness();
+	}
+
 	return true;
 }
 

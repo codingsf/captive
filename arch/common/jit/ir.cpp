@@ -111,6 +111,24 @@ void IRBlock::remove_from_parent()
 	 _owner.remove_block(*this);
 }
 
+void IRBlock::calculate_liveness()
+{
+	for (auto II = _instructions.rbegin(), IE = _instructions.rend(); II != IE; ++II) {
+		IRInstruction *insn = *II;
+
+		insn->_live_in.clear();
+		insn->_live_out.clear();
+
+		for (auto use : insn->_uses) {
+			insn->_live_in.push_back(&use->reg());
+		}
+
+		for (auto def : insn->_defs) {
+			insn->_live_out.push_back(&def->reg());
+		}
+	}
+}
+
 IRInstruction::~IRInstruction()
 {
 	for (auto oper : _all_operands) {
@@ -138,18 +156,18 @@ void IRInstruction::dump() const
 		oper->dump();
 	}
 
-	if (_uses.size() > 0) {
-		printf(" >{ ");
-		for (auto use : _uses) {
-			printf("r%d ", use->reg().id());
+	if (_live_in.size() > 0) {
+		printf(" IN={ ");
+		for (auto in : _live_in) {
+			printf("r%d ", in->id());
 		}
 		printf("}");
 	}
 
-	if (_defs.size() > 0) {
-		printf(" <{ ");
-		for (auto def : _defs) {
-			printf("r%d ", def->reg().id());
+	if (_live_out.size() > 0) {
+		printf(" OUT={ ");
+		for (auto out : _live_out) {
+			printf("r%d ", out->id());
 		}
 		printf("}");
 	}

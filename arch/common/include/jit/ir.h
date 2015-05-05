@@ -257,6 +257,8 @@ namespace captive {
 
 				std::list<IROperand *> _all_operands;
 				std::vector<IRRegisterOperand *> _uses, _defs;
+
+				std::list<IRRegister *> _live_in, _live_out;
 			};
 
 			namespace instructions
@@ -351,6 +353,8 @@ namespace captive {
 				}
 
 				void remove_from_parent();
+
+				void calculate_liveness();
 
 			private:
 				IRContext& _owner;
