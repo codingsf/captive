@@ -16,6 +16,8 @@
 #include <sys/eventfd.h>
 #include <sys/signal.h>
 #include <chrono>
+#include <sstream>
+#include <iomanip>
 
 USE_CONTEXT(CPU);
 
@@ -422,7 +424,9 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
 
-		FILE *f = fopen("code.bin", "wb");
+		std::stringstream fname;
+		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
+		FILE *f = fopen(fname.str().c_str(), "wb");
 
 		uint64_t gpa = regs.rdi & 0xfffffff;
 		gpa += 0x040000000ULL;

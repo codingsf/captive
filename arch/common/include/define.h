@@ -48,7 +48,10 @@ struct mcontext
 static inline __attribute__((noreturn)) void abort()
 {
 	asm volatile("out %0, $0xff\n" : : "a"(0x02));
-	for(;;);
+
+	for(;;) {
+		asm volatile("hlt\n");
+	}
 }
 
 static inline void __local_irq_enable()

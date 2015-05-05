@@ -11,13 +11,15 @@ static const char *resolve_symbol(uint64_t sym)
 
 void dump_stack()
 {
+	int count = 0;
+
 	printf("Stack Frame:\n");
 
 	uint64_t bp;
 	asm volatile("mov %%rbp, %0\n" : "=r"(bp));
 
 	int frame_idx = 0;
-	while (bp != 0) {
+	while (bp != 0 && count++ < 100) {
 		uint64_t *stack = (uint64_t *)bp;
 		printf("  %d: %lx: %s\n", frame_idx++, stack[1], resolve_symbol(stack[1]));
 		bp = stack[0];

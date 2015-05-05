@@ -89,6 +89,10 @@ namespace captive {
 				inline RegisterAllocationClass allocation_class() const { return _alloc_class; }
 				inline uint64_t allocation_data() const { return _alloc_data; }
 
+				inline bool is_allocated() const { return _alloc_class != None; }
+				inline bool is_allocated_reg() const { return _alloc_class == Register; }
+				inline bool is_allocated_stack() const { return _alloc_class == Stack; }
+
 			private:
 				IRRegister& _rg;
 
@@ -266,7 +270,7 @@ namespace captive {
 					if (_instructions.size() > 0) {
 						_instructions.back()->_next = &insn;
 					}
-					
+
 					_instructions.push_back(&insn);
 
 					insn.attach(*this);
@@ -442,13 +446,28 @@ namespace captive {
 					const char* mnemonic() const override { return "ldpc"; }
 				};
 
-				class IRSXInstruction : public IRInstruction
+				class IRChangeSizeInstruction : public IRInstruction
 				{
 				public:
-					IRSXInstruction(IROperand& src, IRRegisterOperand& dest)
+					IRChangeSizeInstruction(IROperand& src, IRRegisterOperand& dest) : _src(src), _dest(dest)
 					{
 						add_input_operand(src);
 						add_output_operand(dest);
+					}
+
+					inline IROperand& source() const { return _src; }
+					inline IRRegisterOperand& destination() const { return _dest; }
+
+				private:
+					IROperand& _src;
+					IRRegisterOperand& _dest;
+				};
+
+				class IRSXInstruction : public IRChangeSizeInstruction
+				{
+				public:
+					IRSXInstruction(IROperand& src, IRRegisterOperand& dest) : IRChangeSizeInstruction(src, dest)
+					{
 					}
 
 					IRInstruction::InstructionTypes type() const override { return SignExtend; }
@@ -457,13 +476,11 @@ namespace captive {
 					const char* mnemonic() const override { return "sx"; }
 				};
 
-				class IRZXInstruction : public IRInstruction
+				class IRZXInstruction : public IRChangeSizeInstruction
 				{
 				public:
-					IRZXInstruction(IROperand& src, IRRegisterOperand& dest)
+					IRZXInstruction(IROperand& src, IRRegisterOperand& dest) : IRChangeSizeInstruction(src, dest)
 					{
-						add_input_operand(src);
-						add_output_operand(dest);
 					}
 
 					IRInstruction::InstructionTypes type() const override { return ZeroExtend; }
@@ -472,13 +489,11 @@ namespace captive {
 					const char* mnemonic() const override { return "zx"; }
 				};
 
-				class IRTruncInstruction : public IRInstruction
+				class IRTruncInstruction : public IRChangeSizeInstruction
 				{
 				public:
-					IRTruncInstruction(IROperand& src, IRRegisterOperand& dest)
+					IRTruncInstruction(IROperand& src, IRRegisterOperand& dest) : IRChangeSizeInstruction(src, dest)
 					{
-						add_input_operand(src);
-						add_output_operand(dest);
 					}
 
 					IRInstruction::InstructionTypes type() const override { return Truncate; }
@@ -512,7 +527,7 @@ namespace captive {
 				class IRWriteRegisterInstruction : public IRInstruction
 				{
 				public:
-					IRWriteRegisterInstruction(IROperand& value, IROperand& offset)
+					IRWriteRegisterInstruction(IROperand& value, IROperand& offset) : _value(value), _offset(offset)
 					{
 						add_input_operand(value);
 						add_input_operand(offset);
@@ -520,8 +535,15 @@ namespace captive {
 
 					IRInstruction::InstructionTypes type() const override { return WriteRegister; }
 
+					IROperand& value() const { return _value; }
+					IROperand& offset() const { return _offset; }
+
 				protected:
 					const char* mnemonic() const override { return "streg"; }
+
+				private:
+					IROperand& _value;
+					IROperand& _offset;
 				};
 
 				class IRReadMemoryInstruction : public IRInstruction

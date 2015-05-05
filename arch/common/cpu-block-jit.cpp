@@ -47,8 +47,6 @@ bool CPU::run_block_jit()
 
 bool CPU::run_block_jit_safepoint()
 {
-	BlockCompiler compiler;
-
 	bool step_ok = true;
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
@@ -75,8 +73,9 @@ bool CPU::run_block_jit_safepoint()
 				return false;
 			}
 
+			BlockCompiler compiler(tb);
 			block_txln_fn fn;
-			if (!compiler.compile(tb, fn)) {
+			if (!compiler.compile(fn)) {
 				printf("jit: block compilation failed\n");
 				return false;
 			}

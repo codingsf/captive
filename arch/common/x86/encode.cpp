@@ -180,6 +180,29 @@ void X86Encoder::andd(uint32_t val, const X86Register& dst)
 	if (val < 256) {
 		emit8(0x83);
 		encode_mod_reg_rm(4, dst);
+		emit8(val);
+	} else {
+		assert(false);
+	}
+}
+
+void X86Encoder::sub(uint32_t val, const X86Register& dst)
+{
+	if (val < 256) {
+		uint8_t rex = 0;
+
+		if (dst.size == 8)
+			rex |= REX_W;
+
+		if (dst.hireg)
+			rex |= REX_B;
+
+		if (rex) emit8(rex);
+
+		emit8(0x83);
+		encode_mod_reg_rm(5, dst);
+
+		emit8(val);
 	} else {
 		assert(false);
 	}

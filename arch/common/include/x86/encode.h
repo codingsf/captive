@@ -87,6 +87,8 @@ namespace captive {
 
 				void xorr(const X86Register src, const X86Register& dest);
 
+				void sub(uint32_t val, const X86Register& dst);
+
 				void jmp_reloc(uint32_t& reloc_offset);
 
 				void leave();
