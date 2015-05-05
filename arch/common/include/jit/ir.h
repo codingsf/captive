@@ -13,6 +13,7 @@
 #include <map>
 #include <list>
 #include <vector>
+#include <set>
 
 namespace captive {
 	namespace arch {
@@ -210,12 +211,14 @@ namespace captive {
 				virtual InstructionTypes type() const = 0;
 
 				inline const std::list<IROperand *>& operands() const { return _all_operands; }
-				inline const std::vector<IRRegister *>& uses() const { return _uses; }
-				inline const std::vector<IRRegister *>& defs() const { return _defs; }
+				inline const std::vector<IRRegisterOperand *>& uses() const { return _uses; }
+				inline const std::vector<IRRegisterOperand *>& defs() const { return _defs; }
 
 				virtual void dump() const;
 
 				inline IRInstruction *next() const { return _next; }
+
+				void remove_from_parent();
 
 			protected:
 				inline void add_input_operand(IROperand& operand)
@@ -224,14 +227,14 @@ namespace captive {
 					_all_operands.push_back(&operand);
 
 					if (operand.type() == IROperand::Register)
-						_uses.push_back(&((IRRegisterOperand&)operand).reg());
+						_uses.push_back(&((IRRegisterOperand&)operand));
 				}
 
 				inline void add_output_operand(IRRegisterOperand& operand)
 				{
 					operand.attach(*this);
 					_all_operands.push_back(&operand);
-					_defs.push_back(&operand.reg());
+					_defs.push_back(&operand);
 				}
 
 				inline void add_input_output_operand(IRRegisterOperand& operand)
@@ -239,21 +242,27 @@ namespace captive {
 					operand.attach(*this);
 					_all_operands.push_back(&operand);
 
-					_uses.push_back(&operand.reg());
-					_defs.push_back(&operand.reg());
+					_uses.push_back(&operand);
+					_defs.push_back(&operand);
 				}
 
 				virtual const char *mnemonic() const = 0;
 
 			private:
 				inline void attach(IRBlock& owner) { _owner = &owner; _next = NULL; }
+				inline void detach(IRBlock& owner) { _owner = NULL; _next = NULL; }
 
 				IRBlock *_owner;
 				IRInstruction *_next;
 
 				std::list<IROperand *> _all_operands;
-				std::vector<IRRegister *> _uses, _defs;
+				std::vector<IRRegisterOperand *> _uses, _defs;
 			};
+
+			namespace instructions
+			{
+				class IRTerminatorInstruction;
+			}
 
 			class IRBlock
 			{
@@ -264,6 +273,52 @@ namespace captive {
 				shared::IRBlockId id() const { return _id; }
 
 				inline const std::list<IRInstruction *>& instructions() const { return _instructions; }
+
+				inline instructions::IRTerminatorInstruction& terminator() const
+				{
+					assert(_instructions.size() > 0);
+
+					IRInstruction& last_insn = *(_instructions.back());
+					assert(last_insn.type() == IRInstruction::Jump || last_insn.type() == IRInstruction::Branch || last_insn.type() == IRInstruction::Return);
+
+					return (instructions::IRTerminatorInstruction&)last_insn;
+				}
+
+				inline void add_successor(IRBlock& successor)
+				{
+					_succ.insert(&successor);
+				}
+
+				inline void remove_successors()
+				{
+					_succ.clear();
+				}
+
+				inline void add_predecessor(IRBlock& predecessor)
+				{
+					_pred.insert(&predecessor);
+				}
+
+				inline void remove_predecessors()
+				{
+					_pred.clear();
+				}
+
+				inline void remove_predecessor(IRBlock& predecessor)
+				{
+					for (auto PI = _pred.begin(), PE = _pred.end(); PI != PE; ++PI) {
+						if ((*PI) == &predecessor) {
+							_pred.erase(PI);
+							break;
+						}
+					}
+				}
+
+				inline const std::set<IRBlock *> successors() const { return _succ; }
+				inline const std::set<IRBlock *> predecessors() const { return _pred; }
+
+				inline const std::list<IRRegister *>& live_ins() const { return _live_ins; }
+				inline const std::list<IRRegister *>& live_outs() const { return _live_outs; }
 
 				void append_instruction(IRInstruction& insn)
 				{
@@ -276,10 +331,34 @@ namespace captive {
 					insn.attach(*this);
 				}
 
+				void remove_instruction(IRInstruction& insn)
+				{
+					IRInstruction *prev = NULL;
+					for (auto IS = _instructions.begin(), IE = _instructions.end(); IS != IE; ++IS) {
+						if ((*IS) == &insn) {
+							if (prev) {
+								prev->_next = insn._next;
+							}
+
+							_instructions.erase(IS);
+							break;
+						}
+
+						prev = *IS;
+					}
+
+					insn.detach(*this);
+				}
+
+				void remove_from_parent();
+
 			private:
 				IRContext& _owner;
 				shared::IRBlockId _id;
 				std::list<IRInstruction *> _instructions;
+
+				std::list<IRRegister *> _live_ins, _live_outs;
+				std::set<IRBlock *> _succ, _pred;
 			};
 
 			class IRContext
@@ -301,6 +380,8 @@ namespace captive {
 				IRRegister& get_register_by_id(shared::IRRegId id, uint8_t width);
 
 				void dump() const;
+
+				void remove_block(IRBlock& block);
 
 			private:
 				typedef std::map<shared::IRBlockId, IRBlock *> block_map_t;
@@ -356,10 +437,27 @@ namespace captive {
 					std::vector<IROperand *> _args;
 				};
 
-				class IRJumpInstruction : public IRInstruction
+				class IRTerminatorInstruction : public IRInstruction
 				{
 				public:
-					IRJumpInstruction(IRBlockOperand& target) { add_input_operand(target); }
+					IRTerminatorInstruction() { }
+
+					inline const std::vector<IRBlock *> successors() const { return _succ; }
+
+				protected:
+					inline void add_successor(IRBlock& succ)
+					{
+						_succ.push_back(&succ);
+					}
+
+				private:
+					std::vector<IRBlock *> _succ;
+				};
+
+				class IRJumpInstruction : public IRTerminatorInstruction
+				{
+				public:
+					IRJumpInstruction(IRBlockOperand& target) { add_input_operand(target); add_successor(target.block()); }
 					IRInstruction::InstructionTypes type() const override { return Jump; }
 
 					IRBlockOperand& target() { return *((IRBlockOperand *)operands().front()); }
@@ -368,7 +466,7 @@ namespace captive {
 					const char* mnemonic() const override { return "jump"; }
 				};
 
-				class IRBranchInstruction : public IRInstruction
+				class IRBranchInstruction : public IRTerminatorInstruction
 				{
 				public:
 					IRBranchInstruction(IROperand& cond, IRBlockOperand& true_target, IRBlockOperand& false_target)
@@ -376,6 +474,9 @@ namespace captive {
 						add_input_operand(cond);
 						add_input_operand(true_target);
 						add_input_operand(false_target);
+
+						add_successor(true_target.block());
+						add_successor(false_target.block());
 					}
 
 					IRInstruction::InstructionTypes type() const override { return Branch; }
@@ -384,7 +485,7 @@ namespace captive {
 					const char* mnemonic() const override { return "branch"; }
 				};
 
-				class IRRetInstruction : public IRInstruction
+				class IRRetInstruction : public IRTerminatorInstruction
 				{
 				public:
 					IRRetInstruction() { }

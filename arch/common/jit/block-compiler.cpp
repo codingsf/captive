@@ -30,6 +30,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}
 
+	ir.dump();
+
 	uint32_t max_stack = 0;
 	if (!allocate(max_stack)) {
 		printf("jit: register allocation failed\n");
@@ -54,7 +56,7 @@ bool BlockCompiler::optimise_tb()
 			if (insn->operands[0].type == shared::IROperand::CONSTANT && insn->operands[0].value == 0) {
 				insn->type = shared::IRInstruction::NOP;
 			}
-			
+
 			break;
 		}
 	}
@@ -64,8 +66,12 @@ bool BlockCompiler::optimise_tb()
 
 bool BlockCompiler::build()
 {
+	// Build blocks and instructions
 	for (uint32_t idx = 0; idx < tb.ir_insn_count; idx++) {
 		shared::IRInstruction *shared_insn = &tb.ir_insn[idx];
+
+		// Don't include NOPs
+		if (shared_insn->type == shared::IRInstruction::NOP) continue;
 
 		IRBlock& block = ir.get_block_by_id(shared_insn->ir_block);
 		IRInstruction *insn = instruction_from_shared(ir, shared_insn);
@@ -73,7 +79,13 @@ bool BlockCompiler::build()
 		block.append_instruction(*insn);
 	}
 
-	ir.dump();
+	// Build block CFG
+	for (auto block : ir.blocks()) {
+		for (auto succ : block->terminator().successors()) {
+			block->add_successor(*succ);
+			succ->add_predecessor(*block);
+		}
+	}
 
 	return true;
 }
@@ -81,6 +93,40 @@ bool BlockCompiler::build()
 
 bool BlockCompiler::optimise_ir()
 {
+	if (!merge_blocks()) return false;
+	return true;
+}
+
+bool BlockCompiler::merge_blocks()
+{
+retry:
+	for (auto block : ir.blocks()) {
+		if (block->successors().size() == 1) {
+			auto succ = *(block->successors().begin());
+
+			if (succ->predecessors().size() == 1) {
+				printf("i've decided to merge %d into %d\n", succ->id(), block->id());
+
+				block->terminator().remove_from_parent();
+
+				for (auto insn : succ->instructions()) {
+					block->append_instruction(*insn);
+				}
+
+				block->remove_successors();
+
+				for (auto new_succ : succ->successors()) {
+					block->add_successor(*new_succ);
+
+					new_succ->remove_predecessor(*succ);
+					new_succ->add_predecessor(*block);
+				}
+
+				succ->remove_from_parent();
+				goto retry;
+			}
+		}
+	}
 	return true;
 }
 
@@ -89,17 +135,48 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 	max_stack = 0;
 
 	for (auto block : ir.blocks()) {
-		for (auto insn : block->instructions()) {
-			for (auto oper : insn->operands()) {
-				if (oper->type() == IROperand::Register) {
-					IRRegisterOperand *ro = (IRRegisterOperand *)oper;
+		std::map<IRRegister *, uint32_t> alloc;
+		std::list<uint32_t> avail;
+		avail.push_back(0);
+		avail.push_back(1);
+		avail.push_back(2);
+		avail.push_back(3);
+		avail.push_back(4);
+		avail.push_back(5);
 
-					uint64_t stack_slot = ro->reg().id() * 4;
-					ro->allocate(IRRegisterOperand::Stack, stack_slot);
+		printf("local allocator on block %d\n", block->id());
+		for (auto II =  block->instructions().begin(), IE = block->instructions().end(); II != IE; ++II) {
+			IRInstruction *insn = *II;
 
-					if (stack_slot > max_stack) {
-						max_stack = stack_slot;
-					}
+			printf("insn: ");
+			insn->dump();
+			printf("\n");
+
+			for (auto use : insn->uses()) {
+				uint32_t live = alloc[&use->reg()];
+
+				printf(" use: r%d reg=%d\n", use->reg().id(), live);
+				use->allocate(IRRegisterOperand::Register, live);
+
+				/*for (auto NI = II+1; NI != IE; ++NI) {
+
+				}*/
+			}
+
+			for (auto def : insn->defs()) {
+				if (alloc.find(&def->reg()) != alloc.end()) {
+					def->allocate(IRRegisterOperand::Register, alloc[&def->reg()]);
+				} else {
+					if (avail.size() == 0) assert(false);
+
+					uint32_t chosen = avail.front();
+					avail.pop_front();
+
+					alloc[&def->reg()] = chosen;
+
+					printf(" def: r%d reg=%d\n", def->reg().id(), chosen);
+
+					def->allocate(IRRegisterOperand::Register, chosen);
 				}
 			}
 		}
@@ -123,6 +200,8 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 	register_assignments[1] = &REG_RCX;
 	register_assignments[2] = &REG_RDX;
 	register_assignments[3] = &REG_RSI;
+	register_assignments[4] = &REG_R8;
+	register_assignments[5] = &REG_R9;
 
 	std::map<shared::IRBlockId, uint32_t> native_block_offsets;
 	for (auto block : ir.blocks()) {
@@ -345,6 +424,15 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					}
 
 					encoder.mov(tmp0_4, stack_from_operand(trunci->destination()));
+				} else if (source.is_allocated_reg() && trunci->destination().is_allocated_reg()) {
+					encoder.mov(register_from_operand(source), register_from_operand(trunci->destination()));
+
+					switch (trunci->destination().reg().width()) {
+					case 1: encoder.andd(0xff, register_from_operand(trunci->destination())); break;
+					case 2: encoder.andd(0xffff, register_from_operand(trunci->destination())); break;
+					case 4: encoder.andd(0xffffffff, register_from_operand(trunci->destination())); break;
+					default: assert(false);
+					}
 				} else {
 					assert(false);
 				}

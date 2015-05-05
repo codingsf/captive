@@ -14,6 +14,11 @@ IRContext::~IRContext()
 	}
 }
 
+void IRContext::remove_block(IRBlock& block)
+{
+	_blocks.erase(block.id());
+}
+
 IRBlock& IRContext::get_block_by_id(shared::IRBlockId id)
 {
 	block_map_t::iterator iter = _blocks.find(id);
@@ -42,7 +47,50 @@ IRRegister& IRContext::get_register_by_id(shared::IRRegId id, uint8_t width)
 void IRContext::dump() const
 {
 	for (auto block : _blocks) {
-		printf("block %d:\n", block.second->id());
+		printf("block %d: ", block.second->id());
+
+		bool first = true;
+
+		printf("PRED={ ");
+		for (auto pred : block.second->predecessors()) {
+			printf("%d ", pred->id());
+		}
+		printf("} ");
+
+		printf("SUCC={ ");
+		for (auto succ : block.second->successors()) {
+			printf("%d ", succ->id());
+		}
+		printf("} ");
+
+		printf("IN={ ");
+		for (auto in : block.second->live_ins()) {
+			if (first) {
+				first = false;
+			} else {
+				first = true;
+				printf(", ");
+			}
+
+			printf("r%d ", in->id());
+		}
+		printf("} ");
+
+		first = true;
+
+		printf("OUT={ ");
+		for (auto out : block.second->live_outs()) {
+			if (first) {
+				first = false;
+			} else {
+				first = true;
+				printf(", ");
+			}
+
+			printf("r%d ", out->id());
+		}
+		printf("}\n");
+
 		for (auto insn : block.second->instructions()) {
 			printf("  ");
 			insn->dump();
@@ -58,11 +106,21 @@ IRBlock::~IRBlock()
 	}
 }
 
+void IRBlock::remove_from_parent()
+{
+	 _owner.remove_block(*this);
+}
+
 IRInstruction::~IRInstruction()
 {
 	for (auto oper : _all_operands) {
 		delete oper;
 	}
+}
+
+void IRInstruction::remove_from_parent()
+{
+	_owner->remove_instruction(*this);
 }
 
 void IRInstruction::dump() const
@@ -78,6 +136,22 @@ void IRInstruction::dump() const
 		}
 
 		oper->dump();
+	}
+
+	if (_uses.size() > 0) {
+		printf(" >{ ");
+		for (auto use : _uses) {
+			printf("r%d ", use->reg().id());
+		}
+		printf("}");
+	}
+
+	if (_defs.size() > 0) {
+		printf(" <{ ");
+		for (auto def : _defs) {
+			printf("r%d ", def->reg().id());
+		}
+		printf("}");
 	}
 }
 

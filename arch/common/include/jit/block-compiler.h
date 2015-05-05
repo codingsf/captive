@@ -64,6 +64,8 @@ namespace captive {
 					assert(oper.is_allocated_stack());
 					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 4);
 				}
+
+				bool merge_blocks();
 			};
 		}
 	}

@@ -182,7 +182,9 @@ void X86Encoder::andd(uint32_t val, const X86Register& dst)
 		encode_mod_reg_rm(4, dst);
 		emit8(val);
 	} else {
-		assert(false);
+		emit8(0x81);
+		encode_mod_reg_rm(4, dst);
+		emit32(val);
 	}
 }
 
