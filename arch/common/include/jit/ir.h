@@ -258,7 +258,7 @@ namespace captive {
 				std::list<IROperand *> _all_operands;
 				std::vector<IRRegisterOperand *> _uses, _defs;
 
-				std::list<IRRegister *> _live_in, _live_out;
+				std::set<IRRegister *> _live_in, _live_out;
 			};
 
 			namespace instructions

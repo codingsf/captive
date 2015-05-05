@@ -113,6 +113,8 @@ void IRBlock::remove_from_parent()
 
 void IRBlock::calculate_liveness()
 {
+	std::set<IRRegister *> current_live;
+
 	for (auto II = _instructions.rbegin(), IE = _instructions.rend(); II != IE; ++II) {
 		IRInstruction *insn = *II;
 
@@ -120,11 +122,22 @@ void IRBlock::calculate_liveness()
 		insn->_live_out.clear();
 
 		for (auto use : insn->_uses) {
-			insn->_live_in.push_back(&use->reg());
+			insn->_live_in.insert(&use->reg());
+			current_live.insert(&use->reg());
 		}
 
 		for (auto def : insn->_defs) {
-			insn->_live_out.push_back(&def->reg());
+			current_live.erase(&def->reg());
+		}
+
+		for (auto live : current_live) {
+			insn->_live_in.insert(live);
+		}
+
+		if (insn->_next) {
+			for (auto in : insn->_next->_live_in) {
+				insn->_live_out.insert(in);
+			}
 		}
 	}
 }
