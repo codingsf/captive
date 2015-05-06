@@ -151,9 +151,14 @@ namespace captive {
 			class IRPCOperand : public IROperand
 			{
 			public:
-				IRPCOperand() { }
+				IRPCOperand(uint32_t val) : _val(val) { }
 
 				OperandType type() const override { return PC; }
+
+				uint32_t value() const { return _val; }
+
+			private:
+				uint32_t _val;
 			};
 
 			class IRInstruction
@@ -203,6 +208,13 @@ namespace captive {
 					BitwiseAnd,
 					BitwiseOr,
 					BitwiseXor,
+
+					CompareEqual,
+					CompareNotEqual,
+					CompareLessThan,
+					CompareGreaterThan,
+					CompareLessThanOrEqual,
+					CompareGreaterThanOrEqual,
 				};
 
 				IRInstruction() : _owner(NULL), _next(NULL) { }
@@ -543,15 +555,20 @@ namespace captive {
 				class IRLoadPCInstruction : public IRInstruction
 				{
 				public:
-					IRLoadPCInstruction(IRRegisterOperand& dest)
+					IRLoadPCInstruction(IRRegisterOperand& dest) : _dst(dest)
 					{
 						add_output_operand(dest);
 					}
 
 					IRInstruction::InstructionTypes type() const override { return LoadPC; }
 
+					IRRegisterOperand& destination() const { return _dst; }
+
 				protected:
 					const char* mnemonic() const override { return "ldpc"; }
+
+				private:
+					IRRegisterOperand& _dst;
 				};
 
 				class IRChangeSizeInstruction : public IRInstruction
@@ -709,12 +726,17 @@ namespace captive {
 				class IRSetCpuModeInstruction : public IRInstruction
 				{
 				public:
-					IRSetCpuModeInstruction(IROperand& new_mode) { add_input_operand(new_mode); }
+					IRSetCpuModeInstruction(IROperand& __new_mode) : _new_mode(__new_mode) { add_input_operand(__new_mode); }
 
 					IRInstruction::InstructionTypes type() const override { return SetCPUMode; }
 
+					IROperand& new_mode() const { return _new_mode; }
+
 				protected:
 					const char* mnemonic() const override { return "set-cpu-mode"; }
+
+				private:
+					IROperand& _new_mode;
 				};
 
 				class IRArithmeticInstruction : public IRInstruction
@@ -880,6 +902,163 @@ namespace captive {
 
 				protected:
 					const char* mnemonic() const override { return "sar"; }
+				};
+
+				class IRDeviceInstruction : public IRInstruction
+				{
+				public:
+					IRDeviceInstruction(IROperand& device, IROperand& offset) : _device(device), _offset(offset)
+					{
+						add_input_operand(device);
+						add_input_operand(offset);
+					}
+
+					IROperand& device() const { return _device; }
+					IROperand& offset() const { return _offset; }
+
+				private:
+					IROperand& _device;
+					IROperand& _offset;
+				};
+
+				class IRWriteDeviceInstruction : public IRDeviceInstruction
+				{
+				public:
+					IRWriteDeviceInstruction(IROperand& device, IROperand& offset, IROperand& data)
+						: IRDeviceInstruction(device, offset), _data(data)
+					{
+						add_input_operand(data);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return WriteDevice; }
+
+				protected:
+					const char* mnemonic() const override { return "wrdev"; }
+
+				private:
+					IROperand& _data;
+				};
+
+				class IRReadDeviceInstruction : public IRDeviceInstruction
+				{
+				public:
+					IRReadDeviceInstruction(IROperand& device, IROperand& offset, IRRegisterOperand& data)
+						: IRDeviceInstruction(device, offset), _data(data)
+					{
+						add_output_operand(data);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return ReadDevice; }
+
+				protected:
+					const char* mnemonic() const override { return "rddev"; }
+
+				private:
+					IRRegisterOperand& _data;
+				};
+
+				class IRComparisonInstruction : public IRInstruction
+				{
+				public:
+					IRComparisonInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : _lh(lh), _rh(rh), _dst(dst)
+					{
+						add_input_operand(lh);
+						add_input_operand(rh);
+						add_output_operand(dst);
+					}
+
+					IROperand& lhs() const { return _lh; }
+					IROperand& rhs() const { return _rh; }
+					IRRegisterOperand& destination() const { return _dst; }
+
+				private:
+					IROperand& _lh;
+					IROperand& _rh;
+					IRRegisterOperand& _dst;
+				};
+
+				class IRCompareEqualInstruction : public IRComparisonInstruction
+				{
+				public:
+					IRCompareEqualInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : IRComparisonInstruction(lh, rh, dst)
+					{
+
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CompareEqual; }
+
+				protected:
+					const char* mnemonic() const override { return "cmpeq"; }
+				};
+
+				class IRCompareNotEqualInstruction : public IRComparisonInstruction
+				{
+				public:
+					IRCompareNotEqualInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : IRComparisonInstruction(lh, rh, dst)
+					{
+
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CompareNotEqual; }
+
+				protected:
+					const char* mnemonic() const override { return "cmpne"; }
+				};
+
+				class IRCompareLessThanInstruction : public IRComparisonInstruction
+				{
+				public:
+					IRCompareLessThanInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : IRComparisonInstruction(lh, rh, dst)
+					{
+
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CompareLessThan; }
+
+				protected:
+					const char* mnemonic() const override { return "cmplt"; }
+				};
+
+				class IRCompareGreaterThanInstruction : public IRComparisonInstruction
+				{
+				public:
+					IRCompareGreaterThanInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : IRComparisonInstruction(lh, rh, dst)
+					{
+
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CompareGreaterThan; }
+
+				protected:
+					const char* mnemonic() const override { return "cmpgt"; }
+				};
+
+				class IRCompareLessThanOrEqualInstruction : public IRComparisonInstruction
+				{
+				public:
+					IRCompareLessThanOrEqualInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : IRComparisonInstruction(lh, rh, dst)
+					{
+
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CompareLessThanOrEqual; }
+
+				protected:
+					const char* mnemonic() const override { return "cmplte"; }
+				};
+
+				class IRCompareGreaterThanOrEqualInstruction : public IRComparisonInstruction
+				{
+				public:
+					IRCompareGreaterThanOrEqualInstruction(IROperand& lh, IROperand& rh, IRRegisterOperand& dst) : IRComparisonInstruction(lh, rh, dst)
+					{
+
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CompareGreaterThanOrEqual; }
+
+				protected:
+					const char* mnemonic() const override { return "cmpgte"; }
 				};
 			}
 		}

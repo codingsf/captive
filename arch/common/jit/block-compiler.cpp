@@ -5,38 +5,19 @@
 #include <printf.h>
 #include <queue>
 
+extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
+
 using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 
 BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb), encoder(memory_allocator)
 {
-	register_assignments_8[0] = &REG_RAX;
-	register_assignments_8[1] = &REG_RCX;
-	register_assignments_8[2] = &REG_RDX;
-	register_assignments_8[3] = &REG_RSI;
-	register_assignments_8[4] = &REG_R8;
-	register_assignments_8[5] = &REG_R9;
-
-	register_assignments_4[0] = &REG_EAX;
-	register_assignments_4[1] = &REG_ECX;
-	register_assignments_4[2] = &REG_EDX;
-	register_assignments_4[3] = &REG_ESI;
-	register_assignments_4[4] = &REG_R8D;
-	register_assignments_4[5] = &REG_R9D;
-
-	register_assignments_2[0] = &REG_AX;
-	register_assignments_2[1] = &REG_CX;
-	register_assignments_2[2] = &REG_DX;
-	register_assignments_2[3] = &REG_SI;
-	register_assignments_2[4] = &REG_R8W;
-	register_assignments_2[5] = &REG_R9W;
-
-	register_assignments_1[0] = &REG_AL;
-	register_assignments_1[1] = &REG_CL;
-	register_assignments_1[2] = &REG_DL;
-	register_assignments_1[3] = &REG_SIL;
-	register_assignments_1[4] = &REG_R8B;
-	register_assignments_1[5] = &REG_R9B;
+	assign(0, REG_RAX, REG_EAX, REG_AX, REG_AL);
+	assign(1, REG_RCX, REG_ECX, REG_CX, REG_CL);
+	assign(2, REG_RSI, REG_ESI, REG_SI, REG_SIL);
+	assign(3, REG_RDI, REG_EDI, REG_DI, REG_DIL);
+	assign(4, REG_R8, REG_R8D, REG_R8W, REG_R8B);
+	assign(5, REG_R9, REG_R9D, REG_R9W, REG_R9B);
 }
 
 bool BlockCompiler::compile(block_txln_fn& fn)
@@ -138,14 +119,23 @@ retry:
 			if (succ->predecessors().size() == 1) {
 				printf("i've decided to merge %d into %d\n", succ->id(), block->id());
 
+				// Detach the terminator instruction from the new parent block.
 				block->terminator().remove_from_parent();
 
+				// TODO: delete terminator
+
+				// Re-parent all instructions in the sucessor block into the
+				// new parent block.
 				for (auto insn : succ->instructions()) {
 					block->append_instruction(*insn);
 				}
 
+				// Remove the successors from the parent block.
 				block->remove_successors();
 
+				// Copy the successors from the child block into the
+				// successors of the parent block, and fix up the predecessors
+				// in the child block's successors.
 				for (auto new_succ : succ->successors()) {
 					block->add_successor(*new_succ);
 
@@ -153,11 +143,15 @@ retry:
 					new_succ->add_predecessor(*block);
 				}
 
+				// Detach the child block from the parent.
 				succ->remove_from_parent();
+
+				// TODO: delete child block
 				goto retry;
 			}
 		}
 	}
+
 	return true;
 }
 
@@ -219,9 +213,13 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 	encoder.push(REG_RBP);
 	encoder.mov(REG_RSP, REG_RBP);
 	encoder.push(REG_R15);
+	encoder.push(REG_R14);
 	encoder.push(REG_RBX);
+
 	//encoder.sub(max_stack, REG_RSP);
-	encoder.mov(REG_RDI, REG_R15);
+
+	encoder.mov(REG_RDI, REG_R14);
+	load_state_field(8, REG_R15);
 
 	std::map<shared::IRBlockId, uint32_t> native_block_offsets;
 	for (auto block : ir.blocks()) {
@@ -257,6 +255,7 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 
 bool BlockCompiler::lower_block(IRBlock& block)
 {
+	X86Register& guest_regs_reg = REG_R15;
 	X86Register& tmp0_8 = REG_RBX;
 	X86Register& tmp0_4 = REG_EBX;
 	X86Register& tmp1_4 = REG_EDX;
@@ -269,21 +268,50 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			// TODO: save registers
 
+			encoder.push(REG_RDI);
+			encoder.push(REG_RSI);
+
 			instructions::IRCallInstruction *calli = (instructions::IRCallInstruction *)insn;
 			load_state_field(0, REG_RDI);
 
 			const std::vector<IROperand *>& args = calli->arguments();
 			if (args.size() > 0)  {
-				encode_operand_to_reg(*args[0], REG_RSI);
+				encode_operand_to_reg(*args[0], REG_ESI);
 			}
 
 			if (args.size() > 1)  {
-				encode_operand_to_reg(*args[1], REG_RDX);
+				encode_operand_to_reg(*args[1], REG_EDX);
 			}
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)((IRFunctionOperand *)calli->operands().front())->ptr(), tmp0_8);
 			encoder.call(tmp0_8);
+
+			encoder.pop(REG_RSI);
+			encoder.pop(REG_RDI);
+
+			break;
+		}
+
+		case IRInstruction::SetCPUMode:
+		{
+			// TODO: save registers
+
+			encoder.push(REG_RDI);
+			encoder.push(REG_RSI);
+
+			instructions::IRSetCpuModeInstruction *scmi = (instructions::IRSetCpuModeInstruction *)insn;
+			load_state_field(0, REG_RDI);
+
+			encode_operand_to_reg(scmi->new_mode(), REG_ESI);
+
+			// Load the address of the target function into a temporary, and perform an indirect call.
+			encoder.mov((uint64_t)&cpu_set_mode, tmp0_8);
+			encoder.call(tmp0_8);
+
+			encoder.pop(REG_RSI);
+			encoder.pop(REG_RDI);
+
 			break;
 		}
 
@@ -304,17 +332,14 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			instructions::IRReadRegisterInstruction *rri = (instructions::IRReadRegisterInstruction *)insn;
 
-			// Load the register state into a temporary
-			load_state_field(8, tmp0_8);
-
 			if (rri->offset().type() == IROperand::Constant) {
 				IRConstantOperand& offset = (IRConstantOperand&)rri->offset();
 
 				// Load a constant offset guest register into the storage location
 				if (rri->storage().is_allocated_reg()) {
-					encoder.mov(X86Memory::get(tmp0_8, offset.value()), register_from_operand(rri->storage()));
+					encoder.mov(X86Memory::get(guest_regs_reg, offset.value()), register_from_operand(rri->storage()));
 				} else if (rri->storage().is_allocated_stack()) {
-					encoder.mov(X86Memory::get(tmp0_8, offset.value()), tmp0_4);
+					encoder.mov(X86Memory::get(guest_regs_reg, offset.value()), tmp0_4);
 					encoder.mov(tmp0_4, stack_from_operand(rri->storage()));
 				} else {
 					assert(false);
@@ -330,8 +355,6 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			instructions::IRWriteRegisterInstruction *wri = (instructions::IRWriteRegisterInstruction *)insn;
 
-			load_state_field(8, tmp0_8);
-
 			if (wri->offset().type() == IROperand::Constant) {
 				IRConstantOperand& offset = (IRConstantOperand&)wri->offset();
 
@@ -341,10 +364,10 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					IRRegisterOperand& value = (IRRegisterOperand&)wri->value();
 
 					if (value.is_allocated_reg()) {
-						encoder.mov(register_from_operand(value), X86Memory::get(tmp0_8, offset.value()));
+						encoder.mov(register_from_operand(value), X86Memory::get(guest_regs_reg, offset.value()));
 					} else if (value.is_allocated_stack()) {
 						encoder.mov(stack_from_operand(value), tmp1_4);
-						encoder.mov(tmp1_4, X86Memory::get(tmp0_8, offset.value()));
+						encoder.mov(tmp1_4, X86Memory::get(guest_regs_reg, offset.value()));
 					} else {
 						assert(false);
 					}
@@ -371,7 +394,11 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 					if (movi->destination().allocation_class() == IRRegisterOperand::Register) {
 						// mov reg -> reg
-						encoder.mov(src_reg, register_from_operand(movi->destination()));
+
+						X86Register& dst_reg = register_from_operand(movi->destination());
+						if (src_reg != dst_reg) {
+							encoder.mov(src_reg, dst_reg);
+						}
 					} else if (movi->destination().allocation_class() == IRRegisterOperand::Stack) {
 						// mov reg -> stack
 						encoder.mov(src_reg, stack_from_operand(movi->destination()));
@@ -438,6 +465,71 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			break;
 		}
 
+		case IRInstruction::Add:
+		case IRInstruction::Sub:
+		{
+			instructions::IRArithmeticInstruction *ai = (instructions::IRArithmeticInstruction *)insn;
+
+			if (ai->source().type() == IROperand::Register) {
+				IRRegisterOperand& source = (IRRegisterOperand&)ai->source();
+
+				if (ai->destination().is_allocated_reg()) {
+					switch (ai->type()) {
+					case IRInstruction::Add:
+						encoder.add(register_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::Sub:
+						encoder.sub(register_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					}
+				} else {
+					assert(false);
+				}
+			} else if (ai->source().type() == IROperand::PC) {
+				IRPCOperand& source = (IRPCOperand&)ai->source();
+
+				if (ai->destination().is_allocated_reg()) {
+					uint32_t pc = source.value();
+
+					switch (ai->type()) {
+					case IRInstruction::Add:
+						encoder.add(pc, register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::Sub:
+						encoder.sub(pc, register_from_operand(ai->destination()));
+						break;
+					}
+				} else {
+					assert(false);
+				}
+			} else if (ai->source().type() == IROperand::Constant) {
+				IRConstantOperand& source = (IRConstantOperand&)ai->source();
+
+				if (ai->destination().is_allocated_reg()) {
+					encoder.add(source.value(), register_from_operand(ai->destination()));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+
+		case IRInstruction::LoadPC:
+		{
+			instructions::IRLoadPCInstruction *ldpci = (instructions::IRLoadPCInstruction *)insn;
+
+			if (ldpci->destination().is_allocated_reg()) {
+				encoder.mov(X86Memory::get(REG_R15, 60), register_from_operand(ldpci->destination()));
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+
 		case IRInstruction::Truncate:
 		{
 			instructions::IRTruncInstruction *trunci = (instructions::IRTruncInstruction *)insn;
@@ -491,10 +583,18 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 		case IRInstruction::Return:
 			encoder.pop(REG_RBX);
+			encoder.pop(REG_R14);
 			encoder.pop(REG_R15);
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.leave();
 			encoder.ret();
+			break;
+
+		default:
+			printf("cannot lower instruction: ");
+			insn->dump();
+			printf("\n");
+			abort();
 			break;
 		}
 	}
@@ -527,6 +627,17 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		assert(target->type() == IROperand::Block);
 
 		return new instructions::IRJumpInstruction(*target);
+	}
+
+	case shared::IRInstruction::BRANCH:
+	{
+		IROperand *cond = operand_from_shared(ctx, &insn->operands[0]);
+
+		IRBlockOperand *tt = (IRBlockOperand *)operand_from_shared(ctx, &insn->operands[1]);
+		IRBlockOperand *ft = (IRBlockOperand *)operand_from_shared(ctx, &insn->operands[2]);
+		assert(tt->type() == IROperand::Block && ft->type() == IROperand::Block);
+
+		return new instructions::IRBranchInstruction(*cond, *tt, *ft);
 	}
 
 	case shared::IRInstruction::RET:
@@ -617,6 +728,29 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		}
 	}
 
+	case shared::IRInstruction::CMPEQ:
+	case shared::IRInstruction::CMPNE:
+	case shared::IRInstruction::CMPLT:
+	case shared::IRInstruction::CMPLTE:
+	case shared::IRInstruction::CMPGT:
+	case shared::IRInstruction::CMPGTE:
+	{
+		IROperand *lhs = operand_from_shared(ctx, &insn->operands[0]);
+		IROperand *rhs = (IROperand *)operand_from_shared(ctx, &insn->operands[1]);
+
+		IRRegisterOperand *dst = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[2]);
+		assert(dst->type() == IROperand::Register);
+
+		switch (insn->type) {
+		case shared::IRInstruction::CMPEQ: return new instructions::IRCompareEqualInstruction(*lhs, *rhs, *dst);
+		case shared::IRInstruction::CMPNE: return new instructions::IRCompareNotEqualInstruction(*lhs, *rhs, *dst);
+		case shared::IRInstruction::CMPLT: return new instructions::IRCompareLessThanInstruction(*lhs, *rhs, *dst);
+		case shared::IRInstruction::CMPLTE: return new instructions::IRCompareLessThanOrEqualInstruction(*lhs, *rhs, *dst);
+		case shared::IRInstruction::CMPGT: return new instructions::IRCompareGreaterThanInstruction(*lhs, *rhs, *dst);
+		case shared::IRInstruction::CMPGTE: return new instructions::IRCompareGreaterThanOrEqualInstruction(*lhs, *rhs, *dst);
+		}
+	}
+
 	case shared::IRInstruction::SET_CPU_MODE:
 		return new instructions::IRSetCpuModeInstruction(*operand_from_shared(ctx, &insn->operands[0]));
 
@@ -626,6 +760,25 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		assert(dst->type() == IROperand::Register);
 
 		return new instructions::IRLoadPCInstruction(*dst);
+	}
+
+	case shared::IRInstruction::WRITE_DEVICE:
+	{
+		IROperand *dev = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
+		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[1]);
+		IROperand *data = (IROperand *)operand_from_shared(ctx, &insn->operands[2]);
+
+		return new instructions::IRWriteDeviceInstruction(*dev, *off, *data);
+	}
+
+	case shared::IRInstruction::READ_DEVICE:
+	{
+		IROperand *dev = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
+		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[1]);
+		IRRegisterOperand *data = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[2]);
+		assert(data->type() == IROperand::Register);
+
+		return new instructions::IRReadDeviceInstruction(*dev, *off, *data);
 	}
 
 	default:
@@ -647,7 +800,7 @@ IROperand* BlockCompiler::operand_from_shared(IRContext& ctx, const shared::IROp
 		return new IRFunctionOperand((void *)operand->value);
 
 	case shared::IROperand::PC:
-		return new IRPCOperand();
+		return new IRPCOperand(operand->value);
 
 	case shared::IROperand::VREG:
 		return new IRRegisterOperand(ctx.get_register_by_id((shared::IRRegId)operand->value, operand->size));
@@ -660,15 +813,23 @@ IROperand* BlockCompiler::operand_from_shared(IRContext& ctx, const shared::IROp
 
 void BlockCompiler::load_state_field(uint32_t slot, x86::X86Register& reg)
 {
-	encoder.mov(X86Memory::get(REG_R15, slot), reg);
+	encoder.mov(X86Memory::get(REG_R14, slot), reg);
 }
 
 void BlockCompiler::encode_operand_to_reg(IROperand& operand, x86::X86Register& reg)
 {
 	switch (operand.type()) {
 	case IROperand::Constant:
-		encoder.mov(((IRConstantOperand&)operand).value(), reg);
+	{
+		IRConstantOperand& constant = (IRConstantOperand&)operand;
+		if (constant.value() == 0) {
+			encoder.xorr(reg, reg);
+		} else {
+			encoder.mov(constant.value(), reg);
+		}
+
 		break;
+	}
 
 	case IROperand::Register:
 	{
@@ -678,7 +839,7 @@ void BlockCompiler::encode_operand_to_reg(IROperand& operand, x86::X86Register& 
 			encoder.mov(stack_from_operand(regop), reg);
 			break;
 		case IRRegisterOperand::Register:
-			encoder.mov(register_from_operand(regop), reg);
+			encoder.mov(register_from_operand(regop, reg.size), reg);
 			break;
 		default:
 			assert(false);

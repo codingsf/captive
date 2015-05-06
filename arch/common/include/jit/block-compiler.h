@@ -41,6 +41,14 @@ namespace captive {
 				std::map<uint64_t, x86::X86Register *> register_assignments_4;
 				std::map<uint64_t, x86::X86Register *> register_assignments_8;
 
+				inline void assign(uint8_t id, x86::X86Register& r8, x86::X86Register& r4, x86::X86Register& r2, x86::X86Register& r1)
+				{
+					register_assignments_8[id] = &r8;
+					register_assignments_4[id] = &r4;
+					register_assignments_2[id] = &r2;
+					register_assignments_1[id] = &r1;
+				}
+
 				bool optimise_tb();
 				bool build();
 				bool optimise_ir();

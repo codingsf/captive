@@ -22,7 +22,8 @@ X86Register REG_R13(8, 5, true), REG_R13D(4, 5, true), REG_R13W(2, 5, true), REG
 X86Register REG_R14(8, 6, true), REG_R14D(4, 6, true), REG_R14W(2, 6, true), REG_R14B(1, 6, true);
 X86Register REG_R15(8, 7, true), REG_R15D(4, 7, true), REG_R15W(2, 7, true), REG_R15B(1, 7, true);
 
-X86Register REG_RIZ(0, 0);
+X86Register REG_RIZ(0, 8);
+X86Register REG_RIP(0, 9);
 } } }
 
 #define REX	0x40
@@ -30,6 +31,9 @@ X86Register REG_RIZ(0, 0);
 #define REX_X	0x42
 #define REX_R	0x44
 #define REX_W	0x48
+
+#define OPER_SIZE_OVERRIDE 0x66
+#define ADDR_SIZE_OVERRIDE 0x67
 
 X86Encoder::X86Encoder(Allocator& allocator) : _alloc(allocator), _buffer(NULL), _buffer_size(0), _write_offset(0)
 {
@@ -231,7 +235,7 @@ void X86Encoder::andd(uint32_t val, const X86Memory& dst)
 
 void X86Encoder::andd(uint32_t val, const X86Register& dst)
 {
-	if (val < 256) {
+	if (val < 128) {
 		emit8(0x83);
 		encode_mod_reg_rm(4, dst);
 		emit8(val);
@@ -307,25 +311,63 @@ void X86Encoder::sar(uint8_t amount, const X86Register& dst)
 	}
 }
 
-void X86Encoder::sub(uint32_t val, const X86Register& dst)
+void X86Encoder::add(const X86Register& src, const X86Register& dst)
 {
-	if (val < 256) {
-		uint8_t rex = 0;
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x0, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x1, src, dst);
+	}
+}
 
-		if (dst.size == 8)
-			rex |= REX_W;
-
-		if (dst.hireg)
-			rex |= REX_B;
-
-		if (rex) emit8(rex);
-
-		emit8(0x83);
-		encode_mod_reg_rm(5, dst);
-
+void X86Encoder::add(uint32_t val, const X86Register& dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0x80, 0, dst);
 		emit8(val);
 	} else {
-		assert(false);
+		if (val < 128) {
+			encode_opcode_mod_rm(0x83, 0, dst);
+			emit8(val);
+		} else {
+			encode_opcode_mod_rm(0x81, 0, dst);
+
+			if (dst.size == 4 || dst.size == 8) {
+				emit32(val);
+			} else if (dst.size == 2) {
+				emit16(val);
+			}
+		}
+	}
+}
+
+void X86Encoder::sub(const X86Register& src, const X86Register& dst)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x28, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x29, src, dst);
+	}
+}
+
+void X86Encoder::sub(uint32_t val, const X86Register& dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0x80, 5, dst);
+		emit8(val);
+	} else {
+		if (val < 128) {
+			encode_opcode_mod_rm(0x83, 5, dst);
+			emit8(val);
+		} else {
+			encode_opcode_mod_rm(0x81, 5, dst);
+
+			if (dst.size == 4 || dst.size == 8) {
+				emit32(val);
+			} else if (dst.size == 2) {
+				emit16(val);
+			}
+		}
 	}
 }
 
@@ -404,6 +446,8 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 	mrm = rm.base.raw_index;
 
 	if (rm.base == REG_RSP) assert(false);
+	if (rm.base == REG_R12) assert(false);
+	if (rm.base == REG_RIP) assert(false);
 
 	if (mod == 0 && rm.base == REG_RBP) {
 		mod = 1;
@@ -421,4 +465,151 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
 {
 	encode_mod_reg_rm(reg.raw_index, rm);
+}
+
+void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Memory& rm)
+{
+	assert(reg.size == 1 || reg.size == 2 || reg.size == 4 || reg.size == 8);
+	assert(rm.base.size == 4 || rm.base.size == 8);
+
+	// Figure out what prefixes are needed (if any)
+
+	// Emit an operand-size override if the reg operand is 16-bits
+	if (reg.size == 2) {
+		emit8(OPER_SIZE_OVERRIDE);
+	}
+
+	// Emit an address-size override if the memory base is 32-bits
+	if (rm.base.size == 4) {
+		emit8(ADDR_SIZE_OVERRIDE);
+	}
+
+	uint8_t rex = 0;
+
+	// Any REX prefix will do to access the new registers
+	if (reg.newreg) {
+		rex |= REX;
+	}
+
+	// If the reg operand is 64-bits, emit a REX_W
+	if (reg.size == 8) {
+		rex |= REX_W;
+	}
+
+	// If the reg operand is a high register, emit a REX_R
+	if (reg.hireg) {
+		rex |= REX_R;
+	}
+
+	// If the base operand is a high register, emit a REX_B
+	if (rm.base.hireg) {
+		rex |= REX_B;
+	}
+
+	// If we are to emit a REX prefix, do that now.
+	if (rex) {
+		emit8(rex);
+	}
+
+	// Emit the opcode
+	if (opcode > 0x100) {
+		emit8(0x0f);
+	}
+
+	emit8(opcode & 0xff);
+
+	// Emit the modrm
+	encode_mod_reg_rm(reg, rm);
+}
+
+void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Register& rm)
+{
+	// Register sizes MUST match
+	assert(reg.size == rm.size);
+
+	// Figure out what prefixes are needed (if any)
+
+	// Emit an operand-size override if the reg operand is 16-bits
+	if (reg.size == 2) {
+		emit8(OPER_SIZE_OVERRIDE);
+	}
+
+	uint8_t rex = 0;
+
+	// Any REX prefix will do to access the new registers
+	if (reg.newreg) {
+		rex |= REX;
+	}
+
+	// If the reg or rm operand is 64-bits, emit a REX_W
+	if (reg.size == 8) {
+		rex |= REX_W;
+	}
+
+	// If the reg operand is a high register, emit a REX_R
+	if (reg.hireg) {
+		rex |= REX_R;
+	}
+
+	// If the rm operand is a high register, emit a REX_B
+	if (rm.hireg) {
+		rex |= REX_B;
+	}
+
+	// If we are to emit a REX prefix, do that now.
+	if (rex) {
+		emit8(rex);
+	}
+
+	// Emit the opcode
+	if (opcode > 0x100) {
+		emit8(0x0f);
+	}
+
+	emit8(opcode & 0xff);
+
+	// Emit the modrm
+	encode_mod_reg_rm(reg, rm);
+}
+
+void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, const X86Register& rm)
+{
+	// Figure out what prefixes are needed (if any)
+
+	// Emit an operand-size override if the reg operand is 16-bits
+	if (rm.size == 2) {
+		emit8(OPER_SIZE_OVERRIDE);
+	}
+
+	uint8_t rex = 0;
+
+	// Any REX prefix will do to access the new registers
+	if (rm.newreg) {
+		rex |= REX;
+	}
+
+	// If the rm operand is 64-bits, emit a REX_W
+	if (rm.size == 8) {
+		rex |= REX_W;
+	}
+
+	// If the rm operand is a high register, emit a REX_B
+	if (rm.hireg) {
+		rex |= REX_B;
+	}
+
+	// If we are to emit a REX prefix, do that now.
+	if (rex) {
+		emit8(rex);
+	}
+
+	// Emit the opcode
+	if (opcode > 0x100) {
+		emit8(0x0f);
+	}
+
+	emit8(opcode & 0xff);
+
+	// Emit the modrm
+	encode_mod_reg_rm(oper, rm);
 }

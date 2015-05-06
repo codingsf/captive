@@ -24,6 +24,7 @@ namespace captive {
 				bool newreg;
 
 				inline bool operator==(const X86Register& other) const { return other.size == size && other.raw_index == raw_index && other.hireg == hireg && other.newreg == newreg; }
+				inline bool operator!=(const X86Register& other) const { return !(other.size == size && other.raw_index == raw_index && other.hireg == hireg && other.newreg == newreg); }
 			};
 
 			extern X86Register REG_RAX, REG_EAX, REG_AX, REG_AL;
@@ -42,7 +43,7 @@ namespace captive {
 			extern X86Register REG_R13, REG_R13D, REG_R13W, REG_R13B;
 			extern X86Register REG_R14, REG_R14D, REG_R14W, REG_R14B;
 			extern X86Register REG_R15, REG_R15D, REG_R15W, REG_R15B;
-			extern X86Register REG_RIZ;
+			extern X86Register REG_RIZ, REG_RIP;
 
 			struct X86Memory
 			{
@@ -93,6 +94,10 @@ namespace captive {
 				void shr(uint8_t amount, const X86Register& dst);
 				void sar(uint8_t amount, const X86Register& dst);
 
+				void add(const X86Register& src, const X86Register& dst);
+				void sub(const X86Register& src, const X86Register& dst);
+
+				void add(uint32_t val, const X86Register& dst);
 				void sub(uint32_t val, const X86Register& dst);
 
 				void jmp_reloc(uint32_t& reloc_offset);
@@ -125,7 +130,15 @@ namespace captive {
 					_buffer[_write_offset++] = b;
 				}
 
-				inline void emit32(uint64_t v)
+				inline void emit16(uint16_t v)
+				{
+					ensure_buffer();
+
+					_buffer[_write_offset++] = v & 0xff;
+					_buffer[_write_offset++] = (v >> 8) & 0xff;
+				}
+
+				inline void emit32(uint32_t v)
 				{
 					ensure_buffer();
 
@@ -155,6 +168,11 @@ namespace captive {
 				void encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm);
 
 				void encode_rex_prefix(bool b, bool x, bool r, bool w);
+
+				void encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Memory& rm);
+				void encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Register& rm);
+
+				void encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, const X86Register& rm);
 			};
 		}
 	}

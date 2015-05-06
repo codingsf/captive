@@ -86,6 +86,7 @@ bool CPU::run_block_jit_safepoint()
 			block_txln_cache[pc] = fn;
 			step_ok = (fn(&jit_state) == 0);
 		} else {
+			printf("jit: executing cached block %x:%p\n", pc, txln->second);
 			step_ok = (txln->second(&jit_state) == 0);
 		}
 	} while(step_ok);
