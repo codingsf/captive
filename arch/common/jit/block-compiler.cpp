@@ -394,6 +394,18 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				} else {
 					assert(false);
 				}
+			} else if (movi->source().type() == IROperand::Constant) {
+				IRConstantOperand& source = (IRConstantOperand&)movi->source();
+
+				if (movi->destination().is_allocated_reg()) {
+					// mov imm -> reg
+					encoder.mov(source.value(), register_from_operand(movi->destination()));
+				} else if (movi->destination().is_allocated_stack()) {
+					// mov imm -> stack
+					encoder.mov(source.value(), stack_from_operand(movi->destination()));
+				} else {
+					assert(false);
+				}
 			} else {
 				assert(false);
 			}
@@ -433,25 +445,39 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			if (trunci->source().type() == IROperand::Register) {
 				IRRegisterOperand& source = (IRRegisterOperand&)trunci->source();
 
-				if (source.is_allocated_stack() && trunci->destination().is_allocated_stack()) {
-					encoder.mov(stack_from_operand(source), tmp0_4);
+				if (source.is_allocated_reg() && trunci->destination().is_allocated_reg()) {
+					encoder.mov(register_from_operand(source), register_from_operand(trunci->destination(), source.reg().width()));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
 
-					switch (trunci->destination().reg().width()) {
-					case 1: encoder.andd(0xff, tmp0_4); break;
-					case 2: encoder.andd(0xffff, tmp0_4); break;
-					case 4: encoder.andd(0xffffffff, tmp0_4); break;
-					default: assert(false);
-					}
+			break;
+		}
 
-					encoder.mov(tmp0_4, stack_from_operand(trunci->destination()));
-				} else if (source.is_allocated_reg() && trunci->destination().is_allocated_reg()) {
-					encoder.mov(register_from_operand(source), register_from_operand(trunci->destination()));
+		case IRInstruction::ShiftLeft:
+		case IRInstruction::ShiftRight:
+		case IRInstruction::ArithmeticShiftRight:
+		{
+			instructions::IRShiftInstruction *si = (instructions::IRShiftInstruction *)insn;
 
-					switch (trunci->destination().reg().width()) {
-					case 1: encoder.andd(0xff, register_from_operand(trunci->destination())); break;
-					case 2: encoder.andd(0xffff, register_from_operand(trunci->destination())); break;
-					case 4: encoder.andd(0xffffffff, register_from_operand(trunci->destination())); break;
-					default: assert(false);
+			if (si->amount().type() == IROperand::Constant) {
+				IRConstantOperand& amount = (IRConstantOperand&)si->amount();
+				X86Register& operand = register_from_operand(si->operand());
+
+				if (si->operand().is_allocated_reg()) {
+					switch (si->type()) {
+					case IRInstruction::ShiftLeft:
+						encoder.shl(amount.value(), operand);
+						break;
+					case IRInstruction::ShiftRight:
+						encoder.shr(amount.value(), operand);
+						break;
+					case IRInstruction::ArithmeticShiftRight:
+						encoder.sar(amount.value(), operand);
+						break;
 					}
 				} else {
 					assert(false);

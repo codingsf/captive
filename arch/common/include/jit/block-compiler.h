@@ -56,11 +56,13 @@ namespace captive {
 				void load_state_field(uint32_t slot, x86::X86Register& reg);
 				void encode_operand_to_reg(IROperand& operand, x86::X86Register& reg);
 
-				inline x86::X86Register& register_from_operand(IRRegisterOperand& oper) const
+				inline x86::X86Register& register_from_operand(IRRegisterOperand& oper, int force_width = 0) const
 				{
 					assert(oper.is_allocated_reg());
 
-					switch (oper.reg().width()) {
+					if (!force_width) force_width = oper.reg().width();
+
+					switch (force_width) {
 					case 1:	return *(register_assignments_1.find(oper.allocation_data())->second);
 					case 2:	return *(register_assignments_2.find(oper.allocation_data())->second);
 					case 4:	return *(register_assignments_4.find(oper.allocation_data())->second);

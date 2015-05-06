@@ -216,7 +216,7 @@ namespace captive {
 
 				const std::set<IRRegister *> live_ins() const { return _live_in; }
 				const std::set<IRRegister *> live_outs() const { return _live_out; }
-				
+
 				virtual void dump() const;
 
 				inline IRInstruction *next() const { return _next; }
@@ -822,13 +822,30 @@ namespace captive {
 					const char* mnemonic() const override { return "xor"; }
 				};
 
-				class IRShiftLeftInstruction : public IRInstruction
+				class IRShiftInstruction : public IRInstruction
 				{
 				public:
-					IRShiftLeftInstruction(IROperand& amt, IRRegisterOperand& operand)
+					IRShiftInstruction(IROperand& amt, IRRegisterOperand& operand) : _amount(amt), _operand(operand)
 					{
 						add_input_operand(amt);
 						add_input_operand(operand);
+					}
+
+					IROperand& amount() const { return _amount; }
+
+					IRRegisterOperand& operand() const { return _operand; }
+
+				private:
+					IROperand& _amount;
+					IRRegisterOperand& _operand;
+				};
+
+				class IRShiftLeftInstruction : public IRShiftInstruction
+				{
+				public:
+					IRShiftLeftInstruction(IROperand& amt, IRRegisterOperand& operand)
+						: IRShiftInstruction(amt, operand)
+					{
 					}
 
 					IRInstruction::InstructionTypes type() const override { return ShiftLeft; }
@@ -837,13 +854,12 @@ namespace captive {
 					const char* mnemonic() const override { return "shl"; }
 				};
 
-				class IRShiftRightInstruction : public IRInstruction
+				class IRShiftRightInstruction : public IRShiftInstruction
 				{
 				public:
 					IRShiftRightInstruction(IROperand& amt, IRRegisterOperand& operand)
+						: IRShiftInstruction(amt, operand)
 					{
-						add_input_operand(amt);
-						add_input_operand(operand);
 					}
 
 					IRInstruction::InstructionTypes type() const override { return ShiftRight; }
@@ -852,13 +868,12 @@ namespace captive {
 					const char* mnemonic() const override { return "shr"; }
 				};
 
-				class IRArithmeticShiftRightInstruction : public IRInstruction
+				class IRArithmeticShiftRightInstruction : public IRShiftInstruction
 				{
 				public:
 					IRArithmeticShiftRightInstruction(IROperand& amt, IRRegisterOperand& operand)
+						: IRShiftInstruction(amt, operand)
 					{
-						add_input_operand(amt);
-						add_input_operand(operand);
 					}
 
 					IRInstruction::InstructionTypes type() const override { return ArithmeticShiftRight; }

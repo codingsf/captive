@@ -17,12 +17,13 @@ namespace captive {
 		namespace x86 {
 			struct X86Register
 			{
-				X86Register(uint8_t size, uint8_t raw_index, bool hi = false) : size(size), raw_index(raw_index), hireg(hi) { }
+				X86Register(uint8_t size, uint8_t raw_index, bool hi = false, bool nw = false) : size(size), raw_index(raw_index), hireg(hi), newreg(nw) { }
 				uint8_t size;
 				uint8_t raw_index;
 				bool hireg;
+				bool newreg;
 
-				inline bool operator==(const X86Register& other) const { return other.size == size && other.raw_index == raw_index && other.hireg == hireg; }
+				inline bool operator==(const X86Register& other) const { return other.size == size && other.raw_index == raw_index && other.hireg == hireg && other.newreg == newreg; }
 			};
 
 			extern X86Register REG_RAX, REG_EAX, REG_AX, REG_AL;
@@ -81,11 +82,16 @@ namespace captive {
 				void mov(const X86Memory& src, const X86Register& dst);
 				void mov(const X86Register& src, const X86Memory& dst);
 				void mov(uint64_t src, const X86Register& dst);
+				void mov(uint64_t src, const X86Memory& dst);
 
 				void andd(uint32_t val, const X86Register& dst);
 				void andd(uint32_t val, const X86Memory& dst);
 
 				void xorr(const X86Register src, const X86Register& dest);
+
+				void shl(uint8_t amount, const X86Register& dst);
+				void shr(uint8_t amount, const X86Register& dst);
+				void sar(uint8_t amount, const X86Register& dst);
 
 				void sub(uint32_t val, const X86Register& dst);
 
