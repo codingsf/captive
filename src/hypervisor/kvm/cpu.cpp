@@ -420,6 +420,17 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		return true;
 	}
 
+	case 13: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
+		std::stringstream cmd;
+		cmd << "addr2line -e arch/arm.arch " << std::hex << regs.rdi;
+		system(cmd.str().c_str());
+		//fprintf(stderr, "<?>");
+		return true;
+	}
+
 	case 15: {
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);

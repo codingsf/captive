@@ -9,6 +9,11 @@ static const char *resolve_symbol(uint64_t sym)
 	return "<???>";
 }
 
+static inline void print_symbol(uint64_t sym)
+{
+	asm volatile("out %0, $0xff\n" :: "a"(13), "D"(sym));
+}
+
 void dump_stack()
 {
 	int count = 0;
@@ -21,7 +26,8 @@ void dump_stack()
 	int frame_idx = 0;
 	while (bp != 0 && count++ < 100) {
 		uint64_t *stack = (uint64_t *)bp;
-		printf("  %d: %lx: %s\n", frame_idx++, stack[1], resolve_symbol(stack[1]));
+		printf("  %d: %lx: ", frame_idx++, stack[1]);
+		print_symbol(stack[1]);
 		bp = stack[0];
 	}
 }
