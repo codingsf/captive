@@ -157,6 +157,8 @@ namespace captive {
 
 				uint32_t value() const { return _val; }
 
+				void dump() const override;
+
 			private:
 				uint32_t _val;
 			};
@@ -489,6 +491,7 @@ namespace captive {
 				{
 				public:
 					IRBranchInstruction(IROperand& cond, IRBlockOperand& true_target, IRBlockOperand& false_target)
+						: _cond(cond), _tt(true_target), _ft(false_target)
 					{
 						add_input_operand(cond);
 						add_input_operand(true_target);
@@ -500,8 +503,17 @@ namespace captive {
 
 					IRInstruction::InstructionTypes type() const override { return Branch; }
 
+					IROperand& condition() const { return _cond; }
+					IRBlockOperand& true_target() const { return _tt; }
+					IRBlockOperand& false_target() const { return _ft; }
+
 				protected:
 					const char* mnemonic() const override { return "branch"; }
+
+				private:
+					IROperand& _cond;
+					IRBlockOperand& _tt;
+					IRBlockOperand& _ft;
 				};
 
 				class IRRetInstruction : public IRTerminatorInstruction
@@ -674,7 +686,7 @@ namespace captive {
 				class IRReadMemoryInstruction : public IRInstruction
 				{
 				public:
-					IRReadMemoryInstruction(IROperand& offset, IRRegisterOperand& storage)
+					IRReadMemoryInstruction(IROperand& offset, IRRegisterOperand& storage) : _off(offset), _dst(storage)
 					{
 						add_input_operand(offset);
 						add_output_operand(storage);
@@ -682,14 +694,22 @@ namespace captive {
 
 					IRInstruction::InstructionTypes type() const override { return ReadMemory; }
 
+					IROperand& offset() const { return _off; }
+
+					IRRegisterOperand& storage() const { return _dst; }
+
 				protected:
 					const char* mnemonic() const override { return "ldmem"; }
+
+				private:
+					IROperand& _off;
+					IRRegisterOperand& _dst;
 				};
 
 				class IRWriteMemoryInstruction : public IRInstruction
 				{
 				public:
-					IRWriteMemoryInstruction(IROperand& value, IROperand& offset)
+					IRWriteMemoryInstruction(IROperand& value, IROperand& offset) : _value(value), _offset(offset)
 					{
 						add_input_operand(value);
 						add_input_operand(offset);
@@ -697,8 +717,15 @@ namespace captive {
 
 					IRInstruction::InstructionTypes type() const override { return WriteMemory; }
 
+					IROperand& value() const { return _value; }
+					IROperand& offset() const { return _offset; }
+
 				protected:
 					const char* mnemonic() const override { return "stmem"; }
+
+				private:
+					IROperand& _value;
+					IROperand& _offset;
 				};
 
 				class IRReadUserMemoryInstruction : public IRReadMemoryInstruction
@@ -931,6 +958,8 @@ namespace captive {
 					}
 
 					IRInstruction::InstructionTypes type() const override { return WriteDevice; }
+
+					IROperand& data() const { return _data; }
 
 				protected:
 					const char* mnemonic() const override { return "wrdev"; }

@@ -210,3 +210,8 @@ void IRBlockOperand::dump() const
 {
 	printf("b%d", _block.id());
 }
+
+void IRPCOperand::dump() const
+{
+	printf("pc");
+}

@@ -73,18 +73,6 @@ void X86Encoder::pop(const X86Register& reg)
 	}
 }
 
-void X86Encoder::xorr(const X86Register src, const X86Register& dest)
-{
-	assert(src.size == dest.size);
-
-	if (src.size == 8) {
-		encode_rex_prefix(false, false, false, true);
-	}
-
-	emit8(0x31);
-	encode_mod_reg_rm(src, dest);
-}
-
 void X86Encoder::mov(const X86Register& src, const X86Register& dst)
 {
 	assert(src.size == dst.size);
@@ -125,72 +113,19 @@ void X86Encoder::mov(const X86Register& src, const X86Register& dst)
 void X86Encoder::mov(const X86Memory& src, const X86Register& dst)
 {
 	if (dst.size == 1) {
-		uint8_t rex = 0;
-
-		if (dst.newreg) {
-			rex |= REX;
-		} else if (dst.hireg) {
-			rex |= REX_R;
-		}
-
-		if (src.base.hireg) {
-			rex |= REX_B;
-		}
-
-		if (rex) {
-			emit8(rex);
-		}
-
-		emit8(0x8a);
-		encode_mod_reg_rm(dst, src);
+		encode_opcode_mod_rm(0x8a, dst, src);
 	} else {
-		uint8_t rex = 0;
-
-		if (dst.size == 8) {
-			rex |= REX_W;
-		} else if (dst.size == 2) {
-			assert(false);
-		}
-
-		if (dst.hireg) {
-			rex |= REX_R;
-		}
-
-		if (src.base.hireg) {
-			rex |= REX_B;
-		}
-
-		if (rex) {
-			emit8(rex);
-		}
-
-		emit8(0x8b);
-		encode_mod_reg_rm(dst, src);
+		encode_opcode_mod_rm(0x8b, dst, src);
 	}
 }
 
 void X86Encoder::mov(const X86Register& src, const X86Memory& dst)
 {
-	uint8_t rex = 0;
-
-	if (src.size == 8) {
-		rex |= REX_W;
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x88, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x89, src, dst);
 	}
-
-	if (src.hireg) {
-		rex |= REX_R;
-	}
-
-	if (dst.base.hireg) {
-		rex |= REX_B;
-	}
-
-	if (rex) {
-		emit8(rex);
-	}
-
-	emit8(0x89);
-	encode_mod_reg_rm(src, dst);
 }
 
 void X86Encoder::mov(uint64_t src, const X86Register& dst)
@@ -215,76 +150,135 @@ void X86Encoder::mov(uint64_t src, const X86Register& dst)
 	}
 }
 
-void X86Encoder::mov(uint64_t src, const X86Memory& dst)
+void X86Encoder::mov8(uint64_t src, const X86Memory& dst)
 {
 	assert(false);
 }
 
+void X86Encoder::mov4(uint32_t src, const X86Memory& dst)
+{
+	encode_opcode_mod_rm(0xc7, 0, 4, dst);
+	emit32(src);
+}
+
+void X86Encoder::mov2(uint16_t src, const X86Memory& dst)
+{
+	encode_opcode_mod_rm(0xc7, 0, 2, dst);
+	emit16(src);
+}
+
+void X86Encoder::mov1(uint8_t src, const X86Memory& dst)
+{
+	encode_opcode_mod_rm(0xc6, 0, 1, dst);
+	emit8(src);
+}
+
+void X86Encoder::movzx(const X86Register& src, const X86Register& dst)
+{
+	assert(src.size < dst.size);
+	assert(src.size == 1 || src.size == 2);
+	assert(dst.size == 2 || dst.size == 4 || dst.size == 8);
+
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x1b6, src, dst);
+	} else if (src.size == 2) {
+		encode_opcode_mod_rm(0x1b7, src, dst);
+	}
+}
+
+void X86Encoder::movsx(const X86Register& src, const X86Register& dst)
+{
+	assert(src.size < dst.size);
+	assert(src.size == 1 || src.size == 2);
+	assert(dst.size == 2 || dst.size == 4 || dst.size == 8);
+
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x1be, src, dst);
+	} else if (src.size == 2) {
+		encode_opcode_mod_rm(0x1bf, src, dst);
+	}
+}
+
 void X86Encoder::andd(uint32_t val, const X86Memory& dst)
 {
-	if (val < 256) {
-		emit8(0x83);
-		encode_mod_reg_rm(4, dst);
-		emit8(val);
-	} else {
-		emit8(0x81);
-		encode_mod_reg_rm(4, dst);
-		emit32(val);
-	}
+	assert(false);
 }
 
 void X86Encoder::andd(uint32_t val, const X86Register& dst)
 {
-	if (val < 128) {
-		emit8(0x83);
-		encode_mod_reg_rm(4, dst);
-		emit8(val);
+	encode_arithmetic(4, val, dst);
+}
+
+void X86Encoder::andd(const X86Register src, const X86Register& dest)
+{
+	assert(src.size == dest.size);
+
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x20, src, dest);
 	} else {
-		emit8(0x81);
-		encode_mod_reg_rm(4, dst);
-		emit32(val);
+		encode_opcode_mod_rm(0x21, src, dest);
+	}
+}
+
+void X86Encoder::orr(uint32_t val, const X86Memory& dst)
+{
+	assert(false);
+}
+
+void X86Encoder::orr(uint32_t val, const X86Register& dst)
+{
+	encode_arithmetic(1, val, dst);
+}
+
+void X86Encoder::orr(const X86Register src, const X86Register& dest)
+{
+	assert(src.size == dest.size);
+
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x08, src, dest);
+	} else {
+		encode_opcode_mod_rm(0x09, src, dest);
+	}
+}
+
+void X86Encoder::xorr(uint32_t val, const X86Memory& dst)
+{
+	assert(false);
+}
+
+void X86Encoder::xorr(uint32_t val, const X86Register& dst)
+{
+	encode_arithmetic(6, val, dst);
+}
+
+void X86Encoder::xorr(const X86Register src, const X86Register& dest)
+{
+	assert(src.size == dest.size);
+
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x30, src, dest);
+	} else {
+		encode_opcode_mod_rm(0x31, src, dest);
 	}
 }
 
 void X86Encoder::shl(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
-		assert(false);
+		encode_opcode_mod_rm(0xc0, 4, dst);
+		emit8(amount);
 	} else {
-		uint8_t rex = 0;
-
-		if (dst.size == 8)
-			rex |= REX_W;
-
-		if (dst.hireg)
-			rex |= REX_B;
-
-		if (rex) emit8(rex);
-
-		emit8(0xc1);
-		encode_mod_reg_rm(4, dst);
-
+		encode_opcode_mod_rm(0xc1, 4, dst);
 		emit8(amount);
 	}
 }
 void X86Encoder::shr(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
-		assert(false);
+		encode_opcode_mod_rm(0xc0, 5, dst);
+		emit8(amount);
 	} else {
-		uint8_t rex = 0;
-
-		if (dst.size == 8)
-			rex |= REX_W;
-
-		if (dst.hireg)
-			rex |= REX_B;
-
-		if (rex) emit8(rex);
-
-		emit8(0xc1);
-		encode_mod_reg_rm(5, dst);
-
+		encode_opcode_mod_rm(0xc1, 5, dst);
 		emit8(amount);
 	}
 }
@@ -292,21 +286,10 @@ void X86Encoder::shr(uint8_t amount, const X86Register& dst)
 void X86Encoder::sar(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
-		assert(false);
+		encode_opcode_mod_rm(0xc0, 7, dst);
+		emit8(amount);
 	} else {
-		uint8_t rex = 0;
-
-		if (dst.size == 8)
-			rex |= REX_W;
-
-		if (dst.hireg)
-			rex |= REX_B;
-
-		if (rex) emit8(rex);
-
-		emit8(0xc1);
-		encode_mod_reg_rm(7, dst);
-
+		encode_opcode_mod_rm(0xc1, 7, dst);
 		emit8(amount);
 	}
 }
@@ -322,23 +305,7 @@ void X86Encoder::add(const X86Register& src, const X86Register& dst)
 
 void X86Encoder::add(uint32_t val, const X86Register& dst)
 {
-	if (dst.size == 1) {
-		encode_opcode_mod_rm(0x80, 0, dst);
-		emit8(val);
-	} else {
-		if (val < 128) {
-			encode_opcode_mod_rm(0x83, 0, dst);
-			emit8(val);
-		} else {
-			encode_opcode_mod_rm(0x81, 0, dst);
-
-			if (dst.size == 4 || dst.size == 8) {
-				emit32(val);
-			} else if (dst.size == 2) {
-				emit16(val);
-			}
-		}
-	}
+	encode_arithmetic(0, val, dst);
 }
 
 void X86Encoder::sub(const X86Register& src, const X86Register& dst)
@@ -352,22 +319,54 @@ void X86Encoder::sub(const X86Register& src, const X86Register& dst)
 
 void X86Encoder::sub(uint32_t val, const X86Register& dst)
 {
-	if (dst.size == 1) {
-		encode_opcode_mod_rm(0x80, 5, dst);
-		emit8(val);
+	encode_arithmetic(5, val, dst);
+}
+
+void X86Encoder::cmp(const X86Register& src, const X86Register& dst)
+{
+	assert(src.size == dst.size);
+
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x38, src, dst);
 	} else {
-		if (val < 128) {
-			encode_opcode_mod_rm(0x83, 5, dst);
-			emit8(val);
+		encode_opcode_mod_rm(0x39, src, dst);
+	}
+}
+
+void X86Encoder::cmp(uint32_t val, const X86Register& dst)
+{
+	encode_arithmetic(7, val, dst);
+}
+
+void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0x80, oper, dst);
+		emit8(imm);
+	} else {
+		if (imm < 128) {
+			encode_opcode_mod_rm(0x83, oper, dst);
+			emit8(imm);
 		} else {
-			encode_opcode_mod_rm(0x81, 5, dst);
+			encode_opcode_mod_rm(0x81, oper, dst);
 
 			if (dst.size == 4 || dst.size == 8) {
-				emit32(val);
+				emit32(imm);
 			} else if (dst.size == 2) {
-				emit16(val);
+				emit16(imm);
 			}
 		}
+	}
+}
+
+void X86Encoder::test(const X86Register& op1, const X86Register& op2)
+{
+	assert(op1.size == op2.size);
+
+	if (op1.size == 1) {
+		encode_opcode_mod_rm(0x84, op2, op1);
+	} else {
+		encode_opcode_mod_rm(0x85, op2, op1);
 	}
 }
 
@@ -382,6 +381,32 @@ void X86Encoder::jmp_reloc(uint32_t& reloc_offset)
 	emit8(0xe9);
 	reloc_offset = _write_offset;
 	emit32(0);
+}
+
+void X86Encoder::jnz_reloc(uint32_t& reloc_offset)
+{
+	emit8(0x0f);
+	emit8(0x85);
+	reloc_offset = _write_offset;
+	emit32(0);
+}
+
+void X86Encoder::sete(const X86Register& dst)
+{
+	assert(dst.size == 1);
+
+	emit8(0x0f);
+	emit8(0x94);
+	encode_mod_reg_rm(0, dst);
+}
+
+void X86Encoder::setne(const X86Register& dst)
+{
+	assert(dst.size == 1);
+
+	emit8(0x0f);
+	emit8(0x95);
+	encode_mod_reg_rm(0, dst);
 }
 
 void X86Encoder::ret()
@@ -525,7 +550,8 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, c
 void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Register& rm)
 {
 	// Register sizes MUST match
-	assert(reg.size == rm.size);
+	// TODO: Think about this
+	//assert(reg.size == rm.size);
 
 	// Figure out what prefixes are needed (if any)
 
@@ -595,6 +621,51 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, const X86Re
 
 	// If the rm operand is a high register, emit a REX_B
 	if (rm.hireg) {
+		rex |= REX_B;
+	}
+
+	// If we are to emit a REX prefix, do that now.
+	if (rex) {
+		emit8(rex);
+	}
+
+	// Emit the opcode
+	if (opcode > 0x100) {
+		emit8(0x0f);
+	}
+
+	emit8(opcode & 0xff);
+
+	// Emit the modrm
+	encode_mod_reg_rm(oper, rm);
+}
+
+void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, uint8_t size, const X86Memory& rm)
+{
+	assert(size == 1 || size == 2 || size == 4 || size == 8);
+	assert(rm.base.size == 4 || rm.base.size == 8);
+
+	// Figure out what prefixes are needed (if any)
+
+	// Emit an operand-size override if the reg operand is 16-bits
+	if (size == 2) {
+		emit8(OPER_SIZE_OVERRIDE);
+	}
+
+	// Emit an address-size override if the memory base is 32-bits
+	if (rm.base.size == 4) {
+		emit8(ADDR_SIZE_OVERRIDE);
+	}
+
+	uint8_t rex = 0;
+
+	// If the reg operand is 64-bits, emit a REX_W
+	if (size == 8) {
+		rex |= REX_W;
+	}
+
+	// If the base operand is a high register, emit a REX_B
+	if (rm.base.hireg) {
 		rex |= REX_B;
 	}
 

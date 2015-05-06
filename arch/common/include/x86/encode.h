@@ -79,28 +79,52 @@ namespace captive {
 				void push(const X86Register& reg);
 				void pop(const X86Register& reg);
 
+				void movzx(const X86Register& src, const X86Register& dst);
+				void movsx(const X86Register& src, const X86Register& dst);
+
 				void mov(const X86Register& src, const X86Register& dst);
 				void mov(const X86Memory& src, const X86Register& dst);
 				void mov(const X86Register& src, const X86Memory& dst);
 				void mov(uint64_t src, const X86Register& dst);
-				void mov(uint64_t src, const X86Memory& dst);
+
+				void mov8(uint64_t imm, const X86Memory& dst);
+				void mov4(uint32_t imm, const X86Memory& dst);
+				void mov2(uint16_t imm, const X86Memory& dst);
+				void mov1(uint8_t imm, const X86Memory& dst);
 
 				void andd(uint32_t val, const X86Register& dst);
 				void andd(uint32_t val, const X86Memory& dst);
+				void orr(uint32_t val, const X86Register& dst);
+				void orr(uint32_t val, const X86Memory& dst);
+				void xorr(uint32_t val, const X86Register& dst);
+				void xorr(uint32_t val, const X86Memory& dst);
 
+				void andd(const X86Register src, const X86Register& dest);
+				void andd(const X86Register src, const X86Memory& dest);
+				void orr(const X86Register src, const X86Register& dest);
+				void orr(const X86Register src, const X86Memory& dest);
 				void xorr(const X86Register src, const X86Register& dest);
+				void xorr(const X86Register src, const X86Memory& dest);
 
 				void shl(uint8_t amount, const X86Register& dst);
 				void shr(uint8_t amount, const X86Register& dst);
 				void sar(uint8_t amount, const X86Register& dst);
 
 				void add(const X86Register& src, const X86Register& dst);
-				void sub(const X86Register& src, const X86Register& dst);
-
 				void add(uint32_t val, const X86Register& dst);
+
+				void sub(const X86Register& src, const X86Register& dst);
 				void sub(uint32_t val, const X86Register& dst);
 
+				void cmp(const X86Register& src, const X86Register& dst);
+				void cmp(uint32_t val, const X86Register& dst);
+				void test(const X86Register& op1, const X86Register& op2);
+
 				void jmp_reloc(uint32_t& reloc_offset);
+				void jnz_reloc(uint32_t& reloc_offset);
+
+				void sete(const X86Register& dst);
+				void setne(const X86Register& dst);
 
 				void leave();
 				void ret();
@@ -162,6 +186,8 @@ namespace captive {
 					_buffer[_write_offset++] = (v >> 56) & 0xff;
 				}
 
+				void encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst);
+
 				void encode_mod_reg_rm(uint8_t mreg, const X86Register& rm);
 				void encode_mod_reg_rm(const X86Register& reg, const X86Register& rm);
 				void encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm);
@@ -171,8 +197,8 @@ namespace captive {
 
 				void encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Memory& rm);
 				void encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Register& rm);
-
 				void encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, const X86Register& rm);
+				void encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, uint8_t size, const X86Memory& rm);
 			};
 		}
 	}

@@ -6,6 +6,8 @@
 #include <queue>
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
+extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
+extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
 
 using namespace captive::arch::jit;
 using namespace captive::arch::x86;
@@ -169,17 +171,17 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 		avail.push_back(4);
 		avail.push_back(5);
 
-		printf("local allocator on block %d\n", block->id());
+		//printf("local allocator on block %d\n", block->id());
 		for (auto II =  block->instructions().begin(), IE = block->instructions().end(); II != IE; ++II) {
 			IRInstruction *insn = *II;
 
-			printf("insn: ");
-			insn->dump();
-			printf("\n");
+			//printf("insn: ");
+			//insn->dump();
+			//printf("\n");
 
 			for (auto in : insn->live_ins()) {
 				if (insn->live_outs().count(in) == 0) {
-					printf("  register %d killed\n", in->id());
+					//printf("  register %d killed\n", in->id());
 					avail.push_front(alloc[in]);
 				}
 			}
@@ -190,7 +192,7 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 					avail.pop_front();
 
 					alloc[out] = chosen;
-					printf("  register %d allocated to %d\n", out->id(), chosen);
+					//printf("  register %d allocated to %d\n", out->id(), chosen);
 				}
 			}
 
@@ -328,6 +330,37 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			break;
 		}
 
+		case IRInstruction::Branch:
+		{
+			instructions::IRBranchInstruction *branchi = (instructions::IRBranchInstruction *)insn;
+
+			if (branchi->condition().type() == IROperand::Register) {
+				IRRegisterOperand& cond = (IRRegisterOperand&)branchi->condition();
+
+				if (cond.is_allocated_reg()) {
+					encoder.test(register_from_operand(cond), register_from_operand(cond));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			{
+				uint32_t reloc_offset;
+				encoder.jnz_reloc(reloc_offset);
+				block_relocations[reloc_offset] = branchi->true_target().block().id();
+			}
+
+			{
+				uint32_t reloc_offset;
+				encoder.jmp_reloc(reloc_offset);
+				block_relocations[reloc_offset] = branchi->false_target().block().id();
+			}
+
+			break;
+		}
+
 		case IRInstruction::ReadRegister:
 		{
 			instructions::IRReadRegisterInstruction *rri = (instructions::IRReadRegisterInstruction *)insn;
@@ -359,7 +392,23 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				IRConstantOperand& offset = (IRConstantOperand&)wri->offset();
 
 				if (wri->value().type() == IROperand::Constant) {
-					assert(false);
+					IRConstantOperand& value = (IRConstantOperand&)wri->value();
+
+					switch (value.width()) {
+					case 8:
+						encoder.mov8(value.value(), X86Memory::get(guest_regs_reg, offset.value()));
+						break;
+					case 4:
+						encoder.mov4(value.value(), X86Memory::get(guest_regs_reg, offset.value()));
+						break;
+					case 2:
+						encoder.mov2(value.value(), X86Memory::get(guest_regs_reg, offset.value()));
+						break;
+					case 1:
+						encoder.mov1(value.value(), X86Memory::get(guest_regs_reg, offset.value()));
+						break;
+					default: assert(false);
+					}
 				} else if (wri->value().type() == IROperand::Register) {
 					IRRegisterOperand& value = (IRRegisterOperand&)wri->value();
 
@@ -427,9 +476,36 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				if (movi->destination().is_allocated_reg()) {
 					// mov imm -> reg
 					encoder.mov(source.value(), register_from_operand(movi->destination()));
-				} else if (movi->destination().is_allocated_stack()) {
-					// mov imm -> stack
-					encoder.mov(source.value(), stack_from_operand(movi->destination()));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+
+		case IRInstruction::ZeroExtend:
+		case IRInstruction::SignExtend:
+		{
+			instructions::IRChangeSizeInstruction *csi = (instructions::IRChangeSizeInstruction *)insn;
+
+			if (csi->source().type() == IROperand::Register) {
+				IRRegisterOperand& source = (IRRegisterOperand&)csi->source();
+
+				if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
+					if (source.reg().width() == 4 && csi->destination().reg().width() == 8) break;
+
+					switch (csi->type()) {
+					case IRInstruction::ZeroExtend:
+						encoder.movzx(register_from_operand(source), register_from_operand(csi->destination()));
+						break;
+
+					case IRInstruction::SignExtend:
+						encoder.movsx(register_from_operand(source), register_from_operand(csi->destination()));
+						break;
+					}
 				} else {
 					assert(false);
 				}
@@ -441,20 +517,61 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		}
 
 		case IRInstruction::BitwiseAnd:
+		case IRInstruction::BitwiseOr:
+		case IRInstruction::BitwiseXor:
 		{
-			instructions::IRBitwiseAndInstruction *andi = (instructions::IRBitwiseAndInstruction *)insn;
+			instructions::IRArithmeticInstruction *ai = (instructions::IRArithmeticInstruction *)insn;
 
-			if (andi->source().type() == IROperand::Register) {
-				assert(false);
-			} else if (andi->source().type() == IROperand::Constant) {
-				IRConstantOperand& source = (IRConstantOperand&)andi->source();
+			if (ai->source().type() == IROperand::Register) {
+				IRRegisterOperand& source = (IRRegisterOperand&)ai->source();
 
-				if (andi->destination().is_allocated_reg()) {
-					// and const -> reg
-					encoder.andd(source.value(), register_from_operand(andi->destination()));
-				} else if (andi->destination().is_allocated_stack()) {
-					// and const -> stack
-					encoder.andd(source.value(), stack_from_operand(andi->destination()));
+				if (source.is_allocated_reg() && ai->destination().is_allocated_reg()) {
+					// OPER reg -> reg
+					switch (ai->type()) {
+					case IRInstruction::BitwiseAnd:
+						encoder.andd(register_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::BitwiseOr:
+						encoder.orr(register_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::BitwiseXor:
+						encoder.xorr(register_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					}
+				} else {
+					assert(false);
+				}
+			} else if (ai->source().type() == IROperand::Constant) {
+				IRConstantOperand& source = (IRConstantOperand&)ai->source();
+
+				if (ai->destination().is_allocated_reg()) {
+					// OPER const -> reg
+
+					switch (ai->type()) {
+					case IRInstruction::BitwiseAnd:
+						encoder.andd(source.value(), register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::BitwiseOr:
+						encoder.orr(source.value(), register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::BitwiseXor:
+						encoder.xorr(source.value(), register_from_operand(ai->destination()));
+						break;
+					}
+				} else if (ai->destination().is_allocated_stack()) {
+					// OPER const -> stack
+
+					switch (ai->type()) {
+					case IRInstruction::BitwiseAnd:
+						encoder.andd(source.value(), stack_from_operand(ai->destination()));
+						break;
+					case IRInstruction::BitwiseOr:
+						encoder.orr(source.value(), stack_from_operand(ai->destination()));
+						break;
+					case IRInstruction::BitwiseXor:
+						encoder.xorr(source.value(), stack_from_operand(ai->destination()));
+						break;
+					}
 				} else {
 					assert(false);
 				}
@@ -589,6 +706,187 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			encoder.leave();
 			encoder.ret();
 			break;
+
+		case IRInstruction::CompareEqual:
+		case IRInstruction::CompareNotEqual:
+		case IRInstruction::CompareLessThan:
+		case IRInstruction::CompareLessThanOrEqual:
+		case IRInstruction::CompareGreaterThan:
+		case IRInstruction::CompareGreaterThanOrEqual:
+		{
+			instructions::IRComparisonInstruction *ci = (instructions::IRComparisonInstruction *)insn;
+
+			switch (ci->lhs().type()) {
+			case IROperand::Register:
+			{
+				IRRegisterOperand& lhs = (IRRegisterOperand&)ci->lhs();
+
+				switch (ci->rhs().type()) {
+				case IROperand::Register: {
+					IRRegisterOperand& rhs = (IRRegisterOperand&)ci->rhs();
+
+					if (lhs.is_allocated_reg() && rhs.is_allocated_reg()) {
+						encoder.cmp(register_from_operand(lhs), register_from_operand(rhs));
+					} else {
+						assert(false);
+					}
+
+					break;
+				}
+
+				case IROperand::Constant: {
+					IRConstantOperand& rhs = (IRConstantOperand&)ci->rhs();
+
+					if (lhs.is_allocated_reg()) {
+						encoder.cmp(rhs.value(), register_from_operand(lhs));
+					} else {
+						assert(false);
+					}
+
+					break;
+				}
+
+				default: assert(false);
+				}
+
+				break;
+			}
+
+			case IROperand::Constant:
+				switch (ci->rhs().type()) {
+				case IROperand::Register: assert(false);
+				default: assert(false);
+				}
+
+				break;
+
+			default: assert(false);
+			}
+
+			switch (ci->type()) {
+			case IRInstruction::CompareEqual:
+				encoder.sete(register_from_operand(ci->destination()));
+				break;
+
+			case IRInstruction::CompareNotEqual:
+				encoder.setne(register_from_operand(ci->destination()));
+				break;
+			default:
+				assert(false);
+			}
+
+			break;
+		}
+
+		case IRInstruction::ReadMemory:
+		{
+			instructions::IRReadMemoryInstruction *rmi = (instructions::IRReadMemoryInstruction *)insn;
+
+			if (rmi->offset().type() == IROperand::Register) {
+				IRRegisterOperand& offset = (IRRegisterOperand&)rmi->offset();
+
+				if (offset.is_allocated_reg() && rmi->storage().is_allocated_reg()) {
+					// mov (reg), reg
+					encoder.mov(X86Memory::get(register_from_operand(offset)), register_from_operand(rmi->storage()));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+
+		case IRInstruction::WriteMemory:
+		{
+			instructions::IRWriteMemoryInstruction *wmi = (instructions::IRWriteMemoryInstruction *)insn;
+
+			if (wmi->offset().type() == IROperand::Register) {
+				IRRegisterOperand& offset = (IRRegisterOperand&)wmi->offset();
+
+				if (wmi->value().type() == IROperand::Register) {
+					IRRegisterOperand& value = (IRRegisterOperand&)wmi->value();
+
+					if (offset.is_allocated_reg() && value.is_allocated_reg()) {
+						// mov reg, (reg)
+
+						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset)));
+					} else {
+						assert(false);
+					}
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+
+		case IRInstruction::WriteDevice:
+		{
+			instructions::IRWriteDeviceInstruction *wdi = (instructions::IRWriteDeviceInstruction *)insn;
+
+			// TODO: save registers
+
+			encoder.push(REG_RDI);	// CPU
+			encoder.push(REG_RSI);	// DEV
+			encoder.push(REG_RDX);	// REG
+			encoder.push(REG_RCX);	// VAL
+
+			load_state_field(0, REG_RDI);
+
+			encode_operand_to_reg(wdi->device(), REG_RSI);
+			encode_operand_to_reg(wdi->offset(), REG_RDX);
+			encode_operand_to_reg(wdi->data(), REG_RCX);
+
+			// Load the address of the target function into a temporary, and perform an indirect call.
+			encoder.mov((uint64_t)&cpu_write_device, tmp0_8);
+			encoder.call(tmp0_8);
+
+			encoder.pop(REG_RCX);
+			encoder.pop(REG_RDX);
+			encoder.pop(REG_RSI);
+			encoder.pop(REG_RDI);
+
+			break;
+		}
+
+		case IRInstruction::ReadDevice:
+		{
+			instructions::IRReadDeviceInstruction *rdi = (instructions::IRReadDeviceInstruction *)insn;
+
+			// TODO: save registers
+
+			encoder.push(REG_RDI);	// CPU
+			encoder.push(REG_RSI);	// DEV
+			encoder.push(REG_RDX);	// OFF
+			encoder.push(REG_RCX);	// DATA
+
+			load_state_field(0, REG_RDI);
+
+			encode_operand_to_reg(rdi->device(), REG_RSI);
+			encode_operand_to_reg(rdi->offset(), REG_RDX);
+
+			// push $0
+			// lea (sp), ecx
+			encoder.xorr(REG_ECX, REG_ECX);
+
+			// Load the address of the target function into a temporary, and perform an indirect call.
+			encoder.mov((uint64_t)&cpu_read_device, tmp0_8);
+			encoder.call(tmp0_8);
+
+			// pop REG_OF(rdi->storage)
+			
+			encoder.pop(REG_RCX);
+			encoder.pop(REG_RDX);
+			encoder.pop(REG_RSI);
+			encoder.pop(REG_RDI);
+
+			break;
+		}
 
 		default:
 			printf("cannot lower instruction: ");
@@ -779,6 +1077,23 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		assert(data->type() == IROperand::Register);
 
 		return new instructions::IRReadDeviceInstruction(*dev, *off, *data);
+	}
+
+	case shared::IRInstruction::WRITE_MEM:
+	{
+		IROperand *val = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
+		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[1]);
+
+		return new instructions::IRWriteMemoryInstruction(*val, *off);
+	}
+
+	case shared::IRInstruction::READ_MEM:
+	{
+		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *dst = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+		assert(dst->type() == IROperand::Register);
+
+		return new instructions::IRReadMemoryInstruction(*off, *dst);
 	}
 
 	default:
