@@ -36,7 +36,10 @@ namespace captive {
 				x86::X86Encoder encoder;
 
 				std::map<uint32_t, shared::IRBlockId> block_relocations;
-				std::map<uint64_t, x86::X86Register *> register_assignments;
+				std::map<uint64_t, x86::X86Register *> register_assignments_1;
+				std::map<uint64_t, x86::X86Register *> register_assignments_2;
+				std::map<uint64_t, x86::X86Register *> register_assignments_4;
+				std::map<uint64_t, x86::X86Register *> register_assignments_8;
 
 				bool optimise_tb();
 				bool build();
@@ -56,7 +59,14 @@ namespace captive {
 				inline x86::X86Register& register_from_operand(IRRegisterOperand& oper) const
 				{
 					assert(oper.is_allocated_reg());
-					return *(register_assignments.find(oper.allocation_data())->second);
+
+					switch (oper.reg().width()) {
+					case 1:	return *(register_assignments_1.find(oper.allocation_data())->second);
+					case 2:	return *(register_assignments_2.find(oper.allocation_data())->second);
+					case 4:	return *(register_assignments_4.find(oper.allocation_data())->second);
+					case 8:	return *(register_assignments_8.find(oper.allocation_data())->second);
+					default: assert(false);
+					}
 				}
 
 				inline x86::X86Memory stack_from_operand(IRRegisterOperand& oper) const

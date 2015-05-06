@@ -214,6 +214,9 @@ namespace captive {
 				inline const std::vector<IRRegisterOperand *>& uses() const { return _uses; }
 				inline const std::vector<IRRegisterOperand *>& defs() const { return _defs; }
 
+				const std::set<IRRegister *> live_ins() const { return _live_in; }
+				const std::set<IRRegister *> live_outs() const { return _live_out; }
+				
 				virtual void dump() const;
 
 				inline IRInstruction *next() const { return _next; }

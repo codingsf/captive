@@ -10,7 +10,33 @@ using namespace captive::arch::x86;
 
 BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb), encoder(memory_allocator)
 {
+	register_assignments_8[0] = &REG_RAX;
+	register_assignments_8[1] = &REG_RCX;
+	register_assignments_8[2] = &REG_RDX;
+	register_assignments_8[3] = &REG_RSI;
+	register_assignments_8[4] = &REG_R8;
+	register_assignments_8[5] = &REG_R9;
 
+	register_assignments_4[0] = &REG_EAX;
+	register_assignments_4[1] = &REG_ECX;
+	register_assignments_4[2] = &REG_EDX;
+	register_assignments_4[3] = &REG_ESI;
+	register_assignments_4[4] = &REG_R8D;
+	register_assignments_4[5] = &REG_R9D;
+
+	register_assignments_2[0] = &REG_AX;
+	register_assignments_2[1] = &REG_CX;
+	register_assignments_2[2] = &REG_DX;
+	register_assignments_2[3] = &REG_SI;
+	register_assignments_2[4] = &REG_R8W;
+	register_assignments_2[5] = &REG_R9W;
+
+	register_assignments_1[0] = &REG_AL;
+	register_assignments_1[1] = &REG_CL;
+	register_assignments_1[2] = &REG_DL;
+	register_assignments_1[3] = &REG_SIL;
+	register_assignments_1[4] = &REG_R8B;
+	register_assignments_1[5] = &REG_R9B;
 }
 
 bool BlockCompiler::compile(block_txln_fn& fn)
@@ -157,31 +183,27 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 			insn->dump();
 			printf("\n");
 
-			for (auto use : insn->uses()) {
-				uint32_t live = alloc[&use->reg()];
-
-				printf(" use: r%d reg=%d\n", use->reg().id(), live);
-				use->allocate(IRRegisterOperand::Register, live);
-
-				/*for (auto NI = II+1; NI != IE; ++NI) {
-
-				}*/
+			for (auto in : insn->live_ins()) {
+				if (insn->live_outs().count(in) == 0) {
+					printf("  register %d killed\n", in->id());
+					avail.push_front(alloc[in]);
+				}
 			}
 
-			for (auto def : insn->defs()) {
-				if (alloc.find(&def->reg()) != alloc.end()) {
-					def->allocate(IRRegisterOperand::Register, alloc[&def->reg()]);
-				} else {
-					if (avail.size() == 0) assert(false);
-
+			for (auto out : insn->live_outs()) {
+				if (alloc.count(out) == 0) {
 					uint32_t chosen = avail.front();
 					avail.pop_front();
 
-					alloc[&def->reg()] = chosen;
+					alloc[out] = chosen;
+					printf("  register %d allocated to %d\n", out->id(), chosen);
+				}
+			}
 
-					printf(" def: r%d reg=%d\n", def->reg().id(), chosen);
-
-					def->allocate(IRRegisterOperand::Register, chosen);
+			for (auto oper : insn->operands()) {
+				if (oper->type() == IROperand::Register) {
+					IRRegisterOperand *regop = (IRRegisterOperand *)oper;
+					regop->allocate(IRRegisterOperand::Register, alloc[&regop->reg()]);
 				}
 			}
 		}
@@ -198,15 +220,8 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 	encoder.mov(REG_RSP, REG_RBP);
 	encoder.push(REG_R15);
 	encoder.push(REG_RBX);
-	encoder.sub(max_stack, REG_RSP);
+	//encoder.sub(max_stack, REG_RSP);
 	encoder.mov(REG_RDI, REG_R15);
-
-	register_assignments[0] = &REG_RAX;
-	register_assignments[1] = &REG_RCX;
-	register_assignments[2] = &REG_RDX;
-	register_assignments[3] = &REG_RSI;
-	register_assignments[4] = &REG_R8;
-	register_assignments[5] = &REG_R9;
 
 	std::map<shared::IRBlockId, uint32_t> native_block_offsets;
 	for (auto block : ir.blocks()) {
