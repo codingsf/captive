@@ -155,6 +155,20 @@ bool BlockCompiler::thread_jumps()
 
 bool BlockCompiler::thread_rets()
 {
+	for (auto block : ir.blocks()) {
+		if (block->terminator().type() == IRInstruction::Jump) {
+			assert(block->terminator().successors().size() == 1);
+			IRBlock *successor = block->terminator().successors().front();
+
+			if (successor->instructions().front()->type() == IRInstruction::Return) {
+				block->terminator().remove_from_parent();
+				block->append_instruction(*new instructions::IRRetInstruction());
+				block->remove_successors();
+				successor->remove_predecessor(*block);
+			}
+		}
+	}
+
 	return true;
 }
 
