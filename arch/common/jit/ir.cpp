@@ -113,7 +113,8 @@ void IRBlock::remove_from_parent()
 
 void IRBlock::calculate_liveness()
 {
-	std::set<IRRegister *> current_live;
+	//std::set<IRRegister *> current_live;
+	_live_in.clear();
 
 	for (auto II = _instructions.rbegin(), IE = _instructions.rend(); II != IE; ++II) {
 		IRInstruction *insn = *II;
@@ -123,14 +124,14 @@ void IRBlock::calculate_liveness()
 
 		for (auto use : insn->_uses) {
 			insn->_live_in.insert(&use->reg());
-			current_live.insert(&use->reg());
+			_live_in.insert(&use->reg());
 		}
 
 		for (auto def : insn->_defs) {
-			current_live.erase(&def->reg());
+			_live_in.erase(&def->reg());
 		}
 
-		for (auto live : current_live) {
+		for (auto live : _live_in) {
 			insn->_live_in.insert(live);
 		}
 
@@ -138,6 +139,12 @@ void IRBlock::calculate_liveness()
 			for (auto in : insn->_next->_live_in) {
 				insn->_live_out.insert(in);
 			}
+		}
+	}
+
+	for (auto in : _live_in) {
+		for (auto pred : _pred) {
+			pred->_live_out.insert(in);
 		}
 	}
 }
@@ -194,6 +201,10 @@ void IROperand::dump() const
 void IRRegisterOperand::dump() const
 {
 	printf("i%d %%r%d", _rg.width(), _rg.id());
+
+	if (_alloc_class == Register) {
+		printf("@(%d)", _alloc_data);
+	}
 }
 
 void IRConstantOperand::dump() const

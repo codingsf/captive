@@ -51,6 +51,7 @@ namespace captive {
 
 				bool optimise_tb();
 				bool build();
+				bool analyse();
 				bool optimise_ir();
 
 				bool allocate(uint32_t& max_stack);
@@ -85,7 +86,13 @@ namespace captive {
 					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 4);
 				}
 
+				void emit_save_reg_state();
+				void emit_restore_reg_state();
+
 				bool merge_blocks();
+				bool thread_jumps();
+				bool thread_rets();
+				bool dse();
 			};
 		}
 	}

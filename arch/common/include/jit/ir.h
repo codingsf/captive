@@ -336,8 +336,8 @@ namespace captive {
 				inline const std::set<IRBlock *> successors() const { return _succ; }
 				inline const std::set<IRBlock *> predecessors() const { return _pred; }
 
-				inline const std::list<IRRegister *>& live_ins() const { return _live_ins; }
-				inline const std::list<IRRegister *>& live_outs() const { return _live_outs; }
+				inline const std::set<IRRegister *>& live_ins() const { return _live_in; }
+				inline const std::set<IRRegister *>& live_outs() const { return _live_out; }
 
 				void append_instruction(IRInstruction& insn)
 				{
@@ -378,7 +378,7 @@ namespace captive {
 				shared::IRBlockId _id;
 				std::list<IRInstruction *> _instructions;
 
-				std::list<IRRegister *> _live_ins, _live_outs;
+				std::set<IRRegister *> _live_in, _live_out;
 				std::set<IRBlock *> _succ, _pred;
 			};
 
@@ -978,6 +978,8 @@ namespace captive {
 					}
 
 					IRInstruction::InstructionTypes type() const override { return ReadDevice; }
+
+					IRRegisterOperand& storage() const { return _data; }
 
 				protected:
 					const char* mnemonic() const override { return "rddev"; }

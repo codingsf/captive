@@ -30,12 +30,17 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	}
 
 	if (!build()) {
-		printf("jit: ir analysis failed\n");
+		printf("jit: ir creation failed\n");
 		return false;
 	}
 
 	if (!optimise_ir()) {
 		printf("jit: optimisation of ir failed\n");
+		return false;
+	}
+
+	if (!analyse()) {
+		printf("jit: analysis of ir failed\n");
 		return false;
 	}
 
@@ -96,6 +101,11 @@ bool BlockCompiler::build()
 		}
 	}
 
+	return true;
+}
+
+bool BlockCompiler::analyse()
+{
 	// Build instruction register liveness analysis
 	for (auto block : ir.blocks()) {
 		block->calculate_liveness();
@@ -104,10 +114,47 @@ bool BlockCompiler::build()
 	return true;
 }
 
-
 bool BlockCompiler::optimise_ir()
 {
 	if (!merge_blocks()) return false;
+	if (!thread_jumps()) return false;
+	if (!thread_rets()) return false;
+	//if (!dse()) return false;
+
+	return true;
+}
+
+bool BlockCompiler::dse()
+{
+retry:
+	analyse();
+
+	bool changed = false;
+	for (auto block : ir.blocks()) {
+		for (auto insn : block->instructions()) {
+			for (auto def : insn->defs()) {
+				if (insn->live_outs().count(&def->reg()) == 0) {
+					printf("i think we can safely eliminate this instruction: ");
+					insn->dump();
+					printf("\n");
+
+					insn->remove_from_parent();
+					goto retry;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
+bool BlockCompiler::thread_jumps()
+{
+	return true;
+}
+
+bool BlockCompiler::thread_rets()
+{
 	return true;
 }
 
@@ -162,6 +209,7 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 	max_stack = 0;
 
 	for (auto block : ir.blocks()) {
+		std::set<IRRegister *> live;
 		std::map<IRRegister *, uint32_t> alloc;
 		std::list<uint32_t> avail;
 		avail.push_back(0);
@@ -171,28 +219,44 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 		avail.push_back(4);
 		avail.push_back(5);
 
-		//printf("local allocator on block %d\n", block->id());
+		printf("local allocator on block %d\n", block->id());
 		for (auto II =  block->instructions().begin(), IE = block->instructions().end(); II != IE; ++II) {
 			IRInstruction *insn = *II;
 
-			//printf("insn: ");
-			//insn->dump();
-			//printf("\n");
+			printf("insn: ");
+			insn->dump();
+			printf("\n");
 
 			for (auto in : insn->live_ins()) {
 				if (insn->live_outs().count(in) == 0) {
-					//printf("  register %d killed\n", in->id());
-					avail.push_front(alloc[in]);
+					uint32_t host_reg = alloc[in];
+
+					printf("  register v%d:%p dead, h%d returned\n", in->id(), in, host_reg);
+
+					for (auto x : avail) {
+						if (x == host_reg) {
+							printf("nope!\n");
+							abort();
+						}
+					}
+
+					avail.push_front(host_reg);
+					live.erase(in);
 				}
 			}
 
 			for (auto out : insn->live_outs()) {
-				if (alloc.count(out) == 0) {
+				if (live.count(out) == 0) {
+					if (avail.size() == 0) assert(false);
+
 					uint32_t chosen = avail.front();
 					avail.pop_front();
 
 					alloc[out] = chosen;
-					//printf("  register %d allocated to %d\n", out->id(), chosen);
+					live.insert(out);
+					printf("  register v%d:%p allocated to h%d\n", out->id(), out, chosen);
+				} else {
+					printf("  register v%d:%p already h%d\n", out->id(), out, alloc[out]);
 				}
 			}
 
@@ -268,10 +332,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		switch (insn->type()) {
 		case IRInstruction::Call:
 		{
-			// TODO: save registers
-
-			encoder.push(REG_RDI);
-			encoder.push(REG_RSI);
+			emit_save_reg_state();
 
 			instructions::IRCallInstruction *calli = (instructions::IRCallInstruction *)insn;
 			load_state_field(0, REG_RDI);
@@ -285,22 +346,21 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				encode_operand_to_reg(*args[1], REG_EDX);
 			}
 
+			if (args.size() > 2)  {
+				encode_operand_to_reg(*args[1], REG_ECX);
+			}
+
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)((IRFunctionOperand *)calli->operands().front())->ptr(), tmp0_8);
 			encoder.call(tmp0_8);
 
-			encoder.pop(REG_RSI);
-			encoder.pop(REG_RDI);
-
+			emit_restore_reg_state();
 			break;
 		}
 
 		case IRInstruction::SetCPUMode:
 		{
-			// TODO: save registers
-
-			encoder.push(REG_RDI);
-			encoder.push(REG_RSI);
+			emit_save_reg_state();
 
 			instructions::IRSetCpuModeInstruction *scmi = (instructions::IRSetCpuModeInstruction *)insn;
 			load_state_field(0, REG_RDI);
@@ -311,8 +371,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			encoder.mov((uint64_t)&cpu_set_mode, tmp0_8);
 			encoder.call(tmp0_8);
 
-			encoder.pop(REG_RSI);
-			encoder.pop(REG_RDI);
+			emit_restore_reg_state();
 
 			break;
 		}
@@ -829,12 +888,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			instructions::IRWriteDeviceInstruction *wdi = (instructions::IRWriteDeviceInstruction *)insn;
 
-			// TODO: save registers
-
-			encoder.push(REG_RDI);	// CPU
-			encoder.push(REG_RSI);	// DEV
-			encoder.push(REG_RDX);	// REG
-			encoder.push(REG_RCX);	// VAL
+			emit_save_reg_state();
 
 			load_state_field(0, REG_RDI);
 
@@ -846,10 +900,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			encoder.mov((uint64_t)&cpu_write_device, tmp0_8);
 			encoder.call(tmp0_8);
 
-			encoder.pop(REG_RCX);
-			encoder.pop(REG_RDX);
-			encoder.pop(REG_RSI);
-			encoder.pop(REG_RDI);
+			emit_restore_reg_state();
 
 			break;
 		}
@@ -858,32 +909,31 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			instructions::IRReadDeviceInstruction *rdi = (instructions::IRReadDeviceInstruction *)insn;
 
-			// TODO: save registers
-
-			encoder.push(REG_RDI);	// CPU
-			encoder.push(REG_RSI);	// DEV
-			encoder.push(REG_RDX);	// OFF
-			encoder.push(REG_RCX);	// DATA
+			emit_save_reg_state();
 
 			load_state_field(0, REG_RDI);
 
 			encode_operand_to_reg(rdi->device(), REG_RSI);
 			encode_operand_to_reg(rdi->offset(), REG_RDX);
 
-			// push $0
-			// lea (sp), ecx
-			encoder.xorr(REG_ECX, REG_ECX);
+			// Allocate a slot on the stack for the reference argument
+			encoder.push(0);
+
+			// Load the address of the stack slot into RCX
+			encoder.lea(X86Memory::get(REG_RSP), REG_RCX);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_read_device, tmp0_8);
 			encoder.call(tmp0_8);
 
-			// pop REG_OF(rdi->storage)
-			
-			encoder.pop(REG_RCX);
-			encoder.pop(REG_RDX);
-			encoder.pop(REG_RSI);
-			encoder.pop(REG_RDI);
+			// Pop the reference argument value into the destination register
+			if (rdi->storage().is_allocated_reg()) {
+				encoder.pop(register_from_operand(rdi->storage(), 8));
+			} else {
+				assert(false);
+			}
+
+			emit_restore_reg_state();
 
 			break;
 		}
@@ -1153,9 +1203,11 @@ void BlockCompiler::encode_operand_to_reg(IROperand& operand, x86::X86Register& 
 		case IRRegisterOperand::Stack:
 			encoder.mov(stack_from_operand(regop), reg);
 			break;
+
 		case IRRegisterOperand::Register:
 			encoder.mov(register_from_operand(regop, reg.size), reg);
 			break;
+
 		default:
 			assert(false);
 		}
@@ -1166,4 +1218,26 @@ void BlockCompiler::encode_operand_to_reg(IROperand& operand, x86::X86Register& 
 	default:
 		assert(false);
 	}
+}
+
+void BlockCompiler::emit_save_reg_state()
+{
+	encoder.push(REG_RSI);
+	encoder.push(REG_RDI);
+	encoder.push(REG_RAX);
+	encoder.push(REG_RCX);
+	encoder.push(REG_RDX);
+	encoder.push(REG_R8);
+	encoder.push(REG_R9);
+}
+
+void BlockCompiler::emit_restore_reg_state()
+{
+	encoder.pop(REG_R9);
+	encoder.pop(REG_R8);
+	encoder.pop(REG_RDX);
+	encoder.pop(REG_RCX);
+	encoder.pop(REG_RAX);
+	encoder.pop(REG_RDI);
+	encoder.pop(REG_RSI);
 }

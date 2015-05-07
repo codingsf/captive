@@ -79,6 +79,10 @@ namespace captive {
 				void push(const X86Register& reg);
 				void pop(const X86Register& reg);
 
+				void push(uint32_t imm);
+
+				void lea(const X86Memory& addr, const X86Register& dst);
+
 				void movzx(const X86Register& src, const X86Register& dst);
 				void movsx(const X86Register& src, const X86Register& dst);
 
