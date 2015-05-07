@@ -8,6 +8,7 @@
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
+extern "C" void jit_verify(void *cpu);
 
 using namespace captive::arch::jit;
 using namespace captive::arch::x86;
@@ -48,6 +49,11 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	uint32_t max_stack = 0;
 	if (!allocate(max_stack)) {
 		printf("jit: register allocation failed\n");
+		return false;
+	}
+
+	if (!die()) {
+		printf("jit: dead instruction elimination failed\n");
 		return false;
 	}
 
@@ -133,6 +139,27 @@ bool BlockCompiler::optimise_ir()
 	if (!thread_jumps()) return false;
 	if (!thread_rets()) return false;
 	//if (!dse()) return false;
+
+	return true;
+}
+
+bool BlockCompiler::die()
+{
+retry:
+	for (auto block : ir.blocks()) {
+		for (auto insn : block->instructions()) {
+			for (auto oper : insn->operands()) {
+				if (oper->type() == IROperand::Register) {
+					IRRegisterOperand& regop = (IRRegisterOperand&)*oper;
+					if (regop.allocation_class() == IRRegisterOperand::None) {
+						printf("whoa there! this instruction has an unallocated register!\n");
+						insn->remove_from_parent();
+						goto retry;
+					}
+				}
+			}
+		}
+	}
 
 	return true;
 }
@@ -353,7 +380,7 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 
 					if (global_live.count(&regop->reg())) {
 						regop->allocate(IRRegisterOperand::Stack, global_regs[&regop->reg()]);
-					} else {
+					} else if (alloc.count(&regop->reg())) {
 						regop->allocate(IRRegisterOperand::Register, alloc[&regop->reg()]);
 					}
 				}
@@ -421,8 +448,6 @@ bool BlockCompiler::lower_block(IRBlock& block)
 	X86Register& tmp1_4 = REG_ECX;
 
 	for (auto insn : block.instructions()) {
-		encoder.nop();
-
 		switch (insn->type()) {
 		case IRInstruction::Call:
 		{
@@ -657,43 +682,57 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			if (csi->source().type() == IROperand::Register) {
 				IRRegisterOperand& source = (IRRegisterOperand&)csi->source();
 
-				if (source.reg().width() == 4 && csi->destination().reg().width() == 8) break;
-
-				if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
-					switch (csi->type()) {
-					case IRInstruction::ZeroExtend:
-						encoder.movzx(register_from_operand(source), register_from_operand(csi->destination()));
-						break;
-
-					case IRInstruction::SignExtend:
-						encoder.movsx(register_from_operand(source), register_from_operand(csi->destination()));
-						break;
+				if (source.reg().width() == 4 && csi->destination().reg().width() == 8) {
+					if (csi->type() == IRInstruction::SignExtend) {
+						if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
+							encoder.mov(register_from_operand(source), register_from_operand(csi->destination(), 4));
+						} else {
+							assert(false);
+						}
+					} else {
+						if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
+							encoder.movsx(register_from_operand(source), register_from_operand(csi->destination()));
+						} else {
+							assert(false);
+						}
 					}
-				} else if (source.is_allocated_reg() && csi->destination().is_allocated_stack()) {
-					assert(false);
-				} else if (source.is_allocated_stack() && csi->destination().is_allocated_reg()) {
-					unspill(source, tmp0_4);
-
-					X86Register *tmpreg;
-					switch (source.reg().width()) {
-					case 1:	tmpreg = &tmp0_1; break;
-					case 2:	tmpreg = &tmp0_2; break;
-					default: assert(false);
-					}
-
-					switch (csi->type()) {
-					case IRInstruction::ZeroExtend:
-						encoder.movzx(*tmpreg, register_from_operand(csi->destination()));
-						break;
-
-					case IRInstruction::SignExtend:
-						encoder.movsx(*tmpreg, register_from_operand(csi->destination()));
-						break;
-					}
-				} else if (source.is_allocated_stack() && csi->destination().is_allocated_stack()) {
-					assert(false);
 				} else {
-					assert(false);
+					if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
+						switch (csi->type()) {
+						case IRInstruction::ZeroExtend:
+							encoder.movzx(register_from_operand(source), register_from_operand(csi->destination()));
+							break;
+
+						case IRInstruction::SignExtend:
+							encoder.movsx(register_from_operand(source), register_from_operand(csi->destination()));
+							break;
+						}
+					} else if (source.is_allocated_reg() && csi->destination().is_allocated_stack()) {
+						assert(false);
+					} else if (source.is_allocated_stack() && csi->destination().is_allocated_reg()) {
+						unspill(source, tmp0_4);
+
+						X86Register *tmpreg;
+						switch (source.reg().width()) {
+						case 1:	tmpreg = &tmp0_1; break;
+						case 2:	tmpreg = &tmp0_2; break;
+						default: assert(false);
+						}
+
+						switch (csi->type()) {
+						case IRInstruction::ZeroExtend:
+							encoder.movzx(*tmpreg, register_from_operand(csi->destination()));
+							break;
+
+						case IRInstruction::SignExtend:
+							encoder.movsx(*tmpreg, register_from_operand(csi->destination()));
+							break;
+						}
+					} else if (source.is_allocated_stack() && csi->destination().is_allocated_stack()) {
+						assert(false);
+					} else {
+						assert(false);
+					}
 				}
 			} else {
 				assert(false);
@@ -1135,6 +1174,23 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			break;
 		}
 
+		case IRInstruction::Verify:
+		{
+			encoder.nop(X86Memory::get(REG_RAX, ((instructions::IRVerifyInstruction *)insn)->pc().value()));
+
+			emit_save_reg_state();
+
+			load_state_field(0, REG_RDI);
+
+			// Load the address of the target function into a temporary, and perform an indirect call.
+			encoder.mov((uint64_t)&jit_verify, tmp0_8);
+			encoder.call(tmp0_8);
+
+			emit_restore_reg_state();
+
+			break;
+		}
+
 		default:
 			printf("cannot lower instruction: ");
 			insn->dump();
@@ -1341,6 +1397,14 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		assert(dst->type() == IROperand::Register);
 
 		return new instructions::IRReadMemoryInstruction(*off, *dst);
+	}
+
+	case shared::IRInstruction::VERIFY:
+	{
+		IRPCOperand *pc = (IRPCOperand *)operand_from_shared(ctx, &insn->operands[0]);
+		assert(pc->type() == IROperand::PC);
+
+		return new instructions::IRVerifyInstruction(*pc);
 	}
 
 	default:

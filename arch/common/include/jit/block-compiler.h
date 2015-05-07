@@ -83,6 +83,8 @@ namespace captive {
 				inline x86::X86Memory stack_from_operand(IRRegisterOperand& oper) const
 				{
 					assert(oper.is_allocated_stack());
+					assert(oper.reg().width() < 8);
+
 					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -4) - 4);
 				}
 
@@ -98,6 +100,7 @@ namespace captive {
 				bool thread_jumps();
 				bool thread_rets();
 				bool dse();
+				bool die();
 			};
 		}
 	}

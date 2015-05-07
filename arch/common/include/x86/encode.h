@@ -144,6 +144,7 @@ namespace captive {
 				void ret();
 				void hlt();
 				void nop();
+				void nop(const X86Memory& mem);
 
 				uint32_t current_offset() const { return _write_offset; }
 

@@ -232,7 +232,7 @@ bool CPU::compile_block(profile::Block& block, captive::shared::TranslationBlock
 		//printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
 
 		if (unlikely(cpu_data().verify_enabled)) {
-			ctx.add_instruction(IRInstruction::verify());
+			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));
 		}
 
 		// Translate this instruction into the context.

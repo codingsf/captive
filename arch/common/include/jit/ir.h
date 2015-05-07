@@ -172,6 +172,7 @@ namespace captive {
 				{
 					Nop,
 					Trap,
+					Verify,
 
 					Call,
 					Jump,
@@ -238,6 +239,12 @@ namespace captive {
 				void remove_from_parent();
 
 			protected:
+				inline void add_operand(IROperand& operand)
+				{
+					operand.attach(*this);
+					_all_operands.push_back(&operand);
+				}
+
 				inline void add_input_operand(IROperand& operand)
 				{
 					operand.attach(*this);
@@ -1091,6 +1098,22 @@ namespace captive {
 
 				protected:
 					const char* mnemonic() const override { return "cmpgte"; }
+				};
+
+				class IRVerifyInstruction : public IRInstruction
+				{
+				public:
+					IRVerifyInstruction(IRPCOperand& pc) : _pc(pc) { add_operand(pc); }
+
+					IRInstruction::InstructionTypes type() const override { return Verify; }
+
+					IRPCOperand& pc() const { return _pc; }
+
+				protected:
+					const char* mnemonic() const override { return "verify"; }
+
+				private:
+					IRPCOperand& _pc;
 				};
 			}
 		}

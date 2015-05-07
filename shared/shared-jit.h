@@ -153,7 +153,7 @@ namespace captive {
 			static IRInstruction nop() { return IRInstruction(NOP); }
 			static IRInstruction ret() { return IRInstruction(RET); }
 			static IRInstruction trap() { return IRInstruction(TRAP); }
-			static IRInstruction verify() { return IRInstruction(VERIFY); }
+			static IRInstruction verify(IROperand pc) { return IRInstruction(VERIFY, pc); }
 
 			static IRInstruction ldpc(IROperand dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
 

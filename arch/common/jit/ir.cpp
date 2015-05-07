@@ -278,5 +278,5 @@ void IRBlockOperand::dump() const
 
 void IRPCOperand::dump() const
 {
-	printf("pc");
+	printf("pc #%08x", _val);
 }

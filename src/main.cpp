@@ -263,7 +263,7 @@ int main(int argc, char **argv)
 
 	CPU *cpu = NULL;
 	if (verify_enabled()) {
-		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
+		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::BlockJIT, true, (devices::timers::CallbackTickSource *)ts);
 		cpu = guest->create_cpu(cpu_cfg);
 	} else {
 		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::BlockJIT);
