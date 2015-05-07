@@ -371,6 +371,7 @@ namespace captive {
 
 				void remove_from_parent();
 
+				void invalidate_liveness();
 				void calculate_liveness();
 
 			private:

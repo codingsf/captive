@@ -129,6 +129,10 @@ namespace captive {
 
 				void sete(const X86Register& dst);
 				void setne(const X86Register& dst);
+				void setl(const X86Register& dst);
+				void setle(const X86Register& dst);
+				void setg(const X86Register& dst);
+				void setge(const X86Register& dst);
 
 				void leave();
 				void ret();

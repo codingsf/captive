@@ -20,6 +20,7 @@ BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb), encoder(mem
 	assign(3, REG_RDI, REG_EDI, REG_DI, REG_DIL);
 	assign(4, REG_R8, REG_R8D, REG_R8W, REG_R8B);
 	assign(5, REG_R9, REG_R9D, REG_R9W, REG_R9B);
+	assign(6, REG_R10, REG_R10D, REG_R10W, REG_R10B);
 }
 
 bool BlockCompiler::compile(block_txln_fn& fn)
@@ -44,13 +45,13 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}
 
-	ir.dump();
-
 	uint32_t max_stack = 0;
 	if (!allocate(max_stack)) {
 		printf("jit: register allocation failed\n");
 		return false;
 	}
+
+	ir.dump();
 
 	if (!lower(max_stack, fn)) {
 		printf("jit: instruction lowering failed\n");
@@ -106,8 +107,20 @@ bool BlockCompiler::build()
 
 bool BlockCompiler::analyse()
 {
-	// Build instruction register liveness analysis
+	std::vector<IRBlock *> exit_blocks;
+
+	// Invalidate liveness on all blocks, and detect exit blocks (i.e. blocks without successors)
 	for (auto block : ir.blocks()) {
+		block->invalidate_liveness();
+
+		if (block->successors().size() == 0)
+			exit_blocks.push_back(block);
+	}
+
+	//printf("*** here we go\n");
+	// Calculate the liveness on every exit block, which will recursively calculate
+	// liveness on their predecessors.
+	for (auto block : exit_blocks) {
 		block->calculate_liveness();
 	}
 
@@ -162,9 +175,16 @@ bool BlockCompiler::thread_rets()
 
 			if (successor->instructions().front()->type() == IRInstruction::Return) {
 				block->terminator().remove_from_parent();
+				// TODO: Delete
+
 				block->append_instruction(*new instructions::IRRetInstruction());
 				block->remove_successors();
 				successor->remove_predecessor(*block);
+
+				if (successor->predecessors().size() == 0) {
+					successor->remove_from_parent();
+					// TODO: Delete
+				}
 			}
 		}
 	}
@@ -218,9 +238,15 @@ retry:
 	return true;
 }
 
+#define DEBUG_ALLOCATOR
+
 bool BlockCompiler::allocate(uint32_t& max_stack)
 {
 	max_stack = 0;
+
+	std::set<IRRegister *> global_live;
+	std::map<IRRegister *, uint32_t> global_regs;
+	uint32_t next_global = 0;
 
 	for (auto block : ir.blocks()) {
 		std::set<IRRegister *> live;
@@ -232,20 +258,56 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 		avail.push_back(3);
 		avail.push_back(4);
 		avail.push_back(5);
+		avail.push_back(6);
 
-		printf("local allocator on block %d\n", block->id());
+#ifdef DEBUG_ALLOCATOR
+		printf("local allocator on block %d ", block->id());
+		printf("IN={ ");
+#endif
+		for (auto in : block->live_ins()) {
+#ifdef DEBUG_ALLOCATOR
+			printf("r%d ", in->id());
+#endif
+
+			if (global_live.count(in) == 0) {
+				global_live.insert(in);
+				global_regs[in] = next_global++;
+			}
+		}
+#ifdef DEBUG_ALLOCATOR
+		printf("} OUT={ ");
+#endif
+		for (auto out : block->live_outs()) {
+#ifdef DEBUG_ALLOCATOR
+			printf("r%d ", out->id());
+#endif
+			if (global_live.count(out) == 0) {
+				global_live.insert(out);
+				global_regs[out] = next_global++;
+			}
+		}
+#ifdef DEBUG_ALLOCATOR
+		printf("}\n");
+#endif
+
 		for (auto II =  block->instructions().begin(), IE = block->instructions().end(); II != IE; ++II) {
 			IRInstruction *insn = *II;
 
-			printf("insn: ");
+#ifdef DEBUG_ALLOCATOR
+			printf("  insn: ");
 			insn->dump();
 			printf("\n");
+#endif
 
 			for (auto in : insn->live_ins()) {
+				if (global_live.count(in)) continue;
+
 				if (insn->live_outs().count(in) == 0) {
 					uint32_t host_reg = alloc[in];
 
-					printf("  register v%d:%p dead, h%d returned\n", in->id(), in, host_reg);
+#ifdef DEBUG_ALLOCATOR
+					printf("    register v%d dead, h%d returned\n", in->id(), host_reg);
+#endif
 
 					for (auto x : avail) {
 						if (x == host_reg) {
@@ -260,6 +322,8 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 			}
 
 			for (auto out : insn->live_outs()) {
+				if (global_live.count(out)) continue;
+
 				if (live.count(out) == 0) {
 					if (avail.size() == 0) assert(false);
 
@@ -268,16 +332,26 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 
 					alloc[out] = chosen;
 					live.insert(out);
-					printf("  register v%d:%p allocated to h%d\n", out->id(), out, chosen);
+
+#ifdef DEBUG_ALLOCATOR
+					printf("    register v%d allocated to h%d\n", out->id(), chosen);
+#endif
 				} else {
-					printf("  register v%d:%p already h%d\n", out->id(), out, alloc[out]);
+#ifdef DEBUG_ALLOCATOR
+					printf("    register v%d already h%d\n", out->id(), alloc[out]);
+#endif
 				}
 			}
 
 			for (auto oper : insn->operands()) {
 				if (oper->type() == IROperand::Register) {
 					IRRegisterOperand *regop = (IRRegisterOperand *)oper;
-					regop->allocate(IRRegisterOperand::Register, alloc[&regop->reg()]);
+
+					if (global_live.count(&regop->reg())) {
+						regop->allocate(IRRegisterOperand::Stack, global_regs[&regop->reg()]);
+					} else {
+						regop->allocate(IRRegisterOperand::Register, alloc[&regop->reg()]);
+					}
 				}
 			}
 		}
@@ -844,6 +918,23 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			case IRInstruction::CompareNotEqual:
 				encoder.setne(register_from_operand(ci->destination()));
 				break;
+
+			case IRInstruction::CompareLessThan:
+				encoder.setl(register_from_operand(ci->destination()));
+				break;
+
+			case IRInstruction::CompareLessThanOrEqual:
+				encoder.setle(register_from_operand(ci->destination()));
+				break;
+
+			case IRInstruction::CompareGreaterThan:
+				encoder.setg(register_from_operand(ci->destination()));
+				break;
+
+			case IRInstruction::CompareGreaterThanOrEqual:
+				encoder.setge(register_from_operand(ci->destination()));
+				break;
+
 			default:
 				assert(false);
 			}

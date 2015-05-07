@@ -24,6 +24,11 @@ int sprintf(char *buffer, const char *fmt, ...)
 	return rc;
 }
 
+int scatf(char *buffer, const char *fmt, ...)
+{
+	return -1;
+}
+
 static void prepend_to_buffer(char c, char *buffer, int size)
 {
 	for (int i = size; i > 0; i--) {

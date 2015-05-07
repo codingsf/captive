@@ -141,23 +141,23 @@ void X86Encoder::mov(const X86Register& src, const X86Memory& dst)
 
 void X86Encoder::mov(uint64_t src, const X86Register& dst)
 {
-	if (dst.size == 8) {
-		encode_rex_prefix(false, false, false, true);
-	} else if (dst.size == 2) {
-		assert(false);
-	} else if (dst.size == 1) {
-		assert(false);
-	}
+	if (dst.size == 1) {
+		emit8(0xb0 + dst.raw_index);
+		emit8(src);
+	} else {
+		if (dst.size == 8) {
+			emit8(REX_W);
+		} else if (dst.size == 2) {
+			emit8(OPER_SIZE_OVERRIDE);
+		}
 
-	emit8(0xb8 + dst.raw_index);
+		emit8(0xb8 + dst.raw_index);
 
-	switch(dst.size) {
-	case 8:
-		emit64(src);
-		break;
-	case 4:
-		emit32(src);
-		break;
+		switch(dst.size) {
+		case 8: emit64(src); break;
+		case 4: emit32(src); break;
+		case 2: emit16(src); break;
+		}
 	}
 }
 
@@ -417,6 +417,41 @@ void X86Encoder::setne(const X86Register& dst)
 
 	emit8(0x0f);
 	emit8(0x95);
+	encode_mod_reg_rm(0, dst);
+}
+void X86Encoder::setl(const X86Register& dst)
+{
+	assert(dst.size == 1);
+
+	emit8(0x0f);
+	emit8(0x9c);
+	encode_mod_reg_rm(0, dst);
+}
+
+void X86Encoder::setle(const X86Register& dst)
+{
+	assert(dst.size == 1);
+
+	emit8(0x0f);
+	emit8(0x9e);
+	encode_mod_reg_rm(0, dst);
+}
+
+void X86Encoder::setg(const X86Register& dst)
+{
+	assert(dst.size == 1);
+
+	emit8(0x0f);
+	emit8(0x9f);
+	encode_mod_reg_rm(0, dst);
+}
+
+void X86Encoder::setge(const X86Register& dst)
+{
+	assert(dst.size == 1);
+
+	emit8(0x0f);
+	emit8(0x9d);
 	encode_mod_reg_rm(0, dst);
 }
 
