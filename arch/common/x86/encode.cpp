@@ -191,9 +191,9 @@ void X86Encoder::movzx(const X86Register& src, const X86Register& dst)
 	assert(dst.size == 2 || dst.size == 4 || dst.size == 8);
 
 	if (src.size == 1) {
-		encode_opcode_mod_rm(0x1b6, src, dst);
+		encode_opcode_mod_rm(0x1b6, dst, src);
 	} else if (src.size == 2) {
-		encode_opcode_mod_rm(0x1b7, src, dst);
+		encode_opcode_mod_rm(0x1b7, dst, src);
 	}
 }
 
@@ -283,6 +283,7 @@ void X86Encoder::shl(uint8_t amount, const X86Register& dst)
 		emit8(amount);
 	}
 }
+
 void X86Encoder::shr(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
@@ -305,12 +306,54 @@ void X86Encoder::sar(uint8_t amount, const X86Register& dst)
 	}
 }
 
+void X86Encoder::shl(const X86Register& amount, const X86Register& dst)
+{
+	assert(amount == REG_CL);
+
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0xd2, 4, dst);
+	} else {
+		encode_opcode_mod_rm(0xd3, 4, dst);
+	}
+}
+
+void X86Encoder::shr(const X86Register& amount, const X86Register& dst)
+{
+	assert(amount == REG_CL);
+
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0xd2, 5, dst);
+	} else {
+		encode_opcode_mod_rm(0xd3, 5, dst);
+	}
+}
+
+void X86Encoder::sar(const X86Register& amount, const X86Register& dst)
+{
+	assert(amount == REG_CL);
+
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0xd2, 7, dst);
+	} else {
+		encode_opcode_mod_rm(0xd3, 7, dst);
+	}
+}
+
 void X86Encoder::add(const X86Register& src, const X86Register& dst)
 {
 	if (src.size == 1) {
 		encode_opcode_mod_rm(0x0, src, dst);
 	} else {
 		encode_opcode_mod_rm(0x1, src, dst);
+	}
+}
+
+void X86Encoder::add(const X86Memory& src, const X86Register& dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0x2, dst, src);
+	} else {
+		encode_opcode_mod_rm(0x3, dst, src);
 	}
 }
 
@@ -325,6 +368,15 @@ void X86Encoder::sub(const X86Register& src, const X86Register& dst)
 		encode_opcode_mod_rm(0x28, src, dst);
 	} else {
 		encode_opcode_mod_rm(0x29, src, dst);
+	}
+}
+
+void X86Encoder::sub(const X86Memory& src, const X86Register& dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0x2a, dst, src);
+	} else {
+		encode_opcode_mod_rm(0x2b, dst, src);
 	}
 }
 
@@ -349,6 +401,11 @@ void X86Encoder::cmp(uint32_t val, const X86Register& dst)
 	encode_arithmetic(7, val, dst);
 }
 
+void X86Encoder::cmp(uint32_t val, const X86Memory& dst)
+{
+	encode_arithmetic(7, val, 4, dst);
+}
+
 void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst)
 {
 	if (dst.size == 1) {
@@ -364,6 +421,27 @@ void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register
 			if (dst.size == 4 || dst.size == 8) {
 				emit32(imm);
 			} else if (dst.size == 2) {
+				emit16(imm);
+			}
+		}
+	}
+}
+
+void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, uint8_t size, const X86Memory& dst)
+{
+	if (size == 1) {
+		encode_opcode_mod_rm(0x80, oper, size, dst);
+		emit8(imm);
+	} else {
+		if (imm < 128) {
+			encode_opcode_mod_rm(0x83, oper, size, dst);
+			emit8(imm);
+		} else {
+			encode_opcode_mod_rm(0x81, oper, size, dst);
+
+			if (size == 4 || size == 8) {
+				emit32(imm);
+			} else if (size == 2) {
 				emit16(imm);
 			}
 		}

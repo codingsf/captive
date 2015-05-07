@@ -83,7 +83,12 @@ namespace captive {
 				inline x86::X86Memory stack_from_operand(IRRegisterOperand& oper) const
 				{
 					assert(oper.is_allocated_stack());
-					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 4);
+					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -4) - 4);
+				}
+
+				inline void unspill(IRRegisterOperand& oper, x86::X86Register& reg)
+				{
+					encoder.mov(stack_from_operand(oper), reg);
 				}
 
 				void emit_save_reg_state();

@@ -15,7 +15,7 @@ using namespace captive::arch::x86;
 BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb), encoder(memory_allocator)
 {
 	assign(0, REG_RAX, REG_EAX, REG_AX, REG_AL);
-	assign(1, REG_RCX, REG_ECX, REG_CX, REG_CL);
+	assign(1, REG_RDX, REG_EDX, REG_DX, REG_DL);
 	assign(2, REG_RSI, REG_ESI, REG_SI, REG_SIL);
 	assign(3, REG_RDI, REG_EDI, REG_DI, REG_DIL);
 	assign(4, REG_R8, REG_R8D, REG_R8W, REG_R8B);
@@ -192,6 +192,8 @@ bool BlockCompiler::thread_rets()
 	return true;
 }
 
+//#define DEBUG_MERGE_BLOCKS
+
 bool BlockCompiler::merge_blocks()
 {
 retry:
@@ -200,7 +202,9 @@ retry:
 			auto succ = *(block->successors().begin());
 
 			if (succ->predecessors().size() == 1) {
+#ifdef DEBUG_MERGE_BLOCKS
 				printf("i've decided to merge %d into %d\n", succ->id(), block->id());
+#endif
 
 				// Detach the terminator instruction from the new parent block.
 				block->terminator().remove_from_parent();
@@ -238,7 +242,7 @@ retry:
 	return true;
 }
 
-#define DEBUG_ALLOCATOR
+//#define DEBUG_ALLOCATOR
 
 bool BlockCompiler::allocate(uint32_t& max_stack)
 {
@@ -357,7 +361,7 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 		}
 	}
 
-	max_stack += 4;
+	max_stack = (next_global * 4) + 4;
 	return true;
 }
 
@@ -366,11 +370,11 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 	// Function prologue
 	encoder.push(REG_RBP);
 	encoder.mov(REG_RSP, REG_RBP);
+	encoder.sub(max_stack, REG_RSP);
+
 	encoder.push(REG_R15);
 	encoder.push(REG_R14);
 	encoder.push(REG_RBX);
-
-	//encoder.sub(max_stack, REG_RSP);
 
 	encoder.mov(REG_RDI, REG_R14);
 	load_state_field(8, REG_R15);
@@ -399,7 +403,7 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 
 	encoder.hlt();
 
-	printf("jit: encoding complete, buffer=%p, size=%d\n", encoder.get_buffer(), encoder.get_buffer_size());
+	printf("jit: encoding complete, block=%08x, buffer=%p, size=%d\n", tb.block_addr, encoder.get_buffer(), encoder.get_buffer_size());
 	fn = (block_txln_fn)encoder.get_buffer();
 
 	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(fn), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
@@ -412,7 +416,9 @@ bool BlockCompiler::lower_block(IRBlock& block)
 	X86Register& guest_regs_reg = REG_R15;
 	X86Register& tmp0_8 = REG_RBX;
 	X86Register& tmp0_4 = REG_EBX;
-	X86Register& tmp1_4 = REG_EDX;
+	X86Register& tmp0_2 = REG_BX;
+	X86Register& tmp0_1 = REG_BL;
+	X86Register& tmp1_4 = REG_ECX;
 
 	for (auto insn : block.instructions()) {
 		encoder.nop();
@@ -623,6 +629,16 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				if (movi->destination().is_allocated_reg()) {
 					// mov imm -> reg
 					encoder.mov(source.value(), register_from_operand(movi->destination()));
+				} else if (movi->destination().is_allocated_stack()) {
+					// mov imm -> stack
+					switch (movi->destination().reg().width()) {
+					case 1: encoder.mov1(source.value(), stack_from_operand(movi->destination())); break;
+					case 2: encoder.mov2(source.value(), stack_from_operand(movi->destination())); break;
+					case 4: encoder.mov4(source.value(), stack_from_operand(movi->destination())); break;
+					case 8: encoder.mov8(source.value(), stack_from_operand(movi->destination())); break;
+					default: assert(false);
+					}
+
 				} else {
 					assert(false);
 				}
@@ -641,9 +657,9 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			if (csi->source().type() == IROperand::Register) {
 				IRRegisterOperand& source = (IRRegisterOperand&)csi->source();
 
-				if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
-					if (source.reg().width() == 4 && csi->destination().reg().width() == 8) break;
+				if (source.reg().width() == 4 && csi->destination().reg().width() == 8) break;
 
+				if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
 					switch (csi->type()) {
 					case IRInstruction::ZeroExtend:
 						encoder.movzx(register_from_operand(source), register_from_operand(csi->destination()));
@@ -653,6 +669,29 @@ bool BlockCompiler::lower_block(IRBlock& block)
 						encoder.movsx(register_from_operand(source), register_from_operand(csi->destination()));
 						break;
 					}
+				} else if (source.is_allocated_reg() && csi->destination().is_allocated_stack()) {
+					assert(false);
+				} else if (source.is_allocated_stack() && csi->destination().is_allocated_reg()) {
+					unspill(source, tmp0_4);
+
+					X86Register *tmpreg;
+					switch (source.reg().width()) {
+					case 1:	tmpreg = &tmp0_1; break;
+					case 2:	tmpreg = &tmp0_2; break;
+					default: assert(false);
+					}
+
+					switch (csi->type()) {
+					case IRInstruction::ZeroExtend:
+						encoder.movzx(*tmpreg, register_from_operand(csi->destination()));
+						break;
+
+					case IRInstruction::SignExtend:
+						encoder.movsx(*tmpreg, register_from_operand(csi->destination()));
+						break;
+					}
+				} else if (source.is_allocated_stack() && csi->destination().is_allocated_stack()) {
+					assert(false);
 				} else {
 					assert(false);
 				}
@@ -737,7 +776,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			if (ai->source().type() == IROperand::Register) {
 				IRRegisterOperand& source = (IRRegisterOperand&)ai->source();
 
-				if (ai->destination().is_allocated_reg()) {
+				if (source.is_allocated_reg() && ai->destination().is_allocated_reg()) {
 					switch (ai->type()) {
 					case IRInstruction::Add:
 						encoder.add(register_from_operand(source), register_from_operand(ai->destination()));
@@ -746,6 +785,19 @@ bool BlockCompiler::lower_block(IRBlock& block)
 						encoder.sub(register_from_operand(source), register_from_operand(ai->destination()));
 						break;
 					}
+				} else if (source.is_allocated_reg() && ai->destination().is_allocated_stack()) {
+					assert(false);
+				} else if (source.is_allocated_stack() && ai->destination().is_allocated_reg()) {
+					switch (ai->type()) {
+					case IRInstruction::Add:
+						encoder.add(stack_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					case IRInstruction::Sub:
+						encoder.sub(stack_from_operand(source), register_from_operand(ai->destination()));
+						break;
+					}
+				} else if (source.is_allocated_stack() && ai->destination().is_allocated_stack()) {
+					assert(false);
 				} else {
 					assert(false);
 				}
@@ -802,7 +854,18 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				IRRegisterOperand& source = (IRRegisterOperand&)trunci->source();
 
 				if (source.is_allocated_reg() && trunci->destination().is_allocated_reg()) {
+					// trunc reg -> reg
 					encoder.mov(register_from_operand(source), register_from_operand(trunci->destination(), source.reg().width()));
+				} else if (source.is_allocated_reg() && trunci->destination().is_allocated_stack()) {
+					// trunc reg -> stack
+					encoder.mov(register_from_operand(source), stack_from_operand(trunci->destination()));
+				} else if (source.is_allocated_stack() && trunci->destination().is_allocated_reg()) {
+					// trunc stack -> reg
+					encoder.mov(stack_from_operand(source), register_from_operand(trunci->destination()));
+				} else if (source.is_allocated_stack() && trunci->destination().is_allocated_stack()) {
+					// trunc stack -> stack
+					encoder.mov(stack_from_operand(source), tmp0_4);
+					encoder.mov(tmp0_4, stack_from_operand(trunci->destination()));
 				} else {
 					assert(false);
 				}
@@ -821,9 +884,10 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 			if (si->amount().type() == IROperand::Constant) {
 				IRConstantOperand& amount = (IRConstantOperand&)si->amount();
-				X86Register& operand = register_from_operand(si->operand());
 
 				if (si->operand().is_allocated_reg()) {
+					X86Register& operand = register_from_operand(si->operand());
+
 					switch (si->type()) {
 					case IRInstruction::ShiftLeft:
 						encoder.shl(amount.value(), operand);
@@ -834,6 +898,32 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					case IRInstruction::ArithmeticShiftRight:
 						encoder.sar(amount.value(), operand);
 						break;
+					}
+				} else {
+					assert(false);
+				}
+			} else if (si->amount().type() == IROperand::Register) {
+				IRRegisterOperand& amount = (IRRegisterOperand&)si->amount();
+
+				if (amount.is_allocated_reg()) {
+					if (si->operand().is_allocated_reg()) {
+						X86Register& operand = register_from_operand(si->operand());
+
+						encoder.mov(register_from_operand(amount, 1), REG_CL);
+
+						switch (si->type()) {
+						case IRInstruction::ShiftLeft:
+							encoder.shl(REG_CL, operand);
+							break;
+						case IRInstruction::ShiftRight:
+							encoder.shr(REG_CL, operand);
+							break;
+						case IRInstruction::ArithmeticShiftRight:
+							encoder.sar(REG_CL, operand);
+							break;
+						}
+					} else {
+						assert(false);
 					}
 				} else {
 					assert(false);
@@ -886,6 +976,8 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 					if (lhs.is_allocated_reg()) {
 						encoder.cmp(rhs.value(), register_from_operand(lhs));
+					} else if (lhs.is_allocated_stack()) {
+						encoder.cmp(rhs.value(), stack_from_operand(lhs));
 					} else {
 						assert(false);
 					}

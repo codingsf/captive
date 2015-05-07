@@ -113,15 +113,21 @@ namespace captive {
 				void shl(uint8_t amount, const X86Register& dst);
 				void shr(uint8_t amount, const X86Register& dst);
 				void sar(uint8_t amount, const X86Register& dst);
+				void shl(const X86Register& amount, const X86Register& dst);
+				void shr(const X86Register& amount, const X86Register& dst);
+				void sar(const X86Register& amount, const X86Register& dst);
 
 				void add(const X86Register& src, const X86Register& dst);
+				void add(const X86Memory& src, const X86Register& dst);
 				void add(uint32_t val, const X86Register& dst);
 
 				void sub(const X86Register& src, const X86Register& dst);
+				void sub(const X86Memory& src, const X86Register& dst);
 				void sub(uint32_t val, const X86Register& dst);
 
 				void cmp(const X86Register& src, const X86Register& dst);
 				void cmp(uint32_t val, const X86Register& dst);
+				void cmp(uint32_t val, const X86Memory& dst);
 				void test(const X86Register& op1, const X86Register& op2);
 
 				void jmp_reloc(uint32_t& reloc_offset);
@@ -195,6 +201,7 @@ namespace captive {
 				}
 
 				void encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst);
+				void encode_arithmetic(uint8_t oper, uint32_t imm, uint8_t size, const X86Memory& dst);
 
 				void encode_mod_reg_rm(uint8_t mreg, const X86Register& rm);
 				void encode_mod_reg_rm(const X86Register& reg, const X86Register& rm);
