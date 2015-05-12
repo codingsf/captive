@@ -4,26 +4,26 @@
 using namespace captive::arch::x86;
 
 namespace captive { namespace arch { namespace x86 {
-X86Register REG_RAX(8, 0), REG_EAX(4, 0), REG_AX(2, 0), REG_AL(1, 0);
-X86Register REG_RCX(8, 1), REG_ECX(4, 1), REG_CX(2, 1), REG_CL(1, 1);
-X86Register REG_RDX(8, 2), REG_EDX(4, 2), REG_DX(2, 2), REG_DL(1, 2);
-X86Register REG_RBX(8, 3), REG_EBX(4, 3), REG_BX(2, 3), REG_BL(1, 3);
-X86Register REG_RSP(8, 4), REG_ESP(4, 4), REG_SP(2, 4), REG_SPL(1, 4, false, true);
-X86Register REG_RBP(8, 5), REG_EBP(4, 5), REG_BP(2, 5), REG_BPL(1, 5, false, true);
-X86Register REG_RSI(8, 6), REG_ESI(4, 6), REG_SI(2, 6), REG_SIL(1, 6, false, true);
-X86Register REG_RDI(8, 7), REG_EDI(4, 7), REG_DI(2, 7), REG_DIL(1, 7, false, true);
+X86Register REG_RAX("rax", 8, 0), REG_EAX("eax", 4, 0), REG_AX("ax", 2, 0), REG_AL("al", 1, 0);
+X86Register REG_RCX("rcx", 8, 1), REG_ECX("ecx", 4, 1), REG_CX("cx", 2, 1), REG_CL("cl", 1, 1);
+X86Register REG_RDX("rdx", 8, 2), REG_EDX("edx", 4, 2), REG_DX("dx", 2, 2), REG_DL("dl", 1, 2);
+X86Register REG_RBX("rbx", 8, 3), REG_EBX("ebx", 4, 3), REG_BX("bx", 2, 3), REG_BL("bl", 1, 3);
+X86Register REG_RSP("rsp", 8, 4), REG_ESP("esp", 4, 4), REG_SP("sp", 2, 4), REG_SPL("spl", 1, 4, false, true);
+X86Register REG_RBP("rbp", 8, 5), REG_EBP("ebp", 4, 5), REG_BP("bp", 2, 5), REG_BPL("bpl", 1, 5, false, true);
+X86Register REG_RSI("rsi", 8, 6), REG_ESI("esi", 4, 6), REG_SI("si", 2, 6), REG_SIL("sil", 1, 6, false, true);
+X86Register REG_RDI("rdi", 8, 7), REG_EDI("edi", 4, 7), REG_DI("di", 2, 7), REG_DIL("dil", 1, 7, false, true);
 
-X86Register REG_R8(8, 0, true), REG_R8D(4, 0, true), REG_R8W(2, 0, true), REG_R8B(1, 0, true);
-X86Register REG_R9(8, 1, true), REG_R9D(4, 1, true), REG_R9W(2, 1, true), REG_R9B(1, 1, true);
-X86Register REG_R10(8, 2, true), REG_R10D(4, 2, true), REG_R10W(2, 2, true), REG_R10B(1, 2, true);
-X86Register REG_R11(8, 3, true), REG_R11D(4, 3, true), REG_R11W(2, 3, true), REG_R11B(1, 3, true);
-X86Register REG_R12(8, 4, true), REG_R12D(4, 4, true), REG_R12W(2, 4, true), REG_R12B(1, 4, true);
-X86Register REG_R13(8, 5, true), REG_R13D(4, 5, true), REG_R13W(2, 5, true), REG_R13B(1, 5, true);
-X86Register REG_R14(8, 6, true), REG_R14D(4, 6, true), REG_R14W(2, 6, true), REG_R14B(1, 6, true);
-X86Register REG_R15(8, 7, true), REG_R15D(4, 7, true), REG_R15W(2, 7, true), REG_R15B(1, 7, true);
+X86Register REG_R8("r8", 8, 0, true), REG_R8D("r8d", 4, 0, true), REG_R8W("r8w", 2, 0, true), REG_R8B("r8b", 1, 0, true);
+X86Register REG_R9("r9", 8, 1, true), REG_R9D("r9d", 4, 1, true), REG_R9W("r9w", 2, 1, true), REG_R9B("r9b", 1, 1, true);
+X86Register REG_R10("r10", 8, 2, true), REG_R10D("r10d", 4, 2, true), REG_R10W("r10w", 2, 2, true), REG_R10B("r10b", 1, 2, true);
+X86Register REG_R11("r11", 8, 3, true), REG_R11D("r11d", 4, 3, true), REG_R11W("r11w", 2, 3, true), REG_R11B("r11b", 1, 3, true);
+X86Register REG_R12("r12", 8, 4, true), REG_R12D("r12d", 4, 4, true), REG_R12W("r12w", 2, 4, true), REG_R12B("r12b", 1, 4, true);
+X86Register REG_R13("r13", 8, 5, true), REG_R13D("r13d", 4, 5, true), REG_R13W("r13w", 2, 5, true), REG_R13B("r13b", 1, 5, true);
+X86Register REG_R14("r14", 8, 6, true), REG_R14D("r14d", 4, 6, true), REG_R14W("r14w", 2, 6, true), REG_R14B("r14b", 1, 6, true);
+X86Register REG_R15("r15", 8, 7, true), REG_R15D("r15d", 4, 7, true), REG_R15W("r15w", 2, 7, true), REG_R15B("r15b", 1, 7, true);
 
-X86Register REG_RIZ(0, 8);
-X86Register REG_RIP(0, 9);
+X86Register REG_RIZ("riz", 0, 8);
+X86Register REG_RIP("rip", 0, 9);
 } } }
 
 #define REX	0x40
@@ -233,7 +233,7 @@ void X86Encoder::andd(uint32_t val, const X86Register& dst)
 	encode_arithmetic(4, val, dst);
 }
 
-void X86Encoder::andd(const X86Register src, const X86Register& dest)
+void X86Encoder::andd(const X86Register& src, const X86Register& dest)
 {
 	assert(src.size == dest.size);
 
@@ -241,6 +241,24 @@ void X86Encoder::andd(const X86Register src, const X86Register& dest)
 		encode_opcode_mod_rm(0x20, src, dest);
 	} else {
 		encode_opcode_mod_rm(0x21, src, dest);
+	}
+}
+
+void X86Encoder::andd(const X86Register& src, const X86Memory& dest)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x20, src, dest);
+	} else {
+		encode_opcode_mod_rm(0x21, src, dest);
+	}
+}
+
+void X86Encoder::andd(const X86Memory& src, const X86Register& dest)
+{
+	if (dest.size == 1) {
+		encode_opcode_mod_rm(0x22, dest, src);
+	} else {
+		encode_opcode_mod_rm(0x23, dest, src);
 	}
 }
 
@@ -254,7 +272,7 @@ void X86Encoder::orr(uint32_t val, const X86Register& dst)
 	encode_arithmetic(1, val, dst);
 }
 
-void X86Encoder::orr(const X86Register src, const X86Register& dest)
+void X86Encoder::orr(const X86Register& src, const X86Register& dest)
 {
 	assert(src.size == dest.size);
 
@@ -262,6 +280,24 @@ void X86Encoder::orr(const X86Register src, const X86Register& dest)
 		encode_opcode_mod_rm(0x08, src, dest);
 	} else {
 		encode_opcode_mod_rm(0x09, src, dest);
+	}
+}
+
+void X86Encoder::orr(const X86Register& src, const X86Memory& dest)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x08, src, dest);
+	} else {
+		encode_opcode_mod_rm(0x09, src, dest);
+	}
+}
+
+void X86Encoder::orr(const X86Memory& src, const X86Register& dest)
+{
+	if (dest.size == 1) {
+		encode_opcode_mod_rm(0x0a, dest, src);
+	} else {
+		encode_opcode_mod_rm(0x0b, dest, src);
 	}
 }
 
@@ -275,7 +311,7 @@ void X86Encoder::xorr(uint32_t val, const X86Register& dst)
 	encode_arithmetic(6, val, dst);
 }
 
-void X86Encoder::xorr(const X86Register src, const X86Register& dest)
+void X86Encoder::xorr(const X86Register& src, const X86Register& dest)
 {
 	assert(src.size == dest.size);
 
@@ -283,6 +319,24 @@ void X86Encoder::xorr(const X86Register src, const X86Register& dest)
 		encode_opcode_mod_rm(0x30, src, dest);
 	} else {
 		encode_opcode_mod_rm(0x31, src, dest);
+	}
+}
+
+void X86Encoder::xorr(const X86Register& src, const X86Memory& dest)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x30, src, dest);
+	} else {
+		encode_opcode_mod_rm(0x31, src, dest);
+	}
+}
+
+void X86Encoder::xorr(const X86Memory& src, const X86Register& dest)
+{
+	if (dest.size == 1) {
+		encode_opcode_mod_rm(0x32, dest, src);
+	} else {
+		encode_opcode_mod_rm(0x33, dest, src);
 	}
 }
 
@@ -398,10 +452,26 @@ void X86Encoder::sub(uint32_t val, const X86Register& dst)
 	encode_arithmetic(5, val, dst);
 }
 
+void X86Encoder::mul(const X86Register& src, const X86Register& dst)
+{
+	assert(src.size == dst.size);
+
+	encode_opcode_mod_rm(0x1af, dst, src);
+}
+
 void X86Encoder::cmp(const X86Register& src, const X86Register& dst)
 {
 	assert(src.size == dst.size);
 
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x38, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x39, src, dst);
+	}
+}
+
+void X86Encoder::cmp(const X86Register& src, const X86Memory& dst)
+{
 	if (src.size == 1) {
 		encode_opcode_mod_rm(0x38, src, dst);
 	} else {

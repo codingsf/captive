@@ -85,13 +85,46 @@ namespace captive {
 					assert(oper.is_allocated_stack());
 					assert(oper.reg().width() < 8);
 
-					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -4) - 4);
+					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 4);
+				}
+
+				inline x86::X86Register& get_temp(int id, int width)
+				{
+					switch (id) {
+					case 0:
+						switch (width) {
+						case 1:	return x86::REG_BL;
+						case 2:	return x86::REG_BX;
+						case 4:	return x86::REG_EBX;
+						case 8:	return x86::REG_RBX;
+						default: assert(false);
+						}
+
+					case 1:
+						switch (width) {
+						case 1:	return x86::REG_CL;
+						case 2:	return x86::REG_CX;
+						case 4:	return x86::REG_ECX;
+						case 8:	return x86::REG_RCX;
+						default: assert(false);
+						}
+
+					default: assert(false);
+					}
 				}
 
 				inline void unspill(IRRegisterOperand& oper, x86::X86Register& reg)
 				{
 					encoder.mov(stack_from_operand(oper), reg);
 				}
+
+				inline x86::X86Register& unspill_temp(IRRegisterOperand& oper, int id)
+				{
+					x86::X86Register& tmp = get_temp(id, oper.reg().width());
+					encoder.mov(stack_from_operand(oper), tmp);
+					return tmp;
+				}
+
 
 				void emit_save_reg_state();
 				void emit_restore_reg_state();

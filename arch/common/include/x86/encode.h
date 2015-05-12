@@ -17,7 +17,8 @@ namespace captive {
 		namespace x86 {
 			struct X86Register
 			{
-				X86Register(uint8_t size, uint8_t raw_index, bool hi = false, bool nw = false) : size(size), raw_index(raw_index), hireg(hi), newreg(nw) { }
+				X86Register(const char *name, uint8_t size, uint8_t raw_index, bool hi = false, bool nw = false) : name(name), size(size), raw_index(raw_index), hireg(hi), newreg(nw) { }
+				const char *name;
 				uint8_t size;
 				uint8_t raw_index;
 				bool hireg;
@@ -103,12 +104,15 @@ namespace captive {
 				void xorr(uint32_t val, const X86Register& dst);
 				void xorr(uint32_t val, const X86Memory& dst);
 
-				void andd(const X86Register src, const X86Register& dest);
-				void andd(const X86Register src, const X86Memory& dest);
-				void orr(const X86Register src, const X86Register& dest);
-				void orr(const X86Register src, const X86Memory& dest);
-				void xorr(const X86Register src, const X86Register& dest);
-				void xorr(const X86Register src, const X86Memory& dest);
+				void andd(const X86Register& src, const X86Register& dest);
+				void andd(const X86Register& src, const X86Memory& dest);
+				void andd(const X86Memory& src, const X86Register& dest);
+				void orr(const X86Register& src, const X86Register& dest);
+				void orr(const X86Register& src, const X86Memory& dest);
+				void orr(const X86Memory& src, const X86Register& dest);
+				void xorr(const X86Register& src, const X86Register& dest);
+				void xorr(const X86Register& src, const X86Memory& dest);
+				void xorr(const X86Memory& src, const X86Register& dest);
 
 				void shl(uint8_t amount, const X86Register& dst);
 				void shr(uint8_t amount, const X86Register& dst);
@@ -125,7 +129,11 @@ namespace captive {
 				void sub(const X86Memory& src, const X86Register& dst);
 				void sub(uint32_t val, const X86Register& dst);
 
+				void mul(const X86Register& src, const X86Register& dst);
+
 				void cmp(const X86Register& src, const X86Register& dst);
+				void cmp(const X86Register& src, const X86Memory& dst);
+				void cmp(const X86Memory& src, const X86Register& dst);
 				void cmp(uint32_t val, const X86Register& dst);
 				void cmp1(uint8_t val, const X86Memory& dst);
 				void cmp2(uint16_t val, const X86Memory& dst);

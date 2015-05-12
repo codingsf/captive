@@ -90,7 +90,7 @@ namespace captive {
 				ArmInterp *_interp;
 				ArmJIT *_jit;
 
-				cpu_state& state;
+				cpu_state state;
 			};
 		}
 	}

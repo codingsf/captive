@@ -40,6 +40,7 @@ bool ArmMMU::enable()
 
 	clear_vma();
 	cpu().profile_image().invalidate();
+	cpu().clear_block_cache();
 
 	_enabled = true;
 	//printf("mmu: enabled\n");
