@@ -145,11 +145,21 @@ void X86Encoder::mov(uint64_t src, const X86Register& dst)
 		emit8(0xb0 + dst.raw_index);
 		emit8(src);
 	} else {
+		uint8_t rex = 0;
+
+		if (dst.hireg) {
+			rex |= REX_B;
+		}
+
 		if (dst.size == 8) {
-			emit8(REX_W);
-		} else if (dst.size == 2) {
+			rex |= REX_W;
+		}
+
+		if (dst.size == 2) {
 			emit8(OPER_SIZE_OVERRIDE);
 		}
+
+		if (rex) emit8(rex);
 
 		emit8(0xb8 + dst.raw_index);
 
@@ -200,13 +210,16 @@ void X86Encoder::movzx(const X86Register& src, const X86Register& dst)
 void X86Encoder::movsx(const X86Register& src, const X86Register& dst)
 {
 	assert(src.size < dst.size);
-	assert(src.size == 1 || src.size == 2);
+	assert(src.size == 1 || src.size == 2 || src.size == 4);
 	assert(dst.size == 2 || dst.size == 4 || dst.size == 8);
 
 	if (src.size == 1) {
 		encode_opcode_mod_rm(0x1be, src, dst);
 	} else if (src.size == 2) {
 		encode_opcode_mod_rm(0x1bf, src, dst);
+	} else if (src.size == 4) {
+		assert(dst.size == 8);
+		encode_opcode_mod_rm(0x63, dst, src);
 	}
 }
 
@@ -401,9 +414,24 @@ void X86Encoder::cmp(uint32_t val, const X86Register& dst)
 	encode_arithmetic(7, val, dst);
 }
 
-void X86Encoder::cmp(uint32_t val, const X86Memory& dst)
+void X86Encoder::cmp1(uint8_t val, const X86Memory& dst)
+{
+	encode_arithmetic(7, val, 1, dst);
+}
+
+void X86Encoder::cmp2(uint16_t val, const X86Memory& dst)
+{
+	assert(false);
+}
+
+void X86Encoder::cmp4(uint32_t val, const X86Memory& dst)
 {
 	encode_arithmetic(7, val, 4, dst);
+}
+
+void X86Encoder::cmp8(uint64_t val, const X86Memory& dst)
+{
+	assert(false);
 }
 
 void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst)
@@ -484,7 +512,7 @@ void X86Encoder::sete(const X86Register& dst)
 {
 	assert(dst.size == 1);
 
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_X);
+	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
 	emit8(0x94);
@@ -495,7 +523,7 @@ void X86Encoder::setne(const X86Register& dst)
 {
 	assert(dst.size == 1);
 
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_X);
+	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
 	emit8(0x95);
@@ -505,7 +533,7 @@ void X86Encoder::setl(const X86Register& dst)
 {
 	assert(dst.size == 1);
 
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_X);
+	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
 	emit8(0x9c);
@@ -516,7 +544,7 @@ void X86Encoder::setle(const X86Register& dst)
 {
 	assert(dst.size == 1);
 
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_X);
+	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
 	emit8(0x9e);
@@ -527,7 +555,7 @@ void X86Encoder::setg(const X86Register& dst)
 {
 	assert(dst.size == 1);
 
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_X);
+	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
 	emit8(0x9f);
@@ -538,11 +566,17 @@ void X86Encoder::setge(const X86Register& dst)
 {
 	assert(dst.size == 1);
 
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_X);
+	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
 	emit8(0x9d);
 	encode_mod_reg_rm(0, dst);
+}
+
+void X86Encoder::bsr(const X86Register& src, const X86Register& dst)
+{
+	assert(src.size == dst.size);
+	encode_opcode_mod_rm(0x1bd, dst, src);
 }
 
 void X86Encoder::ret()
@@ -726,7 +760,7 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, c
 	uint8_t rex = 0;
 
 	// Any REX prefix will do to access the new registers
-	if (reg.newreg) {
+	if (reg.newreg || rm.newreg) {
 		rex |= REX;
 	}
 

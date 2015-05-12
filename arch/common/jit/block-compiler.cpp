@@ -466,7 +466,19 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			}
 
 			if (args.size() > 2)  {
-				encode_operand_to_reg(*args[1], REG_ECX);
+				encode_operand_to_reg(*args[2], REG_ECX);
+			}
+
+			if (args.size() > 3)  {
+				encode_operand_to_reg(*args[3], REG_R8);
+			}
+
+			if (args.size() > 4)  {
+				encode_operand_to_reg(*args[4], REG_R9);
+			}
+
+			if (args.size() > 5) {
+				assert(false);
 			}
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
@@ -683,7 +695,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				IRRegisterOperand& source = (IRRegisterOperand&)csi->source();
 
 				if (source.reg().width() == 4 && csi->destination().reg().width() == 8) {
-					if (csi->type() == IRInstruction::SignExtend) {
+					if (csi->type() == IRInstruction::ZeroExtend) {
 						if (source.is_allocated_reg() && csi->destination().is_allocated_reg()) {
 							encoder.mov(register_from_operand(source), register_from_operand(csi->destination(), 4));
 						} else {
@@ -772,19 +784,37 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				if (ai->destination().is_allocated_reg()) {
 					// OPER const -> reg
 
-					switch (ai->type()) {
-					case IRInstruction::BitwiseAnd:
-						encoder.andd(source.value(), register_from_operand(ai->destination()));
-						break;
-					case IRInstruction::BitwiseOr:
-						encoder.orr(source.value(), register_from_operand(ai->destination()));
-						break;
-					case IRInstruction::BitwiseXor:
-						encoder.xorr(source.value(), register_from_operand(ai->destination()));
-						break;
+					if (source.width() == 8) {
+						encoder.mov(source.value(), tmp0_8);
+
+						switch (ai->type()) {
+						case IRInstruction::BitwiseAnd:
+							encoder.andd(tmp0_8, register_from_operand(ai->destination()));
+							break;
+						case IRInstruction::BitwiseOr:
+							encoder.orr(tmp0_8, register_from_operand(ai->destination()));
+							break;
+						case IRInstruction::BitwiseXor:
+							encoder.xorr(tmp0_8, register_from_operand(ai->destination()));
+							break;
+						}
+					} else {
+						switch (ai->type()) {
+						case IRInstruction::BitwiseAnd:
+							encoder.andd(source.value(), register_from_operand(ai->destination()));
+							break;
+						case IRInstruction::BitwiseOr:
+							encoder.orr(source.value(), register_from_operand(ai->destination()));
+							break;
+						case IRInstruction::BitwiseXor:
+							encoder.xorr(source.value(), register_from_operand(ai->destination()));
+							break;
+						}
 					}
 				} else if (ai->destination().is_allocated_stack()) {
 					// OPER const -> stack
+
+					if (source.width() == 8) assert(false);
 
 					switch (ai->type()) {
 					case IRInstruction::BitwiseAnd:
@@ -861,7 +891,27 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				IRConstantOperand& source = (IRConstantOperand&)ai->source();
 
 				if (ai->destination().is_allocated_reg()) {
-					encoder.add(source.value(), register_from_operand(ai->destination()));
+					if (source.width() == 8) {
+						encoder.mov(source.value(), tmp0_8);
+
+						switch (ai->type()) {
+						case IRInstruction::Add:
+							encoder.add(tmp0_8, register_from_operand(ai->destination()));
+							break;
+						case IRInstruction::Sub:
+							encoder.sub(tmp0_8, register_from_operand(ai->destination()));
+							break;
+						}
+					} else {
+						switch (ai->type()) {
+						case IRInstruction::Add:
+							encoder.add(source.value(), register_from_operand(ai->destination()));
+							break;
+						case IRInstruction::Sub:
+							encoder.sub(source.value(), register_from_operand(ai->destination()));
+							break;
+						}
+					}
 				} else {
 					assert(false);
 				}
@@ -992,6 +1042,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			instructions::IRComparisonInstruction *ci = (instructions::IRComparisonInstruction *)insn;
 
+			bool invert = false;
 			switch (ci->lhs().type()) {
 			case IROperand::Register:
 			{
@@ -1016,7 +1067,13 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					if (lhs.is_allocated_reg()) {
 						encoder.cmp(rhs.value(), register_from_operand(lhs));
 					} else if (lhs.is_allocated_stack()) {
-						encoder.cmp(rhs.value(), stack_from_operand(lhs));
+						switch (rhs.width()) {
+						case 1: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
+						case 2: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
+						case 4: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
+						case 8: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
+						default: assert(false);
+						}
 					} else {
 						assert(false);
 					}
@@ -1031,39 +1088,78 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			}
 
 			case IROperand::Constant:
+			{
+				IRConstantOperand& lhs = (IRConstantOperand&)ci->lhs();
+
 				switch (ci->rhs().type()) {
-				case IROperand::Register: assert(false);
+				case IROperand::Register: {
+					IRRegisterOperand& rhs = (IRRegisterOperand&)ci->rhs();
+
+					if (rhs.is_allocated_reg()) {
+						encoder.cmp(lhs.value(), register_from_operand(rhs));
+					} else if (rhs.is_allocated_stack()) {
+						switch (lhs.width()) {
+						case 1: encoder.cmp1(lhs.value(), stack_from_operand(rhs)); break;
+						case 2: encoder.cmp2(lhs.value(), stack_from_operand(rhs)); break;
+						case 4: encoder.cmp4(lhs.value(), stack_from_operand(rhs)); break;
+						case 8: encoder.cmp8(lhs.value(), stack_from_operand(rhs)); break;
+						}
+					} else {
+						assert(false);
+					}
+
+					break;
+				}
 				default: assert(false);
 				}
 
 				break;
+			}
 
 			default: assert(false);
 			}
 
 			switch (ci->type()) {
 			case IRInstruction::CompareEqual:
-				encoder.sete(register_from_operand(ci->destination()));
+				if (invert)
+					encoder.setne(register_from_operand(ci->destination()));
+				else
+					encoder.sete(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareNotEqual:
-				encoder.setne(register_from_operand(ci->destination()));
+				if (invert)
+					encoder.sete(register_from_operand(ci->destination()));
+				else
+					encoder.setne(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareLessThan:
-				encoder.setl(register_from_operand(ci->destination()));
+				if (invert)
+					encoder.setge(register_from_operand(ci->destination()));
+				else
+					encoder.setl(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareLessThanOrEqual:
-				encoder.setle(register_from_operand(ci->destination()));
+				if (invert)
+					encoder.setg(register_from_operand(ci->destination()));
+				else
+					encoder.setle(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareGreaterThan:
-				encoder.setg(register_from_operand(ci->destination()));
+				if (invert)
+					encoder.setle(register_from_operand(ci->destination()));
+				else
+					encoder.setg(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareGreaterThanOrEqual:
-				encoder.setge(register_from_operand(ci->destination()));
+				if (invert)
+					encoder.setl(register_from_operand(ci->destination()));
+				else
+					encoder.setge(register_from_operand(ci->destination()));
 				break;
 
 			default:
@@ -1145,6 +1241,12 @@ bool BlockCompiler::lower_block(IRBlock& block)
 		{
 			instructions::IRReadDeviceInstruction *rdi = (instructions::IRReadDeviceInstruction *)insn;
 
+			// Allocate a slot on the stack for the reference argument
+			encoder.push(0);
+
+			// Load the address of the stack slot into RCX
+			encoder.mov(REG_RSP, REG_RCX);
+
 			emit_save_reg_state();
 
 			load_state_field(0, REG_RDI);
@@ -1152,15 +1254,11 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			encode_operand_to_reg(rdi->device(), REG_RSI);
 			encode_operand_to_reg(rdi->offset(), REG_RDX);
 
-			// Allocate a slot on the stack for the reference argument
-			encoder.push(0);
-
-			// Load the address of the stack slot into RCX
-			encoder.lea(X86Memory::get(REG_RSP), REG_RCX);
-
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_read_device, tmp0_8);
 			encoder.call(tmp0_8);
+
+			emit_restore_reg_state();
 
 			// Pop the reference argument value into the destination register
 			if (rdi->storage().is_allocated_reg()) {
@@ -1168,8 +1266,6 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			} else {
 				assert(false);
 			}
-
-			emit_restore_reg_state();
 
 			break;
 		}
@@ -1187,6 +1283,38 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			encoder.call(tmp0_8);
 
 			emit_restore_reg_state();
+
+			break;
+		}
+
+		case IRInstruction::CountLeadingZeroes:
+		{
+			instructions::IRCountLeadingZeroesInstruction *clzi = (instructions::IRCountLeadingZeroesInstruction *)insn;
+
+			if (clzi->operand().type() == IROperand::Register) {
+				IRRegisterOperand& operand = (IRRegisterOperand&)clzi->operand();
+
+				if (clzi->storage().type() == IROperand::Register) {
+					IRRegisterOperand& storage = (IRRegisterOperand&)clzi->storage();
+
+					if (operand.is_allocated_reg() && storage.is_allocated_reg()) {
+						encoder.bsr(register_from_operand(operand), register_from_operand(storage));
+						encoder.xorr(0x1f, register_from_operand(storage));
+					} else if (operand.is_allocated_reg() && storage.is_allocated_stack()) {
+						assert(false);
+					} else if (operand.is_allocated_stack() && storage.is_allocated_reg()) {
+						assert(false);
+					} else if (operand.is_allocated_stack() && storage.is_allocated_stack()) {
+						assert(false);
+					} else {
+						assert(false);
+					}
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
 
 			break;
 		}
@@ -1405,6 +1533,15 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		assert(pc->type() == IROperand::PC);
 
 		return new instructions::IRVerifyInstruction(*pc);
+	}
+
+	case shared::IRInstruction::CLZ:
+	{
+		IROperand *op = operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *dst = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+		assert(dst->type() == IROperand::Register);
+
+		return new instructions::IRCountLeadingZeroesInstruction(*op, *dst);
 	}
 
 	default:

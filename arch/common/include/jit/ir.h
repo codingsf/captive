@@ -1115,6 +1115,30 @@ namespace captive {
 				private:
 					IRPCOperand& _pc;
 				};
+
+				class IRCountLeadingZeroesInstruction : public IRInstruction
+				{
+				public:
+					IRCountLeadingZeroesInstruction(IROperand& operand, IRRegisterOperand& storage)
+						: _operand(operand), _storage(storage)
+					{
+							add_input_operand(operand);
+							add_output_operand(storage);
+					}
+
+					IRInstruction::InstructionTypes type() const override { return CountLeadingZeroes; }
+
+					IROperand& operand() const { return _operand; }
+
+					IRRegisterOperand& storage() const { return _storage; }
+
+				protected:
+					const char* mnemonic() const override { return "clz"; }
+
+				private:
+					IROperand& _operand;
+					IRRegisterOperand& _storage;
+				};
 			}
 		}
 	}

@@ -127,7 +127,11 @@ namespace captive {
 
 				void cmp(const X86Register& src, const X86Register& dst);
 				void cmp(uint32_t val, const X86Register& dst);
-				void cmp(uint32_t val, const X86Memory& dst);
+				void cmp1(uint8_t val, const X86Memory& dst);
+				void cmp2(uint16_t val, const X86Memory& dst);
+				void cmp4(uint32_t val, const X86Memory& dst);
+				void cmp8(uint64_t val, const X86Memory& dst);
+
 				void test(const X86Register& op1, const X86Register& op2);
 
 				void jmp_reloc(uint32_t& reloc_offset);
@@ -139,6 +143,8 @@ namespace captive {
 				void setle(const X86Register& dst);
 				void setg(const X86Register& dst);
 				void setge(const X86Register& dst);
+
+				void bsr(const X86Register& src, const X86Register& dst);
 
 				void leave();
 				void ret();
