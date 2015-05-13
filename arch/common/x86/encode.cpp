@@ -214,9 +214,9 @@ void X86Encoder::movsx(const X86Register& src, const X86Register& dst)
 	assert(dst.size == 2 || dst.size == 4 || dst.size == 8);
 
 	if (src.size == 1) {
-		encode_opcode_mod_rm(0x1be, src, dst);
+		encode_opcode_mod_rm(0x1be, dst, src);
 	} else if (src.size == 2) {
-		encode_opcode_mod_rm(0x1bf, src, dst);
+		encode_opcode_mod_rm(0x1bf, dst, src);
 	} else if (src.size == 4) {
 		assert(dst.size == 8);
 		encode_opcode_mod_rm(0x63, dst, src);

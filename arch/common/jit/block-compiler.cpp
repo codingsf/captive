@@ -73,7 +73,13 @@ bool BlockCompiler::optimise_tb()
 		shared::IRInstruction *insn = &tb.ir_insn[idx];
 
 		switch (insn->type) {
+		case shared::IRInstruction::ADD:
+		case shared::IRInstruction::SUB:
+		case shared::IRInstruction::OR:
+		case shared::IRInstruction::XOR:
 		case shared::IRInstruction::SHL:
+		case shared::IRInstruction::SHR:
+		case shared::IRInstruction::SAR:
 			if (insn->operands[0].type == shared::IROperand::CONSTANT && insn->operands[0].value == 0) {
 				insn->type = shared::IRInstruction::NOP;
 			}
@@ -255,7 +261,6 @@ retry:
 				// Detach the child block from the parent.
 				succ->remove_from_parent();
 
-				// TODO: delete child block
 				goto retry;
 			}
 		}
@@ -638,9 +643,8 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					if (movi->destination().allocation_class() == IRRegisterOperand::Register) {
 						// mov reg -> reg
 
-						X86Register& dst_reg = register_from_operand(movi->destination());
-						if (src_reg != dst_reg) {
-							encoder.mov(src_reg, dst_reg);
+						if (source.allocation_data() != movi->destination().allocation_data()) {
+							encoder.mov(src_reg, register_from_operand(movi->destination()));
 						}
 					} else if (movi->destination().allocation_class() == IRRegisterOperand::Stack) {
 						// mov reg -> stack
@@ -656,9 +660,12 @@ bool BlockCompiler::lower_block(IRBlock& block)
 						encoder.mov(src_mem, register_from_operand(movi->destination()));
 					} else if (movi->destination().allocation_class() == IRRegisterOperand::Stack) {
 						// mov stack -> stack
-						X86Register& tmp = get_temp(0, source.reg().width());
-						encoder.mov(src_mem, tmp);
-						encoder.mov(tmp, stack_from_operand(movi->destination()));
+
+						if (source.allocation_data() != movi->destination().allocation_data()) {
+							X86Register& tmp = get_temp(0, source.reg().width());
+							encoder.mov(src_mem, tmp);
+							encoder.mov(tmp, stack_from_operand(movi->destination()));
+						}
 					} else {
 						assert(false);
 					}
@@ -670,7 +677,12 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 				if (movi->destination().is_allocated_reg()) {
 					// mov imm -> reg
-					encoder.mov(source.value(), register_from_operand(movi->destination()));
+
+					if (source.value() == 0) {
+						encoder.xorr(register_from_operand(movi->destination()), register_from_operand(movi->destination()));
+					} else {
+						encoder.mov(source.value(), register_from_operand(movi->destination()));
+					}
 				} else if (movi->destination().is_allocated_stack()) {
 					// mov imm -> stack
 					switch (movi->destination().reg().width()) {
@@ -770,10 +782,16 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					// OPER reg -> reg
 					switch (ai->type()) {
 					case IRInstruction::BitwiseAnd:
-						encoder.andd(register_from_operand(source), register_from_operand(ai->destination()));
+						if (source.allocation_data() != ai->destination().allocation_data()) {
+							encoder.andd(register_from_operand(source), register_from_operand(ai->destination()));
+						}
+
 						break;
 					case IRInstruction::BitwiseOr:
-						encoder.orr(register_from_operand(source), register_from_operand(ai->destination()));
+						if (source.allocation_data() != ai->destination().allocation_data()) {
+							encoder.orr(register_from_operand(source), register_from_operand(ai->destination()));
+						}
+
 						break;
 					case IRInstruction::BitwiseXor:
 						encoder.xorr(register_from_operand(source), register_from_operand(ai->destination()));
@@ -977,7 +995,9 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 				if (source.is_allocated_reg() && trunci->destination().is_allocated_reg()) {
 					// trunc reg -> reg
-					encoder.mov(register_from_operand(source), register_from_operand(trunci->destination(), source.reg().width()));
+					if (source.allocation_data() != trunci->destination().allocation_data()) {
+						encoder.mov(register_from_operand(source), register_from_operand(trunci->destination(), source.reg().width()));
+					}
 				} else if (source.is_allocated_reg() && trunci->destination().is_allocated_stack()) {
 					// trunc reg -> stack
 					encoder.mov(register_from_operand(source), stack_from_operand(trunci->destination()));
@@ -986,8 +1006,10 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					encoder.mov(stack_from_operand(source), register_from_operand(trunci->destination()));
 				} else if (source.is_allocated_stack() && trunci->destination().is_allocated_stack()) {
 					// trunc stack -> stack
-					encoder.mov(stack_from_operand(source), get_temp(0, source.reg().width()));
-					encoder.mov(get_temp(0, trunci->destination().reg().width()), stack_from_operand(trunci->destination()));
+					if (source.allocation_data() != trunci->destination().allocation_data()) {
+						encoder.mov(stack_from_operand(source), get_temp(0, source.reg().width()));
+						encoder.mov(get_temp(0, trunci->destination().reg().width()), stack_from_operand(trunci->destination()));
+					}
 				} else {
 					assert(false);
 				}
@@ -1109,9 +1131,9 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					} else if (lhs.is_allocated_stack()) {
 						switch (rhs.width()) {
 						case 1: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
-						case 2: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
-						case 4: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
-						case 8: encoder.cmp1(rhs.value(), stack_from_operand(lhs)); break;
+						case 2: encoder.cmp2(rhs.value(), stack_from_operand(lhs)); break;
+						case 4: encoder.cmp4(rhs.value(), stack_from_operand(lhs)); break;
+						case 8: encoder.cmp8(rhs.value(), stack_from_operand(lhs)); break;
 						default: assert(false);
 						}
 					} else {
