@@ -85,7 +85,7 @@ namespace captive {
 					assert(oper.is_allocated_stack());
 					assert(oper.reg().width() < 8);
 
-					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 4);
+					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 8);
 				}
 
 				inline x86::X86Register& get_temp(int id, int width)

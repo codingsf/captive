@@ -303,7 +303,7 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 			if (global_live.count(in) == 0) {
 				global_live.insert(in);
 				global_regs[in] = next_global;
-				next_global += in->width();
+				next_global += 8; //in->width();
 			}
 		}
 #ifdef DEBUG_ALLOCATOR
@@ -316,7 +316,7 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 			if (global_live.count(out) == 0) {
 				global_live.insert(out);
 				global_regs[out] = next_global;
-				next_global += out->width();
+				next_global += 8; //out->width();
 			}
 		}
 #ifdef DEBUG_ALLOCATOR

@@ -89,35 +89,9 @@ void X86Encoder::mov(const X86Register& src, const X86Register& dst)
 	assert(src.size == dst.size);
 
 	if (src.size == 1) {
-		if (src.newreg || dst.newreg) {
-			emit8(REX);
-		}
-
-		emit8(0x88);
-		encode_mod_reg_rm(src, dst);
+		encode_opcode_mod_rm(0x88, src, dst);
 	} else {
-		uint8_t rex = 0;
-
-		if (src.size == 8) {
-			rex |= REX_W;
-		} else if (src.size == 2) {
-			assert(false);
-		}
-
-		if (src.hireg) {
-			rex |= REX_R;
-		}
-
-		if (dst.hireg) {
-			rex |= REX_B;
-		}
-
-		if (rex) {
-			emit8(rex);
-		}
-
-		emit8(0x89);
-		encode_mod_reg_rm(src, dst);
+		encode_opcode_mod_rm(0x89, src, dst);
 	}
 }
 
