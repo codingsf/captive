@@ -57,7 +57,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}
 
-	ir.dump();
+	//ir.dump();
 
 	if (!lower(max_stack, fn)) {
 		printf("jit: instruction lowering failed\n");
@@ -303,7 +303,9 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 			if (global_live.count(in) == 0) {
 				global_live.insert(in);
 				global_regs[in] = next_global;
-				next_global += 8; //in->width();
+
+				next_global += 8;
+				max_stack += 8;
 			}
 		}
 #ifdef DEBUG_ALLOCATOR
@@ -316,7 +318,9 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 			if (global_live.count(out) == 0) {
 				global_live.insert(out);
 				global_regs[out] = next_global;
-				next_global += 8; //out->width();
+
+				next_global += 8;
+				max_stack += 8;
 			}
 		}
 #ifdef DEBUG_ALLOCATOR
@@ -390,11 +394,10 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 		}
 	}
 
-	max_stack = next_global + 4;
 	return true;
 }
 
-#define DEBUG_LOWER
+//#define DEBUG_LOWER
 
 bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 {

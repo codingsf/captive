@@ -46,6 +46,7 @@ bool CPU::run_block_jit()
 }
 
 //#define REG_STATE_PROTECTION
+//#define DEBUG_TRANSLATION
 
 bool CPU::run_block_jit_safepoint()
 {
@@ -86,8 +87,10 @@ bool CPU::run_block_jit_safepoint()
 
 		// If we faulted on the fetch, go via the interpreter to sort it out.
 		if (fault != MMU::NONE) {
-			printf("cpu: fault %d whilst resolving %08x\n", fault, virt_pc);
-			return false;
+			printf("cpu: fault when fetching next block instruction @ %08x\n", virt_pc);
+			abort();
+			interpret_block();
+			continue;
 		}
 
 		block_txln_cache_t::iterator txln = block_txln_cache.find(phys_pc);
@@ -97,7 +100,9 @@ bool CPU::run_block_jit_safepoint()
 			Memory::set_va_flags(reg_state(), 0);
 #endif
 
+#ifdef DEBUG_TRANSLATION
 			printf("jit: translating block phys-pc=%08x, virt-pc=%08x\n", phys_pc, virt_pc);
+#endif
 
 			shared::TranslationBlock tb;
 			bzero(&tb, sizeof(tb));
@@ -121,7 +126,9 @@ bool CPU::run_block_jit_safepoint()
 			Memory::set_va_flags(reg_state(), tmp);
 #endif
 
+#ifdef DEBUG_TRANSLATION
 			printf("jit: executing fresh block %p phys-pc=%08x, virt-pc=%08x\n", fn, phys_pc, virt_pc);
+#endif
 			block_txln_cache[phys_pc] = fn;
 
 			ensure_privilege_mode();
@@ -138,7 +145,9 @@ bool CPU::run_block_jit_safepoint()
 
 void CPU::clear_block_cache()
 {
+#ifdef DEBUG_TRANSLATION
 	printf("jit: clearing block cache\n");
+#endif
 
 	for (auto txln : block_txln_cache) {
 		free((void *)txln.second);
@@ -146,8 +155,6 @@ void CPU::clear_block_cache()
 
 	block_txln_cache.clear();
 }
-
-#define DEBUG_TRANSLATION
 
 bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 {
