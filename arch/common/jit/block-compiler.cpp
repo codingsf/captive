@@ -5,6 +5,11 @@
 #include <printf.h>
 #include <queue>
 
+//#define DEBUG_IR
+//#define DEBUG_MERGE_BLOCKS
+//#define DEBUG_ALLOCATOR
+//#define DEBUG_LOWER
+
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
@@ -57,7 +62,9 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}
 
-	//ir.dump();
+#ifdef DEBUG_IR
+	ir.dump();
+#endif
 
 	if (!lower(max_stack, fn)) {
 		printf("jit: instruction lowering failed\n");
@@ -220,8 +227,6 @@ bool BlockCompiler::thread_rets()
 	return true;
 }
 
-//#define DEBUG_MERGE_BLOCKS
-
 bool BlockCompiler::merge_blocks()
 {
 retry:
@@ -268,8 +273,6 @@ retry:
 
 	return true;
 }
-
-//#define DEBUG_ALLOCATOR
 
 bool BlockCompiler::allocate(uint32_t& max_stack)
 {
@@ -397,8 +400,6 @@ bool BlockCompiler::allocate(uint32_t& max_stack)
 	return true;
 }
 
-//#define DEBUG_LOWER
-
 bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 {
 	// Function prologue
@@ -416,6 +417,10 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 	std::map<shared::IRBlockId, uint32_t> native_block_offsets;
 	for (auto block : ir.blocks()) {
 		native_block_offsets[block->id()] = encoder.current_offset();
+
+#ifdef DEBUG_LOWER
+		encoder.nop(X86Memory::get(REG_RBX, block->id()));
+#endif
 
 		if (!lower_block(*block)) {
 			printf("jit: block encoding failed\n");
@@ -1111,12 +1116,14 @@ bool BlockCompiler::lower_block(IRBlock& block)
 					IRRegisterOperand& rhs = (IRRegisterOperand&)ci->rhs();
 
 					if (lhs.is_allocated_reg() && rhs.is_allocated_reg()) {
-						encoder.cmp(register_from_operand(lhs), register_from_operand(rhs));
+						encoder.cmp(register_from_operand(rhs), register_from_operand(lhs));
 					} else if (lhs.is_allocated_stack() && rhs.is_allocated_reg()) {
 						assert(false);
 					} else if (lhs.is_allocated_reg() && rhs.is_allocated_stack()) {
 						assert(false);
 					} else if (lhs.is_allocated_stack() && rhs.is_allocated_stack()) {
+						invert = true;
+
 						X86Register& tmp = unspill_temp(lhs, 0);
 						encoder.cmp(tmp, stack_from_operand(rhs));
 					} else {
@@ -1156,6 +1163,8 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			{
 				IRConstantOperand& lhs = (IRConstantOperand&)ci->lhs();
 
+				invert = true;
+
 				switch (ci->rhs().type()) {
 				case IROperand::Register: {
 					IRRegisterOperand& rhs = (IRRegisterOperand&)ci->rhs();
@@ -1186,45 +1195,39 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 			switch (ci->type()) {
 			case IRInstruction::CompareEqual:
-				if (invert)
-					encoder.setne(register_from_operand(ci->destination()));
-				else
-					encoder.sete(register_from_operand(ci->destination()));
+				encoder.sete(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareNotEqual:
-				if (invert)
-					encoder.sete(register_from_operand(ci->destination()));
-				else
-					encoder.setne(register_from_operand(ci->destination()));
+				encoder.setne(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareLessThan:
 				if (invert)
-					encoder.setge(register_from_operand(ci->destination()));
+					encoder.setnb(register_from_operand(ci->destination()));
 				else
-					encoder.setl(register_from_operand(ci->destination()));
+					encoder.setb(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareLessThanOrEqual:
 				if (invert)
-					encoder.setg(register_from_operand(ci->destination()));
+					encoder.setnbe(register_from_operand(ci->destination()));
 				else
-					encoder.setle(register_from_operand(ci->destination()));
+					encoder.setbe(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareGreaterThan:
 				if (invert)
-					encoder.setle(register_from_operand(ci->destination()));
+					encoder.setna(register_from_operand(ci->destination()));
 				else
-					encoder.setg(register_from_operand(ci->destination()));
+					encoder.seta(register_from_operand(ci->destination()));
 				break;
 
 			case IRInstruction::CompareGreaterThanOrEqual:
 				if (invert)
-					encoder.setl(register_from_operand(ci->destination()));
+					encoder.setnae(register_from_operand(ci->destination()));
 				else
-					encoder.setge(register_from_operand(ci->destination()));
+					encoder.setae(register_from_operand(ci->destination()));
 				break;
 
 			default:
@@ -1501,6 +1504,7 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		case shared::IRInstruction::ZX: return new instructions::IRZXInstruction(*from, *to);
 		case shared::IRInstruction::SX: return new instructions::IRSXInstruction(*from, *to);
 		case shared::IRInstruction::TRUNC: return new instructions::IRTruncInstruction(*from, *to);
+		default: assert(false);
 		}
 	}
 
@@ -1544,6 +1548,7 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 			return new instructions::IRShiftRightInstruction(*src, *dst);
 		case shared::IRInstruction::SAR:
 			return new instructions::IRArithmeticShiftRightInstruction(*src, *dst);
+		default: assert(false);
 		}
 	}
 
@@ -1567,6 +1572,7 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		case shared::IRInstruction::CMPLTE: return new instructions::IRCompareLessThanOrEqualInstruction(*lhs, *rhs, *dst);
 		case shared::IRInstruction::CMPGT: return new instructions::IRCompareGreaterThanInstruction(*lhs, *rhs, *dst);
 		case shared::IRInstruction::CMPGTE: return new instructions::IRCompareGreaterThanOrEqualInstruction(*lhs, *rhs, *dst);
+		default: assert(false);
 		}
 	}
 

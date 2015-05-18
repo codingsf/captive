@@ -81,7 +81,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 
 	case 7:
 	case 8:
-		//cpu.mmu().flush();
+		cpu.mmu().flush();
 		cpu.profile_image().invalidate_vaddr();
 		break;
 	}

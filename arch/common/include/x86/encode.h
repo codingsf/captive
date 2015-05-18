@@ -145,12 +145,51 @@ namespace captive {
 				void jmp_reloc(uint32_t& reloc_offset);
 				void jnz_reloc(uint32_t& reloc_offset);
 
-				void sete(const X86Register& dst);
-				void setne(const X86Register& dst);
-				void setl(const X86Register& dst);
-				void setle(const X86Register& dst);
-				void setg(const X86Register& dst);
-				void setge(const X86Register& dst);
+				void setcc(uint8_t v, const X86Register& dst);
+
+				inline void seto(const X86Register& dst) { setcc(0x00, dst); }
+				inline void setno(const X86Register& dst) { setcc(0x01, dst); }
+
+				inline void setb(const X86Register& dst) { setcc(0x02, dst); }
+				inline void setnae(const X86Register& dst) { setb(dst); }
+				inline void setc(const X86Register& dst) { setb(dst); }
+
+				inline void setnb(const X86Register& dst) { setcc(0x03, dst); }
+				inline void setae(const X86Register& dst) { setnb(dst); }
+				inline void setnc(const X86Register& dst) { setnb(dst); }
+
+				inline void setz(const X86Register& dst) { setcc(0x04, dst); }
+				inline void sete(const X86Register& dst) { setz(dst); }
+
+				inline void setnz(const X86Register& dst) { setcc(0x05, dst); }
+				inline void setne(const X86Register& dst) { setnz(dst); }
+
+				inline void setbe(const X86Register& dst) { setcc(0x06, dst); }
+				inline void setna(const X86Register& dst) { setbe(dst); }
+
+				inline void setnbe(const X86Register& dst) { setcc(0x07, dst); }
+				inline void seta(const X86Register& dst) { setnbe(dst); }
+
+				inline void sets(const X86Register& dst) { setcc(0x08, dst); }
+				inline void setns(const X86Register& dst) { setcc(0x09, dst); }
+
+				inline void setp(const X86Register& dst) { setcc(0x0a, dst); }
+				inline void setpe(const X86Register& dst) { setp(dst); }
+
+				inline void setnp(const X86Register& dst) { setcc(0x0b, dst); }
+				inline void setpo(const X86Register& dst) { setnp(dst); }
+
+				inline void setl(const X86Register& dst) { setcc(0x0c, dst); }
+				inline void setnge(const X86Register& dst) { setl(dst); }
+
+				inline void setnl(const X86Register& dst) { setcc(0x0d, dst); }
+				inline void setge(const X86Register& dst) { setnl(dst); }
+
+				inline void setle(const X86Register& dst) { setcc(0x0e, dst); }
+				inline void setng(const X86Register& dst) { setle(dst); }
+
+				inline void setnle(const X86Register& dst) { setcc(0x0f, dst); }
+				inline void setg(const X86Register& dst) { setnle(dst); }
 
 				void bsr(const X86Register& src, const X86Register& dst);
 

@@ -552,68 +552,14 @@ void X86Encoder::jnz_reloc(uint32_t& reloc_offset)
 	emit32(0);
 }
 
-void X86Encoder::sete(const X86Register& dst)
+void X86Encoder::setcc(uint8_t v, const X86Register& dst)
 {
 	assert(dst.size == 1);
 
 	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
 
 	emit8(0x0f);
-	emit8(0x94);
-	encode_mod_reg_rm(0, dst);
-}
-
-void X86Encoder::setne(const X86Register& dst)
-{
-	assert(dst.size == 1);
-
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
-
-	emit8(0x0f);
-	emit8(0x95);
-	encode_mod_reg_rm(0, dst);
-}
-void X86Encoder::setl(const X86Register& dst)
-{
-	assert(dst.size == 1);
-
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
-
-	emit8(0x0f);
-	emit8(0x9c);
-	encode_mod_reg_rm(0, dst);
-}
-
-void X86Encoder::setle(const X86Register& dst)
-{
-	assert(dst.size == 1);
-
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
-
-	emit8(0x0f);
-	emit8(0x9e);
-	encode_mod_reg_rm(0, dst);
-}
-
-void X86Encoder::setg(const X86Register& dst)
-{
-	assert(dst.size == 1);
-
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
-
-	emit8(0x0f);
-	emit8(0x9f);
-	encode_mod_reg_rm(0, dst);
-}
-
-void X86Encoder::setge(const X86Register& dst)
-{
-	assert(dst.size == 1);
-
-	if (dst.newreg) emit8(REX); else if (dst.hireg) emit8(REX_B);
-
-	emit8(0x0f);
-	emit8(0x9d);
+	emit8(0x90 | (v & 0xf));
 	encode_mod_reg_rm(0, dst);
 }
 

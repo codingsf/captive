@@ -9,6 +9,9 @@
 #include <jit/block-compiler.h>
 #include <shared-jit.h>
 
+//#define REG_STATE_PROTECTION
+//#define DEBUG_TRANSLATION
+
 extern safepoint_t cpu_safepoint;
 
 using namespace captive::arch;
@@ -44,9 +47,6 @@ bool CPU::run_block_jit()
 
 	return run_block_jit_safepoint();
 }
-
-//#define REG_STATE_PROTECTION
-//#define DEBUG_TRANSLATION
 
 bool CPU::run_block_jit_safepoint()
 {
@@ -87,7 +87,7 @@ bool CPU::run_block_jit_safepoint()
 
 		// If we faulted on the fetch, go via the interpreter to sort it out.
 		if (fault != MMU::NONE) {
-			printf("cpu: fault when fetching next block instruction @ %08x\n", virt_pc);
+			printf("cpu: fault when fetching next block instruction @ %08x mode=%d\n", virt_pc, kernel_mode());
 			abort();
 			interpret_block();
 			continue;

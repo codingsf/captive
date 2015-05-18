@@ -124,6 +124,8 @@ namespace captive {
 
 			void clear_block_cache();
 
+			void tlb_flush();
+
 		protected:
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
