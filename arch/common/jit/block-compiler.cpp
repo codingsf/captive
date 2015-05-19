@@ -5,10 +5,10 @@
 #include <printf.h>
 #include <queue>
 
-//#define DEBUG_IR
-//#define DEBUG_MERGE_BLOCKS
+#define DEBUG_IR
+#define DEBUG_MERGE_BLOCKS
 //#define DEBUG_ALLOCATOR
-//#define DEBUG_LOWER
+#define DEBUG_LOWER
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
@@ -158,8 +158,8 @@ bool BlockCompiler::optimise_ir()
 
 bool BlockCompiler::die()
 {
-retry:
 	for (auto block : ir.blocks()) {
+retry:
 		for (auto insn : block->instructions()) {
 			for (auto oper : insn->operands()) {
 				if (oper->type() == IROperand::Register) {
@@ -1719,18 +1719,18 @@ void BlockCompiler::emit_save_reg_state()
 	encoder.push(REG_RSI);
 	encoder.push(REG_RDI);
 	encoder.push(REG_RAX);
-	encoder.push(REG_RCX);
 	encoder.push(REG_RDX);
 	encoder.push(REG_R8);
 	encoder.push(REG_R9);
+	encoder.push(REG_R10);
 }
 
 void BlockCompiler::emit_restore_reg_state()
 {
+	encoder.pop(REG_R10);
 	encoder.pop(REG_R9);
 	encoder.pop(REG_R8);
 	encoder.pop(REG_RDX);
-	encoder.pop(REG_RCX);
 	encoder.pop(REG_RAX);
 	encoder.pop(REG_RDI);
 	encoder.pop(REG_RSI);

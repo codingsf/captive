@@ -10,7 +10,7 @@
 #include <shared-jit.h>
 
 //#define REG_STATE_PROTECTION
-//#define DEBUG_TRANSLATION
+#define DEBUG_TRANSLATION
 
 extern safepoint_t cpu_safepoint;
 
