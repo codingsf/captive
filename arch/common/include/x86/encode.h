@@ -193,6 +193,7 @@ namespace captive {
 
 				void bsr(const X86Register& src, const X86Register& dst);
 
+				void intt(uint8_t irq);
 				void leave();
 				void ret();
 				void hlt();

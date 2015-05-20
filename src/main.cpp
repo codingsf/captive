@@ -239,8 +239,8 @@ int main(int argc, char **argv)
 	}
 
 	// Load the kernel
-	ZImageLoader kernel(argv[2]);
-	//ELFLoader kernel(argv[2]);
+	//ZImageLoader kernel(argv[2]);
+	ELFLoader kernel(argv[2]);
 	if (!guest->load(kernel)) {
 		delete guest;
 		delete hv;
@@ -252,14 +252,14 @@ int main(int argc, char **argv)
 	guest->guest_entrypoint(kernel.entrypoint());
 
 	// Load the device-tree
-	DeviceTreeLoader device_tree(argv[3], 0x1000);
+	/*DeviceTreeLoader device_tree(argv[3], 0x1000);
 	if (!guest->load(device_tree)) {
 		delete guest;
 		delete hv;
 
 		ERROR << "Unable to load device tree";
 		return 1;
-	}
+	}*/
 
 	CPU *cpu = NULL;
 	if (verify_enabled()) {

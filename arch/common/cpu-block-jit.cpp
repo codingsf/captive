@@ -37,8 +37,8 @@ bool CPU::run_block_jit()
 			trace().end_record();
 		}
 
-		printf("cpu: memory fault %d\n", rc);
-		
+		//printf("cpu: memory fault %d\n", rc);
+
 		// Instruct the interpreter to handle the memory fault, passing
 		// in the the type of fault.
 		interpreter().handle_memory_fault((MMU::resolution_fault)rc);

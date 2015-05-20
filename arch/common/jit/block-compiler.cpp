@@ -1284,6 +1284,39 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			break;
 		}
 
+		case IRInstruction::ReadUserMemory:
+		{
+			instructions::IRReadMemoryInstruction *rmi = (instructions::IRReadMemoryInstruction *)insn;
+
+			encoder.intt(0x80);
+
+			if (rmi->offset().type() == IROperand::Register) {
+				IRRegisterOperand& offset = (IRRegisterOperand&)rmi->offset();
+
+				if (offset.is_allocated_reg() && rmi->storage().is_allocated_reg()) {
+					// mov (reg), reg
+					encoder.mov(X86Memory::get(register_from_operand(offset)), register_from_operand(rmi->storage()));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			encoder.push(REG_RDI);
+			encoder.mov(2, REG_RDI);
+			encoder.intt(0x82);
+			encoder.pop(REG_RDI);
+
+			break;
+		}
+
+		case IRInstruction::WriteUserMemory:
+		{
+			assert(false);
+			break;
+		}
+
 		case IRInstruction::WriteDevice:
 		{
 			instructions::IRWriteDeviceInstruction *wdi = (instructions::IRWriteDeviceInstruction *)insn;
@@ -1614,6 +1647,14 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		return new instructions::IRWriteMemoryInstruction(*val, *off);
 	}
 
+	case shared::IRInstruction::WRITE_MEM_USER:
+	{
+		IROperand *val = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
+		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[1]);
+
+		return new instructions::IRWriteUserMemoryInstruction(*val, *off);
+	}
+
 	case shared::IRInstruction::READ_MEM:
 	{
 		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
@@ -1621,6 +1662,15 @@ IRInstruction* BlockCompiler::instruction_from_shared(IRContext& ctx, const shar
 		assert(dst->type() == IROperand::Register);
 
 		return new instructions::IRReadMemoryInstruction(*off, *dst);
+	}
+
+	case shared::IRInstruction::READ_MEM_USER:
+	{
+		IROperand *off = (IROperand *)operand_from_shared(ctx, &insn->operands[0]);
+		IRRegisterOperand *dst = (IRRegisterOperand *)operand_from_shared(ctx, &insn->operands[1]);
+		assert(dst->type() == IROperand::Register);
+
+		return new instructions::IRReadUserMemoryInstruction(*off, *dst);
 	}
 
 	case shared::IRInstruction::VERIFY:

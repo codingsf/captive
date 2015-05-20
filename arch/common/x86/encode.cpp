@@ -574,6 +574,12 @@ void X86Encoder::ret()
 	emit8(0xc3);
 }
 
+void X86Encoder::intt(uint8_t irq)
+{
+	emit8(0xcd);
+	emit8(irq);
+}
+
 void X86Encoder::leave()
 {
 	emit8(0xc9);
