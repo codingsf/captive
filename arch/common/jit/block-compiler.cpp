@@ -5,10 +5,10 @@
 #include <printf.h>
 #include <queue>
 
-#define DEBUG_IR
-#define DEBUG_MERGE_BLOCKS
+//#define DEBUG_IR
+//#define DEBUG_MERGE_BLOCKS
 //#define DEBUG_ALLOCATOR
-#define DEBUG_LOWER
+//#define DEBUG_LOWER
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
@@ -474,23 +474,23 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 			const std::vector<IROperand *>& args = calli->arguments();
 			if (args.size() > 0)  {
-				encode_operand_to_reg(*args[0], REG_ESI);
+				encode_operand_function_argument(*args[0], REG_RSI);
 			}
 
 			if (args.size() > 1)  {
-				encode_operand_to_reg(*args[1], REG_EDX);
+				encode_operand_function_argument(*args[1], REG_RDX);
 			}
 
 			if (args.size() > 2)  {
-				encode_operand_to_reg(*args[2], REG_ECX);
+				encode_operand_function_argument(*args[2], REG_RCX);
 			}
 
 			if (args.size() > 3)  {
-				encode_operand_to_reg(*args[3], REG_R8);
+				encode_operand_function_argument(*args[3], REG_R8);
 			}
 
 			if (args.size() > 4)  {
-				encode_operand_to_reg(*args[4], REG_R9);
+				encode_operand_function_argument(*args[4], REG_R9);
 			}
 
 			if (args.size() > 5) {
@@ -512,7 +512,7 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			instructions::IRSetCpuModeInstruction *scmi = (instructions::IRSetCpuModeInstruction *)insn;
 			load_state_field(0, REG_RDI);
 
-			encode_operand_to_reg(scmi->new_mode(), REG_ESI);
+			encode_operand_function_argument(scmi->new_mode(), REG_RSI);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_set_mode, get_temp(0, 8));
@@ -1292,9 +1292,9 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 			load_state_field(0, REG_RDI);
 
-			encode_operand_to_reg(wdi->device(), REG_RSI);
-			encode_operand_to_reg(wdi->offset(), REG_RDX);
-			encode_operand_to_reg(wdi->data(), REG_RCX);
+			encode_operand_function_argument(wdi->device(), REG_RSI);
+			encode_operand_function_argument(wdi->offset(), REG_RDX);
+			encode_operand_function_argument(wdi->data(), REG_RCX);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_write_device, get_temp(0, 8));
@@ -1319,8 +1319,8 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 			load_state_field(0, REG_RDI);
 
-			encode_operand_to_reg(rdi->device(), REG_RSI);
-			encode_operand_to_reg(rdi->offset(), REG_RDX);
+			encode_operand_function_argument(rdi->device(), REG_RSI);
+			encode_operand_function_argument(rdi->offset(), REG_RDX);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_read_device, get_temp(0, 8));
@@ -1734,4 +1734,31 @@ void BlockCompiler::emit_restore_reg_state()
 	encoder.pop(REG_RAX);
 	encoder.pop(REG_RDI);
 	encoder.pop(REG_RSI);
+}
+
+void BlockCompiler::encode_operand_function_argument(IROperand& oper, const X86Register& target_reg)
+{
+	if (oper.type() == IROperand::Constant) {
+		IRConstantOperand& constant = (IRConstantOperand&)oper;
+		encoder.mov(constant.value(), target_reg);
+	} else if (oper.type() == IROperand::Register) {
+		IRRegisterOperand& reg = (IRRegisterOperand&)oper;
+
+		if (reg.is_allocated_reg()) {
+			switch (reg.allocation_data()) {
+			case 0: encoder.mov(X86Memory::get(REG_RSP, 4*8), target_reg); break;		// A
+			case 1: encoder.mov(X86Memory::get(REG_RSP, 3*8), target_reg); break;		// D
+			case 2: encoder.mov(X86Memory::get(REG_RSP, 6*8), target_reg); break;		// SI
+			case 3: encoder.mov(X86Memory::get(REG_RSP, 5*8), target_reg); break;		// DI
+			case 4: encoder.mov(X86Memory::get(REG_RSP, 2*8), target_reg); break;		// R8
+			case 5: encoder.mov(X86Memory::get(REG_RSP, 1*8), target_reg); break;		// R9
+			case 6: encoder.mov(X86Memory::get(REG_RSP, 0*8), target_reg); break;		// R10
+			default: assert(false);
+			}
+		} else {
+			assert(false);
+		}
+	} else {
+		assert(false);
+	}
 }

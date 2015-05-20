@@ -128,6 +128,7 @@ namespace captive {
 
 				void emit_save_reg_state();
 				void emit_restore_reg_state();
+				void encode_operand_function_argument(IROperand& oper, const x86::X86Register& reg);
 
 				bool merge_blocks();
 				bool thread_jumps();
