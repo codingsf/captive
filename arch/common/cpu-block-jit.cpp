@@ -85,8 +85,8 @@ bool CPU::run_block_jit_safepoint()
 			printf("jit: translating block phys-pc=%08x, virt-pc=%08x\n", phys_pc, virt_pc);
 #endif
 
-			printf("*** before\n");
-			dump_mallinfo();
+			//printf("*** before\n");
+			//dump_mallinfo();
 
 			shared::TranslationBlock tb;
 			bzero(&tb, sizeof(tb));
@@ -96,8 +96,8 @@ bool CPU::run_block_jit_safepoint()
 				return false;
 			}
 
-			printf("*** after translate\n");
-			dump_mallinfo();
+			//printf("*** after translate\n");
+			//dump_mallinfo();
 
 			BlockCompiler *compiler = new BlockCompiler(tb);
 			block_txln_fn fn;
@@ -108,14 +108,14 @@ bool CPU::run_block_jit_safepoint()
 
 			delete compiler;
 
-			printf("*** after compile\n");
-			dump_mallinfo();
+			//printf("*** after compile\n");
+			//dump_mallinfo();
 
 			// Release TB memory
 			free(tb.ir_insn);
 
-			printf("*** after release\n");
-			dump_mallinfo();
+			//printf("*** after release\n");
+			//dump_mallinfo();
 
 #ifdef REG_STATE_PROTECTION
 			Memory::set_va_flags(reg_state(), tmp);

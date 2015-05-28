@@ -221,7 +221,7 @@ namespace captive {
 				inline void ensure_buffer()
 				{
 					if (_write_offset >= _buffer_size) {
-						_buffer_size += 1024;
+						_buffer_size += 64;
 						_buffer = (uint8_t *)_alloc.reallocate(_buffer, _buffer_size);
 					}
 				}

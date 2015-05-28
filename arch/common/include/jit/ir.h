@@ -300,6 +300,8 @@ namespace captive {
 
 				inline const std::list<IRInstruction *>& instructions() const { return _instructions; }
 
+				inline void clear_instructions() { _instructions.clear(); }
+
 				inline instructions::IRTerminatorInstruction& terminator() const
 				{
 					assert(_instructions.size() > 0);

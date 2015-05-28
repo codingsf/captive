@@ -18,7 +18,12 @@ safepoint_t cpu_safepoint;
 
 CPU *CPU::current_cpu;
 
-CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), _exec_txl(false), _profile_image(profile_image), block_txln_cache_size(16384)
+CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data)
+	: _env(env),
+	_per_cpu_data(per_cpu_data),
+	_exec_txl(false),
+	_profile_image(profile_image),
+	block_txln_cache_size(32768)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));

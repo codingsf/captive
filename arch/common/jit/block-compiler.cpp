@@ -166,6 +166,8 @@ retry:
 					IRRegisterOperand& regop = (IRRegisterOperand&)*oper;
 					if (regop.allocation_class() == IRRegisterOperand::None) {
 						insn->remove_from_parent();
+						delete insn;
+
 						goto retry;
 					}
 				}
@@ -187,6 +189,8 @@ retry:
 			for (auto def : insn->defs()) {
 				if (insn->live_outs().count(def) == 0) {
 					insn->remove_from_parent();
+					delete insn;
+
 					goto retry;
 				}
 			}
@@ -209,8 +213,10 @@ bool BlockCompiler::thread_rets()
 			IRBlock *successor = block->terminator().successors().front();
 
 			if (successor->instructions().front()->type() == IRInstruction::Return) {
-				block->terminator().remove_from_parent();
-				// TODO: Delete
+				IRInstruction& terminator = block->terminator();
+
+				terminator.remove_from_parent();
+				delete &terminator;
 
 				block->append_instruction(*new instructions::IRRetInstruction());
 				block->remove_successors();
@@ -218,7 +224,7 @@ bool BlockCompiler::thread_rets()
 
 				if (successor->predecessors().size() == 0) {
 					successor->remove_from_parent();
-					// TODO: Delete
+					delete successor;
 				}
 			}
 		}
@@ -240,15 +246,18 @@ retry:
 #endif
 
 				// Detach the terminator instruction from the new parent block.
-				block->terminator().remove_from_parent();
-
-				// TODO: delete terminator
+				IRInstruction& terminator = block->terminator();
+				terminator.remove_from_parent();
+				delete &terminator;
 
 				// Re-parent all instructions in the sucessor block into the
 				// new parent block.
 				for (auto insn : succ->instructions()) {
 					block->append_instruction(*insn);
 				}
+
+				// Clear the successors list of instructions, so that deleting it works.
+				succ->clear_instructions();
 
 				// Remove the successors from the parent block.
 				block->remove_successors();
@@ -265,6 +274,7 @@ retry:
 
 				// Detach the child block from the parent.
 				succ->remove_from_parent();
+				delete succ;
 
 				goto retry;
 			}

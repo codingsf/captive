@@ -136,7 +136,8 @@ IRBlock::~IRBlock()
 
 void IRBlock::remove_from_parent()
 {
-	 _owner.remove_block(*this);
+	_owner.remove_block(*this);
+	//delete this;
 }
 
 void IRBlock::compute_initial_liveness()
@@ -233,6 +234,7 @@ IRInstruction::~IRInstruction()
 void IRInstruction::remove_from_parent()
 {
 	_owner->remove_instruction(*this);
+	//delete this;
 }
 
 void IRInstruction::dump() const
