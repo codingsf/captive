@@ -37,7 +37,7 @@ bool CPU::run_block_jit()
 			trace().end_record();
 		}
 
-		//printf("cpu: memory fault %d\n", rc);
+		printf("cpu: memory fault %d\n", rc);
 
 		// Instruct the interpreter to handle the memory fault, passing
 		// in the the type of fault.
@@ -71,32 +71,11 @@ bool CPU::run_block_jit_safepoint()
 		}
 
 		gva_t virt_pc = (gva_t)read_pc();
-		gpa_t phys_pc;
 
 		mmu().set_page_executed(virt_pc);
 
-		MMU::access_info info;
-		info.mode = kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
-		info.type = MMU::ACCESS_FETCH;
-
-		MMU::resolution_fault fault;
-
-		// Grab the GPA for the GVA of the PC.
-		if (!mmu().resolve_gpa(virt_pc, phys_pc, info, fault, false)) {
-			printf("cpu: unable to resolve gva %08x\n", virt_pc);
-			return false;
-		}
-
-		// If we faulted on the fetch, go via the interpreter to sort it out.
-		if (fault != MMU::NONE) {
-			printf("cpu: fault when fetching next block instruction @ %08x mode=%d\n", virt_pc, kernel_mode());
-			abort();
-			interpret_block();
-			continue;
-		}
-
-		block_txln_cache_t::iterator txln = block_txln_cache.find(phys_pc);
-		if (txln == block_txln_cache.end()) {
+		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(virt_pc);
+		if (cache_entry->tag == 0 || cache_entry->tag != virt_pc) {
 #ifdef REG_STATE_PROTECTION
 			uint32_t tmp = Memory::get_va_flags(reg_state());
 			Memory::set_va_flags(reg_state(), 0);
@@ -106,39 +85,58 @@ bool CPU::run_block_jit_safepoint()
 			printf("jit: translating block phys-pc=%08x, virt-pc=%08x\n", phys_pc, virt_pc);
 #endif
 
+			printf("*** before\n");
+			dump_mallinfo();
+
 			shared::TranslationBlock tb;
 			bzero(&tb, sizeof(tb));
 
-			if (!translate_block(phys_pc, tb)) {
+			if (!translate_block(virt_pc, tb)) {
 				printf("jit: block translation failed\n");
 				return false;
 			}
 
-			BlockCompiler compiler(tb);
+			printf("*** after translate\n");
+			dump_mallinfo();
+
+			BlockCompiler *compiler = new BlockCompiler(tb);
 			block_txln_fn fn;
-			if (!compiler.compile(fn)) {
+			if (!compiler->compile(fn)) {
 				printf("jit: block compilation failed\n");
 				return false;
 			}
 
+			delete compiler;
+
+			printf("*** after compile\n");
+			dump_mallinfo();
+
 			// Release TB memory
 			free(tb.ir_insn);
+
+			printf("*** after release\n");
+			dump_mallinfo();
 
 #ifdef REG_STATE_PROTECTION
 			Memory::set_va_flags(reg_state(), tmp);
 #endif
 
-#ifdef DEBUG_TRANSLATION
-			printf("jit: executing fresh block %p phys-pc=%08x, virt-pc=%08x\n", fn, phys_pc, virt_pc);
-#endif
-			block_txln_cache[phys_pc] = fn;
+			if (cache_entry->tag) {
+				printf("jit: evicting %08x %p\n", cache_entry->tag, cache_entry->fn);
+				free((void *)cache_entry->fn);
+			}
+
+			printf("jit: executing fresh block %p virt-pc=%08x\n", fn, virt_pc);
+
+			cache_entry->tag = virt_pc;
+			cache_entry->fn = fn;
 
 			ensure_privilege_mode();
 			step_ok = (fn(&jit_state) == 0);
 		} else {
-			//printf("jit: executing cached block %x:%p\n", pc, txln->second);
+			//printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x\n", cache_entry->fn, phys_pc, virt_pc);
 			ensure_privilege_mode();
-			step_ok = (txln->second(&jit_state) == 0);
+			step_ok = (cache_entry->fn(&jit_state) == 0);
 		}
 	} while(step_ok);
 
@@ -147,18 +145,21 @@ bool CPU::run_block_jit_safepoint()
 
 void CPU::clear_block_cache()
 {
+	printf("jit: clearing block cache\n");
 #ifdef DEBUG_TRANSLATION
 	printf("jit: clearing block cache\n");
 #endif
 
-	for (auto txln : block_txln_cache) {
-		free((void *)txln.second);
-	}
+	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
+		if (entry->tag) {
+			free((void *)entry->fn);
+		}
 
-	block_txln_cache.clear();
+		entry->tag = 0;
+	}
 }
 
-bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
+bool CPU::translate_block(gva_t va, shared::TranslationBlock& tb)
 {
 	using namespace captive::shared;
 
@@ -174,14 +175,14 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 	printf("jit: translating block %x\n", pa);
 #endif
 
-	tb.block_addr = pa;
+	tb.block_addr = va;
 	tb.heat = 0;
 	tb.is_entry = 1;
 
-	gpa_t pc = pa;
+	gva_t pc = va;
 	do {
 		// Attempt to decode the current instruction.
-		if (!decode_instruction_phys(pc, insn)) {
+		if (!decode_instruction_virt(pc, insn)) {
 			printf("jit: unhandled decode fault @ %08x\n", pc);
 			assert(false);
 		}

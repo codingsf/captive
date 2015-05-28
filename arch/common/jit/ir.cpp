@@ -12,6 +12,10 @@ IRContext::~IRContext()
 	for (auto block : _blocks) {
 		delete block.second;
 	}
+
+	for (auto reg : _registers) {
+		delete reg.second;
+	}
 }
 
 void IRContext::remove_block(IRBlock& block)
@@ -135,7 +139,7 @@ void IRBlock::remove_from_parent()
 	 _owner.remove_block(*this);
 }
 
-void IRBlock::invalidate_liveness()
+void IRBlock::compute_initial_liveness()
 {
 	_live_in.clear();
 	_live_out.clear();
@@ -144,15 +148,6 @@ void IRBlock::invalidate_liveness()
 		insn->_live_in.clear();
 		insn->_live_out.clear();
 	}
-}
-
-void IRBlock::calculate_liveness()
-{
-	//printf("calculating liveness for block %d\n", id());
-	for (auto out : _live_out) {
-		//printf("  adding live out: r%d\n", out->id());
-		_live_in.insert(out);
-	}
 
 	// Iterate over the list of instructions, backwards.
 	for (auto II = _instructions.rbegin(), IE = _instructions.rend(); II != IE; ++II) {
@@ -160,13 +155,13 @@ void IRBlock::calculate_liveness()
 
 		// Iterate over vregs used by this instruction, and mark as a LIVE IN
 		for (auto use : insn->_uses) {
-			insn->_live_in.insert(&use->reg());
-			_live_in.insert(&use->reg());
+			insn->_live_in.insert(use);
+			_live_in.insert(use);
 		}
 
 		// Iterate over vregs defined by this instruction, and remove them as a LIVE IN
 		for (auto def : insn->_defs) {
-			_live_in.erase(&def->reg());
+			_live_in.erase(def);
 		}
 
 		// Add each LIVE IN as a LIVE IN for this instruction
@@ -183,23 +178,50 @@ void IRBlock::calculate_liveness()
 				insn->_live_out.insert(out);
 			}
 		}
-
-		//printf("  ");
-		//insn->dump();
-		//printf("\n");
 	}
 
-	// Once we've finished, all remaining LIVE INS must be LIVE OUTS of the
-	// predecessors.  Also, calculate their liveness too.
+	_live_in = _instructions.front()->live_ins();
+}
+
+void IRBlock::finalise_liveness(std::set<IRBlock *>& work_list)
+{
+	work_list.erase(this);
+
 	for (auto pred : _pred) {
+		std::set<IRRegister *> current_outs;
+
 		for (auto in : _live_in) {
-			//printf("  still live in: r%d\n", in->id());
 			pred->_live_out.insert(in);
+			current_outs.insert(in);
 		}
 
-		pred->calculate_liveness();
+		for (auto II = pred->_instructions.rbegin(), IE = pred->_instructions.rend(); II != IE; ++II) {
+			IRInstruction *insn = *II;
+
+			for (auto out : current_outs) {
+				insn->_live_out.insert(out);
+
+				// If the instruction defines (and does not read) the vreg, then stop propagation
+				if (insn->_defs.count(out) != 0 && insn->_uses.count(out) == 0) {
+					current_outs.erase(out);
+				}
+			}
+
+			for (auto out : current_outs) {
+				insn->_live_in.insert(out);
+			}
+		}
+
+		if (current_outs.size() != 0) {
+			for (auto out : current_outs) {
+				pred->_live_in.insert(out);
+			}
+
+			work_list.insert(pred);
+		}
 	}
 }
+
 
 IRInstruction::~IRInstruction()
 {

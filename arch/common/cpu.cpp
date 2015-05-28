@@ -18,13 +18,16 @@ safepoint_t cpu_safepoint;
 
 CPU *CPU::current_cpu;
 
-CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), _exec_txl(false), _profile_image(profile_image)
+CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data) : _env(env), _per_cpu_data(per_cpu_data), _exec_txl(false), _profile_image(profile_image), block_txln_cache_size(16384)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
 
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
+
+	// Initialise the block translation cache
+	block_txln_cache = (struct block_txln_cache_entry *)malloc(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
 
 	jit_state.cpu = this;
 	jit_state.region_chaining_table = (void **)malloc(sizeof(void *) * 0x100000);
@@ -185,8 +188,13 @@ void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base
 {
 	if (virt_page_base_addr > (va_t)0x100000000) return;
 
-	// TODO: Optimise for current execution mode
-	clear_block_cache();
+	for (int i = 0; i < 4096; i++) {
+		block_txln_cache_entry *entry = get_block_txln_cache_entry((uint64_t)virt_page_base_addr + i);
+		if (entry->tag) {
+			free((void *)entry->fn);
+			entry->tag = 0;
+		}
+	}
 
 	profile_image().invalidate((gpa_t)((uint64_t)phys_page_base_addr & 0xffffffffULL));
 	jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;

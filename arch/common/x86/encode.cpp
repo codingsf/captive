@@ -433,6 +433,11 @@ void X86Encoder::mul(const X86Register& src, const X86Register& dst)
 	encode_opcode_mod_rm(0x1af, dst, src);
 }
 
+void X86Encoder::div(const X86Register& divisor)
+{
+	encode_opcode_mod_rm(0xf7, 6, divisor);
+}
+
 void X86Encoder::cmp(const X86Register& src, const X86Register& dst)
 {
 	assert(src.size == dst.size);
@@ -520,6 +525,23 @@ void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, uint8_t size, con
 	}
 }
 
+void X86Encoder::test(uint64_t v, const X86Register& op)
+{
+	if (op.size == 1) {
+		encode_opcode_mod_rm(0xf6, 0, op);
+	} else {
+		encode_opcode_mod_rm(0xf7, 0, op);
+	}
+
+	switch (op.size) {
+	case 1:	emit8(v); break;
+	case 2:	emit16(v); break;
+	case 4:	emit32(v); break;
+	case 8:	emit64(v); break;
+	default: assert(false);
+	}
+}
+
 void X86Encoder::test(const X86Register& op1, const X86Register& op2)
 {
 	assert(op1.size == op2.size);
@@ -552,6 +574,18 @@ void X86Encoder::jnz_reloc(uint32_t& reloc_offset)
 	emit32(0);
 }
 
+void X86Encoder::jnz(int8_t off)
+{
+	emit8(0x75);
+	emit8(off);
+}
+
+void X86Encoder::je(int8_t off)
+{
+	emit8(0x74);
+	emit8(off);
+}
+
 void X86Encoder::setcc(uint8_t v, const X86Register& dst)
 {
 	assert(dst.size == 1);
@@ -572,6 +606,15 @@ void X86Encoder::bsr(const X86Register& src, const X86Register& dst)
 void X86Encoder::ret()
 {
 	emit8(0xc3);
+}
+
+void X86Encoder::movcs(const X86Register& dst)
+{
+	assert(dst.size == 2);
+
+	emit8(0x66);
+	emit8(0x8c);
+	encode_mod_reg_rm(1, dst);
 }
 
 void X86Encoder::intt(uint8_t irq)

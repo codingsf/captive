@@ -13,11 +13,6 @@ extern "C" {
 		case 1:
 			captive::arch::CPU::get_active_cpu()->mmu().invalidate((gva_t)mctx->rsi);
 			return 0;
-		case 2:
-			if (captive::arch::CPU::get_active_cpu()->kernel_mode()) {
-				switch_to_kernel_mode();
-			}
-			return 0;
 		}
 		return -1;
 	}

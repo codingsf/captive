@@ -226,8 +226,8 @@ namespace captive {
 				virtual InstructionTypes type() const = 0;
 
 				inline const std::list<IROperand *>& operands() const { return _all_operands; }
-				inline const std::vector<IRRegisterOperand *>& uses() const { return _uses; }
-				inline const std::vector<IRRegisterOperand *>& defs() const { return _defs; }
+				inline const std::set<IRRegister *>& uses() const { return _uses; }
+				inline const std::set<IRRegister *>& defs() const { return _defs; }
 
 				const std::set<IRRegister *> live_ins() const { return _live_in; }
 				const std::set<IRRegister *> live_outs() const { return _live_out; }
@@ -251,14 +251,14 @@ namespace captive {
 					_all_operands.push_back(&operand);
 
 					if (operand.type() == IROperand::Register)
-						_uses.push_back(&((IRRegisterOperand&)operand));
+						_uses.insert(&((IRRegisterOperand&)operand).reg());
 				}
 
 				inline void add_output_operand(IRRegisterOperand& operand)
 				{
 					operand.attach(*this);
 					_all_operands.push_back(&operand);
-					_defs.push_back(&operand);
+					_defs.insert(&(operand.reg()));
 				}
 
 				inline void add_input_output_operand(IRRegisterOperand& operand)
@@ -266,8 +266,8 @@ namespace captive {
 					operand.attach(*this);
 					_all_operands.push_back(&operand);
 
-					_uses.push_back(&operand);
-					_defs.push_back(&operand);
+					_uses.insert(&(operand.reg()));
+					_defs.insert(&(operand.reg()));
 				}
 
 				virtual const char *mnemonic() const = 0;
@@ -280,7 +280,7 @@ namespace captive {
 				IRInstruction *_next;
 
 				std::list<IROperand *> _all_operands;
-				std::vector<IRRegisterOperand *> _uses, _defs;
+				std::set<IRRegister *> _uses, _defs;
 
 				std::set<IRRegister *> _live_in, _live_out;
 			};
@@ -377,9 +377,8 @@ namespace captive {
 				}
 
 				void remove_from_parent();
-
-				void invalidate_liveness();
-				void calculate_liveness();
+				void compute_initial_liveness();
+				void finalise_liveness(std::set<IRBlock *>& work_list);
 
 			private:
 				IRContext& _owner;

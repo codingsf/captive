@@ -3,6 +3,7 @@
 #include <cpu.h>
 #include <env.h>
 #include <interp.h>
+#include <priv.h>
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode)
 {
@@ -39,6 +40,15 @@ extern "C" void cpu_check_interrupts(captive::arch::CPU *cpu)
 {
 	if (unlikely(cpu->cpu_data().isr)) {
 		cpu->interpreter().handle_irq(cpu->cpu_data().isr);
+	}
+}
+
+extern "C" void jit_rum(captive::arch::CPU *cpu)
+{
+	if (in_kernel_mode()) {
+		printf("*** read-user-memory: in kernel mode\n");
+	} else {
+		printf("*** read-user-memory: in user mode\n");
 	}
 }
 

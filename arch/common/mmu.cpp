@@ -6,7 +6,8 @@
 
 using namespace captive::arch;
 
-static const char *mem_access_types[] = { "read", "write", "fetch", "read-user", "write-user" };
+static const char *mem_access_types[] = { "read", "write", "fetch" };
+static const char *mem_access_modes[] = { "user", "kernel" };
 static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
 MMU::MMU(CPU& cpu) : _cpu(cpu)
@@ -64,6 +65,7 @@ bool MMU::clear_vma()
 	// Flush the TLB
 	Memory::flush_tlb();
 
+	//printf("mmu: vma cleared\n");
 	return true;
 }
 
@@ -199,11 +201,11 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 				goto handle_device;
 			}
 
-			//printf("mmu: %d no fault: va=%08x pa=%08x access-type=%s rw=%d\n", _cpu.get_insns_executed(), va, pa, mem_access_types[mem_access_type], rw);
+			//printf("mmu: %08x no fault: va=%08x pa=%08x type=%s mode=%s\n", _cpu.read_pc(), va, pa, mem_access_types[info.type], mem_access_modes[info.mode]);
 		} else {
 			pt->present(false);
 			pt->device(false);
-			//printf("mmu: %08x fault: va=%08x access-type=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[mem_access_type], mem_fault_types[fault]);
+			//printf("mmu: %08x fault: va=%08x type=%s mode=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[info.type], mem_access_modes[info.mode], mem_fault_types[fault]);
 		}
 	}
 

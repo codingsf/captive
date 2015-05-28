@@ -87,6 +87,7 @@ void KVMCpu::interrupt(uint32_t code)
 }
 
 static KVMCpu *signal_cpu;
+static bool trap;
 
 static void handle_signal(int signo)
 {
@@ -94,6 +95,8 @@ static void handle_signal(int signo)
 		signal_cpu->per_cpu_data().async_action = 2;
 	} else if (signo == SIGUSR2) {
 		signal_cpu->interrupt(0);
+	} else if (signo == SIGTRAP) {
+		trap = true;
 	}
 }
 
@@ -114,6 +117,7 @@ bool KVMCpu::run()
 	signal_cpu = this;
 	signal(SIGUSR1, handle_signal);
 	signal(SIGUSR2, handle_signal);
+	signal(SIGTRAP, handle_signal);
 
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
@@ -126,7 +130,15 @@ bool KVMCpu::run()
 	do {
 		rc = vmioctl(KVM_RUN);
 		if (rc < 0) {
-			if (errno == EINTR) continue;
+			if (errno == EINTR) {
+				if (trap) {
+					trap = false;
+					DEBUG << CONTEXT(CPU) << "Received SIGTRAP";
+					dump_regs();
+				}
+
+				continue;
+			}
 
 			ERROR << CONTEXT(CPU) << "Unable to run VCPU: " << LAST_ERROR_TEXT;
 			return false;
@@ -439,15 +451,15 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
 		FILE *f = fopen(fname.str().c_str(), "wb");
 
-		uint64_t gpa = regs.rdi & 0xfffffff;
-		gpa += 0x040000000ULL;
+		uint64_t gpa = regs.rdi & 0xffffffff;
+		gpa += 0x000300000000ULL;
 
 		void *ptr = kvm_guest.get_phys_buffer(gpa);
-
 		if (ptr) {
 			fwrite(ptr, regs.rsi, 1, f);
 		}
 
+		fflush(f);
 		fclose(f);
 		return true;
 	}

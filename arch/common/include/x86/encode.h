@@ -87,6 +87,7 @@ namespace captive {
 				void movzx(const X86Register& src, const X86Register& dst);
 				void movsx(const X86Register& src, const X86Register& dst);
 
+				void movcs(const X86Register& dst);
 				void mov(const X86Register& src, const X86Register& dst);
 				void mov(const X86Memory& src, const X86Register& dst);
 				void mov(const X86Register& src, const X86Memory& dst);
@@ -130,6 +131,7 @@ namespace captive {
 				void sub(uint32_t val, const X86Register& dst);
 
 				void mul(const X86Register& src, const X86Register& dst);
+				void div(const X86Register& divisor);
 
 				void cmp(const X86Register& src, const X86Register& dst);
 				void cmp(const X86Register& src, const X86Memory& dst);
@@ -140,10 +142,17 @@ namespace captive {
 				void cmp4(uint32_t val, const X86Memory& dst);
 				void cmp8(uint64_t val, const X86Memory& dst);
 
+				void test(uint64_t val, const X86Register& op2);
 				void test(const X86Register& op1, const X86Register& op2);
 
 				void jmp_reloc(uint32_t& reloc_offset);
 				void jnz_reloc(uint32_t& reloc_offset);
+
+				void jnz(int32_t off);
+				void jnz(int8_t off);
+
+				void je(int32_t off);
+				void je(int8_t off);
 
 				void setcc(uint8_t v, const X86Register& dst);
 
@@ -212,7 +221,7 @@ namespace captive {
 				inline void ensure_buffer()
 				{
 					if (_write_offset >= _buffer_size) {
-						_buffer_size += 64;
+						_buffer_size += 1024;
 						_buffer = (uint8_t *)_alloc.reallocate(_buffer, _buffer_size);
 					}
 				}

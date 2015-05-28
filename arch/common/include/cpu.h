@@ -184,8 +184,18 @@ namespace captive {
 				return (Decode *)&decode_cache[((pc >> 2) % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
 			}
 
-			typedef std::map<uint32_t, jit::block_txln_fn> block_txln_cache_t;
-			block_txln_cache_t block_txln_cache;
+			struct block_txln_cache_entry {
+				uint32_t tag;
+				jit::block_txln_fn fn;
+			};
+
+			struct block_txln_cache_entry *block_txln_cache;
+			const uint32_t block_txln_cache_size;
+
+			inline struct block_txln_cache_entry *get_block_txln_cache_entry(uint32_t addr)
+			{
+				return &block_txln_cache[(addr >> 1) % block_txln_cache_size];
+			}
 
 			bool run_interp();
 			bool run_interp_safepoint();

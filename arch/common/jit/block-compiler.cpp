@@ -14,9 +14,12 @@ extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
 extern "C" void jit_verify(void *cpu);
+extern "C" void jit_rum(void *cpu);
 
 using namespace captive::arch::jit;
 using namespace captive::arch::x86;
+
+static bool ping = false;
 
 BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb), encoder(memory_allocator)
 {
@@ -126,22 +129,19 @@ bool BlockCompiler::build()
 
 bool BlockCompiler::analyse()
 {
-	std::vector<IRBlock *> exit_blocks;
+	std::set<IRBlock *> exit_blocks;
 
-	// Invalidate liveness on all blocks, and detect exit blocks (i.e. blocks without successors)
 	for (auto block : ir.blocks()) {
-		block->invalidate_liveness();
-
-		if (block->successors().size() == 0)
-			exit_blocks.push_back(block);
+		block->compute_initial_liveness();
+		exit_blocks.insert(block);
 	}
 
-	//printf("*** here we go\n");
-	// Calculate the liveness on every exit block, which will recursively calculate
-	// liveness on their predecessors.
-	for (auto block : exit_blocks) {
-		block->calculate_liveness();
+	while (exit_blocks.size() > 0) {
+		auto block = *(exit_blocks.begin());
+		block->finalise_liveness(exit_blocks);
 	}
+
+	//ir.dump();
 
 	return true;
 }
@@ -185,7 +185,7 @@ retry:
 	for (auto block : ir.blocks()) {
 		for (auto insn : block->instructions()) {
 			for (auto def : insn->defs()) {
-				if (insn->live_outs().count(&def->reg()) == 0) {
+				if (insn->live_outs().count(def) == 0) {
 					insn->remove_from_parent();
 					goto retry;
 				}
@@ -452,9 +452,14 @@ bool BlockCompiler::lower(uint32_t max_stack, block_txln_fn& fn)
 
 	fn = (block_txln_fn)encoder.get_buffer();
 
-#ifdef DEBUG_LOWER
-	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(fn), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
-#endif
+//#ifdef DEBUG_LOWER
+	if (ping) {
+		printf("*** dumping %p %u\n", fn, encoder.get_buffer_size());
+		ir.dump();
+		asm volatile("out %0, $0xff\n" :: "a"(15), "D"(fn), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
+		return false;
+	}
+//#endif
 
 	return true;
 }
@@ -981,6 +986,35 @@ bool BlockCompiler::lower_block(IRBlock& block)
 			break;
 		}
 
+		case IRInstruction::Mod:
+		{
+			instructions::IRModInstruction *modi = (instructions::IRModInstruction *)insn;
+
+			encoder.push(REG_RAX);
+			encoder.push(REG_RDX);
+
+			encoder.xorr(REG_EDX, REG_EDX);
+
+			encode_operand_to_reg(modi->destination(), REG_EAX);
+			encode_operand_to_reg(modi->source(), REG_ECX);
+
+			encoder.div(REG_ECX);
+			encoder.mov(REG_EDX, REG_ECX);
+
+			encoder.pop(REG_RDX);
+			encoder.pop(REG_RAX);
+
+			if (modi->destination().is_allocated_reg()) {
+				encoder.mov(REG_ECX, register_from_operand(modi->destination(), 4));
+			} else {
+				assert(false);
+			}
+
+			//ping = true;
+
+			break;
+		}
+
 		case IRInstruction::LoadPC:
 		{
 			instructions::IRLoadPCInstruction *ldpci = (instructions::IRLoadPCInstruction *)insn;
@@ -1286,9 +1320,12 @@ bool BlockCompiler::lower_block(IRBlock& block)
 
 		case IRInstruction::ReadUserMemory:
 		{
-			instructions::IRReadMemoryInstruction *rmi = (instructions::IRReadMemoryInstruction *)insn;
+			instructions::IRReadUserMemoryInstruction *rmi = (instructions::IRReadUserMemoryInstruction *)insn;
 
-			encoder.intt(0x80);
+			encoder.movcs(REG_CX);
+			encoder.test(3, REG_CL);
+			encoder.jnz((int8_t)2);
+			encoder.intt(0x81);
 
 			if (rmi->offset().type() == IROperand::Register) {
 				IRRegisterOperand& offset = (IRRegisterOperand&)rmi->offset();
@@ -1303,17 +1340,48 @@ bool BlockCompiler::lower_block(IRBlock& block)
 				assert(false);
 			}
 
-			encoder.push(REG_RDI);
-			encoder.mov(2, REG_RDI);
-			encoder.intt(0x82);
-			encoder.pop(REG_RDI);
+			encoder.test(3, REG_CL);
+			encoder.jnz((int8_t)2);
+			encoder.intt(0x80);
+			encoder.nop();
 
 			break;
 		}
 
 		case IRInstruction::WriteUserMemory:
 		{
-			assert(false);
+			instructions::IRWriteUserMemoryInstruction *wmi = (instructions::IRWriteUserMemoryInstruction *)insn;
+
+			encoder.movcs(REG_CX);
+			encoder.test(3, REG_CL);
+			encoder.jnz((int8_t)2);
+			encoder.intt(0x81);
+
+			if (wmi->offset().type() == IROperand::Register) {
+				IRRegisterOperand& offset = (IRRegisterOperand&)wmi->offset();
+
+				if (wmi->value().type() == IROperand::Register) {
+					IRRegisterOperand& value = (IRRegisterOperand&)wmi->value();
+
+					if (offset.is_allocated_reg() && value.is_allocated_reg()) {
+						// mov reg, (reg)
+
+						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset)));
+					} else {
+						assert(false);
+					}
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			encoder.test(3, REG_CL);
+			encoder.jnz((int8_t)2);
+			encoder.intt(0x80);
+			encoder.nop();
+
 			break;
 		}
 
