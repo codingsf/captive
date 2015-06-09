@@ -192,9 +192,9 @@ namespace captive {
 			struct block_txln_cache_entry *block_txln_cache;
 			const uint32_t block_txln_cache_size;
 
-			inline struct block_txln_cache_entry *get_block_txln_cache_entry(uint32_t addr)
+			inline struct block_txln_cache_entry *get_block_txln_cache_entry(gpa_t phys_addr)
 			{
-				return &block_txln_cache[(addr >> 1) % block_txln_cache_size];
+				return &block_txln_cache[((uint32_t)phys_addr >> 1) % block_txln_cache_size];
 			}
 
 			bool run_interp();

@@ -194,7 +194,7 @@ void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base
 	if (virt_page_base_addr > (va_t)0x100000000) return;
 
 	for (int i = 0; i < 4096; i++) {
-		block_txln_cache_entry *entry = get_block_txln_cache_entry((uint64_t)virt_page_base_addr + i);
+		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint64_t)phys_page_base_addr + i));
 		if (entry->tag) {
 			free((void *)entry->fn);
 			entry->tag = 0;

@@ -71,6 +71,9 @@ bool CPU::run_block_jit_safepoint()
 		}
 
 		gva_t virt_pc = (gva_t)read_pc();
+		gpa_t phys_pc;
+
+		if (!mmu().virt_to_phys(virt_pc, phys_pc)) abort();
 
 		mmu().set_page_executed(virt_pc);
 
@@ -99,20 +102,21 @@ bool CPU::run_block_jit_safepoint()
 			//printf("*** after translate\n");
 			//dump_mallinfo();
 
-			BlockCompiler *compiler = new BlockCompiler(tb);
+			struct mallinfo mi = dlmallinfo();
+			BlockCompiler compiler(tb);
 			block_txln_fn fn;
-			if (!compiler->compile(fn)) {
+			if (!compiler.compile(fn)) {
 				printf("jit: block compilation failed\n");
 				return false;
 			}
 
-			delete compiler;
-
-			//printf("*** after compile\n");
-			//dump_mallinfo();
-
 			// Release TB memory
 			free(tb.ir_insn);
+
+			struct mallinfo mix = dlmallinfo();
+			printf("*** after compile: %d\n", mix.uordblks - mi.uordblks);
+			//dump_mallinfo();
+
 
 			//printf("*** after release\n");
 			//dump_mallinfo();
@@ -122,11 +126,11 @@ bool CPU::run_block_jit_safepoint()
 #endif
 
 			if (cache_entry->tag) {
-				printf("jit: evicting %08x %p\n", cache_entry->tag, cache_entry->fn);
+				//printf("jit: evicting %08x %p\n", cache_entry->tag, cache_entry->fn);
 				free((void *)cache_entry->fn);
 			}
 
-			printf("jit: executing fresh block %p virt-pc=%08x\n", fn, virt_pc);
+			printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
 
 			cache_entry->tag = virt_pc;
 			cache_entry->fn = fn;

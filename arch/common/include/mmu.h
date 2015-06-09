@@ -70,6 +70,8 @@ namespace captive {
 			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault);
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 
+			bool virt_to_phys(gva_t va, gpa_t& pa);
+
 			inline void flush() {
 				clear_vma();
 			}

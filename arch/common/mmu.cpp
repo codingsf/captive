@@ -230,3 +230,14 @@ bool MMU::is_device(gpa_t gpa)
 
 	return false;
 }
+
+bool MMU::virt_to_phys(gva_t va, gpa_t& pa)
+{
+	access_info info;
+	resolution_fault fault;
+
+	info.type = ACCESS_FETCH;
+	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+
+	return resolve_gpa(va, pa, info, fault, false);
+}
