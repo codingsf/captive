@@ -162,6 +162,8 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 	tb.heat = 0;
 	tb.is_entry = 1;
 
+	int count = 0;
+
 	gpa_t pc = pa;
 	do {
 		// Attempt to decode the current instruction.
@@ -185,9 +187,9 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 		}
 
 		pc += insn->length;
-	} while (!insn->end_of_block);
+	} while (!insn->end_of_block && count++ < 20);
 
-	assert(insn->end_of_block);
+	/*assert(insn->end_of_block);
 	JumpInfo jump_info = get_instruction_jump_info(insn);
 
 	tb.destination_target = jump_info.target;
@@ -206,6 +208,7 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 			tb.destination_type = TranslationBlock::NON_PREDICATED_INDIRECT;
 		}
 	}
+*/
 
 	// Finish off with a RET.
 	ctx.add_instruction(IRInstruction::ret());

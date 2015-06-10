@@ -34,32 +34,38 @@ BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb), encoder(mem
 
 bool BlockCompiler::compile(block_txln_fn& fn)
 {
+	//printf("optimise tb\n");
 	if (!optimise_tb()) {
 		printf("jit: optimisation of translation block failed\n");
 		return false;
 	}
 
+	//printf("build\n");
 	if (!build()) {
 		printf("jit: ir creation failed\n");
 		return false;
 	}
 
+	//printf("optimise ir\n");
 	if (!optimise_ir()) {
 		printf("jit: optimisation of ir failed\n");
 		return false;
 	}
 
+	//printf("analyse\n");
 	if (!analyse()) {
 		printf("jit: analysis of ir failed\n");
 		return false;
 	}
 
+	//printf("allocate\n");
 	uint32_t max_stack = 0;
 	if (!allocate(max_stack)) {
 		printf("jit: register allocation failed\n");
 		return false;
 	}
 
+	//printf("die\n");
 	if (!die()) {
 		printf("jit: dead instruction elimination failed\n");
 		return false;
@@ -69,6 +75,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	ir.dump();
 #endif
 
+	//printf("lower\n");
 	if (!lower(max_stack, fn)) {
 		printf("jit: instruction lowering failed\n");
 		return false;
