@@ -30,6 +30,7 @@ namespace captive {
 				Interpreter,
 				BlockJIT,
 				RegionJIT,
+				PageJIT,
 			};
 
 			explicit GuestCPUConfiguration(CPUExecutionMode exec_mode) : _exec_mode(exec_mode), _verify_mode(false), _cts(NULL) { }

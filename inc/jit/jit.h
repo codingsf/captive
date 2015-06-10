@@ -22,6 +22,7 @@ namespace captive {
 	namespace shared {
 		struct RegionWorkUnit;
 		struct BlockWorkUnit;
+		struct PageWorkUnit;
 		struct TranslationBlock;
 
 		struct IRInstruction;
@@ -31,6 +32,7 @@ namespace captive {
 	namespace jit {
 		class BlockJIT;
 		class RegionJIT;
+		class PageJIT;
 
 		class JIT
 		{
@@ -44,6 +46,7 @@ namespace captive {
 
 			virtual BlockJIT& block_jit() = 0;
 			virtual RegionJIT& region_jit() = 0;
+			virtual PageJIT& page_jit() = 0;
 
 			void set_shared_memory(hypervisor::SharedMemory& shmem) {
 				_shared_memory = &shmem;
@@ -89,6 +92,18 @@ namespace captive {
 
 			virtual bool compile_region(shared::RegionWorkUnit *work_unit) = 0;
 			void compile_region_async(shared::RegionWorkUnit *work_unit, region_completion_t completion, void *completion_data);
+		};
+
+		class PageJIT : public JITStrategy
+		{
+		public:
+			typedef void (*page_completion_t)(shared::PageWorkUnit *work_unit, bool success, void *completion_data);
+
+			PageJIT(JIT& owner);
+			virtual ~PageJIT();
+
+			virtual bool compile_page(shared::PageWorkUnit *work_unit) = 0;
+			void compile_page_async(shared::PageWorkUnit *work_unit, page_completion_t completion, void *completion_data);
 		};
 
 		class InstructionPrinter

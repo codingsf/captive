@@ -463,6 +463,13 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		fclose(f);
 		return true;
 	}
+
+	case 20: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
+		return kvm_guest.jit().page_jit().compile_page((captive::shared::PageWorkUnit *)regs.rdi);
+	}
 	}
 
 	return false;

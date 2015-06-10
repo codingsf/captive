@@ -32,6 +32,7 @@ namespace captive {
 			class Region;
 			class Block;
 			class Translation;
+			class Page;
 		}
 
 		namespace jit {
@@ -203,6 +204,8 @@ namespace captive {
 			bool run_block_jit_safepoint();
 			bool run_region_jit();
 			bool run_region_jit_safepoint();
+			bool run_page_jit();
+			bool run_page_jit_safepoint();
 
 			bool handle_pending_action(uint32_t action);
 			bool interpret_block();
@@ -211,6 +214,8 @@ namespace captive {
 			void compile_region(profile::Region& rgn);
 			bool compile_block(profile::Block& block, shared::TranslationBlock& tb);
 			bool translate_block(gpa_t pa, shared::TranslationBlock& tb);
+
+			bool translate_page(profile::Page& page);
 		};
 	}
 }

@@ -345,6 +345,21 @@ void BlockJIT::compile_block_async(BlockWorkUnit* work_unit, block_completion_t 
 	assert(false);
 }
 
+PageJIT::PageJIT(JIT& owner) : JITStrategy(owner)
+{
+
+}
+
+PageJIT::~PageJIT()
+{
+
+}
+
+void PageJIT::compile_page_async(shared::PageWorkUnit* work_unit, page_completion_t completion, void* completion_data)
+{
+	assert(false);
+}
+
 RegionJIT::RegionJIT(JIT& owner) : JITStrategy(owner)
 {
 

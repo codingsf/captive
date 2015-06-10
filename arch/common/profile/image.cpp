@@ -1,16 +1,26 @@
 #include <profile/image.h>
 #include <profile/region.h>
+#include <profile/page.h>
 
 using namespace captive::arch::profile;
 
 Image::Image()
 {
-
+	pages = new Page[1048576];
 }
 
 Image::~Image()
 {
 
+}
+
+Page& Image::get_page(gpa_t gpa)
+{
+	gpa_t base_address = gpa & ~0xfff;
+	Page *page = &pages[base_address];
+	page->base_address = base_address;
+
+	return *page;
 }
 
 Block& Image::get_block(gpa_t gpa)

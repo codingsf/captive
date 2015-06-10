@@ -16,14 +16,18 @@ namespace captive {
 		namespace profile {
 			class Region;
 			class Block;
+			class Page;
 
 			class Image
 			{
 			public:
 				typedef std::map<gpa_t, Region *> region_map_t;
+				typedef std::map<gpa_t, Page *> page_map_t;
 
 				Image();
 				~Image();
+
+				Page& get_page(gpa_t gpa);
 
 				Region& get_region(gpa_t gpa);
 				Block& get_block(gpa_t gpa);
@@ -37,6 +41,7 @@ namespace captive {
 
 			private:
 				region_map_t regions;
+				Page *pages;
 			};
 		}
 	}

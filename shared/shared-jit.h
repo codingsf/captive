@@ -555,6 +555,12 @@ namespace captive {
 
 			void *ir;
 		} __packed;
+
+		struct PageWorkUnit
+		{
+			uint8_t page[4096];
+			uint8_t entries[512];
+		} __packed;
 	}
 }
 

@@ -7,6 +7,11 @@ void *operator new(size_t size)
 	return captive::arch::malloc(size);
 }
 
+void *operator new[](size_t size)
+{
+	return captive::arch::calloc(1, size);
+}
+
 void operator delete(void *p)
 {
 	captive::arch::free(p);

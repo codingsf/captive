@@ -29,7 +29,7 @@ namespace captive {
 	namespace jit {
 		class LLVMJITMemoryManager;
 
-		class LLVMJIT : public JIT, public BlockJIT, public RegionJIT {
+		class LLVMJIT : public JIT, public BlockJIT, public RegionJIT, public PageJIT {
 		public:
 			LLVMJIT(engine::Engine& engine, util::ThreadPool& worker_threads);
 			virtual ~LLVMJIT();
@@ -38,9 +38,11 @@ namespace captive {
 
 			BlockJIT& block_jit() override { return *this; }
 			RegionJIT& region_jit() override { return *this; }
+			PageJIT& page_jit() override { return *this; }
 
 			bool compile_block(shared::BlockWorkUnit *bwu) override;
 			bool compile_region(shared::RegionWorkUnit *rwu) override;
+			bool compile_page(shared::PageWorkUnit *rwu) override;
 
 		private:
 			engine::Engine& _engine;
