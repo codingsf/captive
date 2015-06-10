@@ -159,10 +159,10 @@ namespace captive {
 			inline void ensure_privilege_mode()
 			{
 				// Switch x86 privilege mode, to match the mode of the emulated processor
-				if (kernel_mode() && !in_kernel_mode()) {
+				if (kernel_mode()) {
 					//printf("cpu: km=%d, ring=%d switching to ring0\n", kernel_mode(), current_ring());
 					switch_to_kernel_mode();
-				} else if (!kernel_mode() && !in_user_mode()) {
+				} else if (!kernel_mode()) {
 					//printf("cpu: km=%d, ring=%d switching to ring3\n", kernel_mode(), current_ring());
 					switch_to_user_mode();
 				}

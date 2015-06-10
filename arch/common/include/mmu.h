@@ -74,6 +74,7 @@ namespace captive {
 
 			inline void flush() {
 				clear_vma();
+				clear_cache();
 			}
 
 			inline void invalidate(gva_t va)
@@ -101,6 +102,7 @@ namespace captive {
 			}
 
 			bool is_device(gpa_t gpa);
+			void clear_cache();
 
 		protected:
 			bool clear_vma();

@@ -76,26 +76,9 @@ bool CPU::run_region_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		// Update the executed bit on the page we're about to execute.
+		if (!mmu().virt_to_phys(virt_pc, phys_pc)) abort();
+
 		mmu().set_page_executed(virt_pc);
-
-		MMU::access_info info;
-		info.mode = kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
-		info.type = MMU::ACCESS_FETCH;
-
-		MMU::resolution_fault fault;
-
-		// Grab the GPA for the GVA of the PC.
-		if (!mmu().resolve_gpa(virt_pc, phys_pc, info, fault, false)) {
-			return false;
-		}
-
-		// If we faulted on the fetch, go via the interpreter to sort it out.
-		if (fault != MMU::NONE) {
-			prev_pc = phys_pc;
-			step_ok = interpret_block();
-			continue;
-		}
 
 		// Obtain the block descriptor for the BB we're about to execute.
 		Block& block = profile_image().get_block(phys_pc);
@@ -121,7 +104,7 @@ bool CPU::run_region_jit_safepoint()
 		// We need to be back in kernel mode to do some accounting.
 		switch_to_kernel_mode();
 
-		if (trace_interval > 10000) {
+		if (trace_interval > 100000) {
 			trace_interval = 0;
 			analyse_regions();
 		} else {

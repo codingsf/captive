@@ -1,6 +1,7 @@
 #include <devices/timers/millisecond-tick-source.h>
+#include <captive.h>
 #include <thread>
-#include <unistd.h>
+#include <time.h>
 
 using namespace captive::devices::timers;
 
@@ -28,15 +29,26 @@ void MillisecondTickSource::stop()
 	terminate = true;
 	if (tick_thread->joinable())
 		tick_thread->join();
-	
+
 	delete tick_thread;
 	tick_thread = NULL;
 }
 
 void MillisecondTickSource::tick_thread_proc(MillisecondTickSource *o)
 {
+	struct timespec rqtp, rmtp;
+
+	rqtp.tv_nsec = 1e6;
+	rqtp.tv_sec = 0;
+
 	while (!o->terminate) {
 		o->tick(1);
-		usleep(1000);
+
+		nanosleep(&rqtp, &rmtp);
 	}
+}
+
+void MillisecondTickSource::recalibrate()
+{
+	//
 }

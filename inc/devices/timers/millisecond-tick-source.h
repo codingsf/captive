@@ -24,6 +24,8 @@ namespace captive {
 				virtual void stop() override;
 
 			private:
+				void recalibrate();
+				
 				static void tick_thread_proc(MillisecondTickSource *o);
 				std::thread *tick_thread;
 

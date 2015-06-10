@@ -2,7 +2,7 @@
 
 using namespace captive::devices::timers;
 
-CallbackTickSource::CallbackTickSource()
+CallbackTickSource::CallbackTickSource(uint32_t scale) : _scale(scale), _current_scale(0)
 {
 
 }

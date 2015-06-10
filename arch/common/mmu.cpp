@@ -241,3 +241,7 @@ bool MMU::virt_to_phys(gva_t va, gpa_t& pa)
 
 	return resolve_gpa(va, pa, info, fault, false);
 }
+
+void MMU::clear_cache()
+{
+}

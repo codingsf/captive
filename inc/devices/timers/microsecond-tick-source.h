@@ -1,12 +1,12 @@
 /*
- * File:   millisecond-tick-source.h
+ * File:   microsecond-tick-source.h
  * Author: spink
  *
- * Created on 18 February 2015, 16:43
+ * Created on 15 June 2015
  */
 
-#ifndef MILLISECOND_TICK_SOURCE_H
-#define	MILLISECOND_TICK_SOURCE_H
+#ifndef MICROSECOND_TICK_SOURCE_H
+#define	MICROSECOND_TICK_SOURCE_H
 
 #include <devices/timers/tick-source.h>
 #include <thread>
@@ -14,17 +14,19 @@
 namespace captive {
 	namespace devices {
 		namespace timers {
-			class MillisecondTickSource : public TickSource
+			class MicrosecondTickSource : public TickSource
 			{
 			public:
-				MillisecondTickSource();
-				virtual ~MillisecondTickSource();
+				MicrosecondTickSource();
+				virtual ~MicrosecondTickSource();
 
 				virtual void start() override;
 				virtual void stop() override;
 
 			private:
-				static void tick_thread_proc(MillisecondTickSource *o);
+				void recalibrate();
+
+				static void tick_thread_proc(MicrosecondTickSource *o);
 				std::thread *tick_thread;
 
 				volatile bool terminate;
@@ -33,5 +35,5 @@ namespace captive {
 	}
 }
 
-#endif	/* MILLISECOND_TICK_SOURCE_H */
+#endif	/* MICROSECOND_TICK_SOURCE_H */
 

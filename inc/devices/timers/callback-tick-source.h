@@ -18,10 +18,14 @@ namespace captive {
 			class CallbackTickSource : public TickSource
 			{
 			public:
-				CallbackTickSource();
+				CallbackTickSource(uint32_t scale);
 				virtual ~CallbackTickSource();
 
-				void do_tick() { this->tick(1); }
+				void do_tick() { if (_current_scale-- == 0) { this->tick(1); _current_scale = _scale; } }
+
+			private:
+				uint32_t _scale;
+				uint32_t _current_scale;
 			};
 		}
 	}

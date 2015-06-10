@@ -17,6 +17,7 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/IR/InlineAsm.h>
 
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
@@ -367,7 +368,7 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 			Value *memptr = ctx.builder.CreateIntToPtr(addr, memptrtype);
 			set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
-			ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr, true), dst);
+			ctx.builder.CreateStore(ctx.builder.CreateLoad(memptr, false), dst);
 #else
 			Type *dst_type = type_for_operand(ctx, op1, true);
 
@@ -425,7 +426,7 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 			Value *memptr = ctx.builder.CreateIntToPtr(addr, type_for_operand(ctx, op0, true));
 			set_aa_metadata(memptr, TAG_CLASS_MEMORY);
 
-			ctx.builder.CreateStore(src, memptr, true);
+			ctx.builder.CreateStore(src, memptr, false);
 #else
 			Type *src_type = type_for_operand(ctx, op0, false);
 

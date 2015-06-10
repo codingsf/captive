@@ -1,5 +1,6 @@
 #include <devices/arm/sp810.h>
 #include <devices/timers/tick-source.h>
+#include <captive.h>
 
 #include <chrono>
 
@@ -9,7 +10,6 @@ using namespace captive::devices::arm;
 
 SP810::SP810(timers::TickSource& ts) : Primecell(0x00041011), start_time(ts.count()), leds(0), lockval(0), colour_mode(0x1f00), _tick_source(ts)
 {
-
 }
 
 SP810::~SP810()

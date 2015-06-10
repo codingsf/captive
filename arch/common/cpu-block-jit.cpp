@@ -54,8 +54,6 @@ bool CPU::run_block_jit_safepoint()
 {
 	bool step_ok = true;
 	do {
-		switch_to_kernel_mode();
-
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
@@ -88,9 +86,6 @@ bool CPU::run_block_jit_safepoint()
 			printf("jit: translating block phys-pc=%08x, virt-pc=%08x\n", phys_pc, virt_pc);
 #endif
 
-			//printf("*** before\n");
-			//dump_mallinfo();
-
 			shared::TranslationBlock tb;
 			bzero(&tb, sizeof(tb));
 
@@ -99,10 +94,6 @@ bool CPU::run_block_jit_safepoint()
 				return false;
 			}
 
-			//printf("*** after translate\n");
-			//dump_mallinfo();
-
-			struct mallinfo mi = dlmallinfo();
 			BlockCompiler compiler(tb);
 			block_txln_fn fn;
 			if (!compiler.compile(fn)) {
@@ -113,14 +104,6 @@ bool CPU::run_block_jit_safepoint()
 			// Release TB memory
 			free(tb.ir_insn);
 
-			struct mallinfo mix = dlmallinfo();
-			printf("*** after compile: %d\n", mix.uordblks - mi.uordblks);
-			//dump_mallinfo();
-
-
-			//printf("*** after release\n");
-			//dump_mallinfo();
-
 #ifdef REG_STATE_PROTECTION
 			Memory::set_va_flags(reg_state(), tmp);
 #endif
@@ -130,7 +113,7 @@ bool CPU::run_block_jit_safepoint()
 				free((void *)cache_entry->fn);
 			}
 
-			printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
+			//printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
 
 			cache_entry->tag = virt_pc;
 			cache_entry->fn = fn;

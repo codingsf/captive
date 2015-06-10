@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 	TickSource *ts;
 
 	if (verify_enabled()) {
-		ts = new CallbackTickSource();
+		ts = new CallbackTickSource(1000);
 	} else {
 		ts = new MillisecondTickSource();
 	}
