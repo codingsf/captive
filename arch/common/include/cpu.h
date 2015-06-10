@@ -210,7 +210,7 @@ namespace captive {
 			void analyse_regions();
 			void compile_region(profile::Region& rgn);
 			bool compile_block(profile::Block& block, shared::TranslationBlock& tb);
-			bool translate_block(uint32_t va, shared::TranslationBlock& tb);
+			bool translate_block(gpa_t pa, shared::TranslationBlock& tb);
 		};
 	}
 }

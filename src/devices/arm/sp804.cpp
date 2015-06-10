@@ -4,7 +4,7 @@
 
 using namespace captive::devices::arm;
 
-SP804::SP804(timers::TickSource& tick_source, irq::IRQLine& irq) : Primecell(0x00141804), ticks(100), irq(irq)
+SP804::SP804(timers::TickSource& tick_source, irq::IRQLine& irq) : Primecell(0x00141804), ticks(1000), irq(irq)
 {
 	timers[0].owner(*this);
 	timers[1].owner(*this);

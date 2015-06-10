@@ -54,6 +54,8 @@ bool CPU::run_block_jit_safepoint()
 {
 	bool step_ok = true;
 	do {
+		switch_to_kernel_mode();
+
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
@@ -76,54 +78,47 @@ bool CPU::run_block_jit_safepoint()
 		mmu().set_page_executed(virt_pc);
 
 		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(virt_pc);
-		if (cache_entry->tag == 0 || cache_entry->tag != virt_pc) {
-#ifdef REG_STATE_PROTECTION
-			uint32_t tmp = Memory::get_va_flags(reg_state());
-			Memory::set_va_flags(reg_state(), 0);
-#endif
-
-#ifdef DEBUG_TRANSLATION
-			printf("jit: translating block phys-pc=%08x, virt-pc=%08x\n", phys_pc, virt_pc);
-#endif
-
-			shared::TranslationBlock tb;
-			bzero(&tb, sizeof(tb));
-
-			if (!translate_block(virt_pc, tb)) {
-				printf("jit: block translation failed\n");
-				return false;
-			}
-
-			BlockCompiler compiler(tb);
-			block_txln_fn fn;
-			if (!compiler.compile(fn)) {
-				printf("jit: block compilation failed\n");
-				return false;
-			}
-
-			// Release TB memory
-			free(tb.ir_insn);
-
-#ifdef REG_STATE_PROTECTION
-			Memory::set_va_flags(reg_state(), tmp);
-#endif
-
-			if (cache_entry->tag) {
-				//printf("jit: evicting %08x %p\n", cache_entry->tag, cache_entry->fn);
+		if (cache_entry->tag != virt_pc) {
+			if (cache_entry->tag != 1 && cache_entry->fn) {
+				//printf("jit: evicting block translation %p\n", cache_entry->fn);
 				free((void *)cache_entry->fn);
 			}
 
-			//printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
-
 			cache_entry->tag = virt_pc;
-			cache_entry->fn = fn;
+			cache_entry->fn = NULL;
 
-			ensure_privilege_mode();
-			step_ok = (fn(&jit_state) == 0);
+			//printf("jit: interpreting block phys-pc=%08x virt-pc=%08x\n", phys_pc, virt_pc);
+			interpret_block();
 		} else {
+			if (cache_entry->fn == NULL) {
+				//printf("jit: translating block phys-pc=%08x, virt-pc=%08x, tag=%08x\n", phys_pc, virt_pc, cache_entry->tag);
+
+				shared::TranslationBlock tb;
+				bzero(&tb, sizeof(tb));
+
+				if (!translate_block(phys_pc, tb)) {
+					printf("jit: block translation failed\n");
+					return false;
+				}
+
+				BlockCompiler compiler(tb);
+				block_txln_fn fn;
+				if (!compiler.compile(fn)) {
+					printf("jit: block compilation failed\n");
+					return false;
+				}
+
+				// Release TB memory
+				free(tb.ir_insn);
+
+				//printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
+				cache_entry->fn = fn;
+			}
+
 			//printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x\n", cache_entry->fn, phys_pc, virt_pc);
 			ensure_privilege_mode();
 			step_ok = (cache_entry->fn(&jit_state) == 0);
+			//interpret_block();
 		}
 	} while(step_ok);
 
@@ -138,15 +133,16 @@ void CPU::clear_block_cache()
 #endif
 
 	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
-		if (entry->tag) {
+		if (entry->tag != 1 && entry->fn) {
 			free((void *)entry->fn);
+			entry->fn = NULL;
 		}
 
-		entry->tag = 0;
+		entry->tag = 1;
 	}
 }
 
-bool CPU::translate_block(gva_t va, shared::TranslationBlock& tb)
+bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 {
 	using namespace captive::shared;
 
@@ -162,14 +158,14 @@ bool CPU::translate_block(gva_t va, shared::TranslationBlock& tb)
 	printf("jit: translating block %x\n", pa);
 #endif
 
-	tb.block_addr = va;
+	tb.block_addr = pa;
 	tb.heat = 0;
 	tb.is_entry = 1;
 
-	gva_t pc = va;
+	gpa_t pc = pa;
 	do {
 		// Attempt to decode the current instruction.
-		if (!decode_instruction_virt(pc, insn)) {
+		if (!decode_instruction_phys(pc, insn)) {
 			printf("jit: unhandled decode fault @ %08x\n", pc);
 			assert(false);
 		}
