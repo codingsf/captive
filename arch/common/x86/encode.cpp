@@ -35,7 +35,7 @@ X86Register REG_RIP("rip", 0, 9);
 #define OPER_SIZE_OVERRIDE 0x66
 #define ADDR_SIZE_OVERRIDE 0x67
 
-X86Encoder::X86Encoder(Allocator& allocator) : _alloc(allocator), _buffer(NULL), _buffer_size(0), _write_offset(0)
+X86Encoder::X86Encoder() : _buffer(NULL), _buffer_size(0), _write_offset(0)
 {
 }
 

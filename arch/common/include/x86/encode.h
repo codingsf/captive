@@ -9,7 +9,7 @@
 #define	ENCODE_H
 
 #include <define.h>
-#include <allocator.h>
+#include <malloc.h>
 #include <x86/defs.h>
 
 namespace captive {
@@ -70,10 +70,12 @@ namespace captive {
 			class X86Encoder
 			{
 			public:
-				X86Encoder(Allocator& allocator);
+				X86Encoder();
 
 				inline uint8_t *get_buffer() { return _buffer; }
 				inline uint32_t get_buffer_size() { return _write_offset; }
+
+				inline void destroy_buffer() { if (_buffer) captive::arch::free(_buffer); }
 
 				void call(const X86Register& reg);
 
@@ -212,8 +214,6 @@ namespace captive {
 				uint32_t current_offset() const { return _write_offset; }
 
 			private:
-				Allocator& _alloc;
-
 				uint8_t *_buffer;
 				uint32_t _buffer_size;
 				uint32_t _write_offset;
@@ -222,7 +222,7 @@ namespace captive {
 				{
 					if (_write_offset >= _buffer_size) {
 						_buffer_size += 64;
-						_buffer = (uint8_t *)_alloc.reallocate(_buffer, _buffer_size);
+						_buffer = (uint8_t *)captive::arch::realloc(_buffer, _buffer_size);
 					}
 				}
 

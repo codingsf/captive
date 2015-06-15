@@ -4,7 +4,7 @@ top-dir := $(CURDIR)
 inc-dir := $(top-dir)/include
 cpp-inc-dir := $(top-dir)/c++
 
-src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
+src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)$$"))
 obj := $(src:.cpp=.o) trap.o safepoint.o priv.o syscall-tramp.o
 dep := $(src:.cpp=.d)
 

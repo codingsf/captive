@@ -32,13 +32,28 @@ namespace captive {
 				PC
 			};
 
+			enum IRAllocationMode {
+				NOT_ALLOCATED,
+				ALLOCATED_REG,
+				ALLOCATED_STACK
+			};
+
 			IROperandType type;
 			uint64_t value;
 			uint8_t size;
 
-			IROperand() : type(NONE), value(0), size(0) { }
+			IRAllocationMode alloc_mode;
+			uint32_t alloc_data;
+
+			IROperand() : type(NONE), value(0), size(0), alloc_mode(NOT_ALLOCATED), alloc_data(0) { }
 
 			IROperand(IROperandType type, uint64_t value, uint8_t size) : type(type), value(value), size(size) { }
+
+			inline bool is_allocated() const { return alloc_mode != NOT_ALLOCATED; }
+			inline bool is_alloc_reg() const { return alloc_mode == ALLOCATED_REG; }
+			inline bool is_alloc_stack() const { return alloc_mode == ALLOCATED_STACK; }
+
+			inline void allocate(IRAllocationMode mode, uint32_t data) { alloc_mode = mode; alloc_data = data; }
 
 			inline bool is_constant() const { return type == CONSTANT; }
 			inline bool is_vreg() const { return type == VREG; }

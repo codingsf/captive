@@ -10,13 +10,10 @@
 
 #include <define.h>
 #include <shared-jit.h>
-#include <jit/ir.h>
 #include <x86/encode.h>
 #include <local-memory.h>
 
 #include <map>
-#include <vector>
-#include <set>
 
 namespace captive {
 	namespace arch {
@@ -30,18 +27,20 @@ namespace captive {
 				bool compile(block_txln_fn& fn);
 
 			private:
-				LocalMemory memory_allocator;
 				shared::TranslationBlock& tb;
-				IRContext ir;
 				x86::X86Encoder encoder;
 
-				std::map<uint32_t, shared::IRBlockId> block_relocations;
-				std::map<uint64_t, x86::X86Register *> register_assignments_1;
-				std::map<uint64_t, x86::X86Register *> register_assignments_2;
-				std::map<uint64_t, x86::X86Register *> register_assignments_4;
-				std::map<uint64_t, x86::X86Register *> register_assignments_8;
+				bool sort_ir();
+				bool analyse();
+				bool allocate();
+				bool lower();
 
-				inline void assign(uint8_t id, x86::X86Register& r8, x86::X86Register& r4, x86::X86Register& r2, x86::X86Register& r1)
+				std::map<uint64_t, const x86::X86Register *> register_assignments_1;
+				std::map<uint64_t, const x86::X86Register *> register_assignments_2;
+				std::map<uint64_t, const x86::X86Register *> register_assignments_4;
+				std::map<uint64_t, const x86::X86Register *> register_assignments_8;
+
+				inline void assign(uint8_t id, const x86::X86Register& r8, const x86::X86Register& r4, const x86::X86Register& r2, const x86::X86Register& r1)
 				{
 					register_assignments_8[id] = &r8;
 					register_assignments_4[id] = &r4;
@@ -49,43 +48,27 @@ namespace captive {
 					register_assignments_1[id] = &r1;
 				}
 
-				bool optimise_tb();
-				bool build();
-				bool analyse();
-				bool optimise_ir();
-
-				bool allocate(uint32_t& max_stack);
-
-				bool lower(uint32_t max_stack, block_txln_fn& fn);
-				bool lower_block(IRBlock& block);
-
-				IRInstruction *instruction_from_shared(IRContext& ctx, const shared::IRInstruction *insn);
-				IROperand *operand_from_shared(IRContext& ctx, const shared::IROperand *operand);
-
-				void load_state_field(uint32_t slot, x86::X86Register& reg);
-				void encode_operand_to_reg(IROperand& operand, x86::X86Register& reg);
-
-				inline x86::X86Register& register_from_operand(IRRegisterOperand& oper, int force_width = 0) const
+				inline const x86::X86Register& register_from_operand(const captive::shared::IROperand *oper, int force_width = 0) const
 				{
-					assert(oper.is_allocated_reg());
+					assert(oper->alloc_mode == captive::shared::IROperand::ALLOCATED_REG);
 
-					if (!force_width) force_width = oper.reg().width();
+					if (!force_width) force_width = oper->size;
 
 					switch (force_width) {
-					case 1:	return *(register_assignments_1.find(oper.allocation_data())->second);
-					case 2:	return *(register_assignments_2.find(oper.allocation_data())->second);
-					case 4:	return *(register_assignments_4.find(oper.allocation_data())->second);
-					case 8:	return *(register_assignments_8.find(oper.allocation_data())->second);
+					case 1:	return *(register_assignments_1.find(oper->alloc_data)->second);
+					case 2:	return *(register_assignments_2.find(oper->alloc_data)->second);
+					case 4:	return *(register_assignments_4.find(oper->alloc_data)->second);
+					case 8:	return *(register_assignments_8.find(oper->alloc_data)->second);
 					default: assert(false);
 					}
 				}
 
-				inline x86::X86Memory stack_from_operand(IRRegisterOperand& oper) const
+				inline x86::X86Memory stack_from_operand(const captive::shared::IROperand *oper) const
 				{
-					assert(oper.is_allocated_stack());
-					assert(oper.reg().width() < 8);
+					assert(oper->alloc_mode == captive::shared::IROperand::ALLOCATED_STACK);
+					assert(oper->size < 8);
 
-					return x86::X86Memory(x86::REG_RBP, (oper.allocation_data() * -1) - 8);
+					return x86::X86Memory(x86::REG_RBP, (oper->alloc_data * -1) - 8);
 				}
 
 				inline x86::X86Register& get_temp(int id, int width)
@@ -113,28 +96,10 @@ namespace captive {
 					}
 				}
 
-				inline void unspill(IRRegisterOperand& oper, x86::X86Register& reg)
+				inline void load_state_field(uint8_t slot, const x86::X86Register& reg)
 				{
-					encoder.mov(stack_from_operand(oper), reg);
+					encoder.mov(x86::X86Memory::get(x86::REG_R14, slot), reg);
 				}
-
-				inline x86::X86Register& unspill_temp(IRRegisterOperand& oper, int id)
-				{
-					x86::X86Register& tmp = get_temp(id, oper.reg().width());
-					encoder.mov(stack_from_operand(oper), tmp);
-					return tmp;
-				}
-
-
-				void emit_save_reg_state();
-				void emit_restore_reg_state();
-				void encode_operand_function_argument(IROperand& oper, const x86::X86Register& reg);
-
-				bool merge_blocks();
-				bool thread_jumps();
-				bool thread_rets();
-				bool dse();
-				bool die();
 			};
 		}
 	}

@@ -92,14 +92,14 @@ bool CPU::run_page_jit_safepoint()
 
 bool CPU::translate_page(Page& page)
 {
+	struct PageWorkUnit *pwu = (struct PageWorkUnit *)Memory::shared_memory().allocate(sizeof(struct PageWorkUnit));
+	memcpy(pwu->page, page.data(), 4096);
+
 	printf("jit: translating page: %08x, heat=%d\n", page.base_address, page.size());
 
 	for (auto entry : page.entries()) {
-		printf("  entry %x\n", entry | page.base_address);
+		pwu->entries[entry / 8] |= 1 << (entry % 8);
 	}
-
-	struct PageWorkUnit *pwu = (struct PageWorkUnit *)Memory::shared_memory().allocate(sizeof(struct PageWorkUnit));
-	memcpy(pwu->page, page.data(), 4096);
 
 	asm volatile("out %0, $0xff" :: "a"(20), "D"((uint64_t)pwu));
 
