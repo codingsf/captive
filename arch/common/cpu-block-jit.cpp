@@ -87,11 +87,11 @@ bool CPU::run_block_jit_safepoint()
 			cache_entry->tag = virt_pc;
 			cache_entry->fn = NULL;
 
-			printf("jit: interpreting block phys-pc=%08x virt-pc=%08x\n", phys_pc, virt_pc);
+			//printf("jit: interpreting block phys-pc=%08x virt-pc=%08x\n", phys_pc, virt_pc);
 			interpret_block();
 		} else {
 			if (cache_entry->fn == NULL) {
-				printf("jit: translating block phys-pc=%08x, virt-pc=%08x, tag=%08x\n", phys_pc, virt_pc, cache_entry->tag);
+				//printf("jit: translating block phys-pc=%08x, virt-pc=%08x, tag=%08x\n", phys_pc, virt_pc, cache_entry->tag);
 
 				shared::TranslationBlock tb;
 				bzero(&tb, sizeof(tb));
@@ -115,7 +115,7 @@ bool CPU::run_block_jit_safepoint()
 				cache_entry->fn = fn;
 			}
 
-			printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x\n", cache_entry->fn, phys_pc, virt_pc);
+			//printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x\n", cache_entry->fn, phys_pc, virt_pc);
 			ensure_privilege_mode();
 			step_ok = (cache_entry->fn(&jit_state) == 0);
 		}

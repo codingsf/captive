@@ -15,6 +15,8 @@
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
 
+#define ARRAY_SIZE(a) (sizeof((a)) / sizeof((a)[0]))
+
 typedef unsigned long size_t;
 
 typedef unsigned char uint8_t;

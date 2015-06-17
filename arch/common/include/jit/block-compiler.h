@@ -14,6 +14,7 @@
 #include <local-memory.h>
 
 #include <map>
+#include <vector>
 
 namespace captive {
 	namespace arch {
@@ -30,10 +31,21 @@ namespace captive {
 				shared::TranslationBlock& tb;
 				x86::X86Encoder encoder;
 
+				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
+				typedef std::list<shared::IRBlockId> block_list_t;
+
 				bool sort_ir();
-				bool analyse();
+				bool analyse(uint32_t& max_stack);
+				bool build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits);
 				bool allocate();
-				bool lower();
+				bool lower(uint32_t max_stack);
+
+				void dump_ir();
+
+				void emit_save_reg_state();
+				void emit_restore_reg_state();
+				void encode_operand_function_argument(shared::IROperand *oper, const x86::X86Register& reg);
+				void encode_operand_to_reg(shared::IROperand *operand, const x86::X86Register& reg);
 
 				std::map<uint64_t, const x86::X86Register *> register_assignments_1;
 				std::map<uint64_t, const x86::X86Register *> register_assignments_2;
@@ -94,6 +106,13 @@ namespace captive {
 
 					default: assert(false);
 					}
+				}
+
+				inline x86::X86Register& unspill_temp(const captive::shared::IROperand *oper, int id)
+				{
+					x86::X86Register& tmp = get_temp(id, oper->size);
+					encoder.mov(stack_from_operand(oper), tmp);
+					return tmp;
 				}
 
 				inline void load_state_field(uint8_t slot, const x86::X86Register& reg)

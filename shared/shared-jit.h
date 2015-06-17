@@ -47,7 +47,7 @@ namespace captive {
 
 			IROperand() : type(NONE), value(0), size(0), alloc_mode(NOT_ALLOCATED), alloc_data(0) { }
 
-			IROperand(IROperandType type, uint64_t value, uint8_t size) : type(type), value(value), size(size) { }
+			IROperand(IROperandType type, uint64_t value, uint8_t size) : type(type), value(value), size(size), alloc_mode(NOT_ALLOCATED), alloc_data(0) { }
 
 			inline bool is_allocated() const { return alloc_mode != NOT_ALLOCATED; }
 			inline bool is_alloc_reg() const { return alloc_mode == ALLOCATED_REG; }
@@ -55,6 +55,7 @@ namespace captive {
 
 			inline void allocate(IRAllocationMode mode, uint32_t data) { alloc_mode = mode; alloc_data = data; }
 
+			inline bool is_valid() const { return type != NONE; }
 			inline bool is_constant() const { return type == CONSTANT; }
 			inline bool is_vreg() const { return type == VREG; }
 			inline bool is_block() const { return type == BLOCK; }
