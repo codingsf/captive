@@ -20,6 +20,24 @@ record_safepoint:
 	xor %eax, %eax
 	ret
 
+.globl restore_safepoint
+restore_safepoint:
+	movq (%rdi), %rbx
+	movq 8(%rdi), %rsp
+	movq 16(%rdi), %rbp
+	movq 24(%rdi), %r12
+	movq 32(%rdi), %r13
+	movq 40(%rdi), %r14
+	movq 48(%rdi), %r15
+
+	push 64(%rdi)
+	popf
+
+	mov %rsi, %rax
+
+	push 56(%rdi)	// RIP
+	retq
+
 .globl interrupt_restore_safepoint
 interrupt_restore_safepoint:
 	// RAX should be set on entry to this

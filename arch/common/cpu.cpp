@@ -23,7 +23,8 @@ CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_da
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false),
 	_profile_image(profile_image),
-	block_txln_cache_size(1048576)
+	block_txln_cache_size(1048576),
+	state_pte(NULL)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -78,9 +79,26 @@ bool CPU::run()
 		return run_region_jit();
 	case 3:
 		return run_page_jit();
+	case 4:
+		return run_test();
 	default:
 		return false;
 	}
+}
+
+bool CPU::run_test()
+{
+	volatile uint32_t *v1 = (volatile uint32_t *)0x1000;
+	volatile uint32_t *v2 = (volatile uint32_t *)0x100001000;
+
+	*v1; *v2;
+
+	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((va_t)v1), mmu().is_page_dirty((va_t)v2), *v1, *v2);
+	*v1 = 1;
+	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((va_t)v1), mmu().is_page_dirty((va_t)v2), *v1, *v2);
+
+
+	return true;
 }
 
 bool CPU::run_interp()
@@ -150,11 +168,14 @@ bool CPU::interpret_block()
 	// of code.
 	ensure_privilege_mode();
 
+	uint32_t page = read_pc() & ~0xfffULL;
+
 	// Now, execute one basic-block of instructions.
 	Decode *insn;
 	do {
 		// Get the address of the next instruction to execute
 		uint32_t pc = read_pc();
+		if ((pc & ~0xfff) != page) return true;
 
 		//printf("insn=%08x\n", pc);
 		assert_privilege_mode();
@@ -195,25 +216,43 @@ bool CPU::interpret_block()
 	} while(!insn->end_of_block && step_ok);
 }
 
-void CPU::invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr)
+void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 {
+	pa_t phys_page_base_addr = (pa_t)((uint64_t)phys_addr & ~0xfffULL);
+	va_t virt_page_base_addr = (va_t)((uint64_t)virt_addr & ~0xfffULL);
+
 	if (virt_page_base_addr > (va_t)0x100000000) return;
 
-	for (int i = 0; i < 4096; i++) {
-		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint64_t)phys_page_base_addr + i));
-		if (entry->tag != 1) {
+	//printf("dirty page: %08x %08x\n", phys_page_base_addr, virt_page_base_addr);
+	for (unsigned int pgoff = 0; pgoff < 0x1000; pgoff++) {
+		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint64_t)phys_page_base_addr + pgoff));
+
+		// If there is an entry that resides on this page...
+		if ((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)(uint64_t)phys_page_base_addr)) {
 			if (entry->fn) {
+				// If there is a valid function, release the function
+				// and clear the pointer.
+
 				free((void *)entry->fn);
 				entry->fn = NULL;
 			}
 
+			//printf("  saying goodbye to: tag=%08x\n", entry->tag & ~0xfffULL);
+
+			// Invalidate the tag.
 			entry->tag = 1;
 		}
 	}
 
+	// Invalidate the page in the profiling image.
 	profile_image().invalidate((gpa_t)((uint64_t)phys_page_base_addr & 0xffffffffULL));
+
+	// Remove the entry from the region chaining table.
 	jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
 }
+
+static uint32_t pc_ring_buffer[256];
+static uint32_t pc_ring_buffer_ptr;
 
 bool CPU::verify_check()
 {
@@ -231,6 +270,9 @@ bool CPU::verify_check()
 	// Tick!
 	asm volatile("out %0, $0xff" :: "a"(9));
 
+	pc_ring_buffer[pc_ring_buffer_ptr] = read_pc();
+	pc_ring_buffer_ptr = (pc_ring_buffer_ptr + 1) % 256;
+
 	// If we're the primary CPU, perform verification.
 	if (cpu_data().verify_tid == 0) {
 		// Compare OUR register state to the other CPU's.
@@ -247,8 +289,34 @@ bool CPU::verify_check()
 
 	// Check to see if we failed, and if so, dump our state and return a failure code.
 	if (cpu_data().verify_data->verify_failed) {
-		printf("*** DIVERGENCE DETECTED ***\n");
+		gva_t this_pc = read_pc();
+		printf("*** DIVERGENCE DETECTED @ %08x ***\n", this_pc);
 		dump_state();
+
+		for (int i = pc_ring_buffer_ptr; i < pc_ring_buffer_ptr + 256; i++) {
+			gva_t virt_pc = pc_ring_buffer[i % 256];
+			gpa_t phys_pc = 0;
+
+			MMU::access_info info;
+			info.mode = MMU::ACCESS_KERNEL;
+			info.type = MMU::ACCESS_READ;
+
+			MMU::resolution_fault fault;
+			bool ok = mmu().resolve_gpa(virt_pc, phys_pc, info, fault, false);
+
+			if (virt_pc == this_pc)
+				printf("=>");
+			else
+				printf("  ");
+
+			uint32_t pc_data = 0;
+			if (ok && fault == 0) {
+				pc_data = *(uint32_t *)(0x100000000ULL | phys_pc);
+			}
+
+			printf(" VIRT=%08x, PHYS=%08x, DATA=%08x\n", virt_pc, phys_pc, pc_data);
+		}
+
 		return false;
 	} else {
 		return true;
@@ -301,4 +369,20 @@ bool CPU::device_read(uint32_t address, uint8_t length, uint64_t& value)
 
 	//printf("device read: addr=%x, value=%u\n", address, value);
 	return true;
+}
+
+void CPU::protect_state()
+{
+	/*if (state_pte->writable()) {
+		//state_pte->writable(false);
+		Memory::flush_page((va_t)(uint64_t)reg_state());
+	}*/
+}
+
+void CPU::unprotect_state()
+{
+	/*if (!state_pte->writable()) {
+		//state_pte->writable(true);
+		Memory::flush_page((va_t)(uint64_t)reg_state());
+	}*/
 }

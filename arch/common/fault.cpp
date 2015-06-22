@@ -153,7 +153,12 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 	} else {
 		// This page-fault happened elsewhere - we can't do anything about it.
 		printf("panic: internal page-fault: rip=%lx va=%lx, code=%x\n", rip, va, code);
-		assert(false);
+
+		printf("  type:   %s\n", (code & PF_WRITE) ? "write" : "read");
+		printf("  mode:   %s\n", (code & PF_USER_MODE) ? "user" : "kernel");
+		printf("  reason: %s\n", (code & PF_PRESENT) ? "permission" : "not present");
+
+		abort();
 	}
 
 	// We can't ever get here - all other paths have an abort in them.

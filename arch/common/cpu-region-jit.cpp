@@ -76,9 +76,11 @@ bool CPU::run_region_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		if (!mmu().virt_to_phys(virt_pc, phys_pc)) abort();
+		MMU::resolution_fault fault;
+		if (!mmu().virt_to_phys(virt_pc, phys_pc, fault)) abort();
 
-		mmu().set_page_executed(virt_pc);
+		abort();
+		//mmu().set_page_executed(virt_pc);
 
 		// Obtain the block descriptor for the BB we're about to execute.
 		Block& block = profile_image().get_block(phys_pc);

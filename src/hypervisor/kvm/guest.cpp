@@ -28,7 +28,11 @@ using namespace captive::hypervisor::kvm;
 #define PT_PRESENT	(1 << 0)
 #define PT_WRITABLE	(1 << 1)
 #define PT_USER_ACCESS	(1 << 2)
+#define PT_WRITE_THROUGH	(1 << 3)
+#define PT_CACHE_DISABLED	(1 << 4)
+#define PT_DIRTY	(1 << 6)
 #define PT_HUGE_PAGE	(1 << 7)
+#define PT_GLOBAL	(1 << 8)
 
 #define BIOS_PHYS_BASE			0xf0000ULL
 
@@ -73,11 +77,11 @@ struct {
 	uint32_t prot_flags;
 	void *fixed;
 } guest_memory_regions[] = {
-	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = NULL },
-	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE,      .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = NULL },
-	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = NULL },
-	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE,  .prot_flags = PT_WRITABLE | PT_USER_ACCESS, .fixed = (void *)SHARED_MEM_VIRT_BASE },
-	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE,         .prot_flags = PT_USER_ACCESS,               .fixed = NULL },
+	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = NULL },
+	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE,      .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = NULL },
+	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = NULL },
+	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE,  .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = (void *)SHARED_MEM_VIRT_BASE },
+	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE,         .prot_flags = PT_USER_ACCESS | PT_GLOBAL,               .fixed = NULL },
 };
 
 #define DEFAULT_NR_SLOTS		32
@@ -471,19 +475,19 @@ bool KVMGuest::stage2_init(uint64_t& stack)
 	DEBUG << CONTEXT(Guest) << "Mapping LAPIC";
 
 	// Map the LAPIC
-	map_page(0x280002000, 0xfee00000, PT_PRESENT | PT_WRITABLE);
+	map_page(0x280002000, 0xfee00000, PT_PRESENT | PT_WRITABLE | PT_GLOBAL);
 
 	// Map the verification region (if enabled)
 	if (verify_enabled()) {
 		DEBUG << CONTEXT(Guest) << "Mapping verification region";
-		map_page(VERIFY_VIRT_BASE, VERIFY_PHYS_BASE, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
+		map_page(VERIFY_VIRT_BASE, VERIFY_PHYS_BASE, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL);
 	}
 
 	DEBUG << CONTEXT(Guest) << "Mapping GPM copy";
 	// Map ALL guest physical memory, and mark it as present and writable for
-	// use by the engine.
-	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x200000, pa += 0x200000) {
-		map_huge_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS);
+	// use by the engine.  It must be done page-per-page so we can do dirty tracking.
+	for (uint64_t va = GPM_COPY_VIRT_BASE, pa = GPM_PHYS_BASE; va < (GPM_COPY_VIRT_BASE + GPM_SIZE); va += 0x1000, pa += 0x1000) {
+		map_page(va, pa, PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL);
 	}
 
 	return true;

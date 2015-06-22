@@ -65,12 +65,18 @@ namespace captive {
 			inline CPU& cpu() const { return _cpu; }
 
 			void cpu_privilege_change(bool kernel_mode);
-			void set_page_executed(gva_t va);
+			void set_page_executed(va_t va);
+			void clear_page_executed(va_t va);
+			bool is_page_executed(va_t va);
+
+			void set_page_dirty(va_t va, bool dirty);
+			bool is_page_dirty(va_t va);
+			uint32_t page_checksum(va_t va);
 
 			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault);
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 
-			bool virt_to_phys(gva_t va, gpa_t& pa);
+			bool virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault);
 
 			inline void flush() {
 				clear_vma();
@@ -89,6 +95,8 @@ namespace captive {
 
 				Memory::flush_page((va_t)(uint64_t)va);
 			}
+
+			void disable_writes();
 
 		private:
 			CPU& _cpu;

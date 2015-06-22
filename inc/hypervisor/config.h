@@ -31,6 +31,7 @@ namespace captive {
 				BlockJIT,
 				RegionJIT,
 				PageJIT,
+				Test
 			};
 
 			explicit GuestCPUConfiguration(CPUExecutionMode exec_mode) : _exec_mode(exec_mode), _verify_mode(false), _cts(NULL) { }

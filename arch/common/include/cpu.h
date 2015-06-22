@@ -206,6 +206,7 @@ namespace captive {
 			bool run_region_jit_safepoint();
 			bool run_page_jit();
 			bool run_page_jit_safepoint();
+			bool run_test();
 
 			bool handle_pending_action(uint32_t action);
 			bool interpret_block();
@@ -216,6 +217,10 @@ namespace captive {
 			bool translate_block(gpa_t pa, shared::TranslationBlock& tb);
 
 			bool translate_page(profile::Page& page);
+
+			page_table_entry_t *state_pte;
+			void protect_state();
+			void unprotect_state();
 		};
 	}
 }

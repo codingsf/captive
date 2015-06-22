@@ -116,6 +116,16 @@ void X86Encoder::mov(const X86Register& src, const X86Memory& dst)
 void X86Encoder::mov(uint64_t src, const X86Register& dst)
 {
 	if (dst.size == 1) {
+		uint8_t rex = 0;
+
+		if (dst.newreg) {
+			rex |= REX;
+		} else if (dst.hireg) {
+			rex |= REX_B;
+		}
+
+		if (rex) emit8(rex);
+
 		emit8(0xb0 + dst.raw_index);
 		emit8(src);
 	} else {

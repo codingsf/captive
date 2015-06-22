@@ -59,8 +59,6 @@ namespace captive {
 				struct cpu_state {
 					uint32_t isa_mode;
 
-					uint8_t pad[16];
-
 					struct {
 						uint32_t RB[16];
 						uint32_t RB_usr[17];
@@ -90,7 +88,7 @@ namespace captive {
 				ArmInterp *_interp;
 				ArmJIT *_jit;
 
-				cpu_state state;
+				cpu_state state __attribute__((aligned(4096)));
 			};
 		}
 	}

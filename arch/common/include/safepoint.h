@@ -15,6 +15,7 @@ typedef struct safepoint {
 } safepoint_t;
 
 extern "C" int record_safepoint(safepoint_t *sp);
+extern "C" int restore_safepoint(safepoint_t *sp, int v);
 extern "C" int interrupt_restore_safepoint(safepoint_t *sp, int v);
 
 #endif	/* SAFEPOINT_H */

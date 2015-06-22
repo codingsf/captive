@@ -59,12 +59,10 @@ namespace captive {
 
 				inline void ensure_buffer(uint32_t elem_capacity)
 				{
-					uint32_t required_size = (sizeof(shared::IRInstruction) * elem_capacity);
+					uint32_t required_size = (sizeof(shared::IRInstruction) * (elem_capacity + 128));
 
 					if (_ir_insn_buffer_size < required_size) {
-						while (_ir_insn_buffer_size < required_size) {
-							_ir_insn_buffer_size <<= 1;
-						}
+						_ir_insn_buffer_size = required_size;
 
 						_block.ir_insn = (shared::IRInstruction *)_allocator.reallocate(_block.ir_insn, _ir_insn_buffer_size);
 					}

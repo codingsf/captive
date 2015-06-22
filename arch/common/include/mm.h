@@ -53,8 +53,13 @@ namespace captive {
 
 			inline bool present() const { return (flags() & PRESENT) == PRESENT; }
 			inline void present(bool v) { if (v) flags(flags() | PRESENT); else flags(flags() & ~PRESENT); }
+
+			inline bool dirty() const { return (flags() & DIRTY) == DIRTY; }
+			inline void dirty(bool v) { if (v) flags(flags() | DIRTY); else flags(flags() & ~DIRTY); }
+
 			inline bool writable() const { return (flags() & WRITABLE) == WRITABLE; }
 			inline void writable(bool v) { if (v) flags(flags() | WRITABLE); else flags(flags() & ~WRITABLE); }
+
 			inline bool allow_user() const { return get_flag(ALLOW_USER); }
 			inline void allow_user(bool v) { set_flag(ALLOW_USER, v); }
 
@@ -63,6 +68,12 @@ namespace captive {
 
 			inline bool device() const { return get_flag(DEVICE); }
 			inline void device(bool v) { set_flag(DEVICE, v); }
+
+			inline bool cache_disabled() const { return get_flag(CACHE_DISABLED); }
+			inline void cache_disabled(bool v) { set_flag(CACHE_DISABLED, v); }
+
+			inline bool write_through() const { return get_flag(WRITE_THROUGH); }
+			inline void write_through(bool v) { set_flag(WRITE_THROUGH, v); }
 
 			inline bool get_flag(entry_flags_t flag) const {
 				return (flags() & (uint16_t)flag) == (uint16_t)flag;
@@ -162,11 +173,11 @@ namespace captive {
 				asm volatile("mov %0, %%cr4" :: "r"(val), "m"(__force_order));
 			}
 
+		public:
 			static inline void flush_page(va_t addr) {
 				asm volatile("invlpg (%0)\n" :: "r"((uint64_t)addr) : "memory");
 			}
 
-		public:
 			static inline void flush_tlb() {
 				write_cr3(read_cr3());
 			}

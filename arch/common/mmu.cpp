@@ -33,23 +33,80 @@ MMU::~MMU()
 
 }
 
-void MMU::set_page_executed(gva_t va)
+void MMU::set_page_executed(va_t va)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
 	page_dir_entry_t *pd;
 	page_table_entry_t *pt;
 
-	Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+	pt->executed(true);
+}
 
-	// Avoid a page flush for pages already marked as executed.
-	if (!pt->executed()) {
-		//printf("mmu: setting page %08x as executed\n", va);
-		pt->executed(true);
-		pt->writable(false);
+void MMU::clear_page_executed(va_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
 
-		Memory::flush_page((va_t)(uint64_t)va);
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+	pt->executed(false);
+}
+
+bool MMU::is_page_executed(va_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+	return pt->executed();
+}
+
+//static uint32_t page_checksums[0x100000000/0x1000];
+
+bool MMU::is_page_dirty(va_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+
+	return pt->dirty();
+
+	/*uint32_t current_checksum = mmu().page_checksum(va_of_phys_page);
+	if (current_checksum != page_checksums[phys_pc >> 12]) {
+		page_checksums[phys_pc >> 12] = current_checksum;
+		invalidate_executed_page((pa_t)(phys_pc & ~0xfffULL), (va_t)(virt_pc & ~0xfffULL));
+	}*/
+}
+
+void MMU::set_page_dirty(va_t va, bool dirty)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+	pt->dirty(dirty);
+
+	printf("spd: %p %d\n", va, dirty);
+}
+
+uint32_t MMU::page_checksum(va_t va)
+{
+	uint32_t checksum = 0;
+	for (int i = 0; i < 0x400; i++) {
+		checksum ^= ((uint32_t *)va)[i];
 	}
+
+	return checksum;
 }
 
 bool MMU::clear_vma()
@@ -67,6 +124,20 @@ bool MMU::clear_vma()
 
 	//printf("mmu: vma cleared\n");
 	return true;
+}
+
+void MMU::disable_writes()
+{
+	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
+
+	// Clear the present map on the 4G mapping
+	for (int i = 0; i < 4; i++) {
+		pdp->entries[i].writable(false);
+	}
+
+	// Flush the TLB
+	Memory::flush_tlb();
 }
 
 void MMU::cpu_privilege_change(bool kernel_mode)
@@ -119,6 +190,8 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pdp->present(true);
 	}
 
+	pdp->writable(true);
+
 	if (!pd->present()) {
 		// The associated Page Table is not marked as present, so
 		// invalidate the page table and mark it as present.
@@ -144,8 +217,8 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		goto handle_device;
 	}
 
-	if (pt->present() && info.is_write() && pt->executed()) {
-		//printf("mmu: execution fault phys=%08x, virt=%08x jit=%d\n", pt->base_address(), va, _cpu.executing_translation());
+	/*if (pt->present() && info.is_write() && pt->executed()) {
+		printf("mmu: execution fault phys=%08x, virt=%08x, pc=%08x jit=%d\n", pt->base_address(), va, _cpu.read_pc(), _cpu.executing_translation());
 
 		// Clear the EXECUTED flag and invalidate the page, so that translations
 		// can be discarded.
@@ -155,10 +228,10 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		// Now, if we are executing in the JIT, and we are executing code in the page
 		// which was invalidated - i.e. self-modifying code in the same page, then we
 		// need to do something special.  ASSERT!
-		if (_cpu.executing_translation() && ((uint64_t)_cpu.read_pc() & ~0xfffULL) == ((uint64_t)va & ~0xfffULL)) {
+		if (_cpu.executing_translation() && (((uint64_t)_cpu.read_pc() & ~0xfffULL) == ((uint64_t)va & ~0xfffULL))) {
 			assert(false && "write to same executed page whilst in jitted code");
 		}
-	}
+	}*/
 
 	if (!enabled()) {
 		fault = NONE;
@@ -166,7 +239,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pt->base_address((uint64_t)gpa_to_hpa((gpa_t)va));
 		pt->present(true);
 		pt->allow_user(true);
-		pt->writable(true);
+		pt->writable(info.is_write());
 
 		if (is_device((gpa_t)va)) {
 			pt->device(true);
@@ -205,7 +278,18 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		} else {
 			pt->present(false);
 			pt->device(false);
+			//pt->dirty(true);
 			//printf("mmu: %08x fault: va=%08x type=%s mode=%s fault-type=%s\n", _cpu.read_pc(), va, mem_access_types[info.type], mem_access_modes[info.mode], mem_fault_types[fault]);
+		}
+	}
+
+	if (pt->present() && info.is_write()) {
+		va_t va_for_gpa = (va_t)(0x100000000ULL | pt->base_address());
+
+		// TODO: TEST+CLEAR
+		if (is_page_executed(va_for_gpa)) {
+			cpu().invalidate_executed_page((pa_t)pt->base_address(), (va_t)va);
+			clear_page_executed(va_for_gpa);
 		}
 	}
 
@@ -231,10 +315,9 @@ bool MMU::is_device(gpa_t gpa)
 	return false;
 }
 
-bool MMU::virt_to_phys(gva_t va, gpa_t& pa)
+bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 {
 	access_info info;
-	resolution_fault fault;
 
 	info.type = ACCESS_FETCH;
 	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;

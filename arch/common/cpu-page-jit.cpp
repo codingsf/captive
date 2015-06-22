@@ -73,9 +73,11 @@ bool CPU::run_page_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		if (!mmu().virt_to_phys(virt_pc, phys_pc)) abort();
+		MMU::resolution_fault fault;
+		if (!mmu().virt_to_phys(virt_pc, phys_pc, fault)) abort();
 
-		mmu().set_page_executed(virt_pc);
+		//mmu().set_page_executed(virt_pc);
+		abort();
 
 		Page& page = profile_image().get_page(phys_pc);
 		page.add_entry(phys_pc);

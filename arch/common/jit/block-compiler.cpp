@@ -354,6 +354,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 next_instruction:;
 	}
 
+	//printf("block %08x\n", tb.block_addr);
 	//dump_ir();
 
 	max_stack = next_global;
@@ -1466,7 +1467,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
+	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
 	return success;
 }
 

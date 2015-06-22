@@ -37,7 +37,7 @@ bool CPU::run_block_jit()
 			trace().end_record();
 		}
 
-		printf("cpu: memory fault %d\n", rc);
+		//printf("cpu: memory fault %d\n", rc);
 
 		// Instruct the interpreter to handle the memory fault, passing
 		// in the the type of fault.
@@ -73,23 +73,41 @@ bool CPU::run_block_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		if (!mmu().virt_to_phys(virt_pc, phys_pc)) abort();
+		// This will perform a FETCH with side effects, so that we can impose the
+		// correct permissions checking for the block we're about to execute.
+		MMU::resolution_fault fault;
+		if (!mmu().virt_to_phys(virt_pc, phys_pc, fault)) abort();
 
-		mmu().set_page_executed(virt_pc);
+		// If there was a fault, then switch back to the safe-point.
+		if (fault) {
+			//printf("mmu: fetch fault: va=%08x mode=%s\n", virt_pc, kernel_mode() ? "kernel" : "user");
+			restore_safepoint(&cpu_safepoint, (int)fault);
+			assert(false);
+		}
 
-		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(virt_pc);
-		if (cache_entry->tag != virt_pc) {
+		// If the page that we're about to execute is dirty, then we need to throw away the translations.
+		/*if (mmu().is_page_dirty(va_of_phys_page)) {
+			invalidate_executed_page((pa_t)(phys_pc & ~0xfffULL), (va_t)(virt_pc & ~0xfffULL));
+			mmu().set_page_dirty(va_of_phys_page, false);
+			mmu().flush();
+		}*/
+
+		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(phys_pc);
+		if (cache_entry->tag != phys_pc) {
 			if (cache_entry->tag != 1 && cache_entry->fn) {
 				//printf("jit: evicting block translation %p\n", cache_entry->fn);
 				free((void *)cache_entry->fn);
 			}
 
-			cache_entry->tag = virt_pc;
+			cache_entry->tag = phys_pc;
 			cache_entry->fn = NULL;
 
 			//printf("jit: interpreting block phys-pc=%08x virt-pc=%08x\n", phys_pc, virt_pc);
 			interpret_block();
 		} else {
+			va_t va_of_phys_page = (va_t)(0x100000000ULL | (uint64_t)(phys_pc & ~0xfffULL));
+			mmu().set_page_executed(va_of_phys_page);
+
 			if (cache_entry->fn == NULL) {
 				//printf("jit: translating block phys-pc=%08x, virt-pc=%08x, tag=%08x\n", phys_pc, virt_pc, cache_entry->tag);
 
@@ -113,11 +131,18 @@ bool CPU::run_block_jit_safepoint()
 
 				//printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
 				cache_entry->fn = fn;
+
+				//mmu().flush();
+				mmu().disable_writes();
 			}
 
-			//printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x\n", cache_entry->fn, phys_pc, virt_pc);
+			//printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x tag=%08x\n", cache_entry->fn, phys_pc, virt_pc, cache_entry->tag);
+
 			ensure_privilege_mode();
+
+			_exec_txl = true;
 			step_ok = (cache_entry->fn(&jit_state) == 0);
+			_exec_txl = false;
 		}
 	} while(step_ok);
 
@@ -161,9 +186,8 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 	tb.heat = 0;
 	tb.is_entry = 1;
 
-	int count = 0;
-
 	gpa_t pc = pa;
+	gpa_t page = (pc & ~0xfffULL);
 	do {
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(pc, insn)) {
@@ -186,28 +210,7 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 		}
 
 		pc += insn->length;
-	} while (!insn->end_of_block && count++ < 20);
-
-	/*assert(insn->end_of_block);
-	JumpInfo jump_info = get_instruction_jump_info(insn);
-
-	tb.destination_target = jump_info.target;
-	if (insn->is_predicated) {
-		if (jump_info.type == JumpInfo::DIRECT) {
-			tb.destination_type = TranslationBlock::PREDICATED_DIRECT;
-		} else {
-			tb.destination_type = TranslationBlock::PREDICATED_INDIRECT;
-		}
-
-		tb.fallthrough_target = pc;
-	} else {
-		if (jump_info.type == JumpInfo::DIRECT) {
-			tb.destination_type = TranslationBlock::NON_PREDICATED_DIRECT;
-		} else {
-			tb.destination_type = TranslationBlock::NON_PREDICATED_INDIRECT;
-		}
-	}
-*/
+	} while (!insn->end_of_block && (pc & ~0xfffULL) == page);
 
 	// Finish off with a RET.
 	ctx.add_instruction(IRInstruction::ret());
