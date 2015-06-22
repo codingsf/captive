@@ -9,6 +9,8 @@
 #include <sys/ioctl.h>
 #include <linux/kvm.h>
 
+USE_CONTEXT(Hypervisor);
+
 #define KVM_DEVICE_LOCATION		"/dev/kvm"
 
 using namespace captive::engine;
@@ -21,7 +23,7 @@ KVM::KVM() : _initialised(false), kvm_fd(-1)
 
 KVM::~KVM()
 {
-	DEBUG << "Closing KVM device";
+	DEBUG << CONTEXT(Hypervisor) << "Closing KVM device";
 	close(kvm_fd);
 	kvm_fd = -1;
 }
@@ -30,7 +32,7 @@ bool KVM::init()
 {
 	// Ensure we're not already initialised.
 	if (initialised()) {
-		ERROR << "KVM Hypervisor already initialised";
+		ERROR << CONTEXT(Hypervisor) << "KVM Hypervisor already initialised";
 		return false;
 	}
 
@@ -39,7 +41,7 @@ bool KVM::init()
 		return false;
 
 	// Attempt to open the KVM device node.
-	DEBUG << "Opening KVM device";
+	DEBUG << CONTEXT(Hypervisor) << "Opening KVM device";
 	kvm_fd = open(KVM_DEVICE_LOCATION, O_RDWR | O_CLOEXEC);
 	if (kvm_fd < 0) {
 		ERROR << "Unable to open KVM device";
@@ -48,7 +50,7 @@ bool KVM::init()
 
 	_initialised = true;
 
-	DEBUG << "KVM Version: " << version();
+	DEBUG << CONTEXT(Hypervisor) << "KVM Version: " << version();
 
 #ifdef KVM_CAP_READONLY_MEM
 	DEBUG << "KVM read-only mem: " << check_extension(KVM_CAP_READONLY_MEM);
@@ -61,26 +63,26 @@ Guest* KVM::create_guest(engine::Engine& engine, jit::JIT& jit, const GuestConfi
 {
 	// Ensure we've been initialised.
 	if (!initialised()) {
-		ERROR << "KVM Hypervisor not yet initialised";
+		ERROR << CONTEXT(Hypervisor) << "KVM Hypervisor not yet initialised";
 		return NULL;
 	}
 
 	// Validate the incoming guest configuration.
 	if (!validate_configuration(config)) {
-		ERROR << "Invalid configuration";
+		ERROR << CONTEXT(Hypervisor) << "Invalid configuration";
 		return NULL;
 	}
 
 	// Issue the ioctl to create a new VM.
-	DEBUG << "Creating new KVM VM";
+	DEBUG << CONTEXT(Hypervisor) << "Creating new KVM VM";
 	int guest_fd = ioctl(kvm_fd, KVM_CREATE_VM, 0);
 	if (guest_fd < 0) {
-		ERROR << "Failed to create KVM VM";
+		ERROR << CONTEXT(Hypervisor) << "Failed to create KVM VM";
 		return NULL;
 	}
 
 	// Create (and register) the representative guest object.
-	DEBUG << "Creating guest object";
+	DEBUG << CONTEXT(Hypervisor) << "Creating guest object";
 	KVMGuest *guest = new KVMGuest(*this, engine, jit, config, guest_fd);
 	known_guests.push_back(guest);
 
@@ -106,13 +108,13 @@ bool KVM::validate_configuration(const GuestConfiguration& config) const
 int KVM::version() const
 {
 	if (!initialised()) {
-		ERROR << "KVM Hypervisor not yet initialised";
+		ERROR << CONTEXT(Hypervisor) << "KVM Hypervisor not yet initialised";
 		return -1;
 	}
 
 	int rc = ioctl(kvm_fd, KVM_GET_API_VERSION, 0);
 	if (rc == -1) {
-		ERROR << "Unable to ascertain KVM version: " << LAST_ERROR_TEXT;
+		ERROR << CONTEXT(Hypervisor) << "Unable to ascertain KVM version: " << LAST_ERROR_TEXT;
 		return -1;
 	}
 
@@ -121,7 +123,7 @@ int KVM::version() const
 
 bool KVM::supported()
 {
-	DEBUG << "Attempting to access KVM device";
+	DEBUG << CONTEXT(Hypervisor) << "Attempting to access KVM device";
 	if (access(KVM_DEVICE_LOCATION, F_OK)) {
 		return false;
 	}

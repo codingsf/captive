@@ -78,6 +78,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "mov",		.format = "IOXXXX" },
 	{ .mnemonic = "cmov",		.format = "XXXXXX" },
 	{ .mnemonic = "ldpc",		.format = "OXXXXX" },
+	{ .mnemonic = "inc-pc",		.format = "IXXXXX" },
 
 	{ .mnemonic = "add",		.format = "IBXXXX" },
 	{ .mnemonic = "sub",		.format = "IBXXXX" },
@@ -234,54 +235,17 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				allocation.erase(alloc);
 			}
 		}
-
-		/*// Allocate OUT operands
-		for (int o = 0; o < 6; o++) {
-			// Skip non-O and -B operands.
-			if (descr->format[o] != 'O' && descr->format[o] != 'B') continue;
-
-			// Out operands MUST already be allocated
-			IROperand *oper = &insn->operands[o];
-
-			assert(oper->is_vreg());
-
-			// Hmm, dead instruction
-			if (allocation.count((IRRegId)oper->value) == 0) {
-				assert(!oper->is_allocated());
-				continue;
-			}
-
-			oper->allocate(IROperand::ALLOCATED_REG, allocation[(IRRegId)oper->value]);
-
-			// If it's not a live in, release the allocation.
-			if (live_ins.count((IRRegId)oper->value) == 0) {
-				//printf("release %d\n", allocation[(IRRegId)oper->value]);
-				avail_regs.push_front(allocation[(IRRegId)oper->value]);
-			}
+		
+		switch (insn->type) {
+		case IRInstruction::ADD:
+		case IRInstruction::SUB:
+		case IRInstruction::SHL:
+		case IRInstruction::SHR:
+		case IRInstruction::SAR:
+		case IRInstruction::OR:
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) insn->type = IRInstruction::NOP;
+			break;
 		}
-
-		// Allocate IN operands
-		for (int o = 0; o < 6; o++) {
-			// Skip non-I and -B operands.
-			if (descr->format[o] != 'I' && descr->format[o] != 'B') continue;
-
-			IROperand *oper = &insn->operands[o];
-			if (!oper->is_vreg()) continue;
-
-			// In operands MAY not already be allocated - so allocate them now.
-			if (allocation.count((IRRegId)oper->value) == 0) {
-				assert(avail_regs.size() > 0);
-
-				uint8_t next_reg = avail_regs.front();
-				avail_regs.pop_front();
-
-				//printf("alloc %d\n", next_reg);
-
-				allocation[(IRRegId)oper->value] = next_reg;
-			}
-
-			oper->allocate(IROperand::ALLOCATED_REG, allocation[(IRRegId)oper->value]);
-		}*/
 
 		/*for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
@@ -431,7 +395,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	// Function prologue
 	encoder.push(REG_RBP);
 	encoder.mov(REG_RSP, REG_RBP);
-	encoder.sub(max_stack, REG_RSP);
+	
+	if (max_stack > 0) encoder.sub(max_stack, REG_RSP);
 
 	encoder.push(REG_R15);
 	encoder.push(REG_R14);
@@ -735,13 +700,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::JMP:
 		{
 			IROperand *target = &insn->operands[0];
+			assert(target->is_block());
 
-			// Create a relocated jump instruction, and store the relocation offset and
-			// target into the relocations list.
-			uint32_t reloc_offset;
-			encoder.jmp_reloc(reloc_offset);
+			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
 
-			block_relocations[reloc_offset] = target->value;
+			if (next_insn && next_insn->ir_block == (IRBlockId)target->value) {
+				// The next instruction is in the block we're about to jump to, so we can
+				// leave this as a fallthrough.
+			} else {			
+				// Create a relocated jump instruction, and store the relocation offset and
+				// target into the relocations list.
+				uint32_t reloc_offset;
+				encoder.jmp_reloc(reloc_offset);
+
+				block_relocations[reloc_offset] = target->value;
+			}
+			
 			break;
 		}
 
@@ -810,7 +784,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *target = &insn->operands[0];
 
 			if (target->is_alloc_reg()) {
+				// TODO: FIXME: XXX: HACK HACK HACK
 				encoder.mov(X86Memory::get(REG_R15, 60), register_from_operand(target));
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+		
+		case IRInstruction::INCPC:
+		{
+			IROperand *amount = &insn->operands[0];
+
+			if (amount->is_constant()) {
+				// TODO: FIXME: XXX: HACK HACK HACK
+				encoder.add4(amount->value, X86Memory::get(REG_R15, 60));
 			} else {
 				assert(false);
 			}
@@ -1474,7 +1463,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
+	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
 	return success;
 }
 

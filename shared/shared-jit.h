@@ -91,6 +91,7 @@ namespace captive {
 				MOV,
 				CMOV,
 				LDPC,
+				INCPC,
 
 				ADD,
 				SUB,
@@ -174,6 +175,7 @@ namespace captive {
 			static IRInstruction count(IROperand pc, IROperand ir) { return IRInstruction(COUNT, pc, ir); }
 
 			static IRInstruction ldpc(IROperand dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
+			static IRInstruction incpc(IROperand amt) { assert(amt.is_constant()); return IRInstruction(INCPC, amt); }
 
 			//
 			// Data Motion

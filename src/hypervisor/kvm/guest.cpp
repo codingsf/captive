@@ -98,7 +98,7 @@ KVMGuest::~KVMGuest()
 	if (initialised())
 		release_all_guest_memory();
 
-	DEBUG << "Closing KVM VM";
+	DEBUG << CONTEXT(Guest) << "Closing KVM VM";
 	close(fd);
 }
 
@@ -191,7 +191,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_tid = 0;
 	}
 	
-	per_cpu_data->verbose_enabled = true;
+	per_cpu_data->verbose_enabled = false;
 
 	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
 	kvm_cpus.push_back(cpu);

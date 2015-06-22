@@ -90,6 +90,7 @@ namespace captive {
 				void movsx(const X86Register& src, const X86Register& dst);
 				
 				void incq(const X86Memory& loc);
+				void incl(const X86Memory& loc);
 
 				void movcs(const X86Register& dst);
 				void mov(const X86Register& src, const X86Register& dst);
@@ -129,6 +130,7 @@ namespace captive {
 				void add(const X86Register& src, const X86Register& dst);
 				void add(const X86Memory& src, const X86Register& dst);
 				void add(uint32_t val, const X86Register& dst);
+				void add4(uint32_t val, const X86Memory& dst);
 
 				void sub(const X86Register& src, const X86Register& dst);
 				void sub(const X86Memory& src, const X86Register& dst);

@@ -7,6 +7,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+DECLARE_CONTEXT(BlockDevice);
+
 using namespace captive::devices::io;
 
 FileBackedBlockDevice::FileBackedBlockDevice() : BlockDevice(512), _file_descr(-1), _file_data(NULL), _file_size(0), _block_count(0), _use_mmap(false), _read_only(false)
@@ -38,7 +40,7 @@ bool FileBackedBlockDevice::open_file(std::string filename, bool read_only)
 		return false;
 	}
 
-	DEBUG << "File size: " << st.st_size;
+	DEBUG << CONTEXT(BlockDevice) << "File size: " << st.st_size;
 
 	_file_size = st.st_size;
 
@@ -60,7 +62,7 @@ bool FileBackedBlockDevice::open_file(std::string filename, bool read_only)
 		_block_count++;
 	}
 
-	DEBUG << "File opened and mapped to: " << _file_data << ", blocks=" << std::dec << _block_count;
+	DEBUG << CONTEXT(BlockDevice) << "File opened and mapped to: " << _file_data << ", blocks=" << std::dec << _block_count;
 	return true;
 }
 
