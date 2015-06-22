@@ -12,10 +12,6 @@
 
 namespace captive {
 	namespace arch {
-		namespace profile {
-			class Image;
-		}
-		
 		namespace arm {
 			class ArmEnvironment : public Environment
 			{
@@ -24,9 +20,6 @@ namespace captive {
 				virtual ~ArmEnvironment();
 
 				CPU *create_cpu() override;
-
-			private:
-				profile::Image *_profile_image;
 			};
 		}
 	}

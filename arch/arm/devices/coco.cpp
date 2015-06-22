@@ -2,7 +2,6 @@
 #include <arm-cpu.h>
 #include <mmu.h>
 #include <printf.h>
-#include <profile/image.h>
 
 using namespace captive::arch::arm::devices;
 
@@ -65,8 +64,6 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		}
 
 		cpu.mmu().flush();
-		cpu.profile_image().invalidate_vaddr();
-
 		break;
 
 	case 3:
@@ -83,7 +80,6 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	case 7:
 	case 8:
 		cpu.mmu().flush();
-		cpu.profile_image().invalidate_vaddr();
 		break;
 	}
 

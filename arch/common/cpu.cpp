@@ -9,7 +9,6 @@
 #include <priv.h>
 #include <jit.h>
 #include <jit/translation-context.h>
-#include <profile/image.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
@@ -18,13 +17,11 @@ safepoint_t cpu_safepoint;
 
 CPU *CPU::current_cpu;
 
-CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data)
+CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	: _env(env),
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false),
-	_profile_image(profile_image),
-	block_txln_cache_size(1048576),
-	state_pte(NULL)
+	block_txln_cache_size(32768) //(1048576),
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -36,6 +33,7 @@ CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_da
 	block_txln_cache = (struct block_txln_cache_entry *)malloc(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
 	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
 		entry->tag = 1;
+		entry->count = 0;
 		entry->fn = NULL;
 	}
 
@@ -77,10 +75,6 @@ bool CPU::run()
 	case 1:
 		return run_block_jit();
 	case 2:
-		return run_region_jit();
-	case 3:
-		return run_page_jit();
-	case 4:
 		return run_test();
 	default:
 		return false;
@@ -179,7 +173,7 @@ bool CPU::interpret_block()
 		if ((pc & ~0xfff) != page) return true;
 
 		//printf("insn=%08x\n", pc);
-		assert_privilege_mode();
+		//assert_privilege_mode();
 
 		//printf("executing block in %s mode\n", in_kernel_mode() ? "kernel" : "user");
 
@@ -247,11 +241,13 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 		}
 	}
 
-	// Invalidate the page in the profiling image.
-	profile_image().invalidate((gpa_t)((uint64_t)phys_page_base_addr & 0xffffffffULL));
-
 	// Remove the entry from the region chaining table.
 	jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
+}
+
+void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
+{
+	assert(false);
 }
 
 static uint32_t pc_ring_buffer[256];
@@ -372,20 +368,4 @@ bool CPU::device_read(uint32_t address, uint8_t length, uint64_t& value)
 
 	//printf("device read: addr=%x, value=%u\n", address, value);
 	return true;
-}
-
-void CPU::protect_state()
-{
-	/*if (state_pte->writable()) {
-		//state_pte->writable(false);
-		Memory::flush_page((va_t)(uint64_t)reg_state());
-	}*/
-}
-
-void CPU::unprotect_state()
-{
-	/*if (!state_pte->writable()) {
-		//state_pte->writable(true);
-		Memory::flush_page((va_t)(uint64_t)reg_state());
-	}*/
 }

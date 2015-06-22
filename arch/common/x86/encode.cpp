@@ -592,10 +592,10 @@ void X86Encoder::jmp_reloc(uint32_t& reloc_offset)
 	emit32(0);
 }
 
-void X86Encoder::jnz_reloc(uint32_t& reloc_offset)
+void X86Encoder::jcc_reloc(uint8_t v, uint32_t& reloc_offset)
 {
 	emit8(0x0f);
-	emit8(0x85);
+	emit8(0x80 | (v & 0xf));
 	reloc_offset = _write_offset;
 	emit32(0);
 }

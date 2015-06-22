@@ -23,6 +23,20 @@ extern "C" void __cxa_pure_virtual()
 	abort();
 }
 
+extern "C" {
+	void *__dso_handle;
+}
+
+extern "C" int __cxa_atexit(void (*destructor) (void *), void *arg, void *dso)
+{
+	
+}
+
+extern "C" void __cxa_finalize(void *f)
+{
+	
+}
+
 namespace std {
 	void __throw_out_of_range(const char *message)
 	{

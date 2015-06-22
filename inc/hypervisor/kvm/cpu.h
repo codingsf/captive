@@ -53,6 +53,7 @@ namespace captive {
 				bool _initialised;
 				int _id;
 				int fd, irqfd;
+				
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;
 

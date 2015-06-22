@@ -9,6 +9,8 @@
 #include <jit/block-compiler.h>
 #include <shared-jit.h>
 
+#include <set>
+
 //#define REG_STATE_PROTECTION
 //#define DEBUG_TRANSLATION
 
@@ -52,7 +54,9 @@ bool CPU::run_block_jit()
 
 bool CPU::run_block_jit_safepoint()
 {
+	uint32_t trace_interval = 0;
 	bool step_ok = true;
+	
 	do {
 		switch_to_kernel_mode();
 
@@ -83,7 +87,17 @@ bool CPU::run_block_jit_safepoint()
 			restore_safepoint(&cpu_safepoint, (int)fault);
 			assert(false);
 		}
+		
+		va_t va_of_phys_page = (va_t)(0x100000000ULL | (uint64_t)(phys_pc & ~0xfffULL));
+		mmu().set_page_executed(va_of_phys_page);
 
+		if (trace_interval > 100000) {
+			//analyse_blocks();
+			trace_interval = 0;
+		} else {
+			trace_interval++;
+		}
+		
 		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(phys_pc);
 		if (cache_entry->tag != phys_pc) {
 			if (cache_entry->tag != 1 && cache_entry->fn) {
@@ -92,13 +106,18 @@ bool CPU::run_block_jit_safepoint()
 
 			cache_entry->tag = phys_pc;
 			cache_entry->fn = NULL;
+			cache_entry->count = 1;
 
-			interpret_block();
+			step_ok = interpret_block();
 		} else {
-			va_t va_of_phys_page = (va_t)(0x100000000ULL | (uint64_t)(phys_pc & ~0xfffULL));
-			mmu().set_page_executed(va_of_phys_page);
+			cache_entry->count++;
 
 			if (cache_entry->fn == NULL) {
+				if (cache_entry->count < 10) {
+					step_ok = interpret_block();
+					continue;
+				}
+				
 				shared::TranslationBlock tb;
 				bzero(&tb, sizeof(tb));
 
@@ -123,7 +142,7 @@ bool CPU::run_block_jit_safepoint()
 				// Disable writes in the MMU for detecting SMC
 				mmu().disable_writes();
 			}
-
+			
 			// Make sure we're in the correct privilege mode
 			ensure_privilege_mode();
 
@@ -138,11 +157,10 @@ bool CPU::run_block_jit_safepoint()
 
 void CPU::clear_block_cache()
 {
-	printf("jit: clearing block cache\n");
 #ifdef DEBUG_TRANSLATION
 	printf("jit: clearing block cache\n");
 #endif
-
+	
 	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
 		if (entry->tag != 1 && entry->fn) {
 			free((void *)entry->fn);
@@ -150,6 +168,7 @@ void CPU::clear_block_cache()
 		}
 
 		entry->tag = 1;
+		entry->count = 0;
 	}
 }
 
@@ -207,4 +226,40 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 	ctx.add_instruction(IRInstruction::ret());
 
 	return true;
+}
+
+static std::set<uint32_t> compilation_set;
+
+void CPU::analyse_blocks()
+{
+	std::map<uint32_t, std::list<std::pair<uint32_t, uint32_t>>> regions;
+	
+	for (uint32_t cache_idx = 0; cache_idx < block_txln_cache_size; cache_idx++) {
+		const struct block_txln_cache_entry *cache_entry = &block_txln_cache[cache_idx];
+		if (cache_entry->tag == 1) continue;
+		
+		//printf("  block: %x count=%u\n", block_txln_cache[cache_idx].tag, block_txln_cache[cache_idx].count);
+		
+		std::list<std::pair<uint32_t, uint32_t>>& blocks = regions[cache_entry->tag & ~0xfffU];
+		blocks.push_back(std::pair<uint32_t, uint32_t>(cache_entry->tag, cache_entry->count));
+	}
+	
+	for (auto region : regions) {
+		if (compilation_set.count(region.first)) continue;
+		
+		if (region.second.size() > 10) {
+			bool eligible = false;
+			for (auto block : region.second) {
+				if (block.second > 100) {
+					eligible = true;
+					break;
+				}
+			}
+			
+			if (eligible) {
+				printf("compiling region %x\n", region.first);
+				compilation_set.insert(region.first);
+			}
+		}
+	}
 }

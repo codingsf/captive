@@ -2,7 +2,6 @@
 #include <cpu.h>
 #include <mm.h>
 #include <printf.h>
-#include <profile/image.h>
 
 using namespace captive::arch;
 
@@ -66,7 +65,20 @@ bool MMU::is_page_executed(va_t va)
 	return pt->executed();
 }
 
-//static uint32_t page_checksums[0x100000000/0x1000];
+bool MMU::clear_if_page_executed(va_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+
+	if (!pt->executed()) return false;
+	
+	pt->executed(false);
+	return true;
+}
 
 bool MMU::is_page_dirty(va_t va)
 {
@@ -78,12 +90,6 @@ bool MMU::is_page_dirty(va_t va)
 	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
 
 	return pt->dirty();
-
-	/*uint32_t current_checksum = mmu().page_checksum(va_of_phys_page);
-	if (current_checksum != page_checksums[phys_pc >> 12]) {
-		page_checksums[phys_pc >> 12] = current_checksum;
-		invalidate_executed_page((pa_t)(phys_pc & ~0xfffULL), (va_t)(virt_pc & ~0xfffULL));
-	}*/
 }
 
 void MMU::set_page_dirty(va_t va, bool dirty)
@@ -115,6 +121,7 @@ bool MMU::clear_vma()
 	// Clear the present map on the 4G mapping
 	for (int i = 0; i < 4; i++) {
 		pdp->entries[i].present(false);
+		pdp->entries[i].writable(true);
 	}
 
 	// Flush the TLB
@@ -263,9 +270,8 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		va_t va_for_gpa = (va_t)(0x100000000ULL | pt->base_address());
 
 		// TODO: TEST+CLEAR
-		if (is_page_executed(va_for_gpa)) {
+		if (clear_if_page_executed(va_for_gpa)) {
 			cpu().invalidate_executed_page((pa_t)pt->base_address(), (va_t)va);
-			clear_page_executed(va_for_gpa);
 		}
 	}
 
@@ -281,12 +287,14 @@ handle_device:
 
 bool MMU::is_device(gpa_t gpa)
 {
+	if (gpa >= 0x101e0000 && gpa < 0x101e1000) return true;
 	if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
 	if (gpa >= 0x101e3000 && gpa < 0x101e4000) return true;
 	if (gpa >= 0x10140000 && gpa < 0x10141000) return true;
 	if (gpa >= 0x10000000 && gpa < 0x10001000) return true;
+	if (gpa >= 0x10003000 && gpa < 0x10004000) return true;
 	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;
-	//if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
+	if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
 
 	return false;
 }
@@ -298,7 +306,7 @@ bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 	info.type = ACCESS_FETCH;
 	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
 
-	return resolve_gpa(va, pa, info, fault, false);
+	return resolve_gpa(va, pa, info, fault, true);
 }
 
 void MMU::clear_cache()

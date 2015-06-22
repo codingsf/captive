@@ -27,14 +27,6 @@ namespace captive {
 	}
 
 	namespace arch {
-		namespace profile {
-			class Image;
-			class Region;
-			class Block;
-			class Translation;
-			class Page;
-		}
-
 		namespace jit {
 			typedef uint32_t (*block_txln_fn)(void *);
 		}
@@ -48,10 +40,8 @@ namespace captive {
 
 		class CPU
 		{
-			friend class profile::Translation;
-
 		public:
-			CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_data);
+			CPU(Environment& env, PerCPUData *per_cpu_data);
 			virtual ~CPU();
 
 			virtual bool init() = 0;
@@ -63,8 +53,6 @@ namespace captive {
 			virtual MMU& mmu() const = 0;
 			virtual Interpreter& interpreter() const = 0;
 			virtual JIT& jit() const = 0;
-
-			inline profile::Image& profile_image() const { return _profile_image; }
 
 			inline Environment& env() const { return _env; }
 			inline Trace& trace() const { return *_trace; }
@@ -83,7 +71,6 @@ namespace captive {
 			inline void kernel_mode(bool km) {
 				if (local_state._kernel_mode != km) {
 					local_state._kernel_mode = km;
-					//mmu().cpu_privilege_change(km);
 					ensure_privilege_mode();
 				}
 			}
@@ -91,10 +78,6 @@ namespace captive {
 			inline bool executing_translation() const { return _exec_txl; }
 
 			void invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr);
-
-			inline void schedule_decode_cache_flush() {
-				_should_flush_decode_cache = true;
-			}
 
 			static inline CPU *get_active_cpu() {
 				return current_cpu;
@@ -159,9 +142,6 @@ namespace captive {
 
 			static CPU *current_cpu;
 
-			profile::Image& _profile_image;
-			bool _should_flush_decode_cache;
-
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
 
@@ -175,6 +155,7 @@ namespace captive {
 
 			struct block_txln_cache_entry {
 				uint32_t tag;
+				uint32_t count;
 				jit::block_txln_fn fn;
 			};
 
@@ -190,25 +171,13 @@ namespace captive {
 			bool run_interp_safepoint();
 			bool run_block_jit();
 			bool run_block_jit_safepoint();
-			bool run_region_jit();
-			bool run_region_jit_safepoint();
-			bool run_page_jit();
-			bool run_page_jit_safepoint();
 			bool run_test();
 
 			bool handle_pending_action(uint32_t action);
 			bool interpret_block();
 
-			void analyse_regions();
-			void compile_region(profile::Region& rgn);
-			bool compile_block(profile::Block& block, shared::TranslationBlock& tb);
+			void analyse_blocks();
 			bool translate_block(gpa_t pa, shared::TranslationBlock& tb);
-
-			bool translate_page(profile::Page& page);
-
-			page_table_entry_t *state_pte;
-			void protect_state();
-			void unprotect_state();
 		};
 	}
 }

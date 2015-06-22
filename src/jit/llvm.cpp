@@ -594,6 +594,16 @@ bool LLVMJIT::lower_ir_instruction(BlockLoweringContext& ctx, const shared::IRIn
 
 	case shared::IRInstruction::INVALID: assert(false && "Invalid Instruction"); return false;
 
+	case shared::IRInstruction::INCPC:
+	{
+		// TODO: Optimise this
+		Value *amount = value_for_operand(ctx, op0);
+		assert(amount);
+
+		ctx.builder.CreateStore(ctx.builder.CreateAdd(ctx.builder.CreateLoad(ctx.parent.pc_ptr), amount), ctx.parent.pc_ptr);
+		break;
+	}
+	
 	default:
 		ERROR << "Unhandled Instruction: " << ir->type;
 		assert(false && "Unhandled Instruction"); return false;

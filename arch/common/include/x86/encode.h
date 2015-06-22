@@ -152,7 +152,52 @@ namespace captive {
 				void test(const X86Register& op1, const X86Register& op2);
 
 				void jmp_reloc(uint32_t& reloc_offset);
-				void jnz_reloc(uint32_t& reloc_offset);
+				
+				void jcc_reloc(uint8_t v, uint32_t& reloc_offset);
+				
+				inline void jo_reloc(uint32_t& reloc_offset) { jcc_reloc(0, reloc_offset); }
+				inline void jno_reloc(uint32_t& reloc_offset) { jcc_reloc(1, reloc_offset); }
+				
+				inline void jb_reloc(uint32_t& reloc_offset) { jcc_reloc(2, reloc_offset); }
+				inline void jnae_reloc(uint32_t& reloc_offset) { jcc_reloc(2, reloc_offset); }
+				inline void jc_reloc(uint32_t& reloc_offset) { jcc_reloc(2, reloc_offset); }
+				
+				inline void jnb_reloc(uint32_t& reloc_offset) { jcc_reloc(3, reloc_offset); }
+				inline void jae_reloc(uint32_t& reloc_offset) { jcc_reloc(3, reloc_offset); }
+				inline void jnc_reloc(uint32_t& reloc_offset) { jcc_reloc(3, reloc_offset); }
+				
+				inline void jz_reloc(uint32_t& reloc_offset) { jcc_reloc(4, reloc_offset); }
+				inline void je_reloc(uint32_t& reloc_offset) { jcc_reloc(4, reloc_offset); }
+				
+				inline void jnz_reloc(uint32_t& reloc_offset) { jcc_reloc(5, reloc_offset); }
+				inline void jne_reloc(uint32_t& reloc_offset) { jcc_reloc(5, reloc_offset); }
+				
+				inline void jbe_reloc(uint32_t& reloc_offset) { jcc_reloc(6, reloc_offset); }
+				inline void jna_reloc(uint32_t& reloc_offset) { jcc_reloc(6, reloc_offset); }
+				
+				inline void jnbe_reloc(uint32_t& reloc_offset) { jcc_reloc(7, reloc_offset); }
+				inline void ja_reloc(uint32_t& reloc_offset) { jcc_reloc(7, reloc_offset); }
+				
+				inline void js_reloc(uint32_t& reloc_offset) { jcc_reloc(8, reloc_offset); }
+				inline void jns_reloc(uint32_t& reloc_offset) { jcc_reloc(9, reloc_offset); }
+				
+				inline void jp_reloc(uint32_t& reloc_offset) { jcc_reloc(10, reloc_offset); }
+				inline void jpe_reloc(uint32_t& reloc_offset) { jcc_reloc(10, reloc_offset); }
+				
+				inline void jnp_reloc(uint32_t& reloc_offset) { jcc_reloc(11, reloc_offset); }
+				inline void jpo_reloc(uint32_t& reloc_offset) { jcc_reloc(11, reloc_offset); }
+				
+				inline void jl_reloc(uint32_t& reloc_offset) { jcc_reloc(12, reloc_offset); }
+				inline void jnge_reloc(uint32_t& reloc_offset) { jcc_reloc(12, reloc_offset); }
+				
+				inline void jnl_reloc(uint32_t& reloc_offset) { jcc_reloc(13, reloc_offset); }
+				inline void jge_reloc(uint32_t& reloc_offset) { jcc_reloc(13, reloc_offset); }
+				
+				inline void jle_reloc(uint32_t& reloc_offset) { jcc_reloc(14, reloc_offset); }
+				inline void jng_reloc(uint32_t& reloc_offset) { jcc_reloc(14, reloc_offset); }
+				
+				inline void jnle_reloc(uint32_t& reloc_offset) { jcc_reloc(15, reloc_offset); }
+				inline void jg_reloc(uint32_t& reloc_offset) { jcc_reloc(15, reloc_offset); }
 
 				void jnz(int32_t off);
 				void jnz(int8_t off);

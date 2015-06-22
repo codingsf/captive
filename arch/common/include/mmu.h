@@ -67,6 +67,7 @@ namespace captive {
 			void set_page_executed(va_t va);
 			void clear_page_executed(va_t va);
 			bool is_page_executed(va_t va);
+			bool clear_if_page_executed(va_t va);
 
 			void set_page_dirty(va_t va, bool dirty);
 			bool is_page_dirty(va_t va);

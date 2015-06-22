@@ -29,8 +29,6 @@ namespace captive {
 			enum CPUExecutionMode {
 				Interpreter,
 				BlockJIT,
-				RegionJIT,
-				PageJIT,
 				Test
 			};
 

@@ -125,26 +125,28 @@ static struct insn_descriptor insn_descriptors[] = {
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
 {
-	/*cfg_t block_succs, block_preds;
-	block_list_t exits;
-
-	if (!build_cfg(block_succs, block_preds, exits)) return false;*/
-
 	IRBlockId latest_block_id = -1;
 
-	std::list<uint32_t> avail_regs;
-	std::map<IRRegId, uint32_t> allocation;
+	std::map<IRRegId, uint32_t> allocation;			// local register allocation
+	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
+	
 	std::set<IRRegId> live_ins, live_outs;
-	std::map<IRRegId, uint32_t> global_allocation;
-	uint32_t next_global = 0;
+	
+	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
+	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	for (int ir_idx = tb.ir_insn_count - 1; ir_idx >= 0; ir_idx--) {
+		// Grab a pointer to the instruction we're looking at.
 		IRInstruction *insn = &tb.ir_insn[ir_idx];
 
+		// Make sure it has a descriptor.
 		assert(insn->type < ARRAY_SIZE(insn_descriptors));
 		const struct insn_descriptor *descr = &insn_descriptors[insn->type];
 
+		// Detect a change in block
 		if (latest_block_id != insn->ir_block) {
+			// If there are still live-ins after changing block, then these
+			// live-ins must become spanning vregs.
 			if (live_ins.size() != 0) {
 				for (auto in : live_ins) {
 					global_allocation[in] = next_global;
@@ -152,27 +154,25 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				}
 			}
 
+			// Clear the live-in working set and current allocations.
 			live_ins.clear();
 			allocation.clear();
 
-			avail_regs.clear();
-			avail_regs.push_back(0);
-			avail_regs.push_back(1);
-			avail_regs.push_back(2);
-			avail_regs.push_back(3);
-			avail_regs.push_back(4);
-			avail_regs.push_back(5);
-
-
+			// Reset the available register bitfield
+			avail_regs = 0x3f; // 00111111 == 6 available registers
+			
+			// Update the latest block id.
 			latest_block_id = insn->ir_block;
 			//printf("block %d:\n", latest_block_id);
 		}
 
+		// Clear the live-out set, and make every current live-in a live-out.
 		live_outs.clear();
 		for (auto in : live_ins) {
 			live_outs.insert(in);
 		}
 
+		// Loop over the VREG operands and update the live-in set accordingly.
 		for (int o = 0; o < 6; o++) {
 			if (insn->operands[o].type != IROperand::VREG) continue;
 
@@ -193,28 +193,31 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		//printf("  [%03d] %10s", ir_idx, descr->mnemonic);
 
-		// Release LIVE-OUTS that are not LIVE-INS
+		// Release LIVE-OUTs that are not LIVE-INs
 		for (auto out : live_outs) {
 			if (!live_ins.count(out)) {
 				auto alloc = allocation.find(out);
 				assert(alloc != allocation.end());
 
-				avail_regs.push_front(alloc->second);
+				// Make the released register available again.
+				avail_regs |= (1 << alloc->second);
 			}
 		}
 
-		// Allocate LIVE-INS
+		// Allocate LIVE-INs
 		for (auto in : live_ins) {
+			// If the live-in is not already allocated, allocate it.
 			if (allocation.count(in) == 0) {
-				assert(avail_regs.size() > 0);
+				uint32_t next_reg = __builtin_ffs(avail_regs);
+				assert(next_reg);
 
-				uint32_t next_reg = avail_regs.front();
-				avail_regs.pop_front();
-
-				allocation[in] = next_reg;
+				allocation[in] = next_reg - 1;
+				
+				avail_regs &= ~(1 << (next_reg - 1));
 			}
 		}
 
+		// Loop over operands to update the allocation information on VREG operands.
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 
@@ -227,6 +230,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 
+		// Remove allocations that are not LIVE-INs
 		for (auto out : live_outs) {
 			if (!live_ins.count(out)) {
 				auto alloc = allocation.find(out);
@@ -236,6 +240,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 		
+		// Quick optimisations
 		switch (insn->type) {
 		case IRInstruction::ADD:
 		case IRInstruction::SUB:
@@ -243,6 +248,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		case IRInstruction::SHR:
 		case IRInstruction::SAR:
 		case IRInstruction::OR:
+		case IRInstruction::XOR:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) insn->type = IRInstruction::NOP;
 			break;
 		}
@@ -292,7 +298,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		printf(" }\n");*/
 	}
 
-	// Allocate operands
+	// Update spanning vreg operand allocations
 	for (int ir_idx = 0; ir_idx < tb.ir_insn_count; ir_idx++) {
 		IRInstruction *insn = &tb.ir_insn[ir_idx];
 
@@ -402,13 +408,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	encoder.push(REG_R14);
 	encoder.push(REG_RBX);
 
-	encoder.mov(REG_RDI, REG_R14);
-	load_state_field(8, REG_R15);
+	encoder.mov(REG_RDI, REG_R14);	// JIT state ptr
+	load_state_field(8, REG_R15);	// Register state ptr
 
 	IRBlockId current_block_id = -1;
 	for (int i = 0; i < tb.ir_insn_count; i++) {
 		IRInstruction *insn = &tb.ir_insn[i];
 
+		// Record the native offset of an IR block
 		if (current_block_id != insn->ir_block) {
 			current_block_id = insn->ir_block;
 			native_block_offsets[current_block_id] = encoder.current_offset();
@@ -438,7 +445,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						// mov reg -> stack
 						encoder.mov(src_reg, stack_from_operand(dest));
 					} else {
-						printf("UNALLOCATED @ %d %d %d\n", i, insn->ir_block, dest->alloc_mode);
 						assert(false);
 					}
 				} else if (source->is_alloc_stack()) {
@@ -565,8 +571,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		}
 
 		case IRInstruction::RET:
+			// Function Epilogue
 			encoder.pop(REG_RBX);
-			//encoder.pop(REG_R13);
 			encoder.pop(REG_R14);
 			encoder.pop(REG_R15);
 			encoder.xorr(REG_EAX, REG_EAX);
@@ -738,29 +744,61 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
-			{
-				uint32_t reloc_offset;
-				encoder.jnz_reloc(reloc_offset);
-				block_relocations[reloc_offset] = tt->value;
-			}
+			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			
+			if (next_insn && next_insn->ir_block == (IRBlockId)tt->value) {
+				// Fallthrough is TRUE block
+				{
+					uint32_t reloc_offset;
+					encoder.jz_reloc(reloc_offset);
+					block_relocations[reloc_offset] = ft->value;
+				}
+			} else if (next_insn && next_insn->ir_block == (IRBlockId)ft->value) {
+				// Fallthrough is FALSE block
+				{
+					uint32_t reloc_offset;
+					encoder.jnz_reloc(reloc_offset);
+					block_relocations[reloc_offset] = tt->value;
+				}
+			} else {
+				// Fallthrough is NEITHER
+				{
+					uint32_t reloc_offset;
+					encoder.jnz_reloc(reloc_offset);
+					block_relocations[reloc_offset] = tt->value;
+				}
 
-			{
-				uint32_t reloc_offset;
-				encoder.jmp_reloc(reloc_offset);
-				block_relocations[reloc_offset] = ft->value;
+				{
+					uint32_t reloc_offset;
+					encoder.jmp_reloc(reloc_offset);
+					block_relocations[reloc_offset] = ft->value;
+				}
 			}
-
+			
 			break;
 		}
 
 		case IRInstruction::CALL:
 		{
 			IROperand *target = &insn->operands[0];
+			
+			IRInstruction *prev_insn = (i) > 0 ? &tb.ir_insn[i - 1] : NULL;
+			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
 
-			emit_save_reg_state();
+			if (prev_insn) {
+				if (prev_insn->type == IRInstruction::CALL) {
+					// Don't save the state, because the previous instruction was a call and it is already saved.
+				} else {
+					emit_save_reg_state();
+				}
+			} else {
+				emit_save_reg_state();
+			}
+
+			//emit_save_reg_state();
 
 			// DI, SI, DX, CX, R8, R9
-			X86Register *sysv_abi[] = { &REG_RDI, &REG_RSI, &REG_RDX, &REG_RCX, &REG_R8, &REG_R9 };
+			const X86Register *sysv_abi[] = { &REG_RDI, &REG_RSI, &REG_RDX, &REG_RCX, &REG_R8, &REG_R9 };
 
 			// CPU State
 			load_state_field(0, *sysv_abi[0]);
@@ -775,7 +813,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov(target->value, get_temp(0, 8));
 			encoder.call(get_temp(0, 8));
 
-			emit_restore_reg_state();
+			if (next_insn) {
+				if (next_insn->type == IRInstruction::CALL) {
+					// Don't restore the state, because the next instruction is a call and it will use it.
+				} else {
+					emit_restore_reg_state();
+				}
+			} else {
+				emit_restore_reg_state();
+			}
+			
 			break;
 		}
 
@@ -874,7 +921,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.test(3, REG_CL);
 			encoder.jnz((int8_t)2);
 			encoder.intt(0x80);
-			encoder.nop();
+			encoder.nop();				// JIC
 
 			break;
 		}
@@ -908,7 +955,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.test(3, REG_CL);
 			encoder.jnz((int8_t)2);
 			encoder.intt(0x80);
-			encoder.nop();
+			encoder.nop();				// JIC
 
 			break;
 		}
@@ -918,8 +965,15 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *dev = &insn->operands[0];
 			IROperand *reg = &insn->operands[1];
 			IROperand *val = &insn->operands[2];
+			
+			IRInstruction *prev_insn = (i) > 0 ? &tb.ir_insn[i - 1] : NULL;
+			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
 
-			emit_save_reg_state();
+			if (prev_insn && prev_insn->type == IRInstruction::WRITE_DEVICE) {
+				//
+			} else {
+				emit_save_reg_state();
+			}
 
 			load_state_field(0, REG_RDI);
 
@@ -931,7 +985,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&cpu_write_device, get_temp(0, 8));
 			encoder.call(get_temp(0, 8));
 
-			emit_restore_reg_state();
+			if (next_insn && next_insn->type == IRInstruction::WRITE_DEVICE) {
+				//
+			} else {
+				emit_restore_reg_state();
+			}
 
 			break;
 		}
@@ -1224,7 +1282,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			const IROperand *lhs = &insn->operands[0];
 			const IROperand *rhs = &insn->operands[1];
 			const IROperand *dest = &insn->operands[2];
-
+			
 			bool invert = false;
 
 			switch (lhs->type) {
@@ -1271,7 +1329,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 				default: assert(false);
 				}
-
+				
 				break;
 			}
 
@@ -1305,10 +1363,49 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			default: assert(false);
 			}
+			
+			bool should_branch_instead = false;
+			
+			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			
+			// TODO: Look at this optimisation
+			/*if (next_insn && next_insn->type == IRInstruction::BRANCH) {
+				// If the next instruction is a branch, we need to check to see if it's branching on
+				// this condition, before we go ahead an emit an optimised form.
+				
+				if (next_insn->operands[0].is_vreg() && next_insn->operands[0].value == dest->value) {
+					// Right here we go, we've got a compare-and-branch situation.
+					
+					// Skip the next instruction (which is the branch)
+					i++;
+					
+					// Set the do-a-branch-instead flag
+					should_branch_instead = true;
+				}
+			}*/
 
 			switch (insn->type) {
 			case IRInstruction::CMPEQ:
-				encoder.sete(register_from_operand(dest));
+				if (should_branch_instead) {
+					assert(dest->is_alloc_reg());
+					
+					IROperand *tt = &next_insn->operands[1];
+					IROperand *ft = &next_insn->operands[2];
+					
+					{
+						uint32_t reloc_offset;
+						encoder.je_reloc(reloc_offset);
+						block_relocations[reloc_offset] = tt->value;
+					}
+
+					{
+						uint32_t reloc_offset;
+						encoder.jmp_reloc(reloc_offset);
+						block_relocations[reloc_offset] = ft->value;
+					}
+				} else {
+					encoder.sete(register_from_operand(dest));
+				}
 				break;
 
 			case IRInstruction::CMPNE:
