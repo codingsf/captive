@@ -64,7 +64,6 @@ namespace captive {
 
 			inline CPU& cpu() const { return _cpu; }
 
-			void cpu_privilege_change(bool kernel_mode);
 			void set_page_executed(va_t va);
 			void clear_page_executed(va_t va);
 			bool is_page_executed(va_t va);
@@ -80,7 +79,7 @@ namespace captive {
 
 			inline void flush() {
 				clear_vma();
-				clear_cache();
+				//clear_cache();
 			}
 
 			inline void invalidate(gva_t va)

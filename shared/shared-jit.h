@@ -83,6 +83,7 @@ namespace captive {
 				INVALID,
 
 				VERIFY,
+				COUNT,
 
 				NOP,
 				TRAP,
@@ -170,6 +171,7 @@ namespace captive {
 			static IRInstruction ret() { return IRInstruction(RET); }
 			static IRInstruction trap() { return IRInstruction(TRAP); }
 			static IRInstruction verify(IROperand pc) { return IRInstruction(VERIFY, pc); }
+			static IRInstruction count(IROperand pc, IROperand ir) { return IRInstruction(COUNT, pc, ir); }
 
 			static IRInstruction ldpc(IROperand dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
 

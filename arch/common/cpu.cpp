@@ -41,6 +41,7 @@ CPU::CPU(Environment& env, profile::Image& profile_image, PerCPUData *per_cpu_da
 
 	jit_state.cpu = this;
 	jit_state.region_chaining_table = (void **)malloc(sizeof(void *) * 0x100000);
+	jit_state.insn_counter = &(cpu_data().insns_executed);
 }
 
 CPU::~CPU()
@@ -207,8 +208,10 @@ bool CPU::interpret_block()
 		//__local_irq_enable();
 
 		// Increment the instruction counter.
-		inc_insns_executed();
-
+		if (unlikely(cpu_data().verbose_enabled)) {
+			inc_insns_executed();
+		}
+		
 		// Perhaps finish tracing this instruction.
 		if (unlikely(trace().enabled())) {
 			trace().end_record();

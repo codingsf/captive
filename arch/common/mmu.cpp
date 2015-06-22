@@ -95,8 +95,6 @@ void MMU::set_page_dirty(va_t va, bool dirty)
 
 	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
 	pt->dirty(dirty);
-
-	printf("spd: %p %d\n", va, dirty);
 }
 
 uint32_t MMU::page_checksum(va_t va)
@@ -122,7 +120,6 @@ bool MMU::clear_vma()
 	// Flush the TLB
 	Memory::flush_tlb();
 
-	//printf("mmu: vma cleared\n");
 	return true;
 }
 
@@ -138,11 +135,6 @@ void MMU::disable_writes()
 
 	// Flush the TLB
 	Memory::flush_tlb();
-}
-
-void MMU::cpu_privilege_change(bool kernel_mode)
-{
-	//clear_vma();
 }
 
 bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault)
@@ -217,22 +209,6 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		goto handle_device;
 	}
 
-	/*if (pt->present() && info.is_write() && pt->executed()) {
-		printf("mmu: execution fault phys=%08x, virt=%08x, pc=%08x jit=%d\n", pt->base_address(), va, _cpu.read_pc(), _cpu.executing_translation());
-
-		// Clear the EXECUTED flag and invalidate the page, so that translations
-		// can be discarded.
-		pt->executed(false);
-		_cpu.invalidate_executed_page((pa_t)(pt->base_address()), (va_t)((uint64_t)va & ~0xfffULL));
-
-		// Now, if we are executing in the JIT, and we are executing code in the page
-		// which was invalidated - i.e. self-modifying code in the same page, then we
-		// need to do something special.  ASSERT!
-		if (_cpu.executing_translation() && (((uint64_t)_cpu.read_pc() & ~0xfffULL) == ((uint64_t)va & ~0xfffULL))) {
-			assert(false && "write to same executed page whilst in jitted code");
-		}
-	}*/
-
 	if (!enabled()) {
 		fault = NONE;
 
@@ -305,11 +281,11 @@ handle_device:
 
 bool MMU::is_device(gpa_t gpa)
 {
-	/*if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
+	if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
 	if (gpa >= 0x101e3000 && gpa < 0x101e4000) return true;
 	if (gpa >= 0x10140000 && gpa < 0x10141000) return true;
 	if (gpa >= 0x10000000 && gpa < 0x10001000) return true;
-	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;*/
+	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;
 	//if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
 
 	return false;

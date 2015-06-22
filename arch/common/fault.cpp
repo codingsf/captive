@@ -43,7 +43,7 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		case x86::Operand::R_CL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rcx)); break;
 		case x86::Operand::R_DL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rdx)); break;
 
-		default: abort();
+		default: printf("fatal: unhandled source register\n"); abort();
 		}
 	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
 		uint32_t value;
@@ -56,9 +56,31 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		case x86::Operand::R_EDX: mctx->rdx = value; break;
 		case x86::Operand::R_ESI: mctx->rsi = value; break;
 		case x86::Operand::R_EDI: mctx->rdi = value; break;
-		default: abort();
+		
+		case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (value & 0xffffULL); break;
+		case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (value & 0xffffULL); break;
+		case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (value & 0xffffULL); break;
+		case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (value & 0xffffULL); break;
+		case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (value & 0xffffULL); break;
+		case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (value & 0xffffULL); break;
+
+		case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (value & 0xffULL); break;
+		case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (value & 0xffULL); break;
+		case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (value & 0xffULL); break;
+		case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (value & 0xffULL); break;
+		
+		case x86::Operand::R_AH: mctx->rax = (mctx->rax & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
+		case x86::Operand::R_BH: mctx->rbx = (mctx->rbx & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
+		case x86::Operand::R_CH: mctx->rcx = (mctx->rcx & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
+		case x86::Operand::R_DH: mctx->rdx = (mctx->rdx & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
+
+		case x86::Operand::R_SIL: mctx->rsi = (mctx->rsi & ~0xffULL) | (value & 0xffULL); break;
+		case x86::Operand::R_DIL: mctx->rdi = (mctx->rdi & ~0xffULL) | (value & 0xffULL); break;
+		
+		default: printf("fatal: unhandled dest register %d\n", inst.Dest.reg); abort();
 		}
 	} else {
+		printf("fatal: unhandled combination\n");
 		abort();
 	}
 
@@ -66,8 +88,8 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 	mctx->rip += inst.length;
 }
 
-#define PF_PRESENT	(1 << 0)
-#define PF_WRITE	(1 << 1)
+#define PF_PRESENT		(1 << 0)
+#define PF_WRITE		(1 << 1)
 #define PF_USER_MODE	(1 << 2)
 
 static const char *info_modes[] = {

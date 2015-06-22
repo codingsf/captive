@@ -88,6 +88,8 @@ namespace captive {
 
 				void movzx(const X86Register& src, const X86Register& dst);
 				void movsx(const X86Register& src, const X86Register& dst);
+				
+				void incq(const X86Memory& loc);
 
 				void movcs(const X86Register& dst);
 				void mov(const X86Register& src, const X86Register& dst);

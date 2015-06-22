@@ -134,6 +134,9 @@ bool KVMCpu::run()
 				if (trap) {
 					trap = false;
 					DEBUG << CONTEXT(CPU) << "Received SIGTRAP";
+					
+					printf("*** insns executed: %llu\n", per_cpu_data().insns_executed);
+					
 					dump_regs();
 				}
 

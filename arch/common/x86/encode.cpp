@@ -39,6 +39,11 @@ X86Encoder::X86Encoder() : _buffer(NULL), _buffer_size(0), _write_offset(0)
 {
 }
 
+void X86Encoder::incq(const X86Memory& loc)
+{
+	encode_opcode_mod_rm(0xff, 0, 8, loc);
+}
+
 void X86Encoder::push(const X86Register& reg)
 {
 	if (reg.size == 2 || reg.size == 8) {
@@ -705,6 +710,8 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 	}
 
 	if (mod == 0 && rm.base == REG_RBP) {
+		mod = 1;
+	} else if (mod == 0 && rm.base == REG_R13) {
 		mod = 1;
 	}
 

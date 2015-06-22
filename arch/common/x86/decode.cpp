@@ -337,6 +337,7 @@ bool captive::arch::x86::decode_memory_instruction(const uint8_t *code, MemoryIn
 	switch (opcode) {
 	case 0x88: if (!decode_mov(p, &code, inst, O_R8, O_R_M8)) return false; else break;
 	case 0x89: if (!decode_mov(p, &code, inst, O_R16_32_64, O_R_M16_32_64)) return false; else break;
+	case 0x8a: if (!decode_mov(p, &code, inst, O_R_M8, O_R8)) return false; else break;
 	case 0x8b: if (!decode_mov(p, &code, inst, O_R_M16_32_64, O_R16_32_64)) return false; else break;
 	case 0x1b6: if (!decode_movzx_modrm(p, &code, inst, O_R_M8, O_R16_32_64)) return false; else break;
 	case 0x1b7: if (!decode_movzx_modrm(p, &code, inst, O_R_M16, O_R16_32_64)) return false; else break;

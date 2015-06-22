@@ -79,38 +79,26 @@ bool CPU::run_block_jit_safepoint()
 		if (!mmu().virt_to_phys(virt_pc, phys_pc, fault)) abort();
 
 		// If there was a fault, then switch back to the safe-point.
-		if (fault) {
-			//printf("mmu: fetch fault: va=%08x mode=%s\n", virt_pc, kernel_mode() ? "kernel" : "user");
+		if (unlikely(fault)) {
 			restore_safepoint(&cpu_safepoint, (int)fault);
 			assert(false);
 		}
 
-		// If the page that we're about to execute is dirty, then we need to throw away the translations.
-		/*if (mmu().is_page_dirty(va_of_phys_page)) {
-			invalidate_executed_page((pa_t)(phys_pc & ~0xfffULL), (va_t)(virt_pc & ~0xfffULL));
-			mmu().set_page_dirty(va_of_phys_page, false);
-			mmu().flush();
-		}*/
-
 		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(phys_pc);
 		if (cache_entry->tag != phys_pc) {
 			if (cache_entry->tag != 1 && cache_entry->fn) {
-				//printf("jit: evicting block translation %p\n", cache_entry->fn);
 				free((void *)cache_entry->fn);
 			}
 
 			cache_entry->tag = phys_pc;
 			cache_entry->fn = NULL;
 
-			//printf("jit: interpreting block phys-pc=%08x virt-pc=%08x\n", phys_pc, virt_pc);
 			interpret_block();
 		} else {
 			va_t va_of_phys_page = (va_t)(0x100000000ULL | (uint64_t)(phys_pc & ~0xfffULL));
 			mmu().set_page_executed(va_of_phys_page);
 
 			if (cache_entry->fn == NULL) {
-				//printf("jit: translating block phys-pc=%08x, virt-pc=%08x, tag=%08x\n", phys_pc, virt_pc, cache_entry->tag);
-
 				shared::TranslationBlock tb;
 				bzero(&tb, sizeof(tb));
 
@@ -129,15 +117,14 @@ bool CPU::run_block_jit_safepoint()
 				// Release TB memory
 				free(tb.ir_insn);
 
-				//printf("jit: executing fresh block %p phys-pc=%08x virt-pc=%08x\n", fn, phys_pc, virt_pc);
+				// Update the cache entry function pointer
 				cache_entry->fn = fn;
 
-				//mmu().flush();
+				// Disable writes in the MMU for detecting SMC
 				mmu().disable_writes();
 			}
 
-			//printf("jit: executing cached block %p phys-pc=%08x virt-pc=%08x tag=%08x\n", cache_entry->fn, phys_pc, virt_pc, cache_entry->tag);
-
+			// Make sure we're in the correct privilege mode
 			ensure_privilege_mode();
 
 			_exec_txl = true;
@@ -202,6 +189,10 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 		if (unlikely(cpu_data().verify_enabled)) {
 			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));
 		}
+		
+		/*if (unlikely(cpu_data().verbose_enabled)) {
+			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));
+		}*/
 
 		// Translate this instruction into the context.
 		if (!jit().translate(insn, ctx)) {

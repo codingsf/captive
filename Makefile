@@ -17,11 +17,11 @@ dep := $(src:.cpp=.d)
 
 bios := $(bios-dir)/bios.bin.o
 
-common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread
+common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread -fno-rtti
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
 asflags  := -g
-ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lz -lncurses
+ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lz -lncurses -ltinfo
 
 cc  := gcc
 cxx := g++
@@ -45,7 +45,7 @@ $(bios): .FORCE
 
 $(out): $(dep) $(obj) $(bios)
 	@echo "  LD      $(patsubst $(bin-dir)/%,%,$@)"
-	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(bios) `llvm-config --libs engine ipo x86 mcjit`
+	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(bios) `llvm-config --ldflags` `llvm-config --libs engine ipo x86 mcjit`
 
 %.o: %.cpp
 	@echo "  C++     $(patsubst $(src-dir)/%,%,$@)"

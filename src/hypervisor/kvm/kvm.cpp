@@ -50,8 +50,10 @@ bool KVM::init()
 
 	DEBUG << "KVM Version: " << version();
 
+#ifdef KVM_CAP_READONLY_MEM
 	DEBUG << "KVM read-only mem: " << check_extension(KVM_CAP_READONLY_MEM);
-
+#endif
+	
 	return true;
 }
 

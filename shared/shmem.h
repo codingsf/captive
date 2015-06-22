@@ -94,6 +94,7 @@ namespace captive {
 		uint32_t execution_mode;	// Mode of execution
 		uint32_t entrypoint;		// Entrypoint of the guest
 
+		bool verbose_enabled;
 		bool verify_enabled;
 		uint32_t verify_tid;
 

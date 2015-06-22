@@ -70,6 +70,7 @@ struct insn_descriptor {
 static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "invalid",	.format = "XXXXXX" },
 	{ .mnemonic = "verify",		.format = "NXXXXX" },
+	{ .mnemonic = "count",		.format = "NNXXXX" },
 
 	{ .mnemonic = "nop",		.format = "XXXXXX" },
 	{ .mnemonic = "trap",		.format = "XXXXXX" },
@@ -600,6 +601,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 		case IRInstruction::RET:
 			encoder.pop(REG_RBX);
+			//encoder.pop(REG_R13);
 			encoder.pop(REG_R14);
 			encoder.pop(REG_R15);
 			encoder.xorr(REG_EAX, REG_EAX);
@@ -1450,6 +1452,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			break;
 		}
+		
+		case IRInstruction::COUNT:
+		{
+			break;
+		}
 
 		default:
 			printf("unsupported instruction: %s\n", insn_descriptors[insn->type].mnemonic);
@@ -1467,7 +1474,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
+	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
 	return success;
 }
 

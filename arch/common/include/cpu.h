@@ -83,21 +83,9 @@ namespace captive {
 			inline void kernel_mode(bool km) {
 				if (local_state._kernel_mode != km) {
 					local_state._kernel_mode = km;
-					mmu().cpu_privilege_change(km);
+					//mmu().cpu_privilege_change(km);
 					ensure_privilege_mode();
 				}
-			}
-
-			inline bool emulating_user_mode() const { return local_state._emulate_user_mode; }
-
-			inline void emulate_user_mode_begin()
-			{
-				local_state._emulate_user_mode = true;
-			}
-
-			inline void emulate_user_mode_end()
-			{
-				local_state._emulate_user_mode = false;
 			}
 
 			inline bool executing_translation() const { return _exec_txl; }
@@ -140,7 +128,6 @@ namespace captive {
 
 			struct {
 				volatile bool _kernel_mode;
-				volatile bool _emulate_user_mode;
 				uint32_t last_exception_action;
 			} local_state;
 
@@ -149,6 +136,7 @@ namespace captive {
 				void *registers;
 				uint32_t registers_size;
 				void **region_chaining_table;
+				uint64_t *insn_counter;
 			} jit_state;
 
 		private:
