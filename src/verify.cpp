@@ -19,8 +19,9 @@ static int _verify_tid;
 int verify_prepare(int id)
 {
 	int shmfd = open("./captive.shm", O_RDWR);
-	if (shmfd < 0)
+	if (shmfd < 0) {
 		return -1;
+	}
 
 	verify = (struct verify_t *)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
 	close(shmfd);

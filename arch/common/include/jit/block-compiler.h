@@ -12,6 +12,7 @@
 #include <shared-jit.h>
 #include <x86/encode.h>
 #include <local-memory.h>
+#include <jit/translation-context.h>
 
 #include <map>
 #include <vector>
@@ -24,12 +25,13 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(shared::TranslationBlock& tb);
+				BlockCompiler(TranslationContext& ctx, gpa_t pa);
 				bool compile(block_txln_fn& fn);
 
 			private:
-				shared::TranslationBlock& tb;
+				TranslationContext& ctx;
 				x86::X86Encoder encoder;
+				gpa_t pa;
 
 				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
 				typedef std::list<shared::IRBlockId> block_list_t;

@@ -89,18 +89,27 @@ void KVMCpu::interrupt(uint32_t code)
 static KVMCpu *signal_cpu;
 static bool trap;
 
+uint64_t last_insns, last_intrs;
+
 static void handle_signal(int signo)
 {
 	if (signo == SIGUSR1) {
 		signal_cpu->per_cpu_data().async_action = 2;
 	} else if (signo == SIGUSR2) {
-		signal_cpu->interrupt(0);
+		//signal_cpu->interrupt(0);
+		
+		fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
+		last_insns = signal_cpu->per_cpu_data().insns_executed;
+		last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
+		
 	} else if (signo == SIGTRAP) {
 		trap = true;
 	}
 }
 
 static std::chrono::high_resolution_clock::time_point cpu_start_time;
+
+extern void trigger_irq_latency_measure();
 
 bool KVMCpu::run()
 {
@@ -174,6 +183,8 @@ bool KVMCpu::run()
 				}
 			} else if (cpu_run_struct->io.port == 0xfd) {
 				dump_regs();
+			} else if (cpu_run_struct->io.port == 0xfc) {
+				trigger_irq_latency_measure();
 			} else if (cpu_run_struct->io.port == 0xf0) {
 				devices::Device *dev = kvm_guest.lookup_device(per_cpu_data().device_address);
 				if (dev != NULL) {

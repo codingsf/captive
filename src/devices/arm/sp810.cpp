@@ -8,7 +8,7 @@
 
 using namespace captive::devices::arm;
 
-SP810::SP810(timers::TickSource& ts) : Primecell(0x00041011), start_time(ts.count()), leds(0), lockval(0), colour_mode(0x1f00), _tick_source(ts)
+SP810::SP810(timers::TickSource& ts) : Primecell(0x00041011), start_time(ts.count()), leds(0), lockval(0), colour_mode(0x1f00), _tick_source(ts), cfgdata1(0), cfgdata2(0)
 {
 }
 
@@ -22,6 +22,8 @@ bool SP810::read(uint64_t off, uint8_t len, uint64_t& data)
 	if (Primecell::read(off, len, data))
 		return true;
 
+	data = 0;
+	
 	switch (off) {
 	case 0x00:
 		data = 0x41008004;
@@ -35,6 +37,10 @@ bool SP810::read(uint64_t off, uint8_t len, uint64_t& data)
 		data = leds;
 		break;
 
+	case 0x0c:
+	case 0x10:
+	case 0x14:
+	case 0x18:
 	case 0x1c:
 		data = 0;
 		break;
@@ -45,6 +51,14 @@ bool SP810::read(uint64_t off, uint8_t len, uint64_t& data)
 
 	case 0x24:
 		data = std::chrono::duration_cast<tick_100Hz_t>(std::chrono::milliseconds(_tick_source.count() - start_time)).count();
+		break;
+		
+	case 0x28:
+		data = cfgdata1;
+		break;
+
+	case 0x2c:
+		data = cfgdata2;
 		break;
 
 	case 0x50:
@@ -77,6 +91,14 @@ bool SP810::write(uint64_t off, uint8_t len, uint64_t data)
 		else lockval = data & 0x7fff;
 		break;
 
+	case 0x28:
+		cfgdata1 = data;
+		break;
+
+	case 0x2c:
+		cfgdata2 = data;
+		break;
+		
 	case 0x50:	// LCD
 		colour_mode &= 0x3f00;
 		colour_mode |= (data & ~0x3f00);

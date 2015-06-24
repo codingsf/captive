@@ -9,7 +9,7 @@
 #define	TRANSLATION_CONTEXT_H
 
 #include <define.h>
-#include <allocator.h>
+#include <malloc.h>
 #include <shared-jit.h>
 
 namespace captive {
@@ -18,53 +18,62 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext(Allocator& allocator, shared::TranslationBlock& block);
+				TranslationContext();
+				~TranslationContext();
 
 				inline void add_instruction(const shared::IRInstruction& instruction) {
 					add_instruction(_current_block_id, instruction);
 				}
 
 				inline void add_instruction(shared::IRBlockId block_id, const shared::IRInstruction& instruction) {
-					ensure_buffer(_block.ir_insn_count + 1);
+					ensure_buffer(_ir_insn_count + 1);
 
-					_block.ir_insn[_block.ir_insn_count] = instruction;
-					_block.ir_insn[_block.ir_insn_count].ir_block = block_id;
-					_block.ir_insn_count++;
+					_ir_insns[_ir_insn_count] = instruction;
+					_ir_insns[_ir_insn_count].ir_block = block_id;
+					_ir_insn_count++;
 				}
 
 				inline shared::IRBlockId current_block() const { return _current_block_id; }
 				inline void current_block(shared::IRBlockId block_id) { _current_block_id = block_id; }
 
 				inline shared::IRBlockId alloc_block() {
-					return _block.ir_block_count++;
+					return _ir_block_count++;
 				}
 
 				inline shared::IRRegId alloc_reg(uint8_t size) {
-					return _block.ir_reg_count++;
+					return _ir_reg_count++;
 				}
-
-				inline void cancel() {
-					_block.ir_insn_count = 0;
-					_block.ir_reg_count = 0;
-					_block.ir_block_count = 0;
-					_allocator.free(_block.ir_insn);
+				
+				inline uint32_t count() const { return _ir_insn_count; }
+				
+				inline shared::IRInstruction *at(uint32_t idx) const { return &_ir_insns[idx]; }
+				
+				inline void swap(uint32_t a, uint32_t b)
+				{
+					shared::IRInstruction tmp = _ir_insns[a];
+					_ir_insns[a] = _ir_insns[b];
+					_ir_insns[b] = tmp;
 				}
-
+				
 			private:
-				Allocator& _allocator;
-				shared::TranslationBlock& _block;
-
 				shared::IRBlockId _current_block_id;
+				
+				uint32_t _ir_block_count;
+				uint32_t _ir_reg_count;
+				
+				shared::IRInstruction *_ir_insns;
+				
+				uint32_t _ir_insn_count;
 				uint32_t _ir_insn_buffer_size;
 
 				inline void ensure_buffer(uint32_t elem_capacity)
 				{
-					uint32_t required_size = (sizeof(shared::IRInstruction) * (elem_capacity + 128));
+					uint32_t required_size = (sizeof(shared::IRInstruction) * elem_capacity);
 
 					if (_ir_insn_buffer_size < required_size) {
-						_ir_insn_buffer_size = required_size;
+						_ir_insn_buffer_size = required_size + (sizeof(shared::IRInstruction) * 127);
 
-						_block.ir_insn = (shared::IRInstruction *)_allocator.reallocate(_block.ir_insn, _ir_insn_buffer_size);
+						_ir_insns = (shared::IRInstruction *)captive::arch::realloc(_ir_insns, _ir_insn_buffer_size);
 					}
 				}
 			};
@@ -73,4 +82,3 @@ namespace captive {
 }
 
 #endif	/* TRANSLATION_CONTEXT_H */
-

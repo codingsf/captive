@@ -176,6 +176,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->execution_mode = (uint32_t)config.execution_mode();
 	per_cpu_data->guest_data = per_guest_data;
 	per_cpu_data->insns_executed = 0;
+	per_cpu_data->interrupts_taken = 0;
 	per_cpu_data->isr = 0;
 
 	per_cpu_data->rwu_ready_queue = NULL;
@@ -191,7 +192,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_tid = 0;
 	}
 	
-	per_cpu_data->verbose_enabled = false;
+	per_cpu_data->verbose_enabled = true;
 
 	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
 	kvm_cpus.push_back(cpu);

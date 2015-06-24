@@ -38,6 +38,8 @@ namespace captive {
 				uint32_t leds, lockval, colour_mode;
 
 				timers::TickSource& _tick_source;
+				
+				uint32_t cfgdata1, cfgdata2;
 			};
 		}
 	}

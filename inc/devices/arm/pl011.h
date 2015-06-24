@@ -43,8 +43,9 @@ namespace captive {
 				std::atomic<uint32_t> irq_status;
 
 				uint32_t flag_register;
-
-				std::deque<char> fifo;
+				uint32_t rsr, ifl;
+				
+				std::deque<uint32_t> fifo;
 
 				void update_irq();
 

@@ -34,7 +34,7 @@
 
 #include <devices/gfx/sdl-virtual-screen.h>
 
-#include <devices/timers/millisecond-tick-source.h>
+#include <devices/timers/microsecond-tick-source.h>
 #include <devices/timers/callback-tick-source.h>
 
 DECLARE_CONTEXT(Main);
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 	if (verify_enabled()) {
 		ts = new CallbackTickSource(1000);
 	} else {
-		ts = new MillisecondTickSource();
+		ts = new MicrosecondTickSource();
 	}
 
 	// Attempt to create a guest in the hypervisor.
@@ -157,19 +157,19 @@ int main(int argc, char **argv)
 	devices::arm::SP804 *timer1 = new devices::arm::SP804(*ts, *vic->get_irq_line(5));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e3000, *timer1));
 
-	devices::arm::PrimecellStub *static_memory_controller = new devices::arm::PrimecellStub(0x00141093, "smc", 0x10000);
+	devices::arm::PrimecellStub *static_memory_controller = new devices::arm::PrimecellStub(0x93101400, "smc", 0x10000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *static_memory_controller));
 
-	devices::arm::PrimecellStub *mp_memory_controller = new devices::arm::PrimecellStub(0x47041175, "mpm", 0x10000);
+	devices::arm::PrimecellStub *mp_memory_controller = new devices::arm::PrimecellStub(0x75110447, "mpm", 0x10000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10110000, *mp_memory_controller));
 
-	devices::arm::PrimecellStub *watchdog = new devices::arm::PrimecellStub(0x00141805, "watchdog", 0x1000);
+	devices::arm::PrimecellStub *watchdog = new devices::arm::PrimecellStub(0x05181400, "watchdog", 0x1000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e1000, *watchdog));
 
-	devices::arm::PrimecellStub *sci = new devices::arm::PrimecellStub(0x00041131, "sci", 0x1000);
+	devices::arm::PrimecellStub *sci = new devices::arm::PrimecellStub(0x31110400, "sci", 0x1000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f0000, *sci));
 
-	devices::arm::PrimecellStub *ssp = new devices::arm::PrimecellStub(0x00241022, "ssp", 0x1000);
+	devices::arm::PrimecellStub *ssp = new devices::arm::PrimecellStub(0x22102400, "ssp", 0x1000);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f4000, *ssp));
 
 	devices::arm::PrimecellStub *net = new devices::arm::PrimecellStub(0xf0f0f0f0, "net", 0x10000);

@@ -195,26 +195,40 @@ void PS2MouseDevice::button_down(uint32_t button_index)
 {
 	button_state |= 1 << button_index;
 
-	queue_data(button_state);
-	queue_data(0);
-	queue_data(0);
+	send_update();
 }
 
 void PS2MouseDevice::button_up(uint32_t button_index)
 {
 	button_state &= ~(1 << button_index);
 
-	queue_data(button_state);
-	queue_data(0);
-	queue_data(0);
+	send_update();
 }
 
 void PS2MouseDevice::mouse_move(uint32_t x, uint32_t y)
 {
-	int32_t dx = x - last_x;
-	int32_t dy = y - last_y;
+	dx = x - last_x;
+	dy = y - last_y;
+	
+	last_x = x;
+	last_y = y;
+	
+	send_update();
+}
 
-	queue_data(button_state);
+void PS2MouseDevice::send_update()
+{
+	if (dx > 127)
+		dx = 127;
+	else if (dx < -127)
+		dx = -127;
+
+	if (dy > 127)
+		dy = 127;
+	else if (dy < -127)
+		dy = -127;
+
+	queue_data(0x08 | ((dx < 0) << 4) | ((dy < 0) << 5) | (button_state & 0x07) );
 	queue_data(dx & 0xff);
 	queue_data(dy & 0xff);
 }

@@ -13,7 +13,7 @@ using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
-BlockCompiler::BlockCompiler(shared::TranslationBlock& tb) : tb(tb)
+BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
 {
 	assign(0, REG_RAX, REG_EAX, REG_AX, REG_AL);
 	assign(1, REG_RDX, REG_EDX, REG_DX, REG_DL);
@@ -45,13 +45,11 @@ bool BlockCompiler::sort_ir()
 {
 	uint32_t pos = 1;
 
-	while (pos < tb.ir_insn_count) {
-		if (tb.ir_insn[pos].ir_block >= tb.ir_insn[pos - 1].ir_block) {
+	while (pos < ctx.count()) {
+		if (ctx.at(pos)->ir_block >= ctx.at(pos - 1)->ir_block) {
 			pos += 1;
 		} else {
-			IRInstruction tmp = tb.ir_insn[pos];
-			tb.ir_insn[pos] = tb.ir_insn[pos - 1];
-			tb.ir_insn[pos - 1] = tmp;
+			ctx.swap(pos, pos - 1);
 
 			if (pos > 1) {
 				pos -=1;
@@ -135,9 +133,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
-	for (int ir_idx = tb.ir_insn_count - 1; ir_idx >= 0; ir_idx--) {
+	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
-		IRInstruction *insn = &tb.ir_insn[ir_idx];
+		IRInstruction *insn = ctx.at(ir_idx);
 
 		// Make sure it has a descriptor.
 		assert(insn->type < ARRAY_SIZE(insn_descriptors));
@@ -299,8 +297,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	}
 
 	// Update spanning vreg operand allocations
-	for (int ir_idx = 0; ir_idx < tb.ir_insn_count; ir_idx++) {
-		IRInstruction *insn = &tb.ir_insn[ir_idx];
+	for (int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
 
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
@@ -336,8 +334,8 @@ bool BlockCompiler::build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits)
 {
 	IRBlockId current_block_id = -1;
 
-	for (int i = 0; i < tb.ir_insn_count; i++) {
-		IRInstruction *insn = &tb.ir_insn[i];
+	for (int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
 
 		if (insn->ir_block != current_block_id) {
 			current_block_id = insn->ir_block;
@@ -412,8 +410,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	load_state_field(8, REG_R15);	// Register state ptr
 
 	IRBlockId current_block_id = -1;
-	for (int i = 0; i < tb.ir_insn_count; i++) {
-		IRInstruction *insn = &tb.ir_insn[i];
+	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
 
 		// Record the native offset of an IR block
 		if (current_block_id != insn->ir_block) {
@@ -708,7 +706,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *target = &insn->operands[0];
 			assert(target->is_block());
 
-			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
 			if (next_insn && next_insn->ir_block == (IRBlockId)target->value) {
 				// The next instruction is in the block we're about to jump to, so we can
@@ -744,7 +742,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
-			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 			
 			if (next_insn && next_insn->ir_block == (IRBlockId)tt->value) {
 				// Fallthrough is TRUE block
@@ -782,8 +780,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			IROperand *target = &insn->operands[0];
 			
-			IRInstruction *prev_insn = (i) > 0 ? &tb.ir_insn[i - 1] : NULL;
-			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
+			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
 			if (prev_insn) {
 				if (prev_insn->type == IRInstruction::CALL) {
@@ -966,8 +964,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *reg = &insn->operands[1];
 			IROperand *val = &insn->operands[2];
 			
-			IRInstruction *prev_insn = (i) > 0 ? &tb.ir_insn[i - 1] : NULL;
-			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
+			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
 			if (prev_insn && prev_insn->type == IRInstruction::WRITE_DEVICE) {
 				//
@@ -1366,7 +1364,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			bool should_branch_instead = false;
 			
-			IRInstruction *next_insn = (i + 1) < tb.ir_insn_count ? &tb.ir_insn[i + 1] : NULL;
+			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 			
 			// TODO: Look at this optimisation
 			/*if (next_insn && next_insn->type == IRInstruction::BRANCH) {
@@ -1541,6 +1539,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		
 		case IRInstruction::COUNT:
 		{
+			X86Register& tmp = get_temp(0, 8);
+			
+			load_state_field(32, tmp);
+			encoder.add8(1, tmp);
+			
 			break;
 		}
 
@@ -1560,7 +1563,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(tb.block_addr));
+	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	return success;
 }
 
@@ -1614,8 +1617,8 @@ void BlockCompiler::dump_ir()
 {
 	IRBlockId current_block_id = -1;
 
-	for (int ir_idx = 0; ir_idx < tb.ir_insn_count; ir_idx++) {
-		IRInstruction *insn = &tb.ir_insn[ir_idx];
+	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
 
 		assert(insn->type < ARRAY_SIZE(insn_descriptors));
 		const struct insn_descriptor *descr = &insn_descriptors[insn->type];

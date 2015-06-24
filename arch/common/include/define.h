@@ -17,6 +17,16 @@
 
 #define ARRAY_SIZE(a) (sizeof((a)) / sizeof((a)[0]))
 
+#define PAGE_BITS				12ULL
+#define PAGE_SIZE				((uint64_t)(1 << PAGE_BITS))
+#define PAGE_OFFSET_MASK		(PAGE_SIZE - 1)
+#define PAGE_ADDRESS_MASK		(~(PAGE_SIZE - 1))
+#define PAGE_OFFSET_OF(_addr)	(((uint64_t)(_addr)) & PAGE_OFFSET_MASK)
+#define PAGE_INDEX_OF(_addr)	(((uint64_t)(_addr)) >> PAGE_BITS)
+#define PAGE_ADDRESS_OF(_addr)	(((uint64_t)(_addr)) & PAGE_ADDRESS_MASK)
+
+#define VA_OF_GPA(_gpa)			((va_t)(0x100000000ULL | (uint64_t)((uint32_t)(_gpa))))
+
 typedef unsigned long size_t;
 
 typedef unsigned char uint8_t;

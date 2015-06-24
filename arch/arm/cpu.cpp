@@ -47,6 +47,7 @@ bool ArmCPU::init()
 	_interp = new ArmInterp(*this);
 	_jit = new ArmJIT();
 	_mmu = new ArmMMU(*this);
+	_pc_reg_ptr = &state.regs.RB[15];
 
 	jit_state.registers = &state.regs;
 	jit_state.registers_size = sizeof(state.regs);

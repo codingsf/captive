@@ -36,7 +36,7 @@ namespace captive {
 
 				bool init() override;
 
-				uint32_t read_pc() const override { return state.regs.RB[15]; }
+				/*uint32_t read_pc() const override { return state.regs.RB[15]; }
 
 				uint32_t write_pc(uint32_t value) override {
 					uint32_t tmp = state.regs.RB[15];
@@ -48,7 +48,7 @@ namespace captive {
 					uint32_t tmp = state.regs.RB[15];
 					state.regs.RB[15] += delta;
 					return tmp;
-				}
+				}*/
 
 				void dump_state() const;
 
@@ -79,6 +79,7 @@ namespace captive {
 				bool decode_instruction_phys(gpa_t addr, Decode* insn) override;
 				JumpInfo get_instruction_jump_info(Decode* insn) override;
 
+				bool interrupts_enabled() const override { return !state.regs.I; }
 
 				void* reg_state() override { return &state.regs; }
 				uint32_t reg_state_size() override { return sizeof(state.regs); }
@@ -88,7 +89,7 @@ namespace captive {
 				ArmInterp *_interp;
 				ArmJIT *_jit;
 
-				cpu_state state __attribute__((aligned(4096)));
+				cpu_state state;
 			};
 		}
 	}

@@ -18,10 +18,11 @@ safepoint_t cpu_safepoint;
 CPU *CPU::current_cpu;
 
 CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
-	: _env(env),
+	: _pc_reg_ptr(NULL),
+	_env(env),
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false),
-	block_txln_cache_size(32768) //(1048576),
+	block_txln_cache_size(20000003)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -36,23 +37,29 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 		entry->count = 0;
 		entry->fn = NULL;
 	}
-
+	
 	jit_state.cpu = this;
-	jit_state.region_chaining_table = (void **)malloc(sizeof(void *) * 0x100000);
-	jit_state.insn_counter = &(cpu_data().insns_executed);
+	jit_state.region_chaining_table = NULL; // (void **)malloc(sizeof(void *) * 0x100000);
+	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 }
 
 CPU::~CPU()
 {
-	free(jit_state.region_chaining_table);
+	//free(jit_state.region_chaining_table);
 }
 
 bool CPU::handle_pending_action(uint32_t action)
 {
 	switch (action) {
 	case 2:
+	{
+		struct mallinfo mi = dlmallinfo();
+		printf("*** malloc info ***\n");
+		printf("used: %d\nfree: %d\n", mi.uordblks, mi.fordblks);
+		
 		dump_state();
 		return true;
+	}
 
 	case 3:
 		trace().enable();
@@ -238,11 +245,12 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 
 			// Invalidate the tag.
 			entry->tag = 1;
+			entry->count = 0;
 		}
 	}
 
 	// Remove the entry from the region chaining table.
-	jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
+	//jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
 }
 
 void CPU::register_region(captive::shared::RegionWorkUnit* rwu)

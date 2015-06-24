@@ -131,6 +131,7 @@ namespace captive {
 				void add(const X86Memory& src, const X86Register& dst);
 				void add(uint32_t val, const X86Register& dst);
 				void add4(uint32_t val, const X86Memory& dst);
+				void add8(uint32_t val, const X86Memory& dst);
 
 				void sub(const X86Register& src, const X86Register& dst);
 				void sub(const X86Memory& src, const X86Register& dst);
@@ -270,7 +271,7 @@ namespace captive {
 				inline void ensure_buffer()
 				{
 					if (_write_offset >= _buffer_size) {
-						_buffer_size += 64;
+						_buffer_size += 1024;
 						_buffer = (uint8_t *)captive::arch::realloc(_buffer, _buffer_size);
 					}
 				}

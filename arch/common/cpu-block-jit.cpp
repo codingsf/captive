@@ -58,12 +58,13 @@ bool CPU::run_block_jit_safepoint()
 	bool step_ok = true;
 	
 	do {
-		switch_to_kernel_mode();
-
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		if (unlikely(cpu_data().isr)) {
-			interpreter().handle_irq(cpu_data().isr);
+		if (unlikely(cpu_data().isr && interrupts_enabled())) {
+			if (interpreter().handle_irq(cpu_data().isr)) {
+				//asm volatile("out %0, $0xfc\n" :: "a"(0));
+				cpu_data().interrupts_taken++;
+			}
 		}
 
 		// Check to see if there are any pending actions coming in from
@@ -80,7 +81,7 @@ bool CPU::run_block_jit_safepoint()
 		// This will perform a FETCH with side effects, so that we can impose the
 		// correct permissions checking for the block we're about to execute.
 		MMU::resolution_fault fault;
-		if (!mmu().virt_to_phys(virt_pc, phys_pc, fault)) abort();
+		if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) abort();
 
 		// If there was a fault, then switch back to the safe-point.
 		if (unlikely(fault)) {
@@ -88,10 +89,13 @@ bool CPU::run_block_jit_safepoint()
 			assert(false);
 		}
 		
-		va_t va_of_phys_page = (va_t)(0x100000000ULL | (uint64_t)(phys_pc & ~0xfffULL));
-		mmu().set_page_executed(va_of_phys_page);
+		switch_to_kernel_mode();
+		
+		// Mark the physical page corresponding to the PC as executed
+		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 
-		if (trace_interval > 100000) {
+		// Profiling stuff... TODO
+		if (unlikely(trace_interval > 100000)) {
 			//analyse_blocks();
 			trace_interval = 0;
 		} else {
@@ -99,7 +103,7 @@ bool CPU::run_block_jit_safepoint()
 		}
 		
 		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(phys_pc);
-		if (cache_entry->tag != phys_pc) {
+		if (unlikely(cache_entry->tag != phys_pc)) {
 			if (cache_entry->tag != 1 && cache_entry->fn) {
 				free((void *)cache_entry->fn);
 			}
@@ -108,37 +112,24 @@ bool CPU::run_block_jit_safepoint()
 			cache_entry->fn = NULL;
 			cache_entry->count = 1;
 
+			//__local_irq_disable();
 			step_ok = interpret_block();
+			//__local_irq_enable();
 		} else {
 			cache_entry->count++;
 
-			if (cache_entry->fn == NULL) {
-				if (cache_entry->count < 10) {
+			if (unlikely(cache_entry->fn == NULL)) {
+				if (unlikely(cache_entry->count < 10)) {
 					step_ok = interpret_block();
 					continue;
 				}
 				
-				shared::TranslationBlock tb;
-				bzero(&tb, sizeof(tb));
-
-				if (!translate_block(phys_pc, tb)) {
-					printf("jit: block translation failed\n");
-					return false;
-				}
-
-				BlockCompiler compiler(tb);
-				block_txln_fn fn;
-				if (!compiler.compile(fn)) {
+				cache_entry->fn = compile_block(phys_pc);
+				if (unlikely(!cache_entry->fn)) {
 					printf("jit: block compilation failed\n");
 					return false;
 				}
-
-				// Release TB memory
-				free(tb.ir_insn);
-
-				// Update the cache entry function pointer
-				cache_entry->fn = fn;
-
+				
 				// Disable writes in the MMU for detecting SMC
 				mmu().disable_writes();
 			}
@@ -146,9 +137,13 @@ bool CPU::run_block_jit_safepoint()
 			// Make sure we're in the correct privilege mode
 			ensure_privilege_mode();
 
+			//__local_irq_disable();
+			
 			_exec_txl = true;
 			step_ok = (cache_entry->fn(&jit_state) == 0);
 			_exec_txl = false;
+			
+			//__local_irq_enable();
 		}
 	} while(step_ok);
 
@@ -172,15 +167,29 @@ void CPU::clear_block_cache()
 	}
 }
 
-bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
+jit::block_txln_fn CPU::compile_block(gpa_t pa)
+{
+	TranslationContext ctx;
+
+	if (!translate_block(ctx, pa)) {
+		printf("jit: block translation failed\n");
+		return NULL;
+	}
+
+	BlockCompiler compiler(ctx, pa);
+	block_txln_fn fn;
+	if (!compiler.compile(fn)) {
+		printf("jit: block compilation failed\n");
+		return NULL;
+	}
+	
+	return fn;
+}
+
+bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 {
 	using namespace captive::shared;
-
-	LocalMemory allocator;
-	TranslationContext ctx(allocator, tb);
-	uint8_t decode_data[128];
-	Decode *insn = (Decode *)&decode_data[0];
-
+	
 	// We MUST begin in block zero.
 	assert(ctx.current_block() == 0);
 
@@ -188,17 +197,15 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 	printf("jit: translating block %x\n", pa);
 #endif
 
-	tb.block_addr = pa;
-	tb.heat = 0;
-	tb.is_entry = 1;
-
+	Decode *insn = get_decode(0);
+			
 	gpa_t pc = pa;
-	gpa_t page = (pc & ~0xfffULL);
+	gpa_t page = PAGE_ADDRESS_OF(pc);
 	do {
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(pc, insn)) {
 			printf("jit: unhandled decode fault @ %08x\n", pc);
-			assert(false);
+			return false;
 		}
 
 #ifdef DEBUG_TRANSLATION
@@ -209,18 +216,17 @@ bool CPU::translate_block(gpa_t pa, shared::TranslationBlock& tb)
 			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));
 		}
 		
-		/*if (unlikely(cpu_data().verbose_enabled)) {
+		if (unlikely(cpu_data().verbose_enabled)) {
 			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));
-		}*/
+		}
 
 		// Translate this instruction into the context.
 		if (!jit().translate(insn, ctx)) {
-			allocator.free(tb.ir_insn);
 			return false;
 		}
 
 		pc += insn->length;
-	} while (!insn->end_of_block && (pc & ~0xfffULL) == page);
+	} while (!insn->end_of_block && PAGE_ADDRESS_OF(pc) == page);
 
 	// Finish off with a RET.
 	ctx.add_instruction(IRInstruction::ret());

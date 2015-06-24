@@ -15,7 +15,17 @@ using namespace captive::devices::arm;
 #define IRQ_TXINTR (1 << 5)
 #define IRQ_RXINTR (1 << 4)
 
-PL011::PL011(irq::IRQLine& irq) : Primecell(0x00141011), _irq(irq)
+PL011::PL011(irq::IRQLine& irq) 
+	: Primecell(0x00141011),
+	_irq(irq),
+	control_word(0x300),
+	baud_rate(0),
+	fractional_baud(0),
+	line_control(0),
+	irq_mask(0),
+	flag_register(0),
+	rsr(0),
+	ifl(0x12)
 {
 
 }
@@ -30,7 +40,7 @@ bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 	if (Primecell::read(off, len, data)) {
 		return true;
 	}
-
+	
 	switch (off) {
 	case 0x000: // Data register
 		if (fifo.empty()) {
@@ -53,6 +63,10 @@ bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 		if (fifo.empty()) {
 			data |= (1 << 4); //RXFE
 		}
+		
+		if (!(line_control & 0x10)) {
+			data |= (1 << 6);
+		}
 
 		data |= (1 << 7); //TXFE (always)
 		break;
@@ -74,7 +88,7 @@ bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 		break;
 
 	case 0x34:
-		data = 0;
+		data = ifl;
 		break;
 
 	case 0x038:
@@ -101,7 +115,7 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 	if (Primecell::write(off, len, data)) {
 		return true;
 	}
-
+	
 	switch (off) {
 	case 0x000: // Data register
 		/*if (serial) {
@@ -114,7 +128,7 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 
 	case 0x004: // RX status register / clear error register
-		control_word = data;
+		rsr = 0;
 		break;
 
 	case 0x018: // Flag register
@@ -137,6 +151,7 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 
 	case 0x034:
+		ifl = data;
 		break;
 
 	case 0x38:

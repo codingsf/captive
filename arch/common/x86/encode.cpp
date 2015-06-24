@@ -429,6 +429,17 @@ void X86Encoder::add4(uint32_t val, const X86Memory& dst)
 	}
 }
 
+void X86Encoder::add8(uint32_t val, const X86Memory& dst)
+{
+	if (val < 127) {
+		encode_opcode_mod_rm(0x83, 0, 8, dst);
+		emit8(val);
+	} else {
+		encode_opcode_mod_rm(0x81, 0, 8, dst);
+		emit32(val);
+	}
+}
+
 void X86Encoder::sub(const X86Register& src, const X86Register& dst)
 {
 	if (src.size == 1) {

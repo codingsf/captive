@@ -94,7 +94,7 @@ bool FileBackedBlockDevice::read_blocks(uint64_t block_idx, uint32_t count, uint
 		count = (uint32_t)(_block_count - block_idx);
 	}
 
-	// DEBUG << "Reading " << count << " blocks " << block_idx;
+	//DEBUG << "Reading " << count << " blocks " << block_idx;
 
 	if (_use_mmap) {
 		void *data_ptr = get_data_ptr(block_idx);

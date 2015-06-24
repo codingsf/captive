@@ -18,6 +18,7 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 	printf("\n");*/
 
 	core->cpu_data().device_address = dev_addr;
+	asm volatile("" ::: "memory");
 
 	captive::arch::x86::MemoryInstruction inst;
 	assert(decode_memory_instruction((const uint8_t *)mctx->rip, inst));

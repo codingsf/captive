@@ -271,7 +271,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 
 		// TODO: TEST+CLEAR
 		if (clear_if_page_executed(va_for_gpa)) {
-			cpu().invalidate_executed_page((pa_t)pt->base_address(), (va_t)va);
+			cpu().invalidate_executed_page((pa_t)pt->base_address(), (va_t)(uint64_t)va);
 		}
 	}
 
@@ -293,6 +293,8 @@ bool MMU::is_device(gpa_t gpa)
 	if (gpa >= 0x10140000 && gpa < 0x10141000) return true;
 	if (gpa >= 0x10000000 && gpa < 0x10001000) return true;
 	if (gpa >= 0x10003000 && gpa < 0x10004000) return true;
+	if (gpa >= 0x10006000 && gpa < 0x10007000) return true;
+	if (gpa >= 0x10007000 && gpa < 0x10008000) return true;
 	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;
 	if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
 

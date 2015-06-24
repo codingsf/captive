@@ -88,12 +88,16 @@ namespace captive {
 				void mouse_move(uint32_t x, uint32_t y) override;
 
 			private:
+				void send_update();
+				
 				uint32_t last_command;
 
 				uint32_t status, resolution, sample_rate;
 
 				uint32_t last_x, last_y;
 				uint32_t button_state;
+				
+				int32_t dx, dy;
 			};
 		}
 	}

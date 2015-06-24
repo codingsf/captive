@@ -9,6 +9,7 @@
 #include <malloc.h>
 #include <shared-memory.h>
 #include <shmem.h>
+#include <interp.h>
 
 extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
 
@@ -35,9 +36,7 @@ static void call_static_constructors()
 {
 	size_t size = __init_array_end - __init_array_start;
 
-	printf("calling static constructors\n");
 	for (int i = 0; i < size; i++) {
-		printf("running constructor %p\n", *__init_array_start[i]);
 		(*__init_array_start[i])();
 	}
 }
@@ -152,7 +151,7 @@ extern "C" {
 
 	void handle_trap_unk(struct mcontext *mctx)
 	{
-		printf("unhandled exception: rip=0x%lx\n", mctx->rip);
+		printf("unhandled exception: rip=0x%lx\n", mctx->rip);		
 		abort();
 	}
 
@@ -198,6 +197,11 @@ extern "C" {
 			} while(true);
 
 			break;
+			
+		/*case 2:
+			printf("handling irq\n");
+			cpu->interpreter().handle_irq(cpu->cpu_data().isr);
+			break;*/
 		}
 	}
 

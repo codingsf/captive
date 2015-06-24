@@ -28,6 +28,7 @@ namespace captive {
 
 	namespace arch {
 		namespace jit {
+			class TranslationContext;
 			typedef uint32_t (*block_txln_fn)(void *);
 		}
 
@@ -58,9 +59,9 @@ namespace captive {
 			inline Trace& trace() const { return *_trace; }
 			inline PerCPUData& cpu_data() const { return *_per_cpu_data; }
 
-			virtual uint32_t read_pc() const = 0;
-			virtual uint32_t write_pc(uint32_t new_pc_val) = 0;
-			virtual uint32_t inc_pc(uint32_t delta) = 0;
+			inline uint32_t read_pc() const { return *_pc_reg_ptr; }
+			inline uint32_t write_pc(uint32_t new_pc_val) { uint32_t tmp = *_pc_reg_ptr; *_pc_reg_ptr = new_pc_val; return tmp; }
+			inline uint32_t inc_pc(uint32_t delta) { uint32_t tmp = *_pc_reg_ptr; *_pc_reg_ptr += delta; return tmp; }
 
 			virtual void dump_state() const = 0;
 
@@ -99,10 +100,14 @@ namespace captive {
 			void tlb_flush();
 
 		protected:
+			volatile uint32_t *_pc_reg_ptr;
+			
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
 			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
 
+			virtual bool interrupts_enabled() const = 0;
+			
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;
 			}
@@ -115,12 +120,12 @@ namespace captive {
 			} local_state;
 
 			struct {
-				void *cpu;
-				void *registers;
-				uint32_t registers_size;
-				void **region_chaining_table;
-				uint64_t *insn_counter;
-			} jit_state;
+				void *cpu;							
+				void *registers;					
+				uint32_t registers_size;			
+				void **region_chaining_table;		
+				uint64_t *insn_counter;				
+			} jit_state packed;
 
 		private:
 			inline void assert_privilege_mode()
@@ -162,7 +167,7 @@ namespace captive {
 			struct block_txln_cache_entry *block_txln_cache;
 			const uint32_t block_txln_cache_size;
 
-			inline struct block_txln_cache_entry *get_block_txln_cache_entry(gpa_t phys_addr)
+			inline struct block_txln_cache_entry *get_block_txln_cache_entry(gpa_t phys_addr) const
 			{
 				return &block_txln_cache[((uint32_t)phys_addr >> 1) % block_txln_cache_size];
 			}
@@ -177,7 +182,8 @@ namespace captive {
 			bool interpret_block();
 
 			void analyse_blocks();
-			bool translate_block(gpa_t pa, shared::TranslationBlock& tb);
+			jit::block_txln_fn compile_block(gpa_t pa);
+			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
 		};
 	}
 }
