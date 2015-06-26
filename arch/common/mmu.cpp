@@ -13,7 +13,7 @@ MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
 	//printf("mmu: allocating guest pdps\n");
 
-	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
+	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
 
 	for (int i = 0; i < 4; i++) {
@@ -115,7 +115,7 @@ uint32_t MMU::page_checksum(va_t va)
 
 bool MMU::clear_vma()
 {
-	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
+	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
 
 	// Clear the present map on the 4G mapping
@@ -132,7 +132,7 @@ bool MMU::clear_vma()
 
 void MMU::disable_writes()
 {
-	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(Memory::read_cr3());
+	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
 
 	// Clear the present map on the 4G mapping
@@ -141,7 +141,11 @@ void MMU::disable_writes()
 	}
 
 	// Flush the TLB
-	Memory::flush_tlb();
+	if (in_kernel_mode()) {
+		Memory::flush_tlb();
+	} else {
+		asm volatile("int $0x83\n" ::: "rax");
+	}
 }
 
 bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault)

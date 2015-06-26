@@ -76,5 +76,12 @@ static inline void __local_irq_disable()
 	asm volatile("cli\n");
 }
 
-#endif	/* DEFINE_H */
+static inline uint64_t __rdtsc()
+{
+	uint32_t l, h;
+	asm volatile("rdtsc" : "=a"(l), "=d"(h));
+	
+	return (uint64_t)l | ((uint64_t)h) << 32;
+}
 
+#endif	/* DEFINE_H */

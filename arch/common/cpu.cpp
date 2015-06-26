@@ -45,7 +45,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 CPU::~CPU()
 {
-	//free(jit_state.region_chaining_table);
+	if (jit_state.region_chaining_table) free(jit_state.region_chaining_table);
 }
 
 bool CPU::handle_pending_action(uint32_t action)

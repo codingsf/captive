@@ -164,14 +164,24 @@ void SDLVirtualScreen::window_thread_proc()
 
 		// Draw a frame
 		draw_frame();
-		usleep(20000);
+		usleep(10000);
 	}
 }
 
 bool SDLVirtualScreen::initialise()
 {
-	assert(!window_thread);
-
+	if (window_thread) {
+		std::unique_lock<std::mutex> lock(texture_lock);
+		
+		SDL_DestroyTexture(window_texture);
+		window_texture = SDL_CreateTexture(renderer, _sdl_mode, SDL_TEXTUREACCESS_STREAMING, config().width(), config().height());
+		if(!window_texture) {
+			assert(false);
+		}
+		
+		return true;
+	}
+	
 	_sdl_lock.lock();
 	if (!_sdl_initialised) {
 		SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
@@ -224,11 +234,13 @@ bool SDLVirtualScreen::activate_configuration(const VirtualScreenConfiguration& 
 	case VirtualScreenConfiguration::VS_16bpp:
 		_sdl_mode = SDL_PIXELFORMAT_RGB565;
 		frame_drawer = &SDLVirtualScreen::draw_rgb;
+		pitch = cfg.width() * 2;
 		break;
 
 	case VirtualScreenConfiguration::VS_8bpp:
-		_sdl_mode = SDL_PIXELFORMAT_RGB332;
-		frame_drawer = &SDLVirtualScreen::draw_rgb;
+		_sdl_mode = SDL_PIXELFORMAT_RGBA8888;
+		frame_drawer = &SDLVirtualScreen::draw_palette;
+		pitch = cfg.width() * 4;
 		break;
 
 	case VirtualScreenConfiguration::VS_Doom:
@@ -241,18 +253,18 @@ bool SDLVirtualScreen::activate_configuration(const VirtualScreenConfiguration& 
 		return false;
 	}
 
-	pitch = cfg.width() * 2;
-
 	return true;
 }
 
 bool SDLVirtualScreen::reset_configuration()
 {
-	return false;
+	return true;
 }
 
 void SDLVirtualScreen::draw_frame()
 {
+	std::unique_lock<std::mutex> lock(texture_lock);
+	
 	SDL_RenderClear(renderer);
 
 	(this->*frame_drawer)();
@@ -264,6 +276,21 @@ void SDLVirtualScreen::draw_frame()
 void SDLVirtualScreen::draw_doom()
 {
 
+}
+
+void SDLVirtualScreen::draw_palette()
+{
+	uint8_t fb[config().width() * config().height() * 4];
+	
+	for (int pidx = 0; pidx < config().width() * config().height(); pidx++) {
+		uint32_t pv = ((uint16_t *)palette())[framebuffer()[pidx]];
+		fb[(pidx * 4) + 3] = (pv & 0x1f) << 3;
+		fb[(pidx * 4) + 2] = ((pv >> 5) & 0x1f) << 3;
+		fb[(pidx * 4) + 1] = ((pv >> 10) & 0x1f) << 3;
+		fb[(pidx * 4) + 0] = 0xff;
+	}
+	
+	SDL_UpdateTexture(window_texture, NULL, (void *)fb, pitch);
 }
 
 void SDLVirtualScreen::draw_rgb()

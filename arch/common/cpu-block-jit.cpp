@@ -22,7 +22,7 @@ using namespace captive::arch::jit;
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
-
+	
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
@@ -60,9 +60,9 @@ bool CPU::run_block_jit_safepoint()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
+		
 		if (unlikely(cpu_data().isr && interrupts_enabled())) {
 			if (interpreter().handle_irq(cpu_data().isr)) {
-				//asm volatile("out %0, $0xfc\n" :: "a"(0));
 				cpu_data().interrupts_taken++;
 			}
 		}
@@ -89,11 +89,9 @@ bool CPU::run_block_jit_safepoint()
 			assert(false);
 		}
 		
-		switch_to_kernel_mode();
-		
 		// Mark the physical page corresponding to the PC as executed
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
-
+		
 		// Profiling stuff... TODO
 		if (unlikely(trace_interval > 100000)) {
 			//analyse_blocks();
@@ -124,7 +122,7 @@ bool CPU::run_block_jit_safepoint()
 					continue;
 				}
 				
-				cache_entry->fn = compile_block(phys_pc);
+				cache_entry->fn = compile_block(phys_pc);				
 				if (unlikely(!cache_entry->fn)) {
 					printf("jit: block compilation failed\n");
 					return false;

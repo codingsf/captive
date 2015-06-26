@@ -65,6 +65,8 @@ namespace captive {
 
 				uint32_t upper_fbbase, lower_fbbase;
 				uint32_t isr, irq_mask;
+				
+				uint32_t palette[128];
 			};
 		}
 	}

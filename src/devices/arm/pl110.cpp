@@ -13,6 +13,8 @@ PL110::PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq)
 	: Primecell(0x00041110, 0x10000), _screen(screen), _irq(irq), lcd_timing { 0, 0, 0, 0 }, upper_fbbase(0), lower_fbbase(0), isr(0), irq_mask(0)
 {
 	control.data = 0;
+	
+	screen.palette((uint8_t *)&palette[0]);
 }
 
 PL110::~PL110()
@@ -65,8 +67,9 @@ bool PL110::read(uint64_t off, uint8_t len, uint64_t& data)
 		break;
 
 	case 0x200 ... 0x3fc:
-		data = 0;
+		data = palette[(off - 0x200) >> 2];
 		break;
+		
 	default:
 		return false;
 	}
@@ -125,6 +128,7 @@ bool PL110::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 
 	case 0x200 ... 0x3fc:
+		palette[(off - 0x200) >> 2] = data;
 		break;
 
 	default:
@@ -136,7 +140,7 @@ bool PL110::write(uint64_t off, uint8_t len, uint64_t data)
 
 void PL110::update_control()
 {
-	DEBUG << CONTEXT(PL110) << "Update Control " << std::hex << control.data;
+	DEBUG << CONTEXT(PL110) << "Update Control " << std::hex << control.data << ENABLE;
 
 	if (control.fields.en && !_screen.configured()) {
 		uint32_t ppl = 16 * (1 + ((lcd_timing[0] >> 2) & 0x3f));

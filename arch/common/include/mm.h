@@ -124,6 +124,8 @@ namespace captive {
 		static_assert(sizeof(page_table_t) == 0x1000, "x86 page table must be 4096 bytes");
 
 		typedef uint16_t table_idx_t;
+		
+#define CR3 (pa_t)0x2000
 
 		class Memory {
 			friend class MMU;
@@ -190,7 +192,7 @@ namespace captive {
 
 			#define BITS(val, start, end) ((((uint64_t)val) >> start) & (((1 << (end - start + 1)) - 1)))
 
-			static inline va_t phys_to_virt(pa_t pa) {
+			static inline va_t phys_to_virt(pa_t pa) __attribute__((pure)) {
 				if ((uint64_t)pa >= 0 && (uint64_t)pa < 0x10000000) {
 					return (va_t *)(0x200000000 + (uint64_t)pa);
 				} else {
@@ -209,8 +211,8 @@ namespace captive {
 				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
-				// L4
-				pm = &((page_map_t *)phys_to_virt(read_cr3()))->entries[pm_idx];
+				// L4 read_cr3()
+				pm = &((page_map_t *)phys_to_virt(CR3))->entries[pm_idx];
 				if (pm->base_address() == 0) {
 					auto page = Memory::alloc_page();
 					pm->base_address((uint64_t)page.pa);

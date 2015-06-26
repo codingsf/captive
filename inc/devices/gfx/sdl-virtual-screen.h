@@ -46,6 +46,7 @@ namespace captive {
 				void draw_frame();
 
 				void draw_doom();
+				void draw_palette();
 				void draw_rgb();
 
 				typedef void (SDLVirtualScreen::*frame_drawer_fn_t)(void);
@@ -61,6 +62,7 @@ namespace captive {
 				SDL_Window *window;
 				SDL_Renderer *renderer;
 				SDL_Texture *window_texture;
+				std::mutex texture_lock;
 
 				std::thread *window_thread;
 			};

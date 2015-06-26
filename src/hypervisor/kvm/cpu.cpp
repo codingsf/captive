@@ -91,25 +91,50 @@ static bool trap;
 
 uint64_t last_insns, last_intrs;
 
+static uint64_t timer_interp, timer_comp, timer_native, timer_total;
+static std::chrono::high_resolution_clock::time_point times[20];
+
+
 static void handle_signal(int signo)
 {
 	if (signo == SIGUSR1) {
-		signal_cpu->per_cpu_data().async_action = 2;
+		signal_cpu->per_cpu_data().async_action = 5;
 	} else if (signo == SIGUSR2) {
 		//signal_cpu->interrupt(0);
 		
-		fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
-		last_insns = signal_cpu->per_cpu_data().insns_executed;
-		last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
+		//fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
+		//last_insns = signal_cpu->per_cpu_data().insns_executed;
+		//last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
 		
+		//timer_total = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - times[10]).count();
+		//fprintf(stderr, "TIMES: INTERP=%lu, NATIVE=%lu, COMPILATION=%lu, TXLN=%lu\n", timer_interp, timer_native, timer_comp, timer_total);
 	} else if (signo == SIGTRAP) {
-		trap = true;
+		//trap = true;
+		
+
 	}
 }
 
 static std::chrono::high_resolution_clock::time_point cpu_start_time;
 
 extern void trigger_irq_latency_measure();
+
+static void measure_time(uint64_t code)
+{
+	times[code] = std::chrono::high_resolution_clock::now();
+	
+	if (code == 1) {
+		timer_interp += std::chrono::duration_cast<std::chrono::microseconds>(times[1] - times[0]).count();
+	} else if (code == 3) {
+		timer_comp += std::chrono::duration_cast<std::chrono::microseconds>(times[3] - times[2]).count();
+	} else if (code == 5) {
+		timer_native += std::chrono::duration_cast<std::chrono::microseconds>(times[5] - times[4]).count();
+	} else if (code == 11) {
+		timer_total += std::chrono::duration_cast<std::chrono::microseconds>(times[11] - times[10]).count();
+	}
+	
+	//fprintf(stderr, "measure\n");
+}
 
 bool KVMCpu::run()
 {
@@ -185,6 +210,8 @@ bool KVMCpu::run()
 				dump_regs();
 			} else if (cpu_run_struct->io.port == 0xfc) {
 				trigger_irq_latency_measure();
+			} else if (cpu_run_struct->io.port == 0xfb) {
+				measure_time(*(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 			} else if (cpu_run_struct->io.port == 0xf0) {
 				devices::Device *dev = kvm_guest.lookup_device(per_cpu_data().device_address);
 				if (dev != NULL) {
@@ -261,7 +288,7 @@ bool KVMCpu::run()
 	} while (run_cpu && !per_cpu_data().halt);
 
 	dump_regs();
-
+	
 	return true;
 }
 

@@ -17,6 +17,7 @@ extern "C" void trap_signal(struct mcontext *);
 extern "C" void int80_handler(struct mcontext *);
 extern "C" void int81_handler(struct mcontext *);
 extern "C" void int82_handler(struct mcontext *);
+extern "C" void int83_handler(struct mcontext *);
 
 extern "C" void trap_irq(struct mcontext *);
 
@@ -113,6 +114,7 @@ void Environment::install_idt()
 	set_idt(&idt[0x80], int80_handler, true);
 	set_idt(&idt[0x81], int81_handler, true);
 	set_idt(&idt[0x82], int82_handler, true);
+	set_idt(&idt[0x83], int83_handler, true);
 
 	asm volatile("lidt %0\n" :: "m"(IDTR));
 }
