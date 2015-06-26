@@ -9,6 +9,7 @@
 #include <priv.h>
 #include <jit.h>
 #include <jit/translation-context.h>
+#include <shared-memory.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
@@ -31,7 +32,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	memset(decode_cache, 0xff, sizeof(decode_cache));
 
 	// Initialise the block translation cache
-	block_txln_cache = (struct block_txln_cache_entry *)malloc(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
+	SharedMemory shmem;
+	block_txln_cache = (struct block_txln_cache_entry *)shmem.allocate(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
 	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
 		entry->tag = 1;
 		entry->count = 0;

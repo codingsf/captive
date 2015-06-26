@@ -11,7 +11,7 @@ uint64_t Memory::__force_order;
 Memory::Memory(uint64_t first_phys_page, MemoryVector shared_memory_arena)
 	: _next_phys_page((pa_t)first_phys_page),
 	_data_base((va_t)0x200000000),
-	_shared_memory(new SharedMemory(shared_memory_arena.base_address, shared_memory_arena.size))
+	_shared_memory(new SharedMemory())
 {
 	mm = this;
 	//printf("next avail phys page: %x, data area base: %x\n", _next_phys_page, _data_base);

@@ -91,10 +91,6 @@ static bool trap;
 
 uint64_t last_insns, last_intrs;
 
-static uint64_t timer_interp, timer_comp, timer_native, timer_total;
-static std::chrono::high_resolution_clock::time_point times[20];
-
-
 static void handle_signal(int signo)
 {
 	if (signo == SIGUSR1) {
@@ -102,39 +98,17 @@ static void handle_signal(int signo)
 	} else if (signo == SIGUSR2) {
 		//signal_cpu->interrupt(0);
 		
-		//fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
-		//last_insns = signal_cpu->per_cpu_data().insns_executed;
-		//last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
-		
-		//timer_total = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - times[10]).count();
-		//fprintf(stderr, "TIMES: INTERP=%lu, NATIVE=%lu, COMPILATION=%lu, TXLN=%lu\n", timer_interp, timer_native, timer_comp, timer_total);
+		fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
+		last_insns = signal_cpu->per_cpu_data().insns_executed;
+		last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
 	} else if (signo == SIGTRAP) {
-		//trap = true;
-		
-
+		trap = true;
 	}
 }
 
 static std::chrono::high_resolution_clock::time_point cpu_start_time;
 
 extern void trigger_irq_latency_measure();
-
-static void measure_time(uint64_t code)
-{
-	times[code] = std::chrono::high_resolution_clock::now();
-	
-	if (code == 1) {
-		timer_interp += std::chrono::duration_cast<std::chrono::microseconds>(times[1] - times[0]).count();
-	} else if (code == 3) {
-		timer_comp += std::chrono::duration_cast<std::chrono::microseconds>(times[3] - times[2]).count();
-	} else if (code == 5) {
-		timer_native += std::chrono::duration_cast<std::chrono::microseconds>(times[5] - times[4]).count();
-	} else if (code == 11) {
-		timer_total += std::chrono::duration_cast<std::chrono::microseconds>(times[11] - times[10]).count();
-	}
-	
-	//fprintf(stderr, "measure\n");
-}
 
 bool KVMCpu::run()
 {
@@ -193,7 +167,7 @@ bool KVMCpu::run()
 				vmioctl(KVM_GET_REGS, &regs);
 
 				//DEBUG << "Handling hypercall " << std::hex << regs.rax;
-				run_cpu = handle_hypercall(regs.rax);
+				run_cpu = handle_hypercall(regs.rax, regs.rdi);
 				if (!run_cpu) {
 					ERROR << CONTEXT(CPU) << "Unhandled hypercall " << std::hex << regs.rax;
 				}
@@ -210,8 +184,6 @@ bool KVMCpu::run()
 				dump_regs();
 			} else if (cpu_run_struct->io.port == 0xfc) {
 				trigger_irq_latency_measure();
-			} else if (cpu_run_struct->io.port == 0xfb) {
-				measure_time(*(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 			} else if (cpu_run_struct->io.port == 0xf0) {
 				devices::Device *dev = kvm_guest.lookup_device(per_cpu_data().device_address);
 				if (dev != NULL) {
@@ -328,7 +300,7 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 	}
 }
 
-bool KVMCpu::handle_hypercall(uint64_t data)
+bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg)
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
 
@@ -399,50 +371,6 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 		fgetc(stdin);
 		return true;
 
-	case 6: {	// COMPILE
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
-		DEBUG << CONTEXT(CPU) << "Compiling Block, incoming offset=" << regs.rdi;
-		regs.rax = 0; //kvm_guest.jit().block_jit().compile_block(regs.rdi);
-		DEBUG << CONTEXT(CPU) << "Compiled Block, outgoing offset=" << regs.rax;
-
-		vmioctl(KVM_SET_REGS, &regs);
-		return true;
-	}
-
-	case 7: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
-		DEBUG << CONTEXT(CPU) << "Releasing Block, incoming offset=" << regs.rdi;
-		return true;
-	}
-
-	case 8: {	// COMPILE
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
-		DEBUG << CONTEXT(CPU) << "Compiling Region: " << std::hex << "RDI=" << regs.rdi;
-		kvm_guest.jit().region_jit().compile_region_async(
-			(captive::shared::RegionWorkUnit *)regs.rdi,
-			([](captive::shared::RegionWorkUnit *rwu, bool success, void *data) -> void {
-				KVMCpu *cpu = (KVMCpu *)data;
-
-				queue::QueueItem *qi = (queue::QueueItem *)cpu->owner().shared_memory().allocate(sizeof(queue::QueueItem));
-				qi->data = rwu;
-
-				lock::spinlock_acquire(&(cpu->per_cpu_data().rwu_ready_queue_lock));
-				queue::enqueue(&(cpu->per_cpu_data().rwu_ready_queue), qi);
-				lock::spinlock_release(&(cpu->per_cpu_data().rwu_ready_queue_lock));
-
-				((KVMCpu *)data)->interrupt(1);
-			}),
-			this);
-
-		return true;
-	}
-
 	case 9:
 		config().verify_tick_source()->do_tick();
 		return true;
@@ -474,42 +402,15 @@ bool KVMCpu::handle_hypercall(uint64_t data)
 	}
 
 	case 13: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
 		std::stringstream cmd;
-		cmd << "addr2line -e arch/arm.arch " << std::hex << regs.rdi;
+		cmd << "addr2line -e arch/arm.arch " << std::hex << arg;
 		system(cmd.str().c_str());
-		//fprintf(stderr, "<?>");
 		return true;
 	}
-
-	case 15: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
-		std::stringstream fname;
-		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
-		FILE *f = fopen(fname.str().c_str(), "wb");
-
-		uint64_t gpa = regs.rdi & 0xffffffff;
-		gpa += 0x000300000000ULL;
-
-		void *ptr = kvm_guest.get_phys_buffer(gpa);
-		if (ptr) {
-			fwrite(ptr, regs.rsi, 1, f);
-		}
-
-		fflush(f);
-		fclose(f);
+	
+	case 14: {
+		owner().jit().analyse(*this, (void *)arg);
 		return true;
-	}
-
-	case 20: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
-		return kvm_guest.jit().page_jit().compile_page((captive::shared::PageWorkUnit *)regs.rdi);
 	}
 	}
 

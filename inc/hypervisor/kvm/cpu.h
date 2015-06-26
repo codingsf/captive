@@ -59,7 +59,7 @@ namespace captive {
 
 				bool setup_interrupts();
 
-				bool handle_hypercall(uint64_t data);
+				bool handle_hypercall(uint64_t data, uint64_t arg);
 				bool handle_device_access(devices::Device *device, uint64_t pa, struct kvm_run& rs);
 
 				void dump_regs();

@@ -10,6 +10,7 @@
 #include <shared-jit.h>
 
 #include <set>
+#include <map>
 
 //#define REG_STATE_PROTECTION
 //#define DEBUG_TRANSLATION
@@ -92,11 +93,13 @@ bool CPU::run_block_jit_safepoint()
 		// Mark the physical page corresponding to the PC as executed
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 		
-		// Profiling stuff... TODO
-		if (unlikely(trace_interval > 100000)) {
-			//analyse_blocks();
+		// Signal the hypervisor to make a profiling run
+		if (unlikely(trace_interval > 300000)) {
+			_analysing = true;
 			trace_interval = 0;
-		} else {
+
+			asm volatile("out %0, $0xff" :: "a"(14), "D"(block_txln_cache));
+		} else if (!_analysing) {
 			trace_interval++;
 		}
 		
@@ -236,34 +239,27 @@ static std::set<uint32_t> compilation_set;
 
 void CPU::analyse_blocks()
 {
-	std::map<uint32_t, std::list<std::pair<uint32_t, uint32_t>>> regions;
+	typedef const struct block_txln_cache_entry *const_cache_entry_ptr;
+	typedef std::list<const_cache_entry_ptr> block_list_t;
+	typedef std::map<uint32_t, block_list_t> region_map_t;
 	
-	for (uint32_t cache_idx = 0; cache_idx < block_txln_cache_size; cache_idx++) {
-		const struct block_txln_cache_entry *cache_entry = &block_txln_cache[cache_idx];
+	region_map_t regions;
+
+	// Build a region map
+	/*for (uint32_t cache_idx = 0; cache_idx < block_txln_cache_size; cache_idx++) {
+		const_cache_entry_ptr cache_entry = &block_txln_cache[cache_idx];
 		if (cache_entry->tag == 1) continue;
 		
-		//printf("  block: %x count=%u\n", block_txln_cache[cache_idx].tag, block_txln_cache[cache_idx].count);
-		
-		std::list<std::pair<uint32_t, uint32_t>>& blocks = regions[cache_entry->tag & ~0xfffU];
-		blocks.push_back(std::pair<uint32_t, uint32_t>(cache_entry->tag, cache_entry->count));
-	}
+		block_list_t& blocks = regions[PAGE_ADDRESS_OF(cache_entry->tag)];
+		blocks.push_back(cache_entry);
+	}*/
 	
-	for (auto region : regions) {
+	/*for (auto region : regions) {
 		if (compilation_set.count(region.first)) continue;
 		
 		if (region.second.size() > 10) {
-			bool eligible = false;
-			for (auto block : region.second) {
-				if (block.second > 100) {
-					eligible = true;
-					break;
-				}
-			}
-			
-			if (eligible) {
-				printf("compiling region %x\n", region.first);
-				compilation_set.insert(region.first);
-			}
+			printf("compiling region %x\n", region.first);
+			compilation_set.insert(region.first);
 		}
-	}
+	}*/
 }

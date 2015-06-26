@@ -9,10 +9,12 @@
 #define	JIT_H
 
 #include <define.h>
+#include <vector>
 
 namespace captive {
 	namespace hypervisor {
 		class SharedMemory;
+		class CPU;
 	}
 
 	namespace util {
@@ -20,90 +22,32 @@ namespace captive {
 	}
 
 	namespace shared {
-		struct RegionWorkUnit;
-		struct BlockWorkUnit;
-		struct PageWorkUnit;
-		struct TranslationBlock;
-
 		struct IRInstruction;
 		struct IROperand;
 	}
 
 	namespace jit {
-		class BlockJIT;
-		class RegionJIT;
-		class PageJIT;
-
 		class JIT
 		{
 		public:
 			JIT(util::ThreadPool& worker_threads);
 			virtual ~JIT();
 
-			inline util::ThreadPool& worker_threads() const { return _worker_threads; }
-
 			virtual bool init() = 0;
 
-			virtual BlockJIT& block_jit() = 0;
-			virtual RegionJIT& region_jit() = 0;
-			virtual PageJIT& page_jit() = 0;
+			void analyse(hypervisor::CPU& cpu, void *cache_ptr);
+			
+			inline util::ThreadPool& worker_threads() const { return _worker_threads; }
 
-			void set_shared_memory(hypervisor::SharedMemory& shmem) {
+			inline void set_shared_memory(hypervisor::SharedMemory& shmem) {
 				_shared_memory = &shmem;
 			}
+			
+			virtual void compile_region_async(uint32_t gpa, const std::vector<uint32_t>& blocks) = 0;
 
 		protected:
 			util::ThreadPool& _worker_threads;
 			hypervisor::SharedMemory *_shared_memory;
-
-			bool quick_opt(shared::TranslationBlock *tb);
-		};
-
-		class JITStrategy
-		{
-		public:
-			JITStrategy(JIT& owner);
-			virtual ~JITStrategy();
-
-			inline JIT& owner() const { return _owner; }
-
-		private:
-			JIT& _owner;
-		};
-
-		class BlockJIT : public JITStrategy
-		{
-		public:
-			typedef void (*block_completion_t)(shared::BlockWorkUnit *work_unit, bool success, void *completion_data);
-
-			BlockJIT(JIT& owner);
-			virtual ~BlockJIT();
-			virtual bool compile_block(shared::BlockWorkUnit *work_unit) = 0;
-			void compile_block_async(shared::BlockWorkUnit *work_unit, block_completion_t completion, void *completion_data);
-		};
-
-		class RegionJIT : public JITStrategy
-		{
-		public:
-			typedef void (*region_completion_t)(shared::RegionWorkUnit *work_unit, bool success, void *completion_data);
-
-			RegionJIT(JIT& owner);
-			virtual ~RegionJIT();
-
-			virtual bool compile_region(shared::RegionWorkUnit *work_unit) = 0;
-			void compile_region_async(shared::RegionWorkUnit *work_unit, region_completion_t completion, void *completion_data);
-		};
-
-		class PageJIT : public JITStrategy
-		{
-		public:
-			typedef void (*page_completion_t)(shared::PageWorkUnit *work_unit, bool success, void *completion_data);
-
-			PageJIT(JIT& owner);
-			virtual ~PageJIT();
-
-			virtual bool compile_page(shared::PageWorkUnit *work_unit) = 0;
-			void compile_page_async(shared::PageWorkUnit *work_unit, page_completion_t completion, void *completion_data);
 		};
 
 		class InstructionPrinter
@@ -116,4 +60,3 @@ namespace captive {
 }
 
 #endif	/* JIT_H */
-

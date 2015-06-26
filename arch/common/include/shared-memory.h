@@ -18,7 +18,7 @@ namespace captive {
 		class SharedMemory : public Allocator
 		{
 		public:
-			SharedMemory(void *arena, uint64_t arena_size);
+			SharedMemory() { }
 
 			virtual void *allocate(size_t size, alloc_flags_t flags = NONE) override
 			{

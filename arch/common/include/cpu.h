@@ -98,6 +98,8 @@ namespace captive {
 			void clear_block_cache();
 
 			void tlb_flush();
+			
+			inline void release_analysis_lock() { _analysing = false; }
 
 		protected:
 			volatile uint32_t *_pc_reg_ptr;
@@ -150,7 +152,7 @@ namespace captive {
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
 
-			bool _exec_txl;
+			bool _exec_txl, _analysing;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
 

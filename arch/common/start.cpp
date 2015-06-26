@@ -198,6 +198,10 @@ extern "C" {
 
 			break;
 			
+		case 2:
+			cpu->release_analysis_lock();
+			break;
+			
 		/*case 2:
 			printf("handling irq\n");
 			cpu->interpreter().handle_irq(cpu->cpu_data().isr);

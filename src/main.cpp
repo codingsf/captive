@@ -2,7 +2,6 @@
 #include <verify.h>
 #include <engine/engine.h>
 #include <jit/llvm.h>
-#include <jit/wsj.h>
 #include <loader/zimage-loader.h>
 #include <loader/elf-loader.h>
 #include <loader/devtree-loader.h>
@@ -215,7 +214,6 @@ int main(int argc, char **argv)
 
 	// Create the JIT
 	LLVMJIT jit(engine, worker_threads);
-	//WSJ jit(engine);
 	if (!jit.init()) {
 		ERROR << "Unable to initialise jit";
 		return 1;
