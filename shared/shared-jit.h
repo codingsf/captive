@@ -20,10 +20,21 @@ namespace captive {
 	namespace shared {
 		typedef uint32_t IRBlockId;
 		typedef uint32_t IRRegId;
+		
+		struct IRInstruction;
+		
+		typedef uint32_t (*block_txln_fn)(void *);
+		
+		struct BlockTranslation
+		{
+			block_txln_fn native_fn_ptr;
+			const IRInstruction *ir;
+			uint32_t ir_count;
+		} __packed;
 
 		struct IROperand
 		{
-			enum IROperandType {
+			enum IROperandType : uint8_t {
 				NONE,
 				CONSTANT,
 				VREG,
@@ -32,7 +43,7 @@ namespace captive {
 				PC
 			};
 
-			enum IRAllocationMode {
+			enum IRAllocationMode : uint8_t {
 				NOT_ALLOCATED,
 				ALLOCATED_REG,
 				ALLOCATED_STACK
@@ -79,7 +90,7 @@ namespace captive {
 
 		struct IRInstruction
 		{
-			enum IRInstructionType {
+			enum IRInstructionType : uint8_t {
 				INVALID,
 
 				VERIFY,
@@ -530,56 +541,6 @@ namespace captive {
 
 				return IRInstruction(CALL, fn, arg0, arg1, arg2, arg3, arg4);
 			}
-		} __packed;
-
-		struct TranslationBlock
-		{
-			enum DestinationType
-			{
-				PREDICATED_DIRECT,
-				NON_PREDICATED_DIRECT,
-				PREDICATED_INDIRECT,
-				NON_PREDICATED_INDIRECT,
-			};
-
-			uint32_t block_addr;
-			uint32_t heat;
-			uint32_t is_entry;
-
-			uint32_t ir_block_count;
-			uint32_t ir_reg_count;
-			uint32_t ir_insn_count;
-			IRInstruction *ir_insn;
-
-			DestinationType destination_type;
-			uint32_t destination_target;
-			uint32_t fallthrough_target;
-		} __packed;
-
-		struct RegionWorkUnit
-		{
-			uint32_t work_unit_id;
-			uint32_t region_base_address;
-			uint64_t function_addr;
-
-			bool valid;
-			void *region_object;
-
-			uint32_t block_count;
-			TranslationBlock *blocks;
-		} __packed;
-
-		struct BlockWorkUnit
-		{
-			uint32_t work_unit_id;
-
-			void *ir;
-		} __packed;
-
-		struct PageWorkUnit
-		{
-			uint8_t page[4096];
-			uint8_t entries[512];
 		} __packed;
 	}
 }

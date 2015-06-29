@@ -32,12 +32,11 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	memset(decode_cache, 0xff, sizeof(decode_cache));
 
 	// Initialise the block translation cache
-	SharedMemory shmem;
-	block_txln_cache = (struct block_txln_cache_entry *)shmem.allocate(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
+	block_txln_cache = (struct block_txln_cache_entry *)shalloc(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
 	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
 		entry->tag = 1;
 		entry->count = 0;
-		entry->fn = NULL;
+		entry->txln = NULL;
 	}
 	
 	jit_state.cpu = this;
@@ -222,6 +221,19 @@ bool CPU::interpret_block()
 	} while(!insn->end_of_block && step_ok);
 }
 
+void CPU::clear_block_cache()
+{
+	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
+		if (entry->tag != 1 && entry->txln) {
+			release_block_translation(entry->txln);
+			entry->txln = NULL;
+		}
+
+		entry->tag = 1;
+		entry->count = 0;
+	}
+}
+
 void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 {
 	pa_t phys_page_base_addr = (pa_t)((uint64_t)phys_addr & ~0xfffULL);
@@ -235,12 +247,11 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 
 		// If there is an entry that resides on this page...
 		if ((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)(uint64_t)phys_page_base_addr)) {
-			if (entry->fn) {
-				// If there is a valid function, release the function
-				// and clear the pointer.
+			if (entry->txln) {
+				// If there is a valid translation, release it and clear the pointer.
 
-				free((void *)entry->fn);
-				entry->fn = NULL;
+				release_block_translation(entry->txln);
+				entry->txln = NULL;
 			}
 
 			//printf("  saying goodbye to: tag=%08x\n", entry->tag & ~0xfffULL);
@@ -253,11 +264,6 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 
 	// Remove the entry from the region chaining table.
 	//jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
-}
-
-void CPU::register_region(captive::shared::RegionWorkUnit* rwu)
-{
-	assert(false);
 }
 
 static uint32_t pc_ring_buffer[256];
@@ -378,4 +384,16 @@ bool CPU::device_read(uint32_t address, uint8_t length, uint64_t& value)
 
 	//printf("device read: addr=%x, value=%u\n", address, value);
 	return true;
+}
+
+captive::shared::BlockTranslation* CPU::alloc_block_translation()
+{
+	return (captive::shared::BlockTranslation *)shalloc(sizeof(captive::shared::BlockTranslation));
+}
+
+void CPU::release_block_translation(shared::BlockTranslation *txln)
+{
+	shfree((void *)txln->ir);
+	free((void *)txln->native_fn_ptr);
+	shfree(txln);
 }

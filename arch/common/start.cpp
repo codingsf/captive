@@ -128,7 +128,7 @@ extern "C" {
 		captive::arch::malloc_init(cpu_data->guest_data->heap);
 
 		// Initialise the memory manager.
-		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page, cpu_data->guest_data->shared_memory);
+		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
 
 
 		captive::arch::Environment *env = create_environment(cpu_data);
@@ -182,7 +182,7 @@ extern "C" {
 
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
-		case 1:
+		/*case 1:
 			captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
 			do {
 				captive::queue::QueueItem *qi = captive::queue::dequeue(&(cpu->cpu_data().rwu_ready_queue));
@@ -196,7 +196,7 @@ extern "C" {
 				captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
 			} while(true);
 
-			break;
+			break;*/
 			
 		case 2:
 			cpu->release_analysis_lock();

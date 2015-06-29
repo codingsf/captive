@@ -20,13 +20,11 @@
 namespace captive {
 	namespace arch {
 		namespace jit {
-			typedef uint32_t (*block_txln_fn)(void *);
-
 			class BlockCompiler
 			{
 			public:
 				BlockCompiler(TranslationContext& ctx, gpa_t pa);
-				bool compile(block_txln_fn& fn);
+				bool compile(shared::block_txln_fn& fn);
 
 			private:
 				TranslationContext& ctx;
@@ -41,7 +39,8 @@ namespace captive {
 				bool build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits);
 				bool allocate();
 				bool lower(uint32_t max_stack);
-
+				bool peeplower(uint32_t max_stack);
+				
 				void dump_ir();
 
 				void emit_save_reg_state();

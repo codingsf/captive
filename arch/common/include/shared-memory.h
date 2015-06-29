@@ -9,43 +9,30 @@
 #define	SHARED_MEMORY_H
 
 #include <define.h>
-#include <string.h>
-#include <lock.h>
-#include <allocator.h>
 
 namespace captive {
 	namespace arch {
-		class SharedMemory : public Allocator
+		
+		static inline void *shalloc(size_t size)
 		{
-		public:
-			SharedMemory() { }
+			uint64_t addr;
+			asm volatile ("out %2, $0xff" : "=a"(addr) : "D"(size), "a"(10));
 
-			virtual void *allocate(size_t size, alloc_flags_t flags = NONE) override
-			{
-				uint64_t addr;
-				asm volatile ("out %2, $0xff" : "=a"(addr) : "D"(size), "a"(10));
+			return (void *)addr;
+		}
 
-				if (addr && (flags & ZERO) == ZERO) {
-					bzero((void *)addr, size);
-				}
+		static inline void *shrealloc(void *p, size_t size)
+		{
+			uint64_t addr;
+			asm volatile ("out %3, $0xff" : "=D"(addr) : "D"(p), "S"(size), "a"(11));
+			return (void *)addr;
+		}
 
-				return (void *)addr;
-			}
-
-			virtual void *reallocate(void *p, size_t size) override
-			{
-				uint64_t addr;
-				asm volatile ("out %3, $0xff" : "=a"(addr) : "D"(p), "S"(size), "a"(11));
-				return (void *)addr;
-			}
-
-			virtual void free(void *p) override
-			{
-				asm volatile ("out %1, $0xff" : : "D"(p), "a"(12));
-			}
-		};
+		static inline void shfree(void *p)
+		{
+			asm volatile ("out %1, $0xff" : : "D"(p), "a"(12));
+		}
 	}
 }
 
 #endif	/* SHARED_MEMORY_H */
-

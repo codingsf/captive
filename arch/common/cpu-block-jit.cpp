@@ -105,12 +105,12 @@ bool CPU::run_block_jit_safepoint()
 		
 		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(phys_pc);
 		if (unlikely(cache_entry->tag != phys_pc)) {
-			if (cache_entry->tag != 1 && cache_entry->fn) {
-				free((void *)cache_entry->fn);
+			if (cache_entry->tag != 1 && cache_entry->txln) {
+				release_block_translation(cache_entry->txln);
 			}
 
 			cache_entry->tag = phys_pc;
-			cache_entry->fn = NULL;
+			cache_entry->txln = NULL;
 			cache_entry->count = 1;
 
 			//__local_irq_disable();
@@ -119,14 +119,14 @@ bool CPU::run_block_jit_safepoint()
 		} else {
 			cache_entry->count++;
 
-			if (unlikely(cache_entry->fn == NULL)) {
+			if (unlikely(cache_entry->txln == NULL)) {
 				if (unlikely(cache_entry->count < 10)) {
 					step_ok = interpret_block();
 					continue;
 				}
 				
-				cache_entry->fn = compile_block(phys_pc);				
-				if (unlikely(!cache_entry->fn)) {
+				cache_entry->txln = compile_block(phys_pc);				
+				if (unlikely(!cache_entry->txln)) {
 					printf("jit: block compilation failed\n");
 					return false;
 				}
@@ -141,7 +141,7 @@ bool CPU::run_block_jit_safepoint()
 			//__local_irq_disable();
 			
 			_exec_txl = true;
-			step_ok = (cache_entry->fn(&jit_state) == 0);
+			step_ok = ((cache_entry->txln->native_fn_ptr)(&jit_state) == 0);
 			_exec_txl = false;
 			
 			//__local_irq_enable();
@@ -151,24 +151,7 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-void CPU::clear_block_cache()
-{
-#ifdef DEBUG_TRANSLATION
-	printf("jit: clearing block cache\n");
-#endif
-	
-	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
-		if (entry->tag != 1 && entry->fn) {
-			free((void *)entry->fn);
-			entry->fn = NULL;
-		}
-
-		entry->tag = 1;
-		entry->count = 0;
-	}
-}
-
-jit::block_txln_fn CPU::compile_block(gpa_t pa)
+captive::shared::BlockTranslation *CPU::compile_block(gpa_t pa)
 {
 	TranslationContext ctx;
 
@@ -178,13 +161,20 @@ jit::block_txln_fn CPU::compile_block(gpa_t pa)
 	}
 
 	BlockCompiler compiler(ctx, pa);
-	block_txln_fn fn;
+	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		printf("jit: block compilation failed\n");
 		return NULL;
 	}
 	
-	return fn;
+	shared::BlockTranslation *txln = alloc_block_translation();
+	assert(txln);
+	
+	txln->native_fn_ptr = fn;
+	txln->ir_count = ctx.count();
+	txln->ir = ctx.get_ir_buffer();
+	
+	return txln;
 }
 
 bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)

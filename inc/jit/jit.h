@@ -24,6 +24,7 @@ namespace captive {
 	namespace shared {
 		struct IRInstruction;
 		struct IROperand;
+		struct BlockTranslation;
 	}
 
 	namespace jit {
@@ -43,7 +44,7 @@ namespace captive {
 				_shared_memory = &shmem;
 			}
 			
-			virtual void compile_region_async(uint32_t gpa, const std::vector<uint32_t>& blocks) = 0;
+			virtual void *compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t, shared::BlockTranslation *>>& blocks) = 0;
 
 		protected:
 			util::ThreadPool& _worker_threads;

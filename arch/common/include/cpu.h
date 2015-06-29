@@ -22,14 +22,12 @@
 
 namespace captive {
 	namespace shared {
-		struct RegionWorkUnit;
-		struct TranslationBlock;
+		struct BlockTranslation;
 	}
 
 	namespace arch {
 		namespace jit {
 			class TranslationContext;
-			typedef uint32_t (*block_txln_fn)(void *);
 		}
 
 		class Environment;
@@ -89,8 +87,6 @@ namespace captive {
 			}
 
 			bool verify_check();
-
-			void register_region(captive::shared::RegionWorkUnit *rwu);
 
 			virtual void *reg_state() = 0;
 			virtual uint32_t reg_state_size() = 0;
@@ -163,7 +159,7 @@ namespace captive {
 			struct block_txln_cache_entry {
 				uint32_t tag;
 				uint32_t count;
-				jit::block_txln_fn fn;
+				shared::BlockTranslation *txln;
 			};
 
 			struct block_txln_cache_entry *block_txln_cache;
@@ -184,8 +180,11 @@ namespace captive {
 			bool interpret_block();
 
 			void analyse_blocks();
-			jit::block_txln_fn compile_block(gpa_t pa);
+			shared::BlockTranslation *compile_block(gpa_t pa);
 			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
+			
+			shared::BlockTranslation *alloc_block_translation();
+			void release_block_translation(shared::BlockTranslation *txln);
 		};
 	}
 }

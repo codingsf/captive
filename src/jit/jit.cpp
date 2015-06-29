@@ -202,24 +202,41 @@ JIT::~JIT()
 struct block_txln_cache_entry {
 	uint32_t tag;
 	uint32_t count;
-	void *fn;
+	captive::shared::BlockTranslation *txln;
 };
 
 struct analysis_work {
 	JIT *jit;
-	std::unordered_map<uint32_t, std::vector<uint32_t>> regions;
+	std::unordered_map<uint32_t, std::vector<std::pair<uint32_t, captive::shared::BlockTranslation *>>> regions;
 	captive::hypervisor::CPU *cpu;
 };
 
-static uint64_t analyse_async(const struct analysis_work *work)
+/*struct compilation_work {
+	JIT *jit;
+};
+
+static uint64_t compile_async(const struct compilation_work *cwork)
 {
-	for (const auto& region : work->regions) {
-		work->jit->compile_region_async(region.first, region.second);
+	cwork->jit->compile_region(region.first, region.second);
+	
+	delete cwork;
+}*/
+
+static uint64_t analyse_async(const struct analysis_work *awork)
+{
+	for (const auto& region : awork->regions) {
+		//struct compilation_work *cwork = new struct compilation_work();
+		//awork->jit->worker_threads().queue_work((captive::util::action_t)compile_async, NULL, cwork);
+		void *ptr = awork->jit->compile_region(region.first, region.second);
+		if (ptr) {
+			// dispatch region ready message
+			//awork->cpu->
+		}
 	}
 	
-	work->cpu->interrupt(2);
+	//awork->cpu->interrupt(2);
 	
-	delete work;
+	delete awork;
 	return 0;
 }
 
@@ -231,10 +248,11 @@ void JIT::analyse(captive::hypervisor::CPU& cpu, void* cache_ptr)
 	
 	for (uint32_t cache_idx = 0; cache_idx < 20000003; cache_idx++) {
 		struct block_txln_cache_entry *entry = &((struct block_txln_cache_entry *)cache_ptr)[cache_idx];
-		if (entry->tag == 1) continue;
+		if (entry->tag == 1 || !entry->txln) continue;
 		
-		std::vector<uint32_t>& blocks = work->regions[entry->tag & ~0xfff];
-		blocks.push_back(entry->tag);
+		uint32_t region_base_address = entry->tag & ~0xfff;
+		std::vector<std::pair<uint32_t, captive::shared::BlockTranslation *>>& blocks = work->regions[region_base_address];
+		blocks.push_back(std::pair<uint32_t, captive::shared::BlockTranslation *>(entry->tag, entry->txln));
 	}
 	
 	_worker_threads.queue_work((captive::util::action_t)analyse_async, NULL, work);

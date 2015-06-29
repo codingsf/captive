@@ -11,6 +11,7 @@
 #include <define.h>
 #include <malloc.h>
 #include <shared-jit.h>
+#include <shared-memory.h>
 
 namespace captive {
 	namespace arch {
@@ -55,6 +56,8 @@ namespace captive {
 					_ir_insns[b] = tmp;
 				}
 				
+				inline const shared::IRInstruction *get_ir_buffer() const { return _ir_insns; }
+				
 			private:
 				shared::IRBlockId _current_block_id;
 				
@@ -71,9 +74,8 @@ namespace captive {
 					uint32_t required_size = (sizeof(shared::IRInstruction) * elem_capacity);
 
 					if (_ir_insn_buffer_size < required_size) {
-						_ir_insn_buffer_size = required_size + (sizeof(shared::IRInstruction) * 127);
-
-						_ir_insns = (shared::IRInstruction *)captive::arch::realloc(_ir_insns, _ir_insn_buffer_size);
+						_ir_insn_buffer_size = required_size + (sizeof(shared::IRInstruction) * 255);
+						_ir_insns = (shared::IRInstruction *)shrealloc(_ir_insns, _ir_insn_buffer_size);
 					}
 				}
 			};

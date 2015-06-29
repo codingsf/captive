@@ -11,5 +11,5 @@ TranslationContext::TranslationContext()
 
 TranslationContext::~TranslationContext()
 {
-	captive::arch::free(_ir_insns);
+	//captive::arch::free(_ir_insns);
 }
