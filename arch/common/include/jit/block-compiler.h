@@ -23,10 +23,11 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(TranslationContext& ctx, gpa_t pa);
+				BlockCompiler(void *cache_ptr, TranslationContext& ctx, gpa_t pa);
 				bool compile(shared::block_txln_fn& fn);
 
 			private:
+				void *cache_ptr;
 				TranslationContext& ctx;
 				x86::X86Encoder encoder;
 				gpa_t pa;

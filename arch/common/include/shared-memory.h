@@ -24,7 +24,7 @@ namespace captive {
 		static inline void *shrealloc(void *p, size_t size)
 		{
 			uint64_t addr;
-			asm volatile ("out %3, $0xff" : "=D"(addr) : "D"(p), "S"(size), "a"(11));
+			asm volatile ("out %3, $0xff" : "=a"(addr) : "D"(p), "S"(size), "a"(11));
 			return (void *)addr;
 		}
 

@@ -13,7 +13,7 @@ using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
+BlockCompiler::BlockCompiler(void *cache_ptr, TranslationContext& ctx, gpa_t pa) : cache_ptr(cache_ptr), ctx(ctx), pa(pa)
 {
 	assign(0, REG_RAX, REG_EAX, REG_AX, REG_AL);
 	assign(1, REG_RDX, REG_EDX, REG_DX, REG_DL);
@@ -90,7 +90,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "clz",		.format = "IOXXXX" },
 
 	{ .mnemonic = "and",		.format = "IBXXXX" },
-	{ .mnemonic = "or",		.format = "IBXXXX" },
+	{ .mnemonic = "or",			.format = "IBXXXX" },
 	{ .mnemonic = "xor",		.format = "IBXXXX" },
 
 	{ .mnemonic = "cmp eq",		.format = "IIOXXX" },
@@ -395,7 +395,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 	std::map<uint32_t, IRBlockId> block_relocations;
 	std::map<IRBlockId, uint32_t> native_block_offsets;
-
+	
 	// Function prologue
 	encoder.push(REG_RBP);
 	encoder.mov(REG_RSP, REG_RBP);
@@ -569,6 +569,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		}
 
 		case IRInstruction::RET:
+		{
 			// Function Epilogue
 			encoder.pop(REG_RBX);
 			encoder.pop(REG_R14);
@@ -577,6 +578,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.leave();
 			encoder.ret();
 			break;
+		}
 
 		case IRInstruction::ADD:
 		case IRInstruction::SUB:

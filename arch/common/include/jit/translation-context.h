@@ -76,6 +76,7 @@ namespace captive {
 					if (_ir_insn_buffer_size < required_size) {
 						_ir_insn_buffer_size = required_size + (sizeof(shared::IRInstruction) * 255);
 						_ir_insns = (shared::IRInstruction *)shrealloc(_ir_insns, _ir_insn_buffer_size);
+						assert(_ir_insns);
 					}
 				}
 			};

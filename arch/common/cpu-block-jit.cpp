@@ -160,7 +160,7 @@ captive::shared::BlockTranslation *CPU::compile_block(gpa_t pa)
 		return NULL;
 	}
 
-	BlockCompiler compiler(ctx, pa);
+	BlockCompiler compiler((void *)block_txln_cache, ctx, pa);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		printf("jit: block compilation failed\n");

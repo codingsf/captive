@@ -387,7 +387,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg)
 	case 11: {
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
-		regs.rdi = (uint64_t)owner().shared_memory().reallocate((void *)regs.rdi, regs.rsi);
+		regs.rax = (uint64_t)owner().shared_memory().reallocate((void *)regs.rdi, regs.rsi);
 		vmioctl(KVM_SET_REGS, &regs);
 
 		return true;
@@ -410,6 +410,27 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg)
 	
 	case 14: {
 		owner().jit().analyse(*this, (void *)arg);
+		return true;
+	}
+	
+	case 15: {
+		struct kvm_regs regs;
+		vmioctl(KVM_GET_REGS, &regs);
+
+		std::stringstream fname;
+		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
+		FILE *f = fopen(fname.str().c_str(), "wb");
+
+		uint64_t gpa = regs.rdi & 0xffffffff;
+		gpa += 0x000300000000ULL;
+
+		void *ptr = kvm_guest.get_phys_buffer(gpa);
+		if (ptr) {
+			fwrite(ptr, regs.rsi, 1, f);
+		}
+
+		fflush(f);
+		fclose(f);
 		return true;
 	}
 	}
