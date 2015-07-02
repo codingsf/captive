@@ -1,7 +1,10 @@
 #include <jit/jit.h>
 #include <util/thread-pool.h>
 #include <hypervisor/cpu.h>
+#include <hypervisor/guest.h>
+#include <hypervisor/shared-memory.h>
 #include <shared-jit.h>
+#include <shmem.h>
 #include <captive.h>
 
 #include <sstream>
@@ -12,6 +15,7 @@
 
 DECLARE_CONTEXT(JIT);
 
+using namespace captive;
 using namespace captive::jit;
 using namespace captive::shared;
 
@@ -209,45 +213,49 @@ struct analysis_work {
 	JIT *jit;
 	std::unordered_map<uint32_t, std::vector<std::pair<uint32_t, captive::shared::BlockTranslation *>>> regions;
 	captive::hypervisor::CPU *cpu;
+	captive::shared::RegionWorkUnit *rwu;
 };
-
-/*struct compilation_work {
-	JIT *jit;
-};
-
-static uint64_t compile_async(const struct compilation_work *cwork)
-{
-	cwork->jit->compile_region(region.first, region.second);
-	
-	delete cwork;
-}*/
 
 static uint64_t analyse_async(const struct analysis_work *awork)
 {
-	for (const auto& region : awork->regions) {
-		//struct compilation_work *cwork = new struct compilation_work();
-		//awork->jit->worker_threads().queue_work((captive::util::action_t)compile_async, NULL, cwork);
-		void *ptr = awork->jit->compile_region(region.first, region.second);
-		if (ptr) {
-			// dispatch region ready message
-			//awork->cpu->
+	/*if (awork->rwu->valid) {
+		printf("analysing %d\n", awork->regions.size());
+
+		for (const auto& region : awork->regions) {
+			if (awork->rwu->rct[region.first >> 12]) continue;
+			
+			void *ptr = awork->jit->compile_region(region.first, region.second);
+
+			lock::spinlock_acquire(&awork->rwu->rct_lock);
+			if (!awork->rwu->valid) {
+				lock::spinlock_release(&awork->rwu->rct_lock);
+				if (ptr) awork->cpu->owner().shared_memory().free(ptr);
+				break;
+			}
+
+			if (ptr) {
+				fprintf(stderr, "registering %08x %p\n", region.first, ptr);
+				awork->rwu->rct[region.first >> 12] = ptr;
+			}
+			lock::spinlock_release(&awork->rwu->rct_lock);
 		}
 	}
 	
-	//awork->cpu->interrupt(2);
+	awork->cpu->interrupt(2);
 	
-	delete awork;
+	delete awork;*/
 	return 0;
 }
 
-void JIT::analyse(captive::hypervisor::CPU& cpu, void* cache_ptr)
+void JIT::analyse(captive::hypervisor::CPU& cpu, captive::shared::RegionWorkUnit *rwu)
 {
-	struct analysis_work *work = new struct analysis_work();
+	/*struct analysis_work *work = new struct analysis_work();
 	work->jit = this;
 	work->cpu = &cpu;
+	work->rwu = rwu;
 	
 	for (uint32_t cache_idx = 0; cache_idx < 20000003; cache_idx++) {
-		struct block_txln_cache_entry *entry = &((struct block_txln_cache_entry *)cache_ptr)[cache_idx];
+		struct block_txln_cache_entry *entry = &((struct block_txln_cache_entry *)rwu->btc)[cache_idx];
 		if (entry->tag == 1 || !entry->txln) continue;
 		
 		uint32_t region_base_address = entry->tag & ~0xfff;
@@ -255,5 +263,5 @@ void JIT::analyse(captive::hypervisor::CPU& cpu, void* cache_ptr)
 		blocks.push_back(std::pair<uint32_t, captive::shared::BlockTranslation *>(entry->tag, entry->txln));
 	}
 	
-	_worker_threads.queue_work((captive::util::action_t)analyse_async, NULL, work);
+	_worker_threads.queue_work((captive::util::action_t)analyse_async, NULL, work);*/
 }

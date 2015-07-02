@@ -182,7 +182,7 @@ extern "C" {
 
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
-		/*case 1:
+		case 1:
 			captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
 			do {
 				captive::queue::QueueItem *qi = captive::queue::dequeue(&(cpu->cpu_data().rwu_ready_queue));
@@ -190,13 +190,13 @@ extern "C" {
 
 				if (!qi) break;
 
-				if (qi->data) cpu->register_region((captive::shared::RegionWorkUnit *)qi->data);
-				captive::arch::Memory::shared_memory().free(qi);
+				if (qi->data) printf("REGISTER REGION %p\n", qi->data);
+				captive::arch::shfree(qi);
 
 				captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
 			} while(true);
 
-			break;*/
+			break;
 			
 		case 2:
 			cpu->release_analysis_lock();

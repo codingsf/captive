@@ -23,7 +23,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	_env(env),
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false),
-	block_txln_cache_size(20000003)
+	block_txln_cache_size(0x1312d03),
+	region_txln_cache_size(0x100000)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -33,20 +34,37 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	// Initialise the block translation cache
 	block_txln_cache = (struct block_txln_cache_entry *)shalloc(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
-	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
-		entry->tag = 1;
-		entry->count = 0;
-		entry->txln = NULL;
+	for (uint32_t i = 0; i < block_txln_cache_size; i++) {
+		block_txln_cache[i].tag = 1;
+		block_txln_cache[i].count = 0;
+		block_txln_cache[i].txln = NULL;
+	}
+	
+	// Initialise the region translation cache
+	region_txln_cache = (struct region_txln_cache_entry *)shalloc(sizeof(struct region_txln_cache_entry) * region_txln_cache_size);
+	for (uint32_t i = 0; i < region_txln_cache_size; i++) {
+		region_txln_cache[i].tag = 1;
+		region_txln_cache[i].txln = NULL;
 	}
 	
 	jit_state.cpu = this;
-	jit_state.region_chaining_table = NULL; // (void **)malloc(sizeof(void *) * 0x100000);
+	jit_state.region_txln_cache = region_txln_cache;
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
+	
+	rwu = (shared::RegionWorkUnit *)shalloc(sizeof(*rwu));
+	lock::spinlock_init(&rwu->rtc_lock);
+	
+	rwu->valid = 0;
+	rwu->rtc = region_txln_cache;
+	rwu->btc = block_txln_cache;
 }
 
 CPU::~CPU()
 {
-	if (jit_state.region_chaining_table) free(jit_state.region_chaining_table);
+	shfree(region_txln_cache);
+	shfree(block_txln_cache);
+	
+	if (rwu) shfree(rwu);
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -223,7 +241,9 @@ bool CPU::interpret_block()
 
 void CPU::clear_block_cache()
 {
-	for (struct block_txln_cache_entry *entry = block_txln_cache; entry < &block_txln_cache[block_txln_cache_size]; entry++) {
+	for (uint32_t i = 0; i < block_txln_cache_size; i++) {
+		struct block_txln_cache_entry *entry = &block_txln_cache[i];
+		
 		if (entry->tag != 1 && entry->txln) {
 			release_block_translation(entry->txln);
 			entry->txln = NULL;
@@ -232,21 +252,35 @@ void CPU::clear_block_cache()
 		entry->tag = 1;
 		entry->count = 0;
 	}
+	
+	lock::spinlock_acquire(&rwu->rtc_lock);
+	rwu->valid = 0;
+	
+	for (uint32_t i = 0; i < region_txln_cache_size; i++) {
+		struct region_txln_cache_entry *entry = &region_txln_cache[i];
+		
+		if (entry->tag != 1 && entry->txln) {
+			release_region_translation(entry->txln);
+			entry->txln = NULL;
+		}
+
+		entry->tag = 1;
+	}
+	
+	lock::spinlock_release(&rwu->rtc_lock);
 }
 
 void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 {
-	pa_t phys_page_base_addr = (pa_t)((uint64_t)phys_addr & ~0xfffULL);
-	va_t virt_page_base_addr = (va_t)((uint64_t)virt_addr & ~0xfffULL);
+	if (virt_addr >= (va_t)0x100000000) return;
 
-	if (virt_page_base_addr > (va_t)0x100000000) return;
+	gpa_t phys_page_base_addr = (gpa_t)((uint64_t)phys_addr & ~0xfffULL);
 
-	//printf("dirty page: %08x %08x\n", phys_page_base_addr, virt_page_base_addr);
 	for (unsigned int pgoff = 0; pgoff < 0x1000; pgoff++) {
-		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint64_t)phys_page_base_addr + pgoff));
+		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint32_t)phys_page_base_addr + pgoff));
 
 		// If there is an entry that resides on this page...
-		if ((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)(uint64_t)phys_page_base_addr)) {
+		if ((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)phys_page_base_addr)) {
 			if (entry->txln) {
 				// If there is a valid translation, release it and clear the pointer.
 
@@ -254,16 +288,29 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 				entry->txln = NULL;
 			}
 
-			//printf("  saying goodbye to: tag=%08x\n", entry->tag & ~0xfffULL);
-
 			// Invalidate the tag.
 			entry->tag = 1;
 			entry->count = 0;
 		}
 	}
+	
+	uint32_t phys_page_index = ((uint32_t)phys_page_base_addr >> 12);
 
-	// Remove the entry from the region chaining table.
-	//jit_state.region_chaining_table[(uint64_t)virt_page_base_addr >> 12] = NULL;
+	// Remove the entry from the region chaining table, freeing the associated native code.
+	lock::spinlock_acquire(&rwu->rtc_lock);
+	rwu->valid = 0;
+	
+	struct region_txln_cache_entry *rgn_entry = get_region_txln_cache_entry(phys_page_base_addr);
+	if ((rgn_entry->tag != 1) && (rgn_entry->tag == (uint32_t)phys_page_base_addr)) {
+		if (rgn_entry->txln) {
+			release_region_translation(rgn_entry->txln);
+			rgn_entry->txln = NULL;
+		}
+		
+		rgn_entry->tag = 1;
+	}
+	
+	lock::spinlock_release(&rwu->rtc_lock);
 }
 
 static uint32_t pc_ring_buffer[256];
@@ -395,5 +442,16 @@ void CPU::release_block_translation(shared::BlockTranslation *txln)
 {
 	shfree((void *)txln->ir);
 	free((void *)txln->native_fn_ptr);
+	shfree(txln);
+}
+
+captive::shared::RegionTranslation* CPU::alloc_region_translation()
+{
+	return (captive::shared::RegionTranslation *)shalloc(sizeof(captive::shared::RegionTranslation));
+}
+
+void CPU::release_region_translation(shared::RegionTranslation *txln)
+{
+	shfree((void *)txln->native_fn_ptr);
 	shfree(txln);
 }

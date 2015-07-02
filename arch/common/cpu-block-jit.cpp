@@ -94,13 +94,20 @@ bool CPU::run_block_jit_safepoint()
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 		
 		// Signal the hypervisor to make a profiling run
-		if (unlikely(trace_interval > 300000)) {
-			_analysing = true;
+		if (unlikely(trace_interval > 500000)) {
+			//_analysing = true;
 			trace_interval = 0;
 
-			asm volatile("out %0, $0xff" :: "a"(14), "D"(block_txln_cache));
+			rwu->valid = 1;
+			//asm volatile("out %0, $0xff" :: "a"(14), "D"(rwu));
 		} else if (!_analysing) {
 			trace_interval++;
+		}
+		
+		struct region_txln_cache_entry *rgn_cache_entry = get_region_txln_cache_entry(phys_pc);
+		if (rgn_cache_entry->tag == PAGE_ADDRESS_OF(phys_pc) && rgn_cache_entry->txln) {
+			if (rgn_cache_entry->txln->native_fn_ptr(&jit_state) == 0)
+				continue;
 		}
 		
 		struct block_txln_cache_entry *cache_entry = get_block_txln_cache_entry(phys_pc);

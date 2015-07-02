@@ -305,16 +305,38 @@ bool MMU::is_device(gpa_t gpa)
 	return false;
 }
 
+#define CACHE_SIZE 4096
+
+struct {
+	gva_t tag;
+	gpa_t value;
+} cache[CACHE_SIZE];
+
 bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 {
 	access_info info;
 
 	info.type = ACCESS_FETCH;
 	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
-
-	return resolve_gpa(va, pa, info, fault, true);
+	
+	if (cache[va % CACHE_SIZE].tag == va) {
+		pa = cache[va % CACHE_SIZE].value;
+		return true;
+	} else {
+		bool r = resolve_gpa(va, pa, info, fault, true);
+		
+		if (r) {
+			cache[va % CACHE_SIZE].tag = va;
+			cache[va % CACHE_SIZE].value = pa;
+		}
+		
+		return r;
+	}
 }
 
 void MMU::clear_cache()
 {
+	for (int i = 0; i < CACHE_SIZE; i++) {
+		cache[i].tag = 0;
+	}
 }

@@ -167,7 +167,7 @@ bool KVMCpu::run()
 				vmioctl(KVM_GET_REGS, &regs);
 
 				//DEBUG << "Handling hypercall " << std::hex << regs.rax;
-				run_cpu = handle_hypercall(regs.rax, regs.rdi);
+				run_cpu = handle_hypercall(regs.rax, regs.rdi, regs.rsi);
 				if (!run_cpu) {
 					ERROR << CONTEXT(CPU) << "Unhandled hypercall " << std::hex << regs.rax;
 				}
@@ -300,7 +300,7 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 	}
 }
 
-bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg)
+bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
 
@@ -378,7 +378,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg)
 	case 10: {
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
-		regs.rax = (uint64_t)owner().shared_memory().allocate(regs.rdi);
+		regs.rax = (uint64_t)owner().shared_memory().allocate(arg1);
 		vmioctl(KVM_SET_REGS, &regs);
 
 		return true;
@@ -387,29 +387,27 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg)
 	case 11: {
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
-		regs.rax = (uint64_t)owner().shared_memory().reallocate((void *)regs.rdi, regs.rsi);
+		regs.rax = (uint64_t)owner().shared_memory().reallocate((void *)arg1, arg2);
 		vmioctl(KVM_SET_REGS, &regs);
 
 		return true;
 	}
 
 	case 12: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-		owner().shared_memory().free((void *)regs.rdi);
+		owner().shared_memory().free((void *)arg1);
 
 		return true;
 	}
 
 	case 13: {
 		std::stringstream cmd;
-		cmd << "addr2line -e arch/arm.arch " << std::hex << arg;
+		cmd << "addr2line -e arch/arm.arch " << std::hex << arg1;
 		system(cmd.str().c_str());
 		return true;
 	}
 	
 	case 14: {
-		owner().jit().analyse(*this, (void *)arg);
+		owner().jit().analyse(*this, (captive::shared::RegionWorkUnit *)arg1);
 		return true;
 	}
 	

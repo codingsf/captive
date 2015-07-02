@@ -16,6 +16,8 @@
 #endif
 #endif
 
+#include <shmem.h>
+
 namespace captive {
 	namespace shared {
 		typedef uint32_t IRBlockId;
@@ -24,6 +26,21 @@ namespace captive {
 		struct IRInstruction;
 		
 		typedef uint32_t (*block_txln_fn)(void *);
+		typedef uint32_t (*region_txln_fn)(void *);
+		
+		struct RegionWorkUnit
+		{
+			uint32_t valid;
+			void *btc;
+			void *rtc;
+			
+			lock::SpinLock rtc_lock;
+		};
+		
+		struct RegionTranslation
+		{
+			region_txln_fn native_fn_ptr;
+		} __packed;
 		
 		struct BlockTranslation
 		{

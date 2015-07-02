@@ -8,9 +8,14 @@
 #ifndef LLVM_H
 #define	LLVM_H
 
+#include <string>
+
 #include <jit/jit.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/PassManager.h>
+
+#include <shared-jit.h>
 
 namespace llvm {
 	class LLVMContext;
@@ -18,6 +23,7 @@ namespace llvm {
 	class Module;
 	class Function;
 	class BasicBlock;
+	class Pass;
 }
 
 namespace captive {
@@ -27,6 +33,10 @@ namespace captive {
 
 	namespace util {
 		class ThreadPool;
+	}
+	
+	namespace shared {
+		class IRInstruction;
 	}
 
 	namespace jit {
@@ -51,7 +61,7 @@ namespace captive {
 				struct {
 					llvm::Type *i1, *i8, *i16, *i32, *i64;
 					llvm::Type *pi1, *pi8, *pi16, *pi32, *pi64;
-					llvm::Type *voidty, *jit_state;
+					llvm::Type *voidty, *jit_state_ty, *jit_state_ptr;
 				} types;
 				
 				llvm::Module *rgn_module;
@@ -59,18 +69,70 @@ namespace captive {
 				
 				llvm::BasicBlock *entry_block;
 				llvm::BasicBlock *exit_block;
+				llvm::BasicBlock *miss_block;
 				llvm::BasicBlock *dispatch_block;
 				
-				inline llvm::Value *constu8(uint8_t v) { return llvm::ConstantInt::get(types.i8, v, false); }
-				inline llvm::Value *constu16(uint16_t v) { return llvm::ConstantInt::get(types.i16, v, false); }
-				inline llvm::Value *constu32(uint32_t v) { return llvm::ConstantInt::get(types.i32, v, false); }
-				inline llvm::Value *constu64(uint64_t v) { return llvm::ConstantInt::get(types.i64, v, false); }
+				llvm::Value *jit_state;
+				llvm::Value *cpu_obj;
+				llvm::Value *reg_state;
+				llvm::Value *pc_ptr;
+				llvm::Value *exit_code_var;
+				llvm::Value *insn_counter;
 				
-				inline llvm::Value *consti8(int8_t v) { return llvm::ConstantInt::get(types.i8, v, true); }
-				inline llvm::Value *consti16(int16_t v) { return llvm::ConstantInt::get(types.i16, v, true); }
-				inline llvm::Value *consti32(int32_t v) { return llvm::ConstantInt::get(types.i32, v, true); }
-				inline llvm::Value *consti64(int64_t v) { return llvm::ConstantInt::get(types.i64, v, true); }
+				std::map<uint32_t, llvm::BasicBlock *> guest_basic_blocks;
+				
+				inline llvm::ConstantInt *constu8(uint8_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i8, v, false); }
+				inline llvm::ConstantInt *constu16(uint16_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i16, v, false); }
+				inline llvm::ConstantInt *constu32(uint32_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i32, v, false); }
+				inline llvm::ConstantInt *constu64(uint64_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i64, v, false); }
+				
+				inline llvm::ConstantInt *consti1(int8_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i1, v, true); }
+				inline llvm::ConstantInt *consti8(int8_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i8, v, true); }
+				inline llvm::ConstantInt *consti16(int16_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i16, v, true); }
+				inline llvm::ConstantInt *consti32(int32_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i32, v, true); }
+				inline llvm::ConstantInt *consti64(int64_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i64, v, true); }
 			};
+			
+			struct BlockCompilationContext
+			{
+				BlockCompilationContext(RegionCompilationContext& rcc) : rcc(rcc), builder(rcc.builder) { }
+				
+				RegionCompilationContext& rcc;
+				llvm::IRBuilder<>& builder;
+				
+				llvm::BasicBlock *alloca_block;
+				
+				std::map<uint32_t, llvm::BasicBlock *> ir_blocks;
+				std::map<uint32_t, llvm::Value *> ir_vregs;
+			};
+			
+			void print_module(std::string filename, llvm::Module *module);
+			bool add_pass(llvm::PassManagerBase *pm, llvm::Pass *pass);
+			bool initialise_pass_manager(llvm::PassManagerBase *pm);
+			
+			bool lower_block(RegionCompilationContext& rcc, std::pair<uint32_t, captive::shared::BlockTranslation *>& block);
+			
+			enum metadata_tags
+			{
+				AA_MD_NO_ALIAS	= 0,
+				AA_MD_VREG		= 1,
+				AA_MD_REGISTER	= 2,
+				AA_MD_MEMORY	= 3,
+			};
+			
+			void set_aa_metadata(llvm::Value *v, metadata_tags tag);
+			void set_aa_metadata(llvm::Value *v, metadata_tags tag, llvm::Value *value);
+			
+			llvm::Value *value_for_operand(BlockCompilationContext& bcc, const shared::IROperand *oper);
+			llvm::Type *type_for_operand(BlockCompilationContext& bcc, const shared::IROperand* oper, bool ptr);
+			
+			llvm::Value *get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId id, uint8_t size);
+			llvm::Value *vreg_for_operand(BlockCompilationContext& bcc, const shared::IROperand* oper);
+			
+			llvm::BasicBlock *get_ir_block(BlockCompilationContext& bcc, shared::IRBlockId id);
+			llvm::BasicBlock *block_for_operand(BlockCompilationContext& bcc, const shared::IROperand* oper);
+			
+			bool lower_instruction(BlockCompilationContext& bcc, const shared::IRInstruction *insn);
 		};
 	}
 }

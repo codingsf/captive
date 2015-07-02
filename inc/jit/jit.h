@@ -25,6 +25,7 @@ namespace captive {
 		struct IRInstruction;
 		struct IROperand;
 		struct BlockTranslation;
+		struct RegionWorkUnit;
 	}
 
 	namespace jit {
@@ -36,7 +37,7 @@ namespace captive {
 
 			virtual bool init() = 0;
 
-			void analyse(hypervisor::CPU& cpu, void *cache_ptr);
+			void analyse(hypervisor::CPU& cpu, shared::RegionWorkUnit *rwu);
 			
 			inline util::ThreadPool& worker_threads() const { return _worker_threads; }
 

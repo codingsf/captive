@@ -80,7 +80,7 @@ namespace captive {
 
 			inline void flush() {
 				clear_vma();
-				//clear_cache();
+				clear_cache();
 			}
 
 			inline void invalidate(gva_t va)
