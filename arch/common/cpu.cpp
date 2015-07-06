@@ -44,27 +44,20 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	region_txln_cache = (struct region_txln_cache_entry *)shalloc(sizeof(struct region_txln_cache_entry) * region_txln_cache_size);
 	for (uint32_t i = 0; i < region_txln_cache_size; i++) {
 		region_txln_cache[i].tag = 1;
+		region_txln_cache[i].image = NULL;
 		region_txln_cache[i].txln = NULL;
 	}
 	
 	jit_state.cpu = this;
 	jit_state.region_txln_cache = region_txln_cache;
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
-	
-	rwu = (shared::RegionWorkUnit *)shalloc(sizeof(*rwu));
-	lock::spinlock_init(&rwu->rtc_lock);
-	
-	rwu->valid = 0;
-	rwu->rtc = region_txln_cache;
-	rwu->btc = block_txln_cache;
+	jit_state.isr = &cpu_data().isr;
 }
 
 CPU::~CPU()
 {
 	shfree(region_txln_cache);
 	shfree(block_txln_cache);
-	
-	if (rwu) shfree(rwu);
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -198,11 +191,6 @@ bool CPU::interpret_block()
 		uint32_t pc = read_pc();
 		if ((pc & ~0xfff) != page) return true;
 
-		//printf("insn=%08x\n", pc);
-		//assert_privilege_mode();
-
-		//printf("executing block in %s mode\n", in_kernel_mode() ? "kernel" : "user");
-
 		// Obtain a decode object for this PC, and perform the decode.
 		insn = get_decode(pc);
 		if (1) { //insn->pc != pc) {
@@ -253,21 +241,22 @@ void CPU::clear_block_cache()
 		entry->count = 0;
 	}
 	
-	lock::spinlock_acquire(&rwu->rtc_lock);
-	rwu->valid = 0;
-	
 	for (uint32_t i = 0; i < region_txln_cache_size; i++) {
 		struct region_txln_cache_entry *entry = &region_txln_cache[i];
 		
-		if (entry->tag != 1 && entry->txln) {
-			release_region_translation(entry->txln);
-			entry->txln = NULL;
+		if (entry->tag != 1) {
+			if (entry->txln) {
+				release_region_translation(entry->txln);
+				entry->txln = NULL;
+			}
+			
+			if (entry->image && entry->image->rwu) {
+				entry->image->rwu->valid = 0;
+			}
 		}
 
 		entry->tag = 1;
 	}
-	
-	lock::spinlock_release(&rwu->rtc_lock);
 }
 
 void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
@@ -280,7 +269,7 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint32_t)phys_page_base_addr + pgoff));
 
 		// If there is an entry that resides on this page...
-		if ((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)phys_page_base_addr)) {
+		if (unlikely((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)phys_page_base_addr))) {
 			if (entry->txln) {
 				// If there is a valid translation, release it and clear the pointer.
 
@@ -294,12 +283,7 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 		}
 	}
 	
-	uint32_t phys_page_index = ((uint32_t)phys_page_base_addr >> 12);
-
 	// Remove the entry from the region chaining table, freeing the associated native code.
-	lock::spinlock_acquire(&rwu->rtc_lock);
-	rwu->valid = 0;
-	
 	struct region_txln_cache_entry *rgn_entry = get_region_txln_cache_entry(phys_page_base_addr);
 	if ((rgn_entry->tag != 1) && (rgn_entry->tag == (uint32_t)phys_page_base_addr)) {
 		if (rgn_entry->txln) {
@@ -307,10 +291,12 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 			rgn_entry->txln = NULL;
 		}
 		
+		if (rgn_entry->image && rgn_entry->image->rwu) {
+			rgn_entry->image->rwu->valid = 0;
+		}
+		
 		rgn_entry->tag = 1;
 	}
-	
-	lock::spinlock_release(&rwu->rtc_lock);
 }
 
 static uint32_t pc_ring_buffer[256];

@@ -62,7 +62,7 @@ bool LLVMJIT::init()
 	return true;
 }
 
-void *LLVMJIT::compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t, shared::BlockTranslation *>>& blocks)
+void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 {
 	RegionCompilationContext rcc;
 	
@@ -80,9 +80,9 @@ void *LLVMJIT::compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t
 	jit_state_elements.push_back(rcc.types.pi8);					// Registers
 	jit_state_elements.push_back(rcc.types.i64);					// Register Size
 	jit_state_elements.push_back(rcc.types.pi8->getPointerTo(0));	// Region Chaining Table
-	jit_state_elements.push_back(rcc.types.i64);					// Region Chaining Table Generation
 	jit_state_elements.push_back(rcc.types.pi64);					// Instruction Counter
-		
+	jit_state_elements.push_back(rcc.types.pi32);					// ISR
+	
 	rcc.types.jit_state_ty = StructType::get(rcc.ctx, jit_state_elements, false);
 	rcc.types.jit_state_ptr = rcc.types.jit_state_ty->getPointerTo(0);
 	
@@ -94,41 +94,104 @@ void *LLVMJIT::compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t
 	
 	rcc.entry_block = BasicBlock::Create(rcc.ctx, "entry", rcc.rgn_func);
 	rcc.dispatch_block = BasicBlock::Create(rcc.ctx, "dispatch", rcc.rgn_func);
-	rcc.exit_block = BasicBlock::Create(rcc.ctx, "exit", rcc.rgn_func);
-	rcc.miss_block = BasicBlock::Create(rcc.ctx, "miss", rcc.rgn_func);
+	rcc.exit_normal_block = BasicBlock::Create(rcc.ctx, "exit_normal", rcc.rgn_func);
+	rcc.exit_handle_block = BasicBlock::Create(rcc.ctx, "exit_handle_interrupt", rcc.rgn_func);
+	rcc.alloca_block = rcc.entry_block;
 	
 	rcc.builder.SetInsertPoint(rcc.entry_block);
 	rcc.jit_state = rcc.builder.CreateLoad(jit_state_ptr_val, "jit_state");
 	rcc.cpu_obj = rcc.builder.CreateExtractValue(rcc.jit_state, {0}, "cpu_obj");
-	rcc.reg_state = rcc.builder.CreatePtrToInt(rcc.builder.CreateExtractValue(rcc.jit_state, {1}, "reg_state"), rcc.types.i64);
-	rcc.pc_ptr = rcc.builder.CreateIntToPtr(rcc.builder.CreateAdd(rcc.reg_state, rcc.constu64(60)), rcc.types.pi32, "pc_ptr");
-	rcc.insn_counter = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "insn_counter");
-	
-	SwitchInst *first_dispatch = rcc.builder.CreateSwitch(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), rcc.constu32(0xfff)), rcc.miss_block);
+	rcc.reg_state = rcc.builder.CreateExtractValue(rcc.jit_state, {1}, "reg_state");
 
-	rcc.builder.SetInsertPoint(rcc.exit_block);
+	rcc.pc_ptr = rcc.builder.CreateBitCast(rcc.builder.CreateGEP(rcc.reg_state, rcc.constu64(60)), rcc.types.pi32);
+	set_aa_metadata(rcc.pc_ptr, AA_MD_REGISTER, rcc.consti64(60));
+
+	rcc.entry_page = rcc.builder.CreateLShr(rcc.builder.CreateLoad(rcc.pc_ptr), 12);
+	rcc.insn_counter = rcc.builder.CreateExtractValue(rcc.jit_state, {4}, "insn_counter");
+	rcc.isr = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "isr");
+	set_aa_metadata(rcc.isr, AA_MD_ISR);
+	
+	//SwitchInst *first_dispatch = rcc.builder.CreateSwitch(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), rcc.constu32(0xfff), "pc_offset"), rcc.miss_block);
+	
+	rcc.builder.CreateBr(rcc.dispatch_block);
+
+	// --- EXIT NORMAL
+	rcc.builder.SetInsertPoint(rcc.exit_normal_block);
 	rcc.builder.CreateRet(rcc.constu32(0));
 	
-	rcc.builder.SetInsertPoint(rcc.miss_block);
+	// --- EXIT HANDLE
+	rcc.builder.SetInsertPoint(rcc.exit_handle_block);
 	rcc.builder.CreateRet(rcc.constu32(1));
 	
+	BasicBlock *check_dispatch_block = BasicBlock::Create(rcc.ctx, "check_dispatch", rcc.rgn_func);
+	BasicBlock *do_dispatch_block = BasicBlock::Create(rcc.ctx, "do_dispatch", rcc.rgn_func);
+	BasicBlock *handle_interrupt_block = BasicBlock::Create(rcc.ctx, "handle_interrupt", rcc.rgn_func);
+
+	// --- DISPATCH
 	rcc.builder.SetInsertPoint(rcc.dispatch_block);
+
+	Value *isr_value = rcc.builder.CreateLoad(rcc.isr);
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpNE(isr_value, rcc.constu32(0)), handle_interrupt_block, check_dispatch_block);
+
+	// --- HANDLE INTERRUPT
+	rcc.builder.SetInsertPoint(handle_interrupt_block);
 	
-	SwitchInst *second_dispatch = rcc.builder.CreateSwitch(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), rcc.constu32(0xfff)), rcc.exit_block);
+	std::vector<Type *> params;
+	params.push_back(rcc.types.pi8);
+	params.push_back(rcc.types.i32);
+
+	FunctionType *fntype = FunctionType::get(rcc.types.i32, params, false);
+
+	Constant *fn = rcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_handle_interrupt", fntype);
+	Value *interrupt_handled = rcc.builder.CreateCall2(fn, rcc.cpu_obj, isr_value);
 	
-	// Create Blocks
-	for (auto block : blocks) {
-		BasicBlock *gbb = BasicBlock::Create(rcc.ctx, "gbb", rcc.rgn_func);
-		
-		first_dispatch->addCase(rcc.constu32(block.first & 0xfff), gbb);
-		second_dispatch->addCase(rcc.constu32(block.first & 0xfff), gbb);
-		
-		rcc.guest_basic_blocks[block.first & 0xfff] = gbb;
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(interrupt_handled, rcc.consti32(0)), check_dispatch_block, rcc.exit_handle_block);
+	
+	// --- CHECK DISPATCH
+	rcc.builder.SetInsertPoint(check_dispatch_block);
+	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(rcc.builder.CreateLShr(dispatch_loaded_pc, 12), rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
+	
+	uint32_t jump_table_slots = 2048;
+	for (uint32_t slot = 0; slot < jump_table_slots; slot++) {
+		rcc.jump_table_entries[slot] = (Constant *)BlockAddress::get(rcc.exit_normal_block);
 	}
 	
+	// Create Blocks
+	for (uint32_t i = 0; i < rwu->block_count; i++) {
+		BasicBlock *gbb = BasicBlock::Create(rcc.ctx, "gbb-" + std::to_string(rwu->blocks[i].offset), rcc.rgn_func);
+		
+		/*first_dispatch->addCase(rcc.constu32(rwu->blocks[i].offset), gbb);
+		second_dispatch->addCase(rcc.constu32(rwu->blocks[i].offset), gbb);*/
+		
+		rcc.guest_basic_blocks[rwu->blocks[i].offset] = gbb;
+		rcc.jump_table_entries[rwu->blocks[i].offset >> 1] = (Constant *)BlockAddress::get(gbb);
+	}
+	
+	ArrayType *jump_table_type = ArrayType::get(rcc.types.pi8, jump_table_slots);
+	Constant *jump_table_init = ConstantArray::get(jump_table_type, ArrayRef<Constant *>(rcc.jump_table_entries, jump_table_slots));
+	rcc.jump_table = new GlobalVariable(*rcc.rgn_module, jump_table_type, true, GlobalValue::InternalLinkage, jump_table_init, "jump_table");
+
+	// --- DO DISPATCH
+	rcc.builder.SetInsertPoint(do_dispatch_block);
+	Value *jt_slot = rcc.builder.CreateLShr(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), 0xfff), 1);
+	
+	std::vector<Value *> indicies;
+	indicies.push_back(rcc.constu32(0));
+	indicies.push_back(jt_slot);
+	
+	Value *jt_elem = rcc.builder.CreateInBoundsGEP(rcc.jump_table, indicies, "jt_element");
+	set_aa_metadata(jt_elem, AA_MD_JT_ELEM);
+	
+	IndirectBrInst *ibr = rcc.builder.CreateIndirectBr(rcc.builder.CreateLoad(jt_elem), rwu->block_count + 1);
+	ibr->addDestination(rcc.exit_normal_block);
+	
+	//SwitchInst *second_dispatch = rcc.builder.CreateSwitch(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), rcc.constu32(0xfff), "pc_offset"), rcc.exit_block);
+	
 	// Lower Blocks
-	for (auto block : blocks) {
-		lower_block(rcc, block);
+	for (uint32_t i = 0; i < rwu->block_count; i++) {
+		ibr->addDestination(rcc.guest_basic_blocks[rwu->blocks[i].offset]);
+		lower_block(rcc, &rwu->blocks[i]);
 	}
 	
 	// Verify
@@ -141,10 +204,10 @@ void *LLVMJIT::compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t
 	// Dump
 	/*{
 		std::stringstream filename;
-		filename << "region-" << std::hex << (uint64_t)(gpa) << ".ll";
+		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".ll";
 		print_module(filename.str(), rcc.rgn_module);
 	}*/
-
+	
 	// Optimise
 	{
 		PassManager optManager;
@@ -154,11 +217,11 @@ void *LLVMJIT::compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t
 	}
 
 	// Dump
-	/*{
+	{
 		std::stringstream filename;
-		filename << "region-" << std::hex << (uint64_t)(gpa) << ".opt.ll";
+		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".opt.ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}*/
+	}
 	
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
@@ -204,9 +267,175 @@ void LLVMJIT::print_module(std::string filename, Module *module)
 	printManager.run(*module);
 }
 
+class CaptiveAA : public FunctionPass, public AliasAnalysis
+{
+public:
+	static char ID;
+
+	CaptiveAA() : FunctionPass(ID) {}
+
+	virtual void *getAdjustedAnalysisPointer(AnalysisID PI)
+	{
+		if (PI == &AliasAnalysis::ID) return (AliasAnalysis *)this;
+		return this;
+	}
+
+private:
+	virtual void getAnalysisUsage(AnalysisUsage &usage) const;
+	virtual AliasAnalysis::AliasResult alias(const AliasAnalysis::Location &L1, const AliasAnalysis::Location &L2);
+	virtual bool runOnFunction(Function &F);
+};
+
+char CaptiveAA::ID = 0;
+
+static RegisterPass<CaptiveAA> P("captive-aa", "Captive-specific Alias Analysis", false, true);
+static RegisterAnalysisGroup<AliasAnalysis> G(P);
+
+void CaptiveAA::getAnalysisUsage(AnalysisUsage &usage) const
+{
+	AliasAnalysis::getAnalysisUsage(usage);
+	usage.setPreservesAll();
+}
+
+static bool IsInstr(const Value *v)
+{
+	return (v->getValueID() >= Value::InstructionVal);
+}
+
+static bool IsIntToPtr(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::IntToPtr);
+}
+
+static bool IsGEP(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::GetElementPtr);
+}
+
+static bool IsBitCast(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::BitCast);
+}
+
+static bool IsAlloca(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::Alloca);
+}
+
+static bool IsExtractValue(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::ExtractValue);
+}
+
+static bool IsConstVal(const ::llvm::Value *v)
+{
+	return (v->getValueID() == ::llvm::Instruction::ConstantIntVal);
+}
+
+#define CONSTVAL(a) (assert((a)->getValueID() == Instruction::ConstantIntVal), (((ConstantInt *)(a))->getZExtValue()))
+
+AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, const AliasAnalysis::Location &L2)
+{
+	// First heuristic - really easy.  Taken from SCEV-AA
+	if (L1.Size == 0 || L2.Size == 0) return NoAlias;
+
+	// Second heuristic - obvious.
+	if (L1.Ptr == L2.Ptr) return MustAlias;
+
+	const Value *v1 = L1.Ptr, *v2 = L2.Ptr;
+	
+	// First, if we've got two instructions...
+	if (IsInstr(v1) && IsInstr(v2)) {
+		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
+		const MDNode *md2 = ((Instruction *)v2)->getMetadata("cai");
+
+		// And they both have metadata...
+		if (md1 && md2) {
+			// And the metadata has different tags...
+			if (md1->getOperand(0).get() != md2->getOperand(0).get()) {
+				// Then they definitely DO NOT alias!
+				return AliasAnalysis::NoAlias;
+			}
+		}
+	}
+
+	if (IsAlloca(v1) || IsAlloca(v2)) {
+		// They can't alias with anything, because we've already checked for equality above.
+		return NoAlias;
+	} else if ((IsGEP(v1) || IsBitCast(v1)) && (IsGEP(v2) || IsBitCast(v2))) {
+		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
+		const MDNode *md2 = ((Instruction *)v2)->getMetadata("cai");
+
+		if (md1 && md2) {
+			if (md1->getOperand(0).get() == md2->getOperand(0).get()) {
+				uint32_t aa_class = CONSTVAL(((ConstantAsMetadata *)md1->getOperand(0).get())->getValue());
+
+				if (aa_class == 2) { // Register
+					if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
+						uint32_t reg_offset1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
+						uint32_t reg_offset2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
+
+						// This would break if we got some weird overlapping offsets
+						// but, of course, we never generate rubbish code like that!
+						if (reg_offset1 == reg_offset2) {
+							return AliasAnalysis::MustAlias;
+						} else {
+							return AliasAnalysis::NoAlias;
+						}
+					}
+				}
+
+				return AliasAnalysis::MayAlias;
+			} else {
+				return AliasAnalysis::NoAlias;
+			}
+		} else {
+			/*fprintf(stderr, "*** UNDECORATED INTTOPTR\n");
+			v1->dump();
+			v2->dump();*/
+		}
+	}
+
+	/*fprintf(stderr, "*** MAY ALIAS\n");
+	v1->dump();
+	v2->dump();*/
+
+	return AliasAnalysis::MayAlias;
+}
+
+bool CaptiveAA::runOnFunction(Function& F)
+{
+	AliasAnalysis::InitializeAliasAnalysis(this);
+	
+	/*bool changed = false;
+	for (auto& bb : F) {
+		for (auto& insn : bb) {
+			if (insn.getMetadata("cai") != NULL) continue;
+
+			if (IsBitCast(&insn)) {
+				BitCastInst *bc = (BitCastInst *)&insn;
+
+				// FIXME:  HACKY HACK MCHACK
+				if (bc->getOperand(0)->getName() == "reg_state") {
+					changed = true;
+
+					SmallVector<Metadata *, 2> metadata_data;
+					metadata_data.push_back(ValueAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(bc->getContext()), 2)));
+					metadata_data.push_back(ConstantAsMetadata::get(ConstantInt::get(IntegerType::getInt32Ty(bc->getContext()), 0)));
+
+					bc->setMetadata("cai", MDNode::get(bc->getContext(), metadata_data));
+				}
+			}
+		}
+	}*/
+	
+	return false;
+}
+
+
 bool LLVMJIT::add_pass(PassManagerBase *pm, Pass *pass)
 {
-	//pm->add(new CaptiveAA());
+	pm->add(new CaptiveAA());
 	pm->add(pass);
 
 	return true;
@@ -290,15 +519,15 @@ bool LLVMJIT::initialise_pass_manager(PassManagerBase* pm)
 	return true;
 }
 
-bool LLVMJIT::lower_block(RegionCompilationContext& rcc, std::pair<uint32_t, captive::shared::BlockTranslation *>& block)
+bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWorkUnit *bwu)
 {
 	BlockCompilationContext bcc(rcc);
 	
-	BasicBlock *entry_block = rcc.guest_basic_blocks[block.first & 0xfff];
-	bcc.alloca_block = entry_block;
+	BasicBlock *entry_block = rcc.guest_basic_blocks[bwu->offset];
+	bcc.alloca_block = rcc.alloca_block;
 	
-	for (uint32_t ir_idx = 0; ir_idx < block.second->ir_count; ir_idx++) {
-		const IRInstruction *insn = &block.second->ir[ir_idx];
+	for (uint32_t ir_idx = 0; ir_idx < bwu->ir_count; ir_idx++) {
+		const IRInstruction *insn = &bwu->ir[ir_idx];
 		lower_instruction(bcc, insn);
 	}
 	
@@ -368,6 +597,7 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 	auto llvm_vreg = bcc.ir_vregs.find(id);
 	if (llvm_vreg == bcc.ir_vregs.end()) {
 		IRBuilder<> alloca_block_builder(bcc.alloca_block);
+		alloca_block_builder.SetInsertPoint(&(bcc.alloca_block->back()));
 
 		Type *vreg_type = NULL;
 		switch (size) {
@@ -378,7 +608,7 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 		default: assert(false); return NULL;
 		}
 
-		AllocaInst *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "vreg");
+		AllocaInst *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "vreg-" + std::to_string(id));
 		set_aa_metadata(vreg_alloc, AA_MD_VREG);
 		
 		bcc.ir_vregs[(uint32_t)id] = vreg_alloc;
@@ -402,7 +632,7 @@ BasicBlock *LLVMJIT::get_ir_block(BlockCompilationContext& bcc, IRBlockId id)
 {
 	auto llvm_block = bcc.ir_blocks.find(id);
 	if (llvm_block == bcc.ir_blocks.end()) {
-		BasicBlock *new_block = BasicBlock::Create(bcc.rcc.ctx, "irbb", bcc.rcc.rgn_func);
+		BasicBlock *new_block = BasicBlock::Create(bcc.rcc.ctx, "bb-" + std::to_string(id), bcc.rcc.rgn_func);
 		bcc.ir_blocks[(uint32_t)id] = new_block;
 		return new_block;
 	} else {
@@ -612,11 +842,16 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 		assert(offset && dst);
 
-		offset = bcc.builder.CreateCast(Instruction::ZExt, offset, bcc.rcc.types.i64);
+		/*offset = bcc.builder.CreateCast(Instruction::ZExt, offset, bcc.rcc.types.i64);
 
 		Value *regptr = bcc.builder.CreateIntToPtr(bcc.builder.CreateAdd(bcc.rcc.reg_state, offset), type_for_operand(bcc, op1, true));
 		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
 
+		bcc.builder.CreateStore(bcc.builder.CreateLoad(regptr), dst);*/
+				
+		Value *regptr = bcc.builder.CreateBitCast(bcc.builder.CreateGEP(bcc.rcc.reg_state, offset), type_for_operand(bcc, op1, true));
+		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
+		
 		bcc.builder.CreateStore(bcc.builder.CreateLoad(regptr), dst);
 
 		return true;
@@ -628,12 +863,17 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 		assert(offset && val);
 
-		offset = bcc.builder.CreateCast(Instruction::ZExt, offset, bcc.rcc.types.i64);
+		/*offset = bcc.builder.CreateCast(Instruction::ZExt, offset, bcc.rcc.types.i64);
 
 		Value *regptr = bcc.builder.CreateAdd(bcc.rcc.reg_state, offset);
 		regptr = bcc.builder.CreateIntToPtr(regptr, type_for_operand(bcc, op0, true));
 		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
 
+		bcc.builder.CreateStore(val, regptr);*/
+		
+		Value *regptr = bcc.builder.CreateBitCast(bcc.builder.CreateGEP(bcc.rcc.reg_state, offset), type_for_operand(bcc, op0, true));
+		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
+		
 		bcc.builder.CreateStore(val, regptr);
 
 		return true;
@@ -652,7 +892,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 			Value *memptr = bcc.builder.CreateIntToPtr(addr, memptrtype);
 			set_aa_metadata(memptr, AA_MD_MEMORY);
 
-			bcc.builder.CreateStore(bcc.builder.CreateLoad(memptr, false), dst);
+			bcc.builder.CreateStore(bcc.builder.CreateLoad(memptr, true), dst);
 		} else {
 			Type *dst_type = type_for_operand(bcc, op1, true);
 
@@ -688,7 +928,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 			Value *memptr = bcc.builder.CreateIntToPtr(addr, type_for_operand(bcc, op0, true));
 			set_aa_metadata(memptr, AA_MD_MEMORY);
 
-			bcc.builder.CreateStore(src, memptr, false);
+			bcc.builder.CreateStore(src, memptr, true);
 		} else {
 			Type *src_type = type_for_operand(bcc, op0, false);
 

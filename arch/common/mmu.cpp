@@ -307,7 +307,7 @@ bool MMU::is_device(gpa_t gpa)
 
 #define CACHE_SIZE 4096
 
-struct {
+static struct {
 	gva_t tag;
 	gpa_t value;
 } cache[CACHE_SIZE];
@@ -319,7 +319,7 @@ bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 	info.type = ACCESS_FETCH;
 	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
 	
-	if (cache[va % CACHE_SIZE].tag == va) {
+	if (va != 0 && cache[va % CACHE_SIZE].tag == va) {
 		pa = cache[va % CACHE_SIZE].value;
 		return true;
 	} else {

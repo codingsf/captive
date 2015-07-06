@@ -52,6 +52,11 @@ extern "C" void jit_rum(captive::arch::CPU *cpu)
 	}
 }
 
+extern "C" uint32_t jit_handle_interrupt(captive::arch::CPU *cpu, uint32_t isr)
+{
+	return cpu->interpreter().handle_irq(isr);
+}
+
 extern "C" void jit_debug1(uint32_t pc)
 {
 	printf("CHAIN: %x\n", pc);
@@ -81,21 +86,21 @@ extern "C" void mem_user_read8(captive::arch::CPU *cpu, uint32_t addr, uint8_t *
 {
 	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*val = *((volatile uint8_t *)(uint64_t)addr);
-	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
+	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_read16(captive::arch::CPU *cpu, uint32_t addr, uint16_t *val)
 {
 	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*val = *((volatile uint16_t *)(uint64_t)addr);
-	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
+	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_read32(captive::arch::CPU *cpu, uint32_t addr, uint32_t *val)
 {
 	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*val = *((volatile uint32_t *)(uint64_t)addr);
-	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
+	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t val)
@@ -117,19 +122,19 @@ extern "C" void mem_user_write8(captive::arch::CPU *cpu, uint32_t addr, uint8_t 
 {
 	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*((volatile uint8_t *)(uint64_t)addr) = val;
-	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
+	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_write16(captive::arch::CPU *cpu, uint32_t addr, uint16_t val)
 {
 	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*((volatile uint16_t *)(uint64_t)addr) = val;
-	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
+	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }
 
 extern "C" void mem_user_write32(captive::arch::CPU *cpu, uint32_t addr, uint32_t val)
 {
 	if (cpu->kernel_mode()) { switch_to_user_mode(); }
 	*((volatile uint32_t *)(uint64_t)addr) = val;
-	if (cpu->kernel_mode()) { switch_to_kernel_mode(); }
+	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }

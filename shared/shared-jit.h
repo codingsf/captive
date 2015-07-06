@@ -28,13 +28,27 @@ namespace captive {
 		typedef uint32_t (*block_txln_fn)(void *);
 		typedef uint32_t (*region_txln_fn)(void *);
 		
+		struct BlockWorkUnit
+		{
+			uint32_t offset;
+			const IRInstruction *ir;
+			unsigned int ir_count;
+		};
+		
 		struct RegionWorkUnit
 		{
+			uint32_t region_index;
 			uint32_t valid;
-			void *btc;
-			void *rtc;
 			
-			lock::SpinLock rtc_lock;
+			BlockWorkUnit *blocks;
+			unsigned int block_count;
+			
+			void *fn_ptr;
+		};
+		
+		struct RegionImage
+		{
+			RegionWorkUnit *rwu;
 		};
 		
 		struct RegionTranslation

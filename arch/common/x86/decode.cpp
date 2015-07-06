@@ -27,6 +27,8 @@ enum X86OperandTypes
 
 	O_R_M8,
 	O_R_M16,
+	
+	O_IMM16_32,
 };
 
 static X86InstructionPrefixes read_prefixes(const uint8_t **code)
@@ -219,6 +221,10 @@ static bool decode_mov(X86InstructionPrefixes pfx, const uint8_t **code, MemoryI
 		if (!decode_rm(code, pfx, inst.Source, mod, rm, source)) return false;
 		return true;
 
+	case O_IMM16_32:
+		printf("unsupported immediate operand\n");
+		return false;
+		
 	default:
 		return false;
 	}
@@ -339,6 +345,7 @@ bool captive::arch::x86::decode_memory_instruction(const uint8_t *code, MemoryIn
 	case 0x89: if (!decode_mov(p, &code, inst, O_R16_32_64, O_R_M16_32_64)) return false; else break;
 	case 0x8a: if (!decode_mov(p, &code, inst, O_R_M8, O_R8)) return false; else break;
 	case 0x8b: if (!decode_mov(p, &code, inst, O_R_M16_32_64, O_R16_32_64)) return false; else break;
+	case 0xc7: if (!decode_mov(p, &code, inst, O_IMM16_32, O_R_M16_32_64)) return false; else break;
 	case 0x1b6: if (!decode_movzx_modrm(p, &code, inst, O_R_M8, O_R16_32_64)) return false; else break;
 	case 0x1b7: if (!decode_movzx_modrm(p, &code, inst, O_R_M16, O_R16_32_64)) return false; else break;
 	default: printf("x86: unsupported opcode %x\n", opcode); return false;

@@ -25,6 +25,7 @@ namespace captive {
 		struct BlockTranslation;
 		struct RegionTranslation;
 		struct RegionWorkUnit;
+		struct RegionImage;
 	}
 
 	namespace arch {
@@ -99,6 +100,8 @@ namespace captive {
 			
 			inline void release_analysis_lock() { _analysing = false; }
 			
+			void register_region(shared::RegionWorkUnit *rwu);
+			
 		protected:
 			volatile uint32_t *_pc_reg_ptr;
 			
@@ -125,6 +128,7 @@ namespace captive {
 				uint64_t registers_size;						// 16
 				void *region_txln_cache;						// 24
 				uint64_t *insn_counter;							// 32
+				uint32_t *isr;									// 40
 			} jit_state;
 
 		private:
@@ -166,17 +170,16 @@ namespace captive {
 
 			struct block_txln_cache_entry *block_txln_cache;
 			const uint64_t block_txln_cache_size;
-			
+						
 			struct region_txln_cache_entry {
 				uint32_t tag;
+				shared::RegionImage *image;
 				shared::RegionTranslation *txln;
 			};
 			
 			struct region_txln_cache_entry *region_txln_cache;
 			const uint64_t region_txln_cache_size;
 			
-			shared::RegionWorkUnit *rwu;
-
 			inline struct block_txln_cache_entry *get_block_txln_cache_entry(gpa_t phys_addr) const
 			{
 				return &block_txln_cache[((uint32_t)phys_addr >> 1) % block_txln_cache_size];

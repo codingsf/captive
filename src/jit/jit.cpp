@@ -218,50 +218,35 @@ struct analysis_work {
 
 static uint64_t analyse_async(const struct analysis_work *awork)
 {
-	/*if (awork->rwu->valid) {
-		printf("analysing %d\n", awork->regions.size());
+	awork->rwu->fn_ptr = awork->jit->compile_region(awork->rwu);
 
-		for (const auto& region : awork->regions) {
-			if (awork->rwu->rct[region.first >> 12]) continue;
-			
-			void *ptr = awork->jit->compile_region(region.first, region.second);
-
-			lock::spinlock_acquire(&awork->rwu->rct_lock);
-			if (!awork->rwu->valid) {
-				lock::spinlock_release(&awork->rwu->rct_lock);
-				if (ptr) awork->cpu->owner().shared_memory().free(ptr);
-				break;
-			}
-
-			if (ptr) {
-				fprintf(stderr, "registering %08x %p\n", region.first, ptr);
-				awork->rwu->rct[region.first >> 12] = ptr;
-			}
-			lock::spinlock_release(&awork->rwu->rct_lock);
-		}
+	for (uint32_t i = 0; i < awork->rwu->block_count; i++) {
+		awork->cpu->owner().shared_memory().free((void *)awork->rwu->blocks[i].ir);
 	}
 	
-	awork->cpu->interrupt(2);
+	awork->cpu->owner().shared_memory().free(awork->rwu->blocks);
 	
-	delete awork;*/
+	lock::spinlock_acquire(&awork->cpu->per_cpu_data().rwu_ready_queue_lock);
+	
+	queue::QueueItem *qi = (queue::QueueItem *)awork->cpu->owner().shared_memory().allocate(sizeof(queue::QueueItem));
+	qi->data = awork->rwu;
+	
+	queue::enqueue(&awork->cpu->per_cpu_data().rwu_ready_queue, qi);
+	lock::spinlock_release(&awork->cpu->per_cpu_data().rwu_ready_queue_lock);
+	
+	awork->cpu->interrupt(1);
+	
+	delete awork;
+	
 	return 0;
 }
 
 void JIT::analyse(captive::hypervisor::CPU& cpu, captive::shared::RegionWorkUnit *rwu)
 {
-	/*struct analysis_work *work = new struct analysis_work();
+	struct analysis_work *work = new struct analysis_work();
 	work->jit = this;
 	work->cpu = &cpu;
 	work->rwu = rwu;
-	
-	for (uint32_t cache_idx = 0; cache_idx < 20000003; cache_idx++) {
-		struct block_txln_cache_entry *entry = &((struct block_txln_cache_entry *)rwu->btc)[cache_idx];
-		if (entry->tag == 1 || !entry->txln) continue;
-		
-		uint32_t region_base_address = entry->tag & ~0xfff;
-		std::vector<std::pair<uint32_t, captive::shared::BlockTranslation *>>& blocks = work->regions[region_base_address];
-		blocks.push_back(std::pair<uint32_t, captive::shared::BlockTranslation *>(entry->tag, entry->txln));
-	}
-	
-	_worker_threads.queue_work((captive::util::action_t)analyse_async, NULL, work);*/
+
+	_worker_threads.queue_work((captive::util::action_t)analyse_async, NULL, work);
 }

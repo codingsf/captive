@@ -190,7 +190,7 @@ extern "C" {
 
 				if (!qi) break;
 
-				if (qi->data) printf("REGISTER REGION %p\n", qi->data);
+				if (qi->data) cpu->register_region((captive::shared::RegionWorkUnit *)qi->data);
 				captive::arch::shfree(qi);
 
 				captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));

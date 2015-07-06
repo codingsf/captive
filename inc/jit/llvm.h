@@ -47,7 +47,7 @@ namespace captive {
 
 			bool init() override;
 			
-			void *compile_region(uint32_t gpa, const std::vector<std::pair<uint32_t, shared::BlockTranslation *>>& blocks) override;
+			void *compile_region(shared::RegionWorkUnit *rwu) override;
 			
 		private:
 			engine::Engine& _engine;
@@ -68,16 +68,22 @@ namespace captive {
 				llvm::Function *rgn_func;
 				
 				llvm::BasicBlock *entry_block;
-				llvm::BasicBlock *exit_block;
-				llvm::BasicBlock *miss_block;
+				llvm::BasicBlock *exit_normal_block;
+				llvm::BasicBlock *exit_handle_block;
 				llvm::BasicBlock *dispatch_block;
+				llvm::BasicBlock *alloca_block;
 				
 				llvm::Value *jit_state;
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
 				llvm::Value *pc_ptr;
+				llvm::Value *entry_page;
 				llvm::Value *exit_code_var;
 				llvm::Value *insn_counter;
+				llvm::Value *isr;
+				
+				llvm::Constant *jump_table_entries[2048];
+				llvm::GlobalVariable *jump_table;
 				
 				std::map<uint32_t, llvm::BasicBlock *> guest_basic_blocks;
 				
@@ -110,7 +116,7 @@ namespace captive {
 			bool add_pass(llvm::PassManagerBase *pm, llvm::Pass *pass);
 			bool initialise_pass_manager(llvm::PassManagerBase *pm);
 			
-			bool lower_block(RegionCompilationContext& rcc, std::pair<uint32_t, captive::shared::BlockTranslation *>& block);
+			bool lower_block(RegionCompilationContext& rcc, const shared::BlockWorkUnit *bwu);
 			
 			enum metadata_tags
 			{
@@ -118,6 +124,9 @@ namespace captive {
 				AA_MD_VREG		= 1,
 				AA_MD_REGISTER	= 2,
 				AA_MD_MEMORY	= 3,
+				AA_MD_ISR		= 4,
+				AA_MD_JIT_STATE	= 5,
+				AA_MD_JT_ELEM	= 6,
 			};
 			
 			void set_aa_metadata(llvm::Value *v, metadata_tags tag);
