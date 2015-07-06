@@ -64,6 +64,8 @@ namespace captive {
 					llvm::Type *voidty, *jit_state_ty, *jit_state_ptr;
 				} types;
 				
+				uint32_t phys_region_index;
+				
 				llvm::Module *rgn_module;
 				llvm::Function *rgn_func;
 				

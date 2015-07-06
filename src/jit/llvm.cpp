@@ -66,6 +66,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 {
 	RegionCompilationContext rcc;
 	
+	rcc.phys_region_index = rwu->region_index;
 	rcc.rgn_module = new Module("region", rcc.ctx);
 	
 	rcc.types.voidty = Type::getVoidTy(rcc.ctx);
@@ -91,6 +92,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.rgn_func->addFnAttr(Attribute::NoRedZone);
 	
 	llvm::Value *jit_state_ptr_val = &(rcc.rgn_func->getArgumentList().front());
+	jit_state_ptr_val->setName("sausage");
 	
 	rcc.entry_block = BasicBlock::Create(rcc.ctx, "entry", rcc.rgn_func);
 	rcc.dispatch_block = BasicBlock::Create(rcc.ctx, "dispatch", rcc.rgn_func);
@@ -123,32 +125,10 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.builder.SetInsertPoint(rcc.exit_handle_block);
 	rcc.builder.CreateRet(rcc.constu32(1));
 	
-	BasicBlock *check_dispatch_block = BasicBlock::Create(rcc.ctx, "check_dispatch", rcc.rgn_func);
 	BasicBlock *do_dispatch_block = BasicBlock::Create(rcc.ctx, "do_dispatch", rcc.rgn_func);
-	BasicBlock *handle_interrupt_block = BasicBlock::Create(rcc.ctx, "handle_interrupt", rcc.rgn_func);
 
 	// --- DISPATCH
 	rcc.builder.SetInsertPoint(rcc.dispatch_block);
-
-	Value *isr_value = rcc.builder.CreateLoad(rcc.isr);
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpNE(isr_value, rcc.constu32(0)), handle_interrupt_block, check_dispatch_block);
-
-	// --- HANDLE INTERRUPT
-	rcc.builder.SetInsertPoint(handle_interrupt_block);
-	
-	std::vector<Type *> params;
-	params.push_back(rcc.types.pi8);
-	params.push_back(rcc.types.i32);
-
-	FunctionType *fntype = FunctionType::get(rcc.types.i32, params, false);
-
-	Constant *fn = rcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_handle_interrupt", fntype);
-	Value *interrupt_handled = rcc.builder.CreateCall2(fn, rcc.cpu_obj, isr_value);
-	
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(interrupt_handled, rcc.consti32(0)), check_dispatch_block, rcc.exit_handle_block);
-	
-	// --- CHECK DISPATCH
-	rcc.builder.SetInsertPoint(check_dispatch_block);
 	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
 	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(rcc.builder.CreateLShr(dispatch_loaded_pc, 12), rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
 	
@@ -174,7 +154,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 
 	// --- DO DISPATCH
 	rcc.builder.SetInsertPoint(do_dispatch_block);
-	Value *jt_slot = rcc.builder.CreateLShr(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), 0xfff), 1);
+	Value *jt_slot = rcc.builder.CreateLShr(rcc.builder.CreateAnd(dispatch_loaded_pc, 0xfff), 1);
 	
 	std::vector<Value *> indicies;
 	indicies.push_back(rcc.constu32(0));
@@ -217,11 +197,11 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 
 	// Dump
-	{
+	/*{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".opt.ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}
+	}*/
 	
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
@@ -358,6 +338,8 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 			}
 		}
 	}
+	
+	if (v1->getName() == "sausage" || v2->getName() == "sausage") return AliasAnalysis::NoAlias;
 
 	if (IsAlloca(v1) || IsAlloca(v2)) {
 		// They can't alias with anything, because we've already checked for equality above.
@@ -396,10 +378,10 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 		}
 	}
 
-	/*fprintf(stderr, "*** MAY ALIAS\n");
+	/*fprintf(stderr, "*** MAY ALIAS '%s' and '%s'\n", v1->getName().str().c_str(), v2->getName().str().c_str());
 	v1->dump();
 	v2->dump();*/
-
+	
 	return AliasAnalysis::MayAlias;
 }
 
@@ -532,8 +514,18 @@ bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWork
 	}
 	
 	bcc.builder.SetInsertPoint(entry_block);
-	bcc.builder.CreateBr(get_ir_block(bcc, (IRBlockId)0));
+
+	std::vector<Type *> params;
+	params.push_back(rcc.types.pi8);
+	params.push_back(rcc.types.i32);
+
+	FunctionType *fntype = FunctionType::get(rcc.types.i32, params, false);
+
+	Constant *fn = rcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_handle_interrupt", fntype);
+	Value *interrupt_handled = rcc.builder.CreateCall2(fn, rcc.cpu_obj, rcc.builder.CreateLoad(rcc.isr));
 	
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(interrupt_handled, rcc.consti32(0)), get_ir_block(bcc, (IRBlockId)0), rcc.exit_handle_block);
+		
 	return true;
 }
 
@@ -1032,6 +1024,39 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		
 		bcc.builder.CreateCondBr(bcc.builder.CreateCast(Instruction::Trunc, cond, bcc.rcc.types.i1), tt, ft);
 		return true;	
+	}
+	
+	case IRInstruction::DISPATCH:
+	{
+		assert(op0->is_constant() && op1->is_constant());
+		uint32_t target_address = op0->value;
+		uint32_t fallthrough_address = op1->value;
+		
+		BasicBlock *target_block = bcc.rcc.exit_normal_block;
+		BasicBlock *fallthrough_block = bcc.rcc.exit_normal_block;
+		
+		if (target_address >> 12 == bcc.rcc.phys_region_index) {
+			if (bcc.rcc.guest_basic_blocks.count(target_address & 0xfff)) {
+				target_block = bcc.rcc.guest_basic_blocks[target_address & 0xfff];
+			}
+		}
+		
+		if (fallthrough_address >> 12 == bcc.rcc.phys_region_index) {
+			if (bcc.rcc.guest_basic_blocks.count(fallthrough_address & 0xfff)) {
+				fallthrough_block = bcc.rcc.guest_basic_blocks[fallthrough_address & 0xfff];
+			}
+		}
+				
+		if (fallthrough_address == 0) {
+			// Non-predicated Direct
+			bcc.builder.CreateBr(target_block);
+		} else {
+			// Predicated Direct
+			Value *target_match = bcc.builder.CreateICmpEQ(bcc.builder.CreateAnd(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), 0xfff), bcc.rcc.constu32(target_address & 0xfff));
+			bcc.builder.CreateCondBr(target_match, target_block, fallthrough_block);
+		}
+		
+		return true;
 	}
 	
 	case IRInstruction::RET:

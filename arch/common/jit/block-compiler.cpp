@@ -115,6 +115,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "jmp",		.format = "NXXXXX" },
 	{ .mnemonic = "branch",		.format = "INNXXX" },
 	{ .mnemonic = "ret",		.format = "XXXXXX" },
+	{ .mnemonic = "dispatch",	.format = "NNXXXX" },
 
 	{ .mnemonic = "scm",		.format = "IXXXXX" },
 	{ .mnemonic = "stdev",		.format = "IIIXXX" },
@@ -370,6 +371,7 @@ bool BlockCompiler::build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits)
 			break;
 		}
 
+		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
 			exits.push_back(current_block_id);
@@ -568,6 +570,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			break;
 		}
 
+		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
 			// Function Epilogue

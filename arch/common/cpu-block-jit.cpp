@@ -237,8 +237,22 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		pc += insn->length;
 	} while (!insn->end_of_block && PAGE_ADDRESS_OF(pc) == page);
 
-	// Finish off with a RET.
-	ctx.add_instruction(IRInstruction::ret());
+	// Branch optimisation log
+	if (insn->end_of_block) {
+		JumpInfo ji = get_instruction_jump_info(insn);
+		if (insn->is_predicated && ji.type == JumpInfo::DIRECT) {
+			// Direct Predicated
+			ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(ji.target), IROperand::const32(insn->pc + insn->length)));
+		} else if (get_instruction_jump_info(insn).type == JumpInfo::DIRECT) {
+			// Direct Non-predicated
+			ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(ji.target), IROperand::const32(0)));
+		} else {
+			ctx.add_instruction(IRInstruction::ret());
+		}
+		
+	} else {
+		ctx.add_instruction(IRInstruction::ret());
+	}
 
 	return true;
 }
@@ -296,12 +310,12 @@ void CPU::register_region(shared::RegionWorkUnit* rwu)
 	
 	if (rwu->valid) {
 		if (rgn_cache_entry->txln) {
-			release_region_translation(rgn_cache_entry->txln);
+			//release_region_translation(rgn_cache_entry->txln);
 		}
 		
 		rgn_cache_entry->txln = alloc_region_translation();
 		rgn_cache_entry->txln->native_fn_ptr = (shared::region_txln_fn)rwu->fn_ptr;
-		//printf("register %08x %p\n", rwu->region_index << 12, rgn_cache_entry->txln->native_fn_ptr);
+		printf("register %08x %p blocks=%d\n", rwu->region_index << 12, rgn_cache_entry->txln->native_fn_ptr, rwu->block_count);
 	} else {
 		shfree(rwu->fn_ptr);
 	}

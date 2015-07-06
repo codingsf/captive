@@ -172,6 +172,7 @@ namespace captive {
 				JMP,
 				BRANCH,
 				RET,
+				DISPATCH,
 
 				SET_CPU_MODE,
 				WRITE_DEVICE,
@@ -212,6 +213,7 @@ namespace captive {
 
 			static IRInstruction nop() { return IRInstruction(NOP); }
 			static IRInstruction ret() { return IRInstruction(RET); }
+			static IRInstruction dispatch(IROperand target, IROperand fallthrough) { assert(target.is_constant() && fallthrough.is_constant()); return IRInstruction(DISPATCH, target, fallthrough); }
 			static IRInstruction trap() { return IRInstruction(TRAP); }
 			static IRInstruction verify(IROperand pc) { return IRInstruction(VERIFY, pc); }
 			static IRInstruction count(IROperand pc, IROperand ir) { return IRInstruction(COUNT, pc, ir); }
