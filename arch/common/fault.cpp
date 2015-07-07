@@ -16,8 +16,8 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		printf("%02x ", ((uint8_t *)mctx->rip)[i]);
 	}
 	printf("\n");*/
-
-	core->cpu_data().device_address = dev_addr;
+	
+	//core->cpu_data().device_address = dev_addr;
 	asm volatile("" ::: "memory");
 
 	captive::arch::x86::MemoryInstruction inst;
@@ -25,31 +25,31 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {
-		case x86::Operand::R_EAX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rax)); break;
-		case x86::Operand::R_EBX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rbx)); break;
-		case x86::Operand::R_ECX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rcx)); break;
-		case x86::Operand::R_EDX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdx)); break;
-		case x86::Operand::R_ESI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rsi)); break;
-		case x86::Operand::R_EDI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdi)); break;
+		case x86::Operand::R_EAX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rax), "d"(dev_addr)); break;
+		case x86::Operand::R_EBX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rbx), "d"(dev_addr)); break;
+		case x86::Operand::R_ECX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rcx), "d"(dev_addr)); break;
+		case x86::Operand::R_EDX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdx), "d"(dev_addr)); break;
+		case x86::Operand::R_ESI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rsi), "d"(dev_addr)); break;
+		case x86::Operand::R_EDI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdi), "d"(dev_addr)); break;
 
-		case x86::Operand::R_AX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rax)); break;
-		case x86::Operand::R_BX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rbx)); break;
-		case x86::Operand::R_CX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rcx)); break;
-		case x86::Operand::R_DX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdx)); break;
-		case x86::Operand::R_SI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rsi)); break;
-		case x86::Operand::R_DI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdi)); break;
+		case x86::Operand::R_AX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rax), "d"(dev_addr)); break;
+		case x86::Operand::R_BX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rbx), "d"(dev_addr)); break;
+		case x86::Operand::R_CX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rcx), "d"(dev_addr)); break;
+		case x86::Operand::R_DX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdx), "d"(dev_addr)); break;
+		case x86::Operand::R_SI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rsi), "d"(dev_addr)); break;
+		case x86::Operand::R_DI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdi), "d"(dev_addr)); break;
 
-		case x86::Operand::R_AL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rax)); break;
-		case x86::Operand::R_BL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rbx)); break;
-		case x86::Operand::R_CL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rcx)); break;
-		case x86::Operand::R_DL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rdx)); break;
+		case x86::Operand::R_AL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rax), "d"(dev_addr)); break;
+		case x86::Operand::R_BL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rbx), "d"(dev_addr)); break;
+		case x86::Operand::R_CL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rcx), "d"(dev_addr)); break;
+		case x86::Operand::R_DL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rdx), "d"(dev_addr)); break;
 
 		default: printf("fatal: unhandled source register\n"); abort();
 		}
 	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
-		uint32_t value;
-		asm volatile("inl $0xf0, %0\n" : "=a"(value));
-
+		uint32_t value;		
+		asm volatile("inl $0xf0, %0\n" : "=a"(value) : "d"(dev_addr));
+		
 		switch (inst.Dest.reg) {
 		case x86::Operand::R_EAX: mctx->rax = value; break;
 		case x86::Operand::R_EBX: mctx->rbx = value; break;

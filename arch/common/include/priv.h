@@ -24,13 +24,13 @@ static inline bool in_user_mode()
 
 static inline void switch_to_kernel_mode(void)
 {
-	if (!in_kernel_mode())
+	//if (!in_kernel_mode())
 		asm("int $0x80\n");
 }
 
 static inline void switch_to_user_mode(void)
 {
-	if (!in_user_mode())
+	//if (!in_user_mode())
 		asm("int $0x81\n");
 }
 

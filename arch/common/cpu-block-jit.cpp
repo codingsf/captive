@@ -104,7 +104,7 @@ bool CPU::run_block_jit_safepoint()
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 		
 		// Signal the hypervisor to make a profiling run
-		if (unlikely(trace_interval > 300000)) {
+		if (unlikely(trace_interval > 3000000)) {
 			reset_trace = true;
 			
 			analyse_blocks();

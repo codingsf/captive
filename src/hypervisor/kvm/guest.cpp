@@ -192,7 +192,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_tid = 0;
 	}
 	
-	per_cpu_data->verbose_enabled = false;
+	per_cpu_data->verbose_enabled = true;
 
 	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
 	kvm_cpus.push_back(cpu);

@@ -91,10 +91,27 @@ static bool trap;
 
 uint64_t last_insns, last_intrs;
 
+static std::map<uint32_t, uint32_t> dev_addr_reads;
+static std::map<uint32_t, uint32_t> dev_addr_writes;
+
 static void handle_signal(int signo)
 {
 	if (signo == SIGUSR1) {
-		signal_cpu->per_cpu_data().async_action = 5;
+		//signal_cpu->per_cpu_data().async_action = 5;
+		
+		fprintf(stderr, "**************\n");
+		
+		fprintf(stderr, "*** reads\n");
+		for (auto i : dev_addr_reads) {
+			fprintf(stderr, "%08x: %u\n", i.first, i.second);
+		}
+
+		fprintf(stderr, "*** writes\n");
+		for (auto i : dev_addr_writes) {
+			fprintf(stderr, "%08x: %u\n", i.first, i.second);
+		}
+		
+		
 	} else if (signo == SIGUSR2) {
 		//signal_cpu->interrupt(0);
 		
@@ -185,15 +202,20 @@ bool KVMCpu::run()
 			} else if (cpu_run_struct->io.port == 0xfc) {
 				trigger_irq_latency_measure();
 			} else if (cpu_run_struct->io.port == 0xf0) {
-				devices::Device *dev = kvm_guest.lookup_device(per_cpu_data().device_address);
+				struct kvm_regs regs;
+				vmioctl(KVM_GET_REGS, &regs);
+
+				devices::Device *dev = kvm_guest.lookup_device(regs.rdx);
 				if (dev != NULL) {
 					// TODO: FIXME: HACK
 					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
 						// Device Write
-						dev->write(per_cpu_data().device_address & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
+						dev_addr_writes[regs.rdx]++;
+						dev->write(regs.rdx & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					} else {
 						// Device Read
-						dev->read(per_cpu_data().device_address & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
+						dev_addr_reads[regs.rdx]++;
+						dev->read(regs.rdx & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					}
 				}
 			} else {
@@ -282,6 +304,8 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 		}
 
 		return device->write(offset, rs.mmio.len, masked_data);*/
+		
+		dev_addr_writes[pa & 0xffffffff]++;
 		return device->write(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);
 	} else {
 		/*uint64_t masked_data;
@@ -294,6 +318,7 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 
 		*(uint64_t *)&rs.mmio.data[0] = masked_data;*/
 
+		dev_addr_reads[pa & 0xffffffff]++;
 		if (!device->read(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]))
 			return false;
 		return true;
