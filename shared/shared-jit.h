@@ -33,6 +33,7 @@ namespace captive {
 			uint32_t offset;
 			const IRInstruction *ir;
 			unsigned int ir_count;
+			bool interrupt_check;
 		};
 		
 		struct RegionWorkUnit

@@ -9,6 +9,10 @@
 #include <jit/block-compiler.h>
 #include <shared-jit.h>
 
+#include <profile/image.h>
+#include <profile/region.h>
+#include <profile/block.h>
+
 #include <set>
 #include <map>
 #include <list>
@@ -20,6 +24,7 @@ extern safepoint_t cpu_safepoint;
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
+using namespace captive::arch::profile;
 
 bool CPU::run_block_jit()
 {
@@ -59,6 +64,8 @@ bool CPU::run_block_jit_safepoint()
 	uint32_t trace_interval = 0;
 	bool step_ok = true;
 	
+	bool reset_trace = true;
+	gpa_t last_phys_pc = 0;
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -97,102 +104,72 @@ bool CPU::run_block_jit_safepoint()
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 		
 		// Signal the hypervisor to make a profiling run
-		if (unlikely(trace_interval > 5000000)) {
+		if (unlikely(trace_interval > 300000)) {
+			reset_trace = true;
+			
 			analyse_blocks();
 			trace_interval = 0;
 		} else {
 			trace_interval++;
 		}
 		
-		struct region_txln_cache_entry *rgn_cache_entry = get_region_txln_cache_entry(phys_pc);
-		if (rgn_cache_entry->tag == PAGE_ADDRESS_OF(phys_pc) && rgn_cache_entry->txln) {
-			if (rgn_cache_entry->txln->native_fn_ptr(&jit_state) == 1)
-				continue;
-			
-			if (virt_pc != read_pc())
-				continue;
-		} else if (unlikely(rgn_cache_entry->tag != PAGE_ADDRESS_OF(phys_pc))) {
-			assert(rgn_cache_entry->tag == 1);
-			rgn_cache_entry->tag = PAGE_ADDRESS_OF(phys_pc);
-			
-			if (unlikely(rgn_cache_entry->image == NULL)) {
-				rgn_cache_entry->image = (shared::RegionImage *)shalloc(sizeof(shared::RegionImage));
-				rgn_cache_entry->image->rwu = NULL;
+		Region *rgn = image->get_region(phys_pc);
+		Block *blk = rgn->get_block(phys_pc);
+		
+		if (unlikely(reset_trace) || PAGE_INDEX_OF(last_phys_pc) != PAGE_INDEX_OF(phys_pc)) {
+			blk->entry = true;
+			reset_trace = false;
+		} else {
+			if (last_phys_pc > phys_pc) {
+				rgn->get_block(last_phys_pc)->loop_header = true;
 			}
 		}
+				
+		last_phys_pc = phys_pc;
 		
-		struct block_txln_cache_entry *blk_cache_entry = get_block_txln_cache_entry(phys_pc);
-		if (unlikely(blk_cache_entry->tag != phys_pc)) {
-			if (blk_cache_entry->tag != 1 && blk_cache_entry->txln) {
-				release_block_translation(blk_cache_entry->txln);
-			}
+		if (rgn->txln) {
+			rgn->txln(&jit_state);
+			if (virt_pc != read_pc()) continue;
+		}
+		
+		if (rgn->rwu == NULL) blk->exec_count++;
+		if (blk->txln) {
+			step_ok = blk->txln(&jit_state) == 0;
+			continue;
+		}
 
-			blk_cache_entry->tag = phys_pc;
-			blk_cache_entry->txln = NULL;
-			blk_cache_entry->count = 1;
-
-			//__local_irq_disable();
-			step_ok = interpret_block();
-			//__local_irq_enable();
+		if (blk->exec_count > 10) {
+			blk->txln = compile_block(blk, phys_pc);
+			mmu().disable_writes();
+			
+			step_ok = blk->txln(&jit_state) == 0;
 		} else {
-			if (rgn_cache_entry->image->rwu == NULL) blk_cache_entry->count++;
-
-			if (unlikely(blk_cache_entry->txln == NULL)) {
-				if (unlikely(blk_cache_entry->count < 10)) {
-					step_ok = interpret_block();
-					continue;
-				}
-				
-				blk_cache_entry->txln = compile_block(phys_pc);				
-				if (unlikely(!blk_cache_entry->txln)) {
-					printf("jit: block compilation failed\n");
-					return false;
-				}
-				
-				// Disable writes in the MMU for detecting SMC
-				mmu().disable_writes();
-			}
-			
-			// Make sure we're in the correct privilege mode
-			ensure_privilege_mode();
-
-			//__local_irq_disable();
-			
-			_exec_txl = true;
-			step_ok = ((blk_cache_entry->txln->native_fn_ptr)(&jit_state) == 0);
-			_exec_txl = false;
-			
-			//__local_irq_enable();
+			interpret_block();
 		}
 	} while(step_ok);
 
 	return true;
 }
 
-captive::shared::BlockTranslation *CPU::compile_block(gpa_t pa)
+captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa)
 {
 	TranslationContext ctx;
-
 	if (!translate_block(ctx, pa)) {
 		printf("jit: block translation failed\n");
 		return NULL;
 	}
-
-	BlockCompiler compiler((void *)block_txln_cache, ctx, pa);
+	
+	BlockCompiler compiler(ctx, pa);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		printf("jit: block compilation failed\n");
 		return NULL;
 	}
+
+	blk->ir_count = ctx.count();
+	blk->ir = ctx.get_ir_buffer();
 	
-	shared::BlockTranslation *txln = alloc_block_translation();
-	assert(txln);
-	
-	txln->native_fn_ptr = fn;
-	txln->ir_count = ctx.count();
-	txln->ir = ctx.get_ir_buffer();
-	
-	return txln;
+	return fn;
 }
 
 bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
@@ -249,7 +226,6 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		} else {
 			ctx.add_instruction(IRInstruction::ret());
 		}
-		
 	} else {
 		ctx.add_instruction(IRInstruction::ret());
 	}
@@ -259,71 +235,77 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 
 void CPU::analyse_blocks()
 {
-	for (uint32_t region_index = 0; region_index < region_txln_cache_size; region_index++) {
-		if (region_txln_cache[region_index].tag == 1) continue;
-		if (!region_txln_cache[region_index].image) continue;
-		if (region_txln_cache[region_index].image->rwu) continue;
+	for (int ri = 0; ri < 0x100000; ri++) {
+		Region *rgn = image->regions[ri];
+		if (!rgn) continue;
+		if (rgn->rwu) continue;
 		
-		shared::RegionWorkUnit *rwu = (shared::RegionWorkUnit *)shalloc(sizeof(shared::RegionWorkUnit));
-		region_txln_cache[region_index].image->rwu = rwu;
-
-		rwu->region_index = region_index;
-		rwu->blocks = NULL;
-		rwu->block_count = 0;
-		rwu->valid = 1;
-		
-		for (uint32_t block_offset = 0; block_offset < 0x1000; block_offset+=2) {
-			struct block_txln_cache_entry *blk_cache_entry = get_block_txln_cache_entry((region_index << 12) | block_offset);
-			if (blk_cache_entry->tag == 1 || (blk_cache_entry->tag >> 12) != region_index || (blk_cache_entry->txln == NULL)) continue;
-			if (blk_cache_entry->count < 20) continue;
-			blk_cache_entry->count = 0;
+		for (int bi = 0; bi < 0x1000; bi++) {
+			Block *blk = rgn->blocks[bi];
+			if (!blk) continue;
 			
-			// add block to rwu
-			rwu->block_count++;
-			rwu->blocks = (shared::BlockWorkUnit *)shrealloc(rwu->blocks, sizeof(shared::BlockWorkUnit) * rwu->block_count);
-			rwu->blocks[rwu->block_count - 1].offset = block_offset;
-			
-			uint32_t native_ir_size = blk_cache_entry->txln->ir_count * sizeof(shared::IRInstruction);
-			shared::IRInstruction *ir_copy = (shared::IRInstruction *)shalloc(native_ir_size);
-			memcpy((void *)ir_copy, blk_cache_entry->txln->ir, native_ir_size);
-			
-			rwu->blocks[rwu->block_count - 1].ir = ir_copy;
-			rwu->blocks[rwu->block_count - 1].ir_count = blk_cache_entry->txln->ir_count;
-		}
-		
-		if (rwu->block_count > 0) {
-			asm volatile("out %0, $0xff" :: "a"(14), "D"(rwu));
-		} else {
-			shfree((void *)rwu);
+			if (blk->exec_count > 100) {
+				compile_region(rgn, ri);
+				break;
+			}
 		}
 	}
 }
 
+void CPU::compile_region(Region *rgn, uint32_t region_index)
+{
+	rgn->rwu = (shared::RegionWorkUnit *) shalloc(sizeof(shared::RegionWorkUnit));
+	rgn->rwu->region_index = region_index;
+	rgn->rwu->valid = 1;
+	rgn->rwu->block_count = 0;
+	rgn->rwu->blocks = NULL;
+	
+	//printf("compiling region %p %08x\n", rgn, region_index << 12);
+	
+	for (int bi = 0; bi < 0x1000; bi++) {
+		Block *blk = rgn->blocks[bi];
+		if (!blk) continue;
+		
+		blk->exec_count = 0;
+		
+		if (!blk->ir) continue;
+		
+		rgn->rwu->block_count++;
+		rgn->rwu->blocks = (shared::BlockWorkUnit *) shrealloc(rgn->rwu->blocks, sizeof(shared::BlockWorkUnit) * rgn->rwu->block_count);
+		
+		shared::BlockWorkUnit *bwu = &rgn->rwu->blocks[rgn->rwu->block_count - 1];
+		bwu->offset = bi;
+		bwu->interrupt_check = blk->loop_header || blk->entry;
+		
+		bwu->ir_count = blk->ir_count;
+		bwu->ir = (const shared::IRInstruction *)shalloc(sizeof(shared::IRInstruction) * bwu->ir_count);
+		memcpy((void *)bwu->ir, (const void *)blk->ir, sizeof(shared::IRInstruction) * bwu->ir_count);
+	}
+	
+	asm volatile("out %0, $0xff" :: "a"(14), "D"(rgn->rwu));
+}
+
 void CPU::register_region(shared::RegionWorkUnit* rwu)
 {
-	if (rwu->fn_ptr == NULL) {
-		//shfree(rwu);
-		return;
-	}
-	
-	struct region_txln_cache_entry *rgn_cache_entry = get_region_txln_cache_entry(rwu->region_index << 12);
-	
+	Region *rgn = image->get_region_from_index(rwu->region_index);
+	assert(rgn->rwu == rwu);
+	rgn->rwu = NULL;
+
+	//printf("registering region %p %08x\n", rgn, rwu->region_index << 12);
 	if (rwu->valid) {
-		if (rgn_cache_entry->txln) {
-			//release_region_translation(rgn_cache_entry->txln);
-		}
+		if (rgn->txln)
+			shfree((void *)rgn->txln);
 		
-		rgn_cache_entry->txln = alloc_region_translation();
-		rgn_cache_entry->txln->native_fn_ptr = (shared::region_txln_fn)rwu->fn_ptr;
-		printf("register %08x %p blocks=%d\n", rwu->region_index << 12, rgn_cache_entry->txln->native_fn_ptr, rwu->block_count);
-	} else {
+		rgn->txln = (shared::region_txln_fn)rwu->fn_ptr;
+	} else
 		shfree(rwu->fn_ptr);
+		
+	for (int i = 0; i < rwu->block_count; i++) {
+		shfree((void *)rwu->blocks[i].ir);
 	}
 	
-	rgn_cache_entry->image->rwu = NULL;
-	
-	// TODO: MEMORY LEAK
-	//shfree(rwu);
+	shfree(rwu->blocks);
+	shfree(rwu);
 	
 	mmu().disable_writes();
 }

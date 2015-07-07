@@ -515,17 +515,21 @@ bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWork
 	
 	bcc.builder.SetInsertPoint(entry_block);
 
-	std::vector<Type *> params;
-	params.push_back(rcc.types.pi8);
-	params.push_back(rcc.types.i32);
+	if (bwu->interrupt_check) {
+		std::vector<Type *> params;
+		params.push_back(rcc.types.pi8);
+		params.push_back(rcc.types.i32);
 
-	FunctionType *fntype = FunctionType::get(rcc.types.i32, params, false);
+		FunctionType *fntype = FunctionType::get(rcc.types.i32, params, false);
 
-	Constant *fn = rcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_handle_interrupt", fntype);
-	Value *interrupt_handled = rcc.builder.CreateCall2(fn, rcc.cpu_obj, rcc.builder.CreateLoad(rcc.isr));
+		Constant *fn = rcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_handle_interrupt", fntype);
+		Value *interrupt_handled = rcc.builder.CreateCall2(fn, rcc.cpu_obj, rcc.builder.CreateLoad(rcc.isr));
+
+		rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(interrupt_handled, rcc.consti32(0)), get_ir_block(bcc, (IRBlockId)0), rcc.exit_handle_block);
+	} else {
+		rcc.builder.CreateBr(get_ir_block(bcc, (IRBlockId)0));
+	}
 	
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(interrupt_handled, rcc.consti32(0)), get_ir_block(bcc, (IRBlockId)0), rcc.exit_handle_block);
-		
 	return true;
 }
 

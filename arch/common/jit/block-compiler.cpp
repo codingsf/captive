@@ -13,7 +13,7 @@ using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
-BlockCompiler::BlockCompiler(void *cache_ptr, TranslationContext& ctx, gpa_t pa) : cache_ptr(cache_ptr), ctx(ctx), pa(pa)
+BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
 {
 	assign(0, REG_RAX, REG_EAX, REG_AX, REG_AL);
 	assign(1, REG_RDX, REG_EDX, REG_DX, REG_DL);
@@ -278,9 +278,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 					printf("<invalid>");
 				}
 			}
-		}*/
+		}
 
-		/*printf(" {");
+		printf(" {");
 		for (auto in : live_ins) {
 			auto alloc = allocation.find(in);
 			int alloc_reg = alloc == allocation.end() ? -1 : alloc->second;

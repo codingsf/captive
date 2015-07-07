@@ -10,9 +10,13 @@
 #include <jit.h>
 #include <jit/translation-context.h>
 #include <shared-memory.h>
+#include <profile/image.h>
+#include <profile/region.h>
+#include <profile/block.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
+using namespace captive::arch::profile;
 
 safepoint_t cpu_safepoint;
 
@@ -22,9 +26,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	: _pc_reg_ptr(NULL),
 	_env(env),
 	_per_cpu_data(per_cpu_data),
-	_exec_txl(false),
-	block_txln_cache_size(0x1312d03),
-	region_txln_cache_size(0x100000)
+	_exec_txl(false)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
@@ -32,32 +34,17 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
 
-	// Initialise the block translation cache
-	block_txln_cache = (struct block_txln_cache_entry *)shalloc(sizeof(struct block_txln_cache_entry) * block_txln_cache_size);
-	for (uint32_t i = 0; i < block_txln_cache_size; i++) {
-		block_txln_cache[i].tag = 1;
-		block_txln_cache[i].count = 0;
-		block_txln_cache[i].txln = NULL;
-	}
-	
-	// Initialise the region translation cache
-	region_txln_cache = (struct region_txln_cache_entry *)shalloc(sizeof(struct region_txln_cache_entry) * region_txln_cache_size);
-	for (uint32_t i = 0; i < region_txln_cache_size; i++) {
-		region_txln_cache[i].tag = 1;
-		region_txln_cache[i].image = NULL;
-		region_txln_cache[i].txln = NULL;
-	}
+	// Initialise the profiling image
+	image = new(shalloc(sizeof(profile::Image))) profile::Image();
 	
 	jit_state.cpu = this;
-	jit_state.region_txln_cache = region_txln_cache;
+	jit_state.region_txln_cache = NULL;
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.isr = &cpu_data().isr;
 }
 
 CPU::~CPU()
 {
-	shfree(region_txln_cache);
-	shfree(block_txln_cache);
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -229,73 +216,17 @@ bool CPU::interpret_block()
 
 void CPU::clear_block_cache()
 {
-	for (uint32_t i = 0; i < block_txln_cache_size; i++) {
-		struct block_txln_cache_entry *entry = &block_txln_cache[i];
-		
-		if (entry->tag != 1 && entry->txln) {
-			release_block_translation(entry->txln);
-			entry->txln = NULL;
-		}
-
-		entry->tag = 1;
-		entry->count = 0;
-	}
-	
-	for (uint32_t i = 0; i < region_txln_cache_size; i++) {
-		struct region_txln_cache_entry *entry = &region_txln_cache[i];
-		
-		if (entry->tag != 1) {
-			if (entry->txln) {
-				release_region_translation(entry->txln);
-				entry->txln = NULL;
-			}
-			
-			if (entry->image && entry->image->rwu) {
-				entry->image->rwu->valid = 0;
-			}
-		}
-
-		entry->tag = 1;
-	}
+	image->invalidate();
 }
 
 void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 {
 	if (virt_addr >= (va_t)0x100000000) return;
 
-	gpa_t phys_page_base_addr = (gpa_t)((uint64_t)phys_addr & ~0xfffULL);
-
-	for (unsigned int pgoff = 0; pgoff < 0x1000; pgoff++) {
-		block_txln_cache_entry *entry = get_block_txln_cache_entry((gpa_t)((uint32_t)phys_page_base_addr + pgoff));
-
-		// If there is an entry that resides on this page...
-		if (unlikely((entry->tag != 1) && ((entry->tag & ~0xfffULL) == (uint32_t)phys_page_base_addr))) {
-			if (entry->txln) {
-				// If there is a valid translation, release it and clear the pointer.
-
-				release_block_translation(entry->txln);
-				entry->txln = NULL;
-			}
-
-			// Invalidate the tag.
-			entry->tag = 1;
-			entry->count = 0;
-		}
-	}
+	Region *rgn = image->get_region((uint32_t)(uint64_t)phys_addr);
 	
-	// Remove the entry from the region chaining table, freeing the associated native code.
-	struct region_txln_cache_entry *rgn_entry = get_region_txln_cache_entry(phys_page_base_addr);
-	if ((rgn_entry->tag != 1) && (rgn_entry->tag == (uint32_t)phys_page_base_addr)) {
-		if (rgn_entry->txln) {
-			release_region_translation(rgn_entry->txln);
-			rgn_entry->txln = NULL;
-		}
-		
-		if (rgn_entry->image && rgn_entry->image->rwu) {
-			rgn_entry->image->rwu->valid = 0;
-		}
-		
-		rgn_entry->tag = 1;
+	if (rgn) {
+		rgn->invalidate();
 	}
 }
 

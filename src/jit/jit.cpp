@@ -92,32 +92,32 @@ std::string InstructionPrinter::render_instruction(const IRInstruction& insn)
 		break;
 
 	case IRInstruction::CMPEQ:
-		str << "cmpeq " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
+		str << "cmp eq " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 	case IRInstruction::CMPNE:
-		str << "cmpne " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
+		str << "cmp ne " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 	case IRInstruction::CMPGT:
-		str << "cmpgt " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
+		str << "cmp gt " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 	case IRInstruction::CMPGTE:
-		str << "cmpgte " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
+		str << "cmp gte " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 	case IRInstruction::CMPLT:
-		str << "cmplt " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
+		str << "cmp lt " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 	case IRInstruction::CMPLTE:
-		str << "cmplte " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
+		str << "cmp lte " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 
 	case IRInstruction::SX:
-		str << "sx " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
+		str << "mov sx " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
 		break;
 	case IRInstruction::ZX:
-		str << "zx " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
+		str << "mov zx " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
 		break;
 	case IRInstruction::TRUNC:
-		str << "trunc " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
+		str << "mov trunc " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
 		break;
 
 	case IRInstruction::READ_REG:
@@ -143,12 +143,15 @@ std::string InstructionPrinter::render_instruction(const IRInstruction& insn)
 	case IRInstruction::BRANCH:
 		str << "branch " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
+	case IRInstruction::DISPATCH:
+		str << "dispatch " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]);
+		break;
 	case IRInstruction::RET:
 		str << "ret";
 		break;
 
 	case IRInstruction::SET_CPU_MODE:
-		str << "set-cpu-mode " << render_operand(insn.operands[0]);
+		str << "scm " << render_operand(insn.operands[0]);
 		break;
 
 	case IRInstruction::WRITE_DEVICE:
@@ -158,6 +161,10 @@ std::string InstructionPrinter::render_instruction(const IRInstruction& insn)
 		str << "lddev " << render_operand(insn.operands[0]) << ", " << render_operand(insn.operands[1]) << ", " << render_operand(insn.operands[2]);
 		break;
 
+	case IRInstruction::INCPC:
+		str << "inc-pc " << render_operand(insn.operands[0]);
+		break;
+		
 	default:
 		str << "???";
 		break;
@@ -220,12 +227,6 @@ static uint64_t analyse_async(const struct analysis_work *awork)
 {
 	awork->rwu->fn_ptr = awork->jit->compile_region(awork->rwu);
 
-	for (uint32_t i = 0; i < awork->rwu->block_count; i++) {
-		awork->cpu->owner().shared_memory().free((void *)awork->rwu->blocks[i].ir);
-	}
-	
-	awork->cpu->owner().shared_memory().free(awork->rwu->blocks);
-	
 	lock::spinlock_acquire(&awork->cpu->per_cpu_data().rwu_ready_queue_lock);
 	
 	queue::QueueItem *qi = (queue::QueueItem *)awork->cpu->owner().shared_memory().allocate(sizeof(queue::QueueItem));

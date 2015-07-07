@@ -13,8 +13,7 @@
 #include <mmu.h>
 #include <shmem.h>
 #include <priv.h>
-
-#include <map>
+#include <shared-jit.h>
 
 #define DECODE_CACHE_SIZE	8192
 #define DECODE_OBJ_SIZE		128
@@ -31,6 +30,12 @@ namespace captive {
 	namespace arch {
 		namespace jit {
 			class TranslationContext;
+		}
+		
+		namespace profile {
+			struct Image;
+			struct Region;
+			struct Block;
 		}
 
 		class Environment;
@@ -162,33 +167,7 @@ namespace captive {
 				return (Decode *)&decode_cache[((pc >> 2) % DECODE_CACHE_ENTRIES) * DECODE_OBJ_SIZE];
 			}
 
-			struct block_txln_cache_entry {
-				uint32_t tag;
-				uint32_t count;
-				shared::BlockTranslation *txln;
-			};
-
-			struct block_txln_cache_entry *block_txln_cache;
-			const uint64_t block_txln_cache_size;
-						
-			struct region_txln_cache_entry {
-				uint32_t tag;
-				shared::RegionImage *image;
-				shared::RegionTranslation *txln;
-			};
-			
-			struct region_txln_cache_entry *region_txln_cache;
-			const uint64_t region_txln_cache_size;
-			
-			inline struct block_txln_cache_entry *get_block_txln_cache_entry(gpa_t phys_addr) const
-			{
-				return &block_txln_cache[((uint32_t)phys_addr >> 1) % block_txln_cache_size];
-			}
-			
-			inline struct region_txln_cache_entry *get_region_txln_cache_entry(gpa_t phys_addr) const
-			{
-				return &region_txln_cache[PAGE_INDEX_OF(phys_addr) % block_txln_cache_size];
-			}
+			profile::Image *image;
 
 			bool run_interp();
 			bool run_interp_safepoint();
@@ -200,7 +179,9 @@ namespace captive {
 			bool interpret_block();
 
 			void analyse_blocks();
-			shared::BlockTranslation *compile_block(gpa_t pa);
+			void compile_region(profile::Region *rgn, uint32_t region_index);
+			
+			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa);
 			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
 			
 			shared::BlockTranslation *alloc_block_translation();
