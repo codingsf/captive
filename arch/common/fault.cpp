@@ -43,8 +43,26 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		case x86::Operand::R_BL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rbx), "d"(dev_addr)); break;
 		case x86::Operand::R_CL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rcx), "d"(dev_addr)); break;
 		case x86::Operand::R_DL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rdx), "d"(dev_addr)); break;
+		
+		case x86::Operand::R_R8: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r8), "d"(dev_addr)); break;
+		case x86::Operand::R_R9: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r9), "d"(dev_addr)); break;
+		case x86::Operand::R_R10: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r10), "d"(dev_addr)); break;
+		case x86::Operand::R_R11: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r11), "d"(dev_addr)); break;
+		case x86::Operand::R_R12: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r12), "d"(dev_addr)); break;
+		case x86::Operand::R_R13: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r13), "d"(dev_addr)); break;
+		case x86::Operand::R_R14: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r14), "d"(dev_addr)); break;
+		case x86::Operand::R_R15: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r15), "d"(dev_addr)); break;
+		
+		case x86::Operand::R_R8D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r8), "d"(dev_addr)); break;
+		case x86::Operand::R_R9D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r9), "d"(dev_addr)); break;
+		case x86::Operand::R_R10D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r10), "d"(dev_addr)); break;
+		case x86::Operand::R_R11D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r11), "d"(dev_addr)); break;
+		case x86::Operand::R_R12D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r12), "d"(dev_addr)); break;
+		case x86::Operand::R_R13D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r13), "d"(dev_addr)); break;
+		case x86::Operand::R_R14D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r14), "d"(dev_addr)); break;
+		case x86::Operand::R_R15D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r15), "d"(dev_addr)); break;
 
-		default: printf("fatal: unhandled source register\n"); abort();
+		default: printf("fatal: unhandled source register %d\n", inst.Source.reg); abort();
 		}
 	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
 		uint32_t value;		

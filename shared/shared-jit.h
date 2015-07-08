@@ -34,6 +34,7 @@ namespace captive {
 			const IRInstruction *ir;
 			unsigned int ir_count;
 			bool interrupt_check;
+			bool entry_block;
 		};
 		
 		struct RegionWorkUnit
@@ -66,7 +67,7 @@ namespace captive {
 
 		struct IROperand
 		{
-			enum IROperandType : uint8_t {
+			enum IROperandType {
 				NONE,
 				CONSTANT,
 				VREG,
@@ -75,28 +76,27 @@ namespace captive {
 				PC
 			};
 
-			enum IRAllocationMode : uint8_t {
+			enum IRAllocationMode {
 				NOT_ALLOCATED,
 				ALLOCATED_REG,
 				ALLOCATED_STACK
 			};
 
-			IROperandType type;
 			uint64_t value;
-			uint8_t size;
+			uint16_t alloc_data : 14;
+			IRAllocationMode alloc_mode : 2;
+			IROperandType type : 4;
+			uint8_t size : 4;
 
-			IRAllocationMode alloc_mode;
-			uint32_t alloc_data;
+			IROperand() : value(0), alloc_data(0), alloc_mode(NOT_ALLOCATED), type(NONE), size(0) { }
 
-			IROperand() : type(NONE), value(0), size(0), alloc_mode(NOT_ALLOCATED), alloc_data(0) { }
-
-			IROperand(IROperandType type, uint64_t value, uint8_t size) : type(type), value(value), size(size), alloc_mode(NOT_ALLOCATED), alloc_data(0) { }
+			IROperand(IROperandType type, uint64_t value, uint8_t size) : value(value), alloc_data(0), alloc_mode(NOT_ALLOCATED), type(type), size(size) { }
 
 			inline bool is_allocated() const { return alloc_mode != NOT_ALLOCATED; }
 			inline bool is_alloc_reg() const { return alloc_mode == ALLOCATED_REG; }
 			inline bool is_alloc_stack() const { return alloc_mode == ALLOCATED_STACK; }
 
-			inline void allocate(IRAllocationMode mode, uint32_t data) { alloc_mode = mode; alloc_data = data; }
+			inline void allocate(IRAllocationMode mode, uint16_t data) { alloc_mode = mode; alloc_data = data; }
 
 			inline bool is_valid() const { return type != NONE; }
 			inline bool is_constant() const { return type == CONSTANT; }
@@ -178,6 +178,12 @@ namespace captive {
 				SET_CPU_MODE,
 				WRITE_DEVICE,
 				READ_DEVICE,
+				
+				FLUSH,
+				FLUSH_ITLB,
+				FLUSH_DTLB,
+				FLUSH_ITLB_ENTRY,
+				FLUSH_DTLB_ENTRY,
 			};
 
 			IRBlockId ir_block;
@@ -222,6 +228,12 @@ namespace captive {
 			static IRInstruction ldpc(IROperand dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
 			static IRInstruction incpc(IROperand amt) { assert(amt.is_constant()); return IRInstruction(INCPC, amt); }
 
+			static IRInstruction flush() { return IRInstruction(FLUSH); }
+			static IRInstruction flush_itlb() { return IRInstruction(FLUSH_ITLB); }
+			static IRInstruction flush_dtlb() { return IRInstruction(FLUSH_DTLB); }
+			static IRInstruction flush_itlb_entry(IROperand addr) { return IRInstruction(FLUSH_ITLB_ENTRY, addr); }
+			static IRInstruction flush_dtlb_entry(IROperand addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
+			
 			//
 			// Data Motion
 			//

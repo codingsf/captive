@@ -110,10 +110,9 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 
 	rcc.entry_page = rcc.builder.CreateLShr(rcc.builder.CreateLoad(rcc.pc_ptr), 12);
 	rcc.insn_counter = rcc.builder.CreateExtractValue(rcc.jit_state, {4}, "insn_counter");
+	set_aa_metadata(rcc.insn_counter, AA_MD_INSN_COUNTER);
 	rcc.isr = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "isr");
 	set_aa_metadata(rcc.isr, AA_MD_ISR);
-	
-	//SwitchInst *first_dispatch = rcc.builder.CreateSwitch(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), rcc.constu32(0xfff), "pc_offset"), rcc.miss_block);
 	
 	rcc.builder.CreateBr(rcc.dispatch_block);
 
@@ -132,20 +131,30 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
 	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(rcc.builder.CreateLShr(dispatch_loaded_pc, 12), rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
 	
+	// Create Blocks
+	for (uint32_t i = 0; i < rwu->block_count; i++) {
+		BasicBlock *gbb = BasicBlock::Create(rcc.ctx, "gbb-" + std::to_string(rwu->blocks[i].offset), rcc.rgn_func);
+		rcc.guest_basic_blocks[rwu->blocks[i].offset] = gbb;
+	}
+	
+	// Create Jump Table
 	uint32_t jump_table_slots = 2048;
 	for (uint32_t slot = 0; slot < jump_table_slots; slot++) {
 		rcc.jump_table_entries[slot] = (Constant *)BlockAddress::get(rcc.exit_normal_block);
 	}
-	
-	// Create Blocks
+
+	// Lower Blocks
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
-		BasicBlock *gbb = BasicBlock::Create(rcc.ctx, "gbb-" + std::to_string(rwu->blocks[i].offset), rcc.rgn_func);
+		shared::BlockWorkUnit *bwu = &rwu->blocks[i];
 		
-		/*first_dispatch->addCase(rcc.constu32(rwu->blocks[i].offset), gbb);
-		second_dispatch->addCase(rcc.constu32(rwu->blocks[i].offset), gbb);*/
-		
-		rcc.guest_basic_blocks[rwu->blocks[i].offset] = gbb;
-		rcc.jump_table_entries[rwu->blocks[i].offset >> 1] = (Constant *)BlockAddress::get(gbb);
+		lower_block(rcc, bwu);
+	}
+	
+	for (uint32_t i = 0; i < rwu->block_count; i++) {
+		shared::BlockWorkUnit *bwu = &rwu->blocks[i];
+		if (rwu->blocks[i].entry_block || rcc.direct_blocks.count(bwu->offset) == 0) {
+			rcc.jump_table_entries[bwu->offset >> 1] = (Constant *)BlockAddress::get(rcc.guest_basic_blocks[bwu->offset]);
+		}
 	}
 	
 	ArrayType *jump_table_type = ArrayType::get(rcc.types.pi8, jump_table_slots);
@@ -165,13 +174,13 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	
 	IndirectBrInst *ibr = rcc.builder.CreateIndirectBr(rcc.builder.CreateLoad(jt_elem), rwu->block_count + 1);
 	ibr->addDestination(rcc.exit_normal_block);
-	
-	//SwitchInst *second_dispatch = rcc.builder.CreateSwitch(rcc.builder.CreateAnd(rcc.builder.CreateLoad(rcc.pc_ptr), rcc.constu32(0xfff), "pc_offset"), rcc.exit_block);
-	
-	// Lower Blocks
+
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
-		ibr->addDestination(rcc.guest_basic_blocks[rwu->blocks[i].offset]);
-		lower_block(rcc, &rwu->blocks[i]);
+		uint32_t block_offset = rwu->blocks[i].offset;
+
+		if (rwu->blocks[i].entry_block || rcc.direct_blocks.count(block_offset) == 0) {
+			ibr->addDestination(rcc.guest_basic_blocks[block_offset]);
+		}
 	}
 	
 	// Verify
@@ -197,11 +206,11 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 
 	// Dump
-	/*{
+	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".opt.ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}*/
+	}
 	
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
@@ -503,7 +512,7 @@ bool LLVMJIT::initialise_pass_manager(PassManagerBase* pm)
 
 bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWorkUnit *bwu)
 {
-	BlockCompilationContext bcc(rcc);
+	BlockCompilationContext bcc(rcc, bwu->offset);
 	
 	BasicBlock *entry_block = rcc.guest_basic_blocks[bwu->offset];
 	bcc.alloca_block = rcc.alloca_block;
@@ -628,7 +637,7 @@ BasicBlock *LLVMJIT::get_ir_block(BlockCompilationContext& bcc, IRBlockId id)
 {
 	auto llvm_block = bcc.ir_blocks.find(id);
 	if (llvm_block == bcc.ir_blocks.end()) {
-		BasicBlock *new_block = BasicBlock::Create(bcc.rcc.ctx, "bb-" + std::to_string(id), bcc.rcc.rgn_func);
+		BasicBlock *new_block = BasicBlock::Create(bcc.rcc.ctx, "gbb-" + std::to_string(bcc.block_offset) + "-bb-" + std::to_string(id), bcc.rcc.rgn_func);
 		bcc.ir_blocks[(uint32_t)id] = new_block;
 		return new_block;
 	} else {
@@ -951,7 +960,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	}
 
 	case shared::IRInstruction::SET_CPU_MODE: {
-		std::vector<Type *> params;
+		/*std::vector<Type *> params;
 		params.push_back(bcc.rcc.types.pi8);
 		params.push_back(bcc.rcc.types.i8);
 
@@ -963,7 +972,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		Value *v1 = value_for_operand(bcc, op0);
 		assert(v1);
 
-		bcc.builder.CreateCall2(fn, bcc.rcc.cpu_obj, v1);
+		bcc.builder.CreateCall2(fn, bcc.rcc.cpu_obj, v1);*/
 		return true;
 	}
 
@@ -1041,12 +1050,14 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		
 		if (target_address >> 12 == bcc.rcc.phys_region_index) {
 			if (bcc.rcc.guest_basic_blocks.count(target_address & 0xfff)) {
+				bcc.rcc.direct_blocks.insert(target_address & 0xfff);
 				target_block = bcc.rcc.guest_basic_blocks[target_address & 0xfff];
 			}
 		}
 		
-		if (fallthrough_address >> 12 == bcc.rcc.phys_region_index) {
+		if (fallthrough_address && (fallthrough_address >> 12 == bcc.rcc.phys_region_index)) {
 			if (bcc.rcc.guest_basic_blocks.count(fallthrough_address & 0xfff)) {
+				bcc.rcc.direct_blocks.insert(fallthrough_address & 0xfff);
 				fallthrough_block = bcc.rcc.guest_basic_blocks[fallthrough_address & 0xfff];
 			}
 		}
@@ -1068,6 +1079,13 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		bcc.builder.CreateBr(bcc.rcc.dispatch_block);
 		return true;
 	}
+	
+	case IRInstruction::FLUSH:
+	case IRInstruction::FLUSH_ITLB:
+	case IRInstruction::FLUSH_DTLB:
+	case IRInstruction::FLUSH_ITLB_ENTRY:
+	case IRInstruction::FLUSH_DTLB_ENTRY:
+		return true;
 	
 	case IRInstruction::NOP: return true;
 	

@@ -9,6 +9,7 @@
 #define	LLVM_H
 
 #include <string>
+#include <set>
 
 #include <jit/jit.h>
 #include <llvm/IR/LLVMContext.h>
@@ -88,6 +89,7 @@ namespace captive {
 				llvm::GlobalVariable *jump_table;
 				
 				std::map<uint32_t, llvm::BasicBlock *> guest_basic_blocks;
+				std::set<uint32_t> direct_blocks;
 				
 				inline llvm::ConstantInt *constu8(uint8_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i8, v, false); }
 				inline llvm::ConstantInt *constu16(uint16_t v) { return (llvm::ConstantInt *)llvm::ConstantInt::get(types.i16, v, false); }
@@ -103,10 +105,12 @@ namespace captive {
 			
 			struct BlockCompilationContext
 			{
-				BlockCompilationContext(RegionCompilationContext& rcc) : rcc(rcc), builder(rcc.builder) { }
+				BlockCompilationContext(RegionCompilationContext& rcc, uint32_t block_offset) : rcc(rcc), builder(rcc.builder), block_offset(block_offset) { }
 				
 				RegionCompilationContext& rcc;
 				llvm::IRBuilder<>& builder;
+
+				uint32_t block_offset;
 				
 				llvm::BasicBlock *alloca_block;
 				
@@ -129,6 +133,7 @@ namespace captive {
 				AA_MD_ISR		= 4,
 				AA_MD_JIT_STATE	= 5,
 				AA_MD_JT_ELEM	= 6,
+				AA_MD_INSN_COUNTER	= 7,
 			};
 			
 			void set_aa_metadata(llvm::Value *v, metadata_tags tag);

@@ -82,8 +82,8 @@ static inline void trap() { printf("trap: " __FILE__ " at %d \n", __LINE__); asm
 #define write_device(a, b, c) cpu.env().write_core_device(cpu, a, b, c)
 #define read_device(a, b, c) cpu.env().read_core_device(cpu, a, b, c)
 
-#define flush_dtlb_entry(v) asm volatile ("int $0x82\n" :: "D"(0), "S"(v) : "rax");
-#define flush_itlb_entry(v) asm volatile ("int $0x82\n" :: "D"(1), "S"(v) : "rax");
+static inline void flush_itlb_entry(uint32_t v) { asm volatile ("int $0x82\n" :: "D"(4), "S"(v)); }
+static inline void flush_dtlb_entry(uint32_t v) { asm volatile ("int $0x82\n" :: "D"(5), "S"(v)); }
 
 #define __mem_read(_addr, _type) (*((_type *)((uint64_t)(_addr))))
 #define __mem_write(_addr, _data, _type) *((_type *)((uint64_t)(_addr))) = (_data)

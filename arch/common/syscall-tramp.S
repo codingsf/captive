@@ -39,13 +39,29 @@
 	popf
 .endm
 
-// Switching to ring0 from ring3
+// Syscall Handler
 .globl int82_handler
 .extern do_syscall
 int82_handler:
 	push $0
 	push_regs
+	mov %rsi, %rdx
+	mov %rdi, %rsi
 	mov %rsp, %rdi
+	call do_syscall
+	pop_regs
+	add $8, %rsp
+	iretq
+
+// JIT Syscall Handler
+.globl int85_handler
+.extern do_syscall
+int85_handler:
+	push $0
+	push_regs
+	mov %rsp, %rdi
+	mov %rbx, %rsi
+	mov %rcx, %rdx
 	call do_syscall
 	pop_regs
 	add $8, %rsp

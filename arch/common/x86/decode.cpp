@@ -40,6 +40,24 @@ static X86InstructionPrefixes read_prefixes(const uint8_t **code)
 		switch (**code) {
 		case 0x67: p = (X86InstructionPrefixes)(p | ADDRESS_SIZE_OVERRIDE); break;
 		case 0x66: p = (X86InstructionPrefixes)(p | OPERAND_SIZE_OVERRIDE); break;
+		
+		case 0x40: p = (X86InstructionPrefixes)(p | REX); break;
+		case 0x41: p = (X86InstructionPrefixes)(p | REX | REX_B); break;
+		case 0x42: p = (X86InstructionPrefixes)(p | REX | REX_X); break;
+		case 0x43: p = (X86InstructionPrefixes)(p | REX | REX_X | REX_B); break;
+		case 0x44: p = (X86InstructionPrefixes)(p | REX | REX_R); break;
+		case 0x45: p = (X86InstructionPrefixes)(p | REX | REX_R | REX_B); break;
+		case 0x46: p = (X86InstructionPrefixes)(p | REX | REX_R | REX_X); break;
+		case 0x47: p = (X86InstructionPrefixes)(p | REX | REX_R | REX_X | REX_B); break;
+		case 0x48: p = (X86InstructionPrefixes)(p | REX | REX_W); break;
+		case 0x49: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_B); break;
+		case 0x4a: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_X); break;
+		case 0x4b: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_X | REX_B); break;
+		case 0x4c: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_R); break;
+		case 0x4d: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_R | REX_B); break;
+		case 0x4e: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_R | REX_X); break;
+		case 0x4f: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_R | REX_X | REX_B); break;
+		
 		default: prefixes_complete = true; continue;
 		}
 
@@ -66,33 +84,60 @@ static bool decode_reg(X86InstructionPrefixes pfx, Operand& oper, uint8_t& size,
 
 	switch (type) {
 	case O_R8:
-		switch (reg) {
-		case 0: oper.reg = Operand::R_AL; break;
-		case 1: oper.reg = Operand::R_CL; break;
-		case 2: oper.reg = Operand::R_DL; break;
-		case 3: oper.reg = Operand::R_BL; break;
-		case 4: if (pfx & REX) oper.reg = Operand::R_SPL; else oper.reg = Operand::R_AH; break;
-		case 5: if (pfx & REX) oper.reg = Operand::R_BPL; else oper.reg = Operand::R_CH; break;
-		case 6: if (pfx & REX) oper.reg = Operand::R_SIL; else oper.reg = Operand::R_DH; break;
-		case 7: if (pfx & REX) oper.reg = Operand::R_DIL; else oper.reg = Operand::R_BH; break;
-		default: return false;
+		if (pfx & REX_R) {
+			switch (reg) {
+			case 0: oper.reg = Operand::R_R8B; break;
+			case 1: oper.reg = Operand::R_R9B; break;
+			case 2: oper.reg = Operand::R_R10B; break;
+			case 3: oper.reg = Operand::R_R11B; break;
+			case 4: oper.reg = Operand::R_R12B; break;
+			case 5: oper.reg = Operand::R_R13B; break;
+			case 6: oper.reg = Operand::R_R14B; break;
+			case 7: oper.reg = Operand::R_R15B; break;
+			default: return false;
+			}
+		} else {
+			switch (reg) {
+			case 0: oper.reg = Operand::R_AL; break;
+			case 1: oper.reg = Operand::R_CL; break;
+			case 2: oper.reg = Operand::R_DL; break;
+			case 3: oper.reg = Operand::R_BL; break;
+			case 4: if (pfx & REX) oper.reg = Operand::R_SPL; else oper.reg = Operand::R_AH; break;
+			case 5: if (pfx & REX) oper.reg = Operand::R_BPL; else oper.reg = Operand::R_CH; break;
+			case 6: if (pfx & REX) oper.reg = Operand::R_SIL; else oper.reg = Operand::R_DH; break;
+			case 7: if (pfx & REX) oper.reg = Operand::R_DIL; else oper.reg = Operand::R_BH; break;
+			default: return false;
+			}			
 		}
-
 		break;
 
 	case O_R16_32_64:
-		switch (reg) {
-		case 0: if (pfx & REX_W) oper.reg = Operand::R_RAX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_AX; else oper.reg = Operand::R_EAX; break;
-		case 1: if (pfx & REX_W) oper.reg = Operand::R_RCX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_CX; else oper.reg = Operand::R_ECX; break;
-		case 2: if (pfx & REX_W) oper.reg = Operand::R_RDX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_DX; else oper.reg = Operand::R_EDX; break;
-		case 3: if (pfx & REX_W) oper.reg = Operand::R_RBX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_BX; else oper.reg = Operand::R_EBX; break;
-		case 4: if (pfx & REX_W) oper.reg = Operand::R_RSP; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_SP; else oper.reg = Operand::R_ESP; break;
-		case 5: if (pfx & REX_W) oper.reg = Operand::R_RBP; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_BP; else oper.reg = Operand::R_EBP; break;
-		case 6: if (pfx & REX_W) oper.reg = Operand::R_RSI; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_SI; else oper.reg = Operand::R_ESI; break;
-		case 7: if (pfx & REX_W) oper.reg = Operand::R_RDI; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_DI; else oper.reg = Operand::R_EDI; break;
-		default: return false;
+		if (pfx & REX_R) {
+			switch (reg) {
+			case 0: if (pfx & REX_W) oper.reg = Operand::R_R8; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R8W; else oper.reg = Operand::R_R8D; break;
+			case 1: if (pfx & REX_W) oper.reg = Operand::R_R9; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R9W; else oper.reg = Operand::R_R9D; break;
+			case 2: if (pfx & REX_W) oper.reg = Operand::R_R10; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R10W; else oper.reg = Operand::R_R10D; break;
+			case 3: if (pfx & REX_W) oper.reg = Operand::R_R11; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R11W; else oper.reg = Operand::R_R11D; break;
+			case 4: if (pfx & REX_W) oper.reg = Operand::R_R12; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R12W; else oper.reg = Operand::R_R12D; break;
+			case 5: if (pfx & REX_W) oper.reg = Operand::R_R13; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R13W; else oper.reg = Operand::R_R13D; break;
+			case 6: if (pfx & REX_W) oper.reg = Operand::R_R14; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R14W; else oper.reg = Operand::R_R14D; break;
+			case 7: if (pfx & REX_W) oper.reg = Operand::R_R15; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_R15W; else oper.reg = Operand::R_R15D; break;
+			default: return false;
+			}			
+		} else {
+			switch (reg) {
+			case 0: if (pfx & REX_W) oper.reg = Operand::R_RAX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_AX; else oper.reg = Operand::R_EAX; break;
+			case 1: if (pfx & REX_W) oper.reg = Operand::R_RCX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_CX; else oper.reg = Operand::R_ECX; break;
+			case 2: if (pfx & REX_W) oper.reg = Operand::R_RDX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_DX; else oper.reg = Operand::R_EDX; break;
+			case 3: if (pfx & REX_W) oper.reg = Operand::R_RBX; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_BX; else oper.reg = Operand::R_EBX; break;
+			case 4: if (pfx & REX_W) oper.reg = Operand::R_RSP; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_SP; else oper.reg = Operand::R_ESP; break;
+			case 5: if (pfx & REX_W) oper.reg = Operand::R_RBP; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_BP; else oper.reg = Operand::R_EBP; break;
+			case 6: if (pfx & REX_W) oper.reg = Operand::R_RSI; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_SI; else oper.reg = Operand::R_ESI; break;
+			case 7: if (pfx & REX_W) oper.reg = Operand::R_RDI; else if (pfx & OPERAND_SIZE_OVERRIDE) oper.reg = Operand::R_DI; else oper.reg = Operand::R_EDI; break;
+			default: return false;
+			}
 		}
-
+		
 		break;
 
 	default:
@@ -108,6 +153,14 @@ static bool decode_reg(X86InstructionPrefixes pfx, Operand& oper, uint8_t& size,
 	case Operand::R_RBP:
 	case Operand::R_RSI:
 	case Operand::R_RDI:
+	case Operand::R_R8:
+	case Operand::R_R9:
+	case Operand::R_R10:
+	case Operand::R_R11:
+	case Operand::R_R12:
+	case Operand::R_R13:
+	case Operand::R_R14:
+	case Operand::R_R15:
 		size = 8;
 		break;
 
@@ -119,6 +172,14 @@ static bool decode_reg(X86InstructionPrefixes pfx, Operand& oper, uint8_t& size,
 	case Operand::R_EBP:
 	case Operand::R_ESI:
 	case Operand::R_EDI:
+	case Operand::R_R8D:
+	case Operand::R_R9D:
+	case Operand::R_R10D:
+	case Operand::R_R11D:
+	case Operand::R_R12D:
+	case Operand::R_R13D:
+	case Operand::R_R14D:
+	case Operand::R_R15D:
 		size = 4;
 		break;
 
@@ -130,6 +191,14 @@ static bool decode_reg(X86InstructionPrefixes pfx, Operand& oper, uint8_t& size,
 	case Operand::R_BP:
 	case Operand::R_SI:
 	case Operand::R_DI:
+	case Operand::R_R8W:
+	case Operand::R_R9W:
+	case Operand::R_R10W:
+	case Operand::R_R11W:
+	case Operand::R_R12W:
+	case Operand::R_R13W:
+	case Operand::R_R14W:
+	case Operand::R_R15W:
 		size = 2;
 		break;
 
@@ -145,6 +214,14 @@ static bool decode_reg(X86InstructionPrefixes pfx, Operand& oper, uint8_t& size,
 	case Operand::R_BPL:
 	case Operand::R_SIL:
 	case Operand::R_DIL:
+	case Operand::R_R8B:
+	case Operand::R_R9B:
+	case Operand::R_R10B:
+	case Operand::R_R11B:
+	case Operand::R_R12B:
+	case Operand::R_R13B:
+	case Operand::R_R14B:
+	case Operand::R_R15B:
 		size = 1;
 		break;
 	}
@@ -161,17 +238,30 @@ static bool decode_rm(const uint8_t **code, X86InstructionPrefixes pfx, Operand&
 		oper.mem.index_reg_idx = Operand::R_Z;
 		oper.mem.scale = 0;
 
-		switch (rm) {
-		case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EAX; else oper.mem.base_reg_idx = Operand::R_RAX; break;
-		case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ECX; else oper.mem.base_reg_idx = Operand::R_RCX; break;
-		case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDX; else oper.mem.base_reg_idx = Operand::R_RDX; break;
-		case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EBX; else oper.mem.base_reg_idx = Operand::R_RBX; break;
-		case 4:	return false;
-		case 5:	return false;
-		case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ESI; else oper.mem.base_reg_idx = Operand::R_RSI; break;
-		case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDI; else oper.mem.base_reg_idx = Operand::R_RDI; break;
+		if (pfx & REX_B) {
+			switch (rm) {
+			case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R8D; else oper.mem.base_reg_idx = Operand::R_R8; break;
+			case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R9D; else oper.mem.base_reg_idx = Operand::R_R9; break;
+			case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R10D; else oper.mem.base_reg_idx = Operand::R_R10; break;
+			case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R11D; else oper.mem.base_reg_idx = Operand::R_R11; break;
+			case 4:	return false;
+			case 5:	return false;
+			case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R14D; else oper.mem.base_reg_idx = Operand::R_R14; break;
+			case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R15D; else oper.mem.base_reg_idx = Operand::R_R15; break;
+			}
+		} else {
+			switch (rm) {
+			case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EAX; else oper.mem.base_reg_idx = Operand::R_RAX; break;
+			case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ECX; else oper.mem.base_reg_idx = Operand::R_RCX; break;
+			case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDX; else oper.mem.base_reg_idx = Operand::R_RDX; break;
+			case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EBX; else oper.mem.base_reg_idx = Operand::R_RBX; break;
+			case 4:	return false;
+			case 5:	return false;
+			case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ESI; else oper.mem.base_reg_idx = Operand::R_RSI; break;
+			case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDI; else oper.mem.base_reg_idx = Operand::R_RDI; break;
+			}
 		}
-
+		
 		break;
 
 	case 1:
@@ -182,17 +272,30 @@ static bool decode_rm(const uint8_t **code, X86InstructionPrefixes pfx, Operand&
 
 		(*code)++;
 
-		switch (rm) {
-		case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EAX; else oper.mem.base_reg_idx = Operand::R_RAX; break;
-		case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ECX; else oper.mem.base_reg_idx = Operand::R_RCX; break;
-		case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDX; else oper.mem.base_reg_idx = Operand::R_RDX; break;
-		case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EBX; else oper.mem.base_reg_idx = Operand::R_RBX; break;
-		case 4:	return false;
-		case 5:	return false;
-		case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ESI; else oper.mem.base_reg_idx = Operand::R_RSI; break;
-		case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDI; else oper.mem.base_reg_idx = Operand::R_RDI; break;
+		if (pfx & REX_B) {
+			switch (rm) {
+			case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R8D; else oper.mem.base_reg_idx = Operand::R_R8; break;
+			case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R9D; else oper.mem.base_reg_idx = Operand::R_R9; break;
+			case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R10D; else oper.mem.base_reg_idx = Operand::R_R10; break;
+			case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R11D; else oper.mem.base_reg_idx = Operand::R_R11; break;
+			case 4:	return false;
+			case 5:	return false;
+			case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R14D; else oper.mem.base_reg_idx = Operand::R_R14; break;
+			case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R15D; else oper.mem.base_reg_idx = Operand::R_R15; break;
+			}
+		} else {
+			switch (rm) {
+			case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EAX; else oper.mem.base_reg_idx = Operand::R_RAX; break;
+			case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ECX; else oper.mem.base_reg_idx = Operand::R_RCX; break;
+			case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDX; else oper.mem.base_reg_idx = Operand::R_RDX; break;
+			case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EBX; else oper.mem.base_reg_idx = Operand::R_RBX; break;
+			case 4:	return false;
+			case 5:	return false;
+			case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ESI; else oper.mem.base_reg_idx = Operand::R_RSI; break;
+			case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDI; else oper.mem.base_reg_idx = Operand::R_RDI; break;
+			}
 		}
-
+		
 		break;
 	default: return false;
 	}

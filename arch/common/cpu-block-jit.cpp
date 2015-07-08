@@ -276,6 +276,7 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 		shared::BlockWorkUnit *bwu = &rgn->rwu->blocks[rgn->rwu->block_count - 1];
 		bwu->offset = bi;
 		bwu->interrupt_check = blk->loop_header || blk->entry;
+		bwu->entry_block = blk->entry;
 		
 		bwu->ir_count = blk->ir_count;
 		bwu->ir = (const shared::IRInstruction *)shalloc(sizeof(shared::IRInstruction) * bwu->ir_count);
@@ -297,9 +298,10 @@ void CPU::register_region(shared::RegionWorkUnit* rwu)
 			shfree((void *)rgn->txln);
 		
 		rgn->txln = (shared::region_txln_fn)rwu->fn_ptr;
-	} else
+	} else {
 		shfree(rwu->fn_ptr);
-		
+	}
+	
 	for (int i = 0; i < rwu->block_count; i++) {
 		shfree((void *)rwu->blocks[i].ir);
 	}

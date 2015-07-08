@@ -120,6 +120,12 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "scm",		.format = "IXXXXX" },
 	{ .mnemonic = "stdev",		.format = "IIIXXX" },
 	{ .mnemonic = "lddev",		.format = "IIOXXX" },
+	
+	{ .mnemonic = "flush",		.format = "XXXXXX" },
+	{ .mnemonic = "flush itlb",	.format = "XXXXXX" },
+	{ .mnemonic = "flush dtlb",	.format = "XXXXXX" },
+	{ .mnemonic = "flush itlb",	.format = "IXXXXX" },
+	{ .mnemonic = "flush dtlb",	.format = "IXXXXX" },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
@@ -1452,7 +1458,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 		case IRInstruction::SET_CPU_MODE:
 		{
-			IROperand *mode = &insn->operands[0];
+			/*IROperand *mode = &insn->operands[0];
 
 			emit_save_reg_state();
 
@@ -1464,7 +1470,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&cpu_set_mode, get_temp(0, 8));
 			encoder.call(get_temp(0, 8));
 
-			emit_restore_reg_state();
+			emit_restore_reg_state();*/
 
 			break;
 		}
@@ -1551,7 +1557,57 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			break;
 		}
-
+		
+		case IRInstruction::FLUSH:
+		{
+			encoder.mov(1, REG_RBX);
+			encoder.intt(0x85);
+			
+			break;
+		}	
+		
+		case IRInstruction::FLUSH_ITLB:
+		{
+			encoder.mov(2, REG_RBX);
+			encoder.intt(0x85);
+			
+			break;
+		}	
+		
+		case IRInstruction::FLUSH_DTLB:
+		{
+			encoder.mov(3, REG_RBX);
+			encoder.intt(0x85);
+			
+			break;
+		}	
+		
+		case IRInstruction::FLUSH_DTLB_ENTRY:
+		case IRInstruction::FLUSH_ITLB_ENTRY:
+		{
+			if (insn->type == IRInstruction::FLUSH_ITLB_ENTRY) { 
+				encoder.mov(4, REG_RBX);
+			} else if (insn->type == IRInstruction::FLUSH_DTLB_ENTRY) { 
+				encoder.mov(5, REG_RBX);
+			}
+			
+			if (insn->operands[0].is_constant()) {
+				encoder.mov(insn->operands[0].value, REG_RCX);
+			} else if (insn->operands[0].is_vreg()) {
+				if (insn->operands[0].is_alloc_reg()) {
+					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
+					encoder.mov(addr, REG_ECX);	
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+			
+			encoder.intt(0x85);
+			break;
+		}	
+		
 		default:
 			printf("unsupported instruction: %s\n", insn_descriptors[insn->type].mnemonic);
 			success = false;
