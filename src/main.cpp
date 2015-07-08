@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 	if (cl::Help) {
 		return 1;
 	}
-
+	
 	captive::logging::configure_logging_contexts();
 
 	if (argc < 5 || argc > 7 || argc == 6) {
@@ -209,7 +209,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the worker thread pool
-	ThreadPool worker_threads(1, 3);
+	ThreadPool worker_threads("jit-worker-", 1, 3);
 	worker_threads.start();
 
 	// Create the JIT

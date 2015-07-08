@@ -206,11 +206,11 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 
 	// Dump
-	{
+	/*{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".opt.ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}
+	}*/
 	
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
@@ -222,6 +222,8 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 
 	ExecutionEngine *engine = EngineBuilder(std::unique_ptr<Module>(rcc.rgn_module))
 		.setEngineKind(EngineKind::JIT)
+		.setRelocationModel(Reloc::Static)
+		.setOptLevel(CodeGenOpt::Aggressive)
 		.setMCJITMemoryManager(std::unique_ptr<RTDyldMemoryManager>(new LLVMJITMemoryManager(_engine, *_shared_memory)))
 		.setTargetOptions(target_opts)
 		.create();
@@ -316,6 +318,11 @@ static bool IsExtractValue(const Value *v)
 	return (v->getValueID() == Value::InstructionVal + Instruction::ExtractValue);
 }
 
+static bool IsPHI(const Value *v)
+{
+	return (v->getValueID() == Value::InstructionVal + Instruction::PHI);
+}
+
 static bool IsConstVal(const ::llvm::Value *v)
 {
 	return (v->getValueID() == ::llvm::Instruction::ConstantIntVal);
@@ -387,9 +394,11 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 		}
 	}
 
-	/*fprintf(stderr, "*** MAY ALIAS '%s' and '%s'\n", v1->getName().str().c_str(), v2->getName().str().c_str());
-	v1->dump();
-	v2->dump();*/
+	/*if (!(IsPHI(v1) || IsPHI(v2))) {
+		fprintf(stderr, "*** MAY ALIAS '%s' and '%s'\n", v1->getName().str().c_str(), v2->getName().str().c_str());
+		v1->dump();
+		v2->dump();
+	}*/
 	
 	return AliasAnalysis::MayAlias;
 }
@@ -398,7 +407,7 @@ bool CaptiveAA::runOnFunction(Function& F)
 {
 	AliasAnalysis::InitializeAliasAnalysis(this);
 	
-	/*bool changed = false;
+	bool changed = false;
 	for (auto& bb : F) {
 		for (auto& insn : bb) {
 			if (insn.getMetadata("cai") != NULL) continue;
@@ -418,9 +427,9 @@ bool CaptiveAA::runOnFunction(Function& F)
 				}
 			}
 		}
-	}*/
+	}
 	
-	return false;
+	return changed;
 }
 
 
@@ -844,15 +853,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	case shared::IRInstruction::READ_REG:
 	{
 		Value *offset = value_for_operand(bcc, op0), *dst = vreg_for_operand(bcc, op1);
-
 		assert(offset && dst);
-
-		/*offset = bcc.builder.CreateCast(Instruction::ZExt, offset, bcc.rcc.types.i64);
-
-		Value *regptr = bcc.builder.CreateIntToPtr(bcc.builder.CreateAdd(bcc.rcc.reg_state, offset), type_for_operand(bcc, op1, true));
-		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
-
-		bcc.builder.CreateStore(bcc.builder.CreateLoad(regptr), dst);*/
 				
 		Value *regptr = bcc.builder.CreateBitCast(bcc.builder.CreateGEP(bcc.rcc.reg_state, offset), type_for_operand(bcc, op1, true));
 		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
@@ -865,16 +866,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	case shared::IRInstruction::WRITE_REG:
 	{
 		Value *offset = value_for_operand(bcc, op1), *val = value_for_operand(bcc, op0);
-
 		assert(offset && val);
-
-		/*offset = bcc.builder.CreateCast(Instruction::ZExt, offset, bcc.rcc.types.i64);
-
-		Value *regptr = bcc.builder.CreateAdd(bcc.rcc.reg_state, offset);
-		regptr = bcc.builder.CreateIntToPtr(regptr, type_for_operand(bcc, op0, true));
-		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
-
-		bcc.builder.CreateStore(val, regptr);*/
 		
 		Value *regptr = bcc.builder.CreateBitCast(bcc.builder.CreateGEP(bcc.rcc.reg_state, offset), type_for_operand(bcc, op0, true));
 		set_aa_metadata(regptr, AA_MD_REGISTER, offset);

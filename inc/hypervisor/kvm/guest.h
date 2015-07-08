@@ -79,7 +79,7 @@ namespace captive {
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
-				int fd, irq_fd, mmio_epoll_fd;
+				int fd, irq_fd;
 				int next_cpu_id;
 				int next_slot_idx;
 
@@ -111,16 +111,6 @@ namespace captive {
 				bool prepare_guest_memory();
 				bool attach_guest_devices();
 				devices::Device *lookup_device(uint64_t addr);
-
-				struct memory_callback
-				{
-					int event_fd;
-					gpa_t gpa;
-					memory_callback_fn_t callback;
-				};
-
-				bool attach_memory_callback(gpa_t gpa, uint8_t size, memory_callback_fn_t callback);
-				void mmio_thread();
 
 				bool install_bios();
 				bool install_initial_pgt();

@@ -2,6 +2,7 @@
 #include <captive.h>
 #include <thread>
 #include <time.h>
+#include <pthread.h>
 
 using namespace captive::devices::timers;
 
@@ -37,7 +38,8 @@ void MillisecondTickSource::stop()
 void MillisecondTickSource::tick_thread_proc(MillisecondTickSource *o)
 {
 	struct timespec rqtp, rmtp;
-
+	pthread_setname_np(pthread_self(), "millisecond-tick");
+	
 	rqtp.tv_nsec = 1e6;
 	rqtp.tv_sec = 0;
 

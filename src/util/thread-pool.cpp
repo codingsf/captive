@@ -1,11 +1,13 @@
 #include <util/thread-pool.h>
 #include <captive.h>
 
+#include <pthread.h>
+
 DECLARE_CONTEXT(ThreadPool);
 
 using namespace captive::util;
 
-ThreadPool::ThreadPool(uint32_t min_threads, uint32_t max_threads) : _min_threads(min_threads), _max_threads(max_threads)
+ThreadPool::ThreadPool(std::string name_pfx, uint32_t min_threads, uint32_t max_threads) : _name_pfx(name_pfx), _min_threads(min_threads), _max_threads(max_threads)
 {
 
 }
@@ -18,7 +20,8 @@ ThreadPool::~ThreadPool()
 void thread_proc_tramp(void *o)
 {
 	ThreadPool::ThreadPoolWorkerInfo *info = (ThreadPool::ThreadPoolWorkerInfo *)o;
-
+	pthread_setname_np(pthread_self(), info->name.c_str());
+	
 	info->owner->thread_proc(info->id);
 }
 
@@ -31,6 +34,7 @@ void ThreadPool::start()
 		ThreadPoolWorkerInfo *info = new ThreadPoolWorkerInfo();
 		info->owner = this;
 		info->id = i;
+		info->name = _name_pfx + std::to_string(i);
 
 		threads.push_back(new std::thread(thread_proc_tramp, info));
 	}

@@ -3,6 +3,7 @@
 #include <thread>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 
 using namespace captive::devices::timers;
 
@@ -36,6 +37,8 @@ void MicrosecondTickSource::tick_thread_proc_tramp(MicrosecondTickSource* o) {
 }
 
 void MicrosecondTickSource::tick_thread_proc() {
+	pthread_setname_np(pthread_self(), "millisecond-tick");
+	
 	while (!terminate) {
 		tick(1);
 

@@ -25,7 +25,7 @@ namespace captive {
 		{
 			friend void ::thread_proc_tramp(void *);
 		public:
-			explicit ThreadPool(uint32_t min_threads = 1, uint32_t max_threads = 4);
+			explicit ThreadPool(std::string name_pfx, uint32_t min_threads = 1, uint32_t max_threads = 4);
 			~ThreadPool();
 
 			void queue_work(action_t action, completion_t completion, void *data);
@@ -38,6 +38,7 @@ namespace captive {
 			{
 				ThreadPool *owner;
 				uint32_t id;
+				std::string name;
 			};
 
 			struct ThreadPoolWork
@@ -48,6 +49,7 @@ namespace captive {
 				completion_t completion;
 			};
 
+			std::string _name_pfx;
 			uint32_t _min_threads, _max_threads;
 
 			void thread_proc(uint32_t id);
