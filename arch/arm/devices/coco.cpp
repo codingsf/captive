@@ -78,6 +78,151 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 
 	case 7:
+		printf("**** system control coprocessor: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
+		cpu.mmu().flush();
+		switch (rm) {
+			case 0:
+				switch (op2) {
+				case 4:
+					printf("WFI\n");
+					break;
+					
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 5:
+				switch (op2) {
+				case 0:		// Invalidate entire I$
+					break;
+					
+				case 1:		// Invalidate I$ LINE	(MVA)
+					break;
+					
+				case 2:		// Invalidate I$ LINE	(SET/WAY)
+					break;
+					
+				case 4:		// Flush prefetch buffer
+					break;
+					
+				case 6:		// Flush BT$
+					break;
+					
+				case 7:		// Flush BT$ entry
+					break;
+					
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 6:
+				switch (op2) {
+				case 0:		// Invalidate entire D$
+					break;
+				
+				case 1:		// Invalidate D$ LINE	(MVA)
+					break;
+
+				case 2:		// Invalidate D$ LINE	(SET/WAY)
+					break;
+					
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 7:
+				switch (op2) {
+				case 0:		// Invalidate unified $
+					break;
+
+				case 1:		// Invalidate unified $ line	(MVA)
+					break;
+
+				case 2:		// Invalidate unified $ line	(SET/WAY)
+					break;
+					
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 10:
+				switch (op2) {
+				case 0:		// Clean entire D$
+					break;
+				case 1:		// Clean D$ line	(MVA)
+					break;
+				case 2:		// Clean D$ line	(SET/WAY)
+					break;
+				case 3:		// Test and Clean
+					break;
+				case 4:		// Data Sync Barrier
+					break;
+				case 5:		// Data Mem Barrier
+					break;
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 11:
+				switch (op2) {
+				case 0:		// Clean entire unified $
+					break;
+				case 1:		// Clean unified $ line		(MVA)
+					break;
+				case 2:		// Clean unified $			(SET/WAY)
+					break;
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 13:
+				switch (op2) {
+				case 1:		// Prefetch I$ line		(MVA)
+					break;
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 14:
+				switch (op2) {
+				case 0:		// Clean and Invalidate entire D$
+					break;
+				case 1:		// Clean and Invalidate D$ line		(MVA)
+					break;
+				case 2:		// Clean and Invalidate D$ line		(SET/WAY)
+					break;
+				case 3:		// Test, clean and invalidate
+					break;
+				default:
+					assert(false);
+				}
+				break;
+				
+			case 15:
+				switch (op2) {
+				case 0:		// Clean and Invalidate entire unified $
+					break;
+				case 1:		// Clean and Invalidate unified $ line	(MVA)
+					break;
+				case 2:		// Clean and Invalidate unified $ line	(SET/WAY)
+					break;
+				default:
+					assert(false);
+				}
+				break;
+				
+			default:
+				assert(false);
+		}
+		break;
+		
 	case 8:
 		cpu.mmu().flush();
 		break;

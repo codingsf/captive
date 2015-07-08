@@ -94,6 +94,7 @@ namespace captive {
 				pt->present(false);
 
 				Memory::flush_page((va_t)(uint64_t)va);
+				clear_cache();
 			}
 
 			void disable_writes();

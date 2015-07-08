@@ -1075,9 +1075,36 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	case IRInstruction::FLUSH:
 	case IRInstruction::FLUSH_ITLB:
 	case IRInstruction::FLUSH_DTLB:
+	{
+		std::vector<Type *> args;
+		args.push_back(bcc.rcc.types.i32);
+		
+		FunctionType *iaty = FunctionType::get(bcc.rcc.types.voidty, args, false);
+		InlineAsm* ia = InlineAsm::get(iaty, "int $$0x85", "{bx},~{dirflag},~{fpsr},~{flags}", true);
+		
+		CallInst* iac = bcc.builder.CreateCall(ia, bcc.rcc.consti32(1));
+		iac->setCallingConv(CallingConv::C);
+		iac->setTailCall(false);
+
+		return true;
+	}
+	
 	case IRInstruction::FLUSH_ITLB_ENTRY:
 	case IRInstruction::FLUSH_DTLB_ENTRY:
+	{
+		std::vector<Type *> args;
+		args.push_back(bcc.rcc.types.i32);
+		args.push_back(bcc.rcc.types.i32);
+		
+		FunctionType *iaty = FunctionType::get(bcc.rcc.types.voidty, args, false);
+		InlineAsm* ia = InlineAsm::get(iaty, "int $$0x85", "{bx},{cx},~{dirflag},~{fpsr},~{flags}", true);
+		
+		CallInst* iac = bcc.builder.CreateCall2(ia, bcc.rcc.consti32(1), value_for_operand(bcc, &insn->operands[0]));
+		iac->setCallingConv(CallingConv::C);
+		iac->setTailCall(false);
+
 		return true;
+	}
 	
 	case IRInstruction::NOP: return true;
 	

@@ -84,6 +84,17 @@ void X86Encoder::pop(const X86Register& reg)
 	}
 }
 
+void X86Encoder::wbinvd()
+{
+	emit8(0x0f);
+	emit8(0x09);
+}
+
+void X86Encoder::invlpg(const X86Memory& addr)
+{
+	encode_opcode_mod_rm(0x101, 7, 8, addr);
+}
+
 void X86Encoder::lea(const X86Memory& addr, const X86Register& dst)
 {
 	encode_opcode_mod_rm(0x8d, dst, addr);
