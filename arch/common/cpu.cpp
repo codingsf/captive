@@ -35,7 +35,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	memset(decode_cache, 0xff, sizeof(decode_cache));
 
 	// Initialise the profiling image
-	image = new(shalloc(sizeof(profile::Image))) profile::Image();
+	image = new profile::Image();
 	
 	jit_state.cpu = this;
 	jit_state.region_txln_cache = NULL;

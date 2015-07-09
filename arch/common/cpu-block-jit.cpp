@@ -107,7 +107,7 @@ bool CPU::run_block_jit_safepoint()
 		if (unlikely(trace_interval > 3000000)) {
 			reset_trace = true;
 			
-			analyse_blocks();
+			//analyse_blocks();
 			trace_interval = 0;
 		} else {
 			trace_interval++;

@@ -14,6 +14,18 @@ static inline void print_symbol(uint64_t sym)
 	asm volatile("out %0, $0xff\n" :: "a"(13), "D"(sym));
 }
 
+void dump_code(unsigned long int rip)
+{
+	printf("Code:\n");
+	
+	uint8_t *p = (uint8_t *)rip;
+	for (int i = 0; i < 0x100; i++) {
+		printf("%02x ", p[i]);
+		if (i % 10 == 0) printf("\n");
+	}
+	printf("\n");
+}
+
 void dump_stack()
 {
 	int count = 0;

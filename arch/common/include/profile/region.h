@@ -32,7 +32,7 @@ namespace captive {
 				inline Block *get_block(uint32_t addr)
 				{
 					Block **block_ptr = &blocks[addr & 0xfff];
-					if (*block_ptr == NULL) *block_ptr = new(shalloc(sizeof(Block))) Block();
+					if (*block_ptr == NULL) *block_ptr = new Block();
 					
 					return *block_ptr;
 				}

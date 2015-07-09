@@ -27,7 +27,7 @@ namespace captive {
 				inline Region *get_region(uint32_t addr)
 				{
 					Region **region_ptr = &regions[addr >> 12];
-					if (*region_ptr == NULL) *region_ptr = new(shalloc(sizeof(Region))) Region();
+					if (*region_ptr == NULL) *region_ptr = new Region();
 					
 					return *region_ptr;
 				}
@@ -35,7 +35,7 @@ namespace captive {
 				inline Region *get_region_from_index(uint32_t idx)
 				{
 					Region **region_ptr = &regions[idx];
-					if (*region_ptr == NULL) *region_ptr = new(shalloc(sizeof(Region))) Region();
+					if (*region_ptr == NULL) *region_ptr = new Region();
 					
 					return *region_ptr;
 				}

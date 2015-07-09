@@ -50,16 +50,12 @@ using namespace captive::hypervisor::kvm;
 #define ENGINE_HEAP_SIZE		0x050000000ULL*/
 
 #define ENGINE_HEAP_PHYS_BASE		0x000300000000ULL
-#define ENGINE_HEAP_VIRT_BASE		0x6e0000000000ULL
+#define ENGINE_HEAP_VIRT_BASE		0x6d0000000000ULL
 #define ENGINE_HEAP_SIZE		0x000100000000ULL
 
-#define SHARED_MEM_PHYS_BASE		0x000200000000ULL
-#define SHARED_MEM_VIRT_BASE		0x6f0000000000ULL
-#define SHARED_MEM_SIZE			0x000100000000ULL
-
-#define JIT_PHYS_BASE			0x0a0000000ULL
-#define JIT_VIRT_BASE			0x270000000ULL
-#define JIT_SIZE			0x010000000ULL
+#define SHARED_MEM1_PHYS_BASE		0x000200000000ULL
+#define SHARED_MEM1_VIRT_BASE		0x7f0000000000ULL
+#define SHARED_MEM1_SIZE			0x000100000000ULL
 
 #define GPM_PHYS_BASE			0x100000000ULL
 #define GPM_VIRT_BASE			0x000000000ULL
@@ -81,8 +77,7 @@ struct {
 	{ .name = "system-data", .phys_base = SYSTEM_DATA_PHYS_BASE, .virt_base = SYSTEM_DATA_VIRT_BASE, .size = SYSTEM_DATA_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = NULL },
 	{ .name = "engine",      .phys_base = ENGINE_PHYS_BASE,      .virt_base = ENGINE_VIRT_BASE,      .size = ENGINE_SIZE,      .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = NULL },
 	{ .name = "engine-heap", .phys_base = ENGINE_HEAP_PHYS_BASE, .virt_base = ENGINE_HEAP_VIRT_BASE, .size = ENGINE_HEAP_SIZE, .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = NULL },
-	{ .name = "shared-mem",  .phys_base = SHARED_MEM_PHYS_BASE,  .virt_base = SHARED_MEM_VIRT_BASE,  .size = SHARED_MEM_SIZE,  .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = (void *)SHARED_MEM_VIRT_BASE },
-	{ .name = "jit-mem",     .phys_base = JIT_PHYS_BASE,         .virt_base = JIT_VIRT_BASE,         .size = JIT_SIZE,         .prot_flags = PT_USER_ACCESS | PT_GLOBAL,               .fixed = NULL },
+	{ .name = "shared-mem-1",  .phys_base = SHARED_MEM1_PHYS_BASE,  .virt_base = SHARED_MEM1_VIRT_BASE,  .size = SHARED_MEM1_SIZE,  .prot_flags = PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, .fixed = (void *)SHARED_MEM1_VIRT_BASE },
 };
 
 #define DEFAULT_NR_SLOTS		32
@@ -287,15 +282,15 @@ bool KVMGuest::prepare_guest_memory()
 	}
 
 	DEBUG << CONTEXT(Guest) << "Initialising shared memory";
-	_shared_memory.set_arena((void *)SHARED_MEM_VIRT_BASE, SHARED_MEM_SIZE);
+	_shared_memory.set_arena((void *)SHARED_MEM1_VIRT_BASE, SHARED_MEM1_SIZE);
 
 	DEBUG << CONTEXT(Guest) << "Allocating per-guest data structure";
 	per_guest_data = (PerGuestData *)_shared_memory.allocate(sizeof(*per_guest_data));
 	assert(per_guest_data);
 
 	DEBUG << CONTEXT(Guest) << "Initialising per-guest data structure";
-	per_guest_data->shared_memory.size = SHARED_MEM_SIZE;
-	per_guest_data->shared_memory.base_address = (void *)SHARED_MEM_VIRT_BASE;
+	per_guest_data->shared_memory.size = 0; 
+	per_guest_data->shared_memory.base_address = NULL;
 
 	per_guest_data->heap.size = ENGINE_HEAP_SIZE;
 	per_guest_data->heap.base_address = (void *)ENGINE_HEAP_VIRT_BASE;
@@ -506,8 +501,10 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 {
 	// Try to obtain a free memory region slot.
 	vm_mem_region *rgn = get_mem_slot();
-	if (rgn == NULL)
+	if (rgn == NULL) {
+		ERROR << "Unable to acquire memory slot";
 		return NULL;
+	}
 
 	// Fill in the KVM memory structure.
 	rgn->kvm.flags = flags;
