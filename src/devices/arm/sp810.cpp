@@ -100,7 +100,6 @@ bool SP810::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 		
 	case 0x50:	// LCD
-		DEBUG << ENABLE << "LCD MODE=" << std::hex << data;
 		colour_mode &= 0x3f00;
 		colour_mode |= (data & ~0x3f00);
 		break;

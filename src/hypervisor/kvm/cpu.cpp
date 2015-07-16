@@ -91,29 +91,13 @@ static bool trap;
 
 uint64_t last_insns, last_intrs;
 
-static std::map<uint32_t, uint32_t> dev_addr_reads;
-static std::map<uint32_t, uint32_t> dev_addr_writes;
-
 static void handle_signal(int signo)
 {
 	if (signo == SIGUSR1) {
-		//signal_cpu->per_cpu_data().async_action = 5;
-		
-		fprintf(stderr, "**************\n");
-		
-		fprintf(stderr, "*** reads\n");
-		for (auto i : dev_addr_reads) {
-			fprintf(stderr, "%08x: %u\n", i.first, i.second);
-		}
+		signal_cpu->interrupt(2);
 
-		fprintf(stderr, "*** writes\n");
-		for (auto i : dev_addr_writes) {
-			fprintf(stderr, "%08x: %u\n", i.first, i.second);
-		}
-		
-		
+//		signal_cpu->per_cpu_data().async_action = 2;
 	} else if (signo == SIGUSR2) {
-		//signal_cpu->interrupt(0);
 		
 		fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
 		last_insns = signal_cpu->per_cpu_data().insns_executed;
@@ -210,11 +194,9 @@ bool KVMCpu::run()
 					// TODO: FIXME: HACK
 					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
 						// Device Write
-						dev_addr_writes[regs.rdx]++;
 						dev->write(regs.rdx & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					} else {
 						// Device Read
-						dev_addr_reads[regs.rdx]++;
 						dev->read(regs.rdx & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					}
 				}
@@ -231,12 +213,10 @@ bool KVMCpu::run()
 				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
 				if (dev != NULL) {
-					//fprintf(stderr, "device access %x\n", converted_pa);
-
-					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct)))
+					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct))) {
 						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
-					/*else
-						fprintf(stderr, "dev %x\n", coverted_pa);*/
+					}
+					
 					break;
 				} else {
 					ERROR << CONTEXT(CPU) << "Device Not Found: " << std::hex << converted_pa;
@@ -297,28 +277,8 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 	DEBUG << CONTEXT(CPU) << "Handling Device Access: name=" << device->name() << ", is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
 
 	if (rs.mmio.is_write) {
-		/*uint64_t masked_data = *(uint64_t *)&rs.mmio.data[0];
-
-		if (rs.mmio.len < 8) {
-			masked_data &= (1ULL << (rs.mmio.len * 8)) - 1;
-		}
-
-		return device->write(offset, rs.mmio.len, masked_data);*/
-		
-		dev_addr_writes[pa & 0xffffffff]++;
 		return device->write(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);
 	} else {
-		/*uint64_t masked_data;
-		if (!device->read(offset, rs.mmio.len, masked_data))
-			return false;
-
-		if (rs.mmio.len < 8) {
-			masked_data &= (1ULL << (rs.mmio.len * 8)) - 1;
-		}
-
-		*(uint64_t *)&rs.mmio.data[0] = masked_data;*/
-
-		dev_addr_reads[pa & 0xffffffff]++;
 		if (!device->read(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]))
 			return false;
 		return true;

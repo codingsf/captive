@@ -672,6 +672,19 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	bcc.builder.SetInsertPoint(get_ir_block(bcc, insn->ir_block));
 	
 	switch (insn->type) {
+	case IRInstruction::VERIFY:
+	{
+		std::vector<Type *> params;
+		params.push_back(bcc.rcc.types.pi8);
+
+		FunctionType *fntype = FunctionType::get(bcc.rcc.types.voidty, params, false);
+
+		Constant *fn = bcc.rcc.rgn_module->getOrInsertFunction("jit_verify", fntype);
+		bcc.builder.CreateCall(fn, bcc.rcc.cpu_obj);
+		
+		return true;	
+	}
+	
 	case IRInstruction::COUNT:
 	{
 		Value *counter_val = bcc.builder.CreateLoad(bcc.rcc.insn_counter);

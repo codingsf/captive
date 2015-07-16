@@ -200,7 +200,7 @@ extern "C" {
 			break;
 			
 		case 2:
-			cpu->release_analysis_lock();
+			cpu->dump_state();
 			break;
 			
 		/*case 2:

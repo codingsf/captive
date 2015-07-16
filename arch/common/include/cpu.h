@@ -78,7 +78,7 @@ namespace captive {
 			inline void kernel_mode(bool km) {
 				if (local_state._kernel_mode != km) {
 					local_state._kernel_mode = km;
-					ensure_privilege_mode();
+					if (km) switch_to_kernel_mode(); else switch_to_user_mode();
 				}
 			}
 
@@ -173,6 +173,8 @@ namespace captive {
 			bool run_interp_safepoint();
 			bool run_block_jit();
 			bool run_block_jit_safepoint();
+			bool run_region_jit();
+			bool run_region_jit_safepoint();
 			bool run_test();
 
 			bool handle_pending_action(uint32_t action);

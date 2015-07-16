@@ -140,7 +140,7 @@ bool PL110::write(uint64_t off, uint8_t len, uint64_t data)
 
 void PL110::update_control()
 {
-	DEBUG << CONTEXT(PL110) << "Update Control " << std::hex << control.data << ENABLE;
+	DEBUG << CONTEXT(PL110) << "Update Control " << std::hex << control.data;
 
 	if (control.fields.en && !_screen.configured()) {
 		uint32_t ppl = 16 * (1 + ((lcd_timing[0] >> 2) & 0x3f));
