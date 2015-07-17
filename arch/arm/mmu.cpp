@@ -69,7 +69,7 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 
 	//printf("mmu: resolve va=%08x, type=%d, ttbr0=%x\n", va, type, _coco.TTBR0());
 
-	l1_descriptor *ttbr = (l1_descriptor *)resolve_guest_phys((gpa_t)_coco.TTBR0());
+	l1_descriptor *ttbr = (l1_descriptor *)resolve_guest_phys((gpa_t)((ArmCPU&)cpu()).state.regs.TTBR0);
 	l1_descriptor *l1 = &ttbr[va >> 20];
 
 	//printf("l1: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, l1->type(), l1->base_addr(), l1->ap(), l1->domain());
@@ -186,7 +186,7 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, a
 
 	//printf("resolving coarse descriptor: l1-base=%x l2-idx=%d va=%x, type=%d, base=%x, data=%x\n", l1->base_addr(), l2_idx, va, l2->type(), l2->base_addr(), l2->data);
 
-	uint32_t dacr = _coco.DACR();
+	uint32_t dacr = ((ArmCPU&)cpu()).state.regs.DACR;
 	dacr >>= l1->domain() * 2;
 	dacr &= 0x3;
 
@@ -233,7 +233,7 @@ bool ArmMMU::resolve_fine_page(gva_t va, gpa_t& pa, const access_info& info, arm
 
 bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
-	uint32_t dacr = _coco.DACR();
+	uint32_t dacr = ((ArmCPU&)cpu()).state.regs.DACR;
 	dacr >>= l1->domain() * 2;
 	dacr &= 0x3;
 

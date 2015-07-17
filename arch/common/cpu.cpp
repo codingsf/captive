@@ -143,6 +143,9 @@ bool CPU::run_interp_safepoint()
 	bool step_ok = true;
 
 	do {
+		/*if (cpu_data().insns_executed > 392000000)
+			trace().enable();*/
+
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {

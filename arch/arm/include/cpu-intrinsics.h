@@ -86,6 +86,7 @@ static inline void flush_itlb_entry(uint32_t v) { asm volatile ("int $0x82\n" ::
 static inline void flush_dtlb_entry(uint32_t v) { asm volatile ("int $0x82\n" :: "D"(5), "S"(v)); }
 static inline void flush_itlb() { asm volatile ("int $0x82\n" :: "D"(2)); }
 static inline void flush_dtlb() { asm volatile ("int $0x82\n" :: "D"(3)); }
+static inline void flush() { asm volatile ("int $0x82\n" :: "D"(1)); }
 
 #define __mem_read(_addr, _type) (*((_type *)((uint64_t)(_addr))))
 #define __mem_write(_addr, _data, _type) *((_type *)((uint64_t)(_addr))) = (_data)

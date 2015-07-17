@@ -17,8 +17,10 @@ CoCo::~CoCo()
 
 bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data)
 {
+	//printf("mcr %d %d %d %d %d\n", op1, op2, rn, rm, data);
 	switch (rn) {
 	case 1:
+	{
 		L2 = (data & (1 << 26)) != 0;
 		EE = (data & (1 << 25)) != 0;
 		VE = (data & (1 << 24)) != 0;
@@ -49,14 +51,15 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		}
 
 		break;
-
+	}
+	
 	case 2:
 		switch (op2) {
 		case 0:
-			_TTBR0 = data;
+			((ArmCPU&)cpu).state.regs.TTBR0 = data;
 			break;
 		case 1:
-			_TTBR1 = data;
+			((ArmCPU&)cpu).state.regs.TTBR1 = data;
 			break;
 		default:
 			assert(false);
@@ -67,7 +70,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 
 	case 3:
-		_DACR = data;
+		((ArmCPU&)cpu).state.regs.DACR = data;
 		break;
 
 	case 5:
@@ -78,13 +81,11 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 
 	case 7:
-		printf("**** system control coprocessor: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
 		cpu.mmu().flush();
 		switch (rm) {
 			case 0:
 				switch (op2) {
-				case 4:
-					printf("WFI\n");
+				case 4:		// WFI
 					break;
 					
 				default:
@@ -224,7 +225,17 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 		
 	case 8:
-		cpu.mmu().flush();
+		switch (rm) {
+		case 5:
+		case 6:
+			cpu.mmu().flush();
+			break;
+		}
+		
+		break;
+		
+	default:
+		printf("**** unknown system control coprocessor: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
 		break;
 	}
 
@@ -234,7 +245,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data)
 {
 	data = 0;
-
+	
 	switch (rn) {
 	case 0: // System Information
 		switch (op2) {
@@ -305,10 +316,10 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	case 2:
 		switch (op2) {
 		case 0:
-			data = _TTBR0;
+			data = ((ArmCPU&)cpu).state.regs.TTBR0;
 			break;
 		case 1:
-			data = _TTBR1;
+			data = ((ArmCPU&)cpu).state.regs.TTBR1;
 			break;
 		default:
 			assert(false);
@@ -317,8 +328,9 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 
 	case 3:
-		data = _DACR;
+		data = ((ArmCPU&)cpu).state.regs.DACR;
 		break;
+		
 	case 5:
 		data = _FSR;
 		break;
@@ -327,6 +339,9 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 	case 7:
 		if (rm == 14) data = 1 << 30;
+		break;
+	default:
+		printf("mrc %d %d %d %d\n", op1, op2, rn, rm);
 		break;
 	}
 
