@@ -285,9 +285,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				allocation.erase(alloc);
 			}
 		}
-		
-		can_be_dead = false;
-		
+				
 		// If this instruction is dead, remove any live ins which are not live outs
 		// in order to propagate dead instruction elimination information
 		if(!not_dead && can_be_dead) {
