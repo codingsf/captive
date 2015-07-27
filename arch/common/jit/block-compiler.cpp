@@ -29,8 +29,11 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	uint32_t max_stack = 0;
 
 	if (!sort_ir()) return false;
+	
 	if (!analyse(max_stack)) return false;
 	if (!allocate()) return false;
+
+//	dump_ir();
 
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -140,6 +143,24 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
+	std::map<IRRegId, IRBlockId> vreg_seen_block;
+	
+	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		for (int o = 0; o < 6; o++) {
+			IROperand *oper = &insn->operands[o];
+			
+			if(oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
+				if(vreg_seen_block.count(oper->value) && vreg_seen_block[oper->value] != insn->ir_block) {
+					//globally allocate
+					global_allocation[oper->value] = next_global;
+					next_global += 8;
+				}
+				vreg_seen_block[oper->value] = insn->ir_block;
+			}
+		}
+	}
+
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -150,15 +171,6 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		// Detect a change in block
 		if (latest_block_id != insn->ir_block) {
-			// If there are still live-ins after changing block, then these
-			// live-ins must become spanning vregs.
-			if (live_ins.size() != 0) {
-				for (auto in : live_ins) {
-					global_allocation[in] = next_global;
-					next_global += 8;
-				}
-			}
-
 			// Clear the live-in working set and current allocations.
 			live_ins.clear();
 			allocation.clear();
@@ -222,12 +234,41 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 
+		// If an instruction has no output or both operands which are live outs then the instruction is dead
+		bool not_dead = false;
+		bool can_be_dead = false;
+		switch(insn->type) {
+			case IRInstruction::MOV:
+			case IRInstruction::TRUNC:
+			case IRInstruction::SX:
+			case IRInstruction::ZX:
+			case IRInstruction::XOR:
+			case IRInstruction::AND:
+			case IRInstruction::OR:
+			case IRInstruction::ADD:
+			case IRInstruction::SUB:
+			case IRInstruction::MUL:
+			case IRInstruction::DIV:
+			case IRInstruction::MOD:
+			case IRInstruction::SHL:
+			case IRInstruction::SHR:
+			case IRInstruction::SAR:
+			case IRInstruction::READ_REG:
+				can_be_dead = true;
+				break;
+		}
+		
+//		printf("About to fuck up %10s\n", insn_descriptors[insn->type].mnemonic);
 		// Loop over operands to update the allocation information on VREG operands.
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 
 			if (oper->is_vreg()) {
 				auto alloc_reg = allocation.find((IRRegId)oper->value);
+
+//				printf("Operand %u (%u) is %c and is live out:%u\n", op_idx, oper->value, descr->format[op_idx], live_outs.count(oper->value));
+				if (descr->format[op_idx] != 'I' && live_outs.count(oper->value)) not_dead = true;
+				if (global_allocation.count(oper->value)) not_dead = true;
 
 				if (alloc_reg != allocation.end()) {
 					oper->allocate(IROperand::ALLOCATED_REG, alloc_reg->second);
@@ -245,6 +286,29 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 		
+		can_be_dead = false;
+		
+		// If this instruction is dead, remove any live ins which are not live outs
+		// in order to propagate dead instruction elimination information
+		if(!not_dead && can_be_dead) {
+			insn->type = IRInstruction::NOP;
+			
+			std::set<IRRegId> old_live_ins = live_ins;
+			for(auto in : old_live_ins) {
+				if(live_outs.count(in) == 0) {
+					//printf("Found a live in that's not a live out in a dead instruction r%d \n", in);
+					auto alloc = allocation.find(in);
+					assert(alloc != allocation.end());
+					avail_regs |= 1 << alloc->second;
+					allocation.erase(alloc);
+					
+					live_ins.erase(in);
+				}
+			}
+		}
+
+		//printf("  [%03d] %10s", ir_idx, insn_descriptors[insn->type].mnemonic);
+		
 		// Quick optimisations
 		switch (insn->type) {
 		case IRInstruction::ADD:
@@ -257,8 +321,10 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) insn->type = IRInstruction::NOP;
 			break;
 		}
-
-		/*for (int op_idx = 0; op_idx < 6; op_idx++) {
+		
+		
+#if 0
+		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 
 			if (descr->format[op_idx] != 'X') {
@@ -300,7 +366,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 			printf(" r%d:%d", out, alloc_reg);
 		}
-		printf(" }\n");*/
+		printf(" }\n");
+#endif
 	}
 
 	// Update spanning vreg operand allocations
@@ -1633,7 +1700,8 @@ void BlockCompiler::emit_restore_reg_state()
 void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86Register& target_reg)
 {
 	if (oper->is_constant() == IROperand::CONSTANT) {
-		encoder.mov(oper->value, target_reg);
+		if(oper->value == 0) encoder.xorr(target_reg, target_reg);
+		else encoder.mov(oper->value, target_reg);
 	} else if (oper->is_vreg()) {
 		if (oper->is_alloc_reg()) {
 			switch (oper->alloc_data) {
@@ -1686,7 +1754,7 @@ void BlockCompiler::dump_ir()
 						oper->alloc_mode == IROperand::NOT_ALLOCATED ? 'N' : (oper->alloc_mode == IROperand::ALLOCATED_REG ? 'R' : (oper->alloc_mode == IROperand::ALLOCATED_STACK ? 'S' : '?')),
 						oper->alloc_data);
 				} else if (oper->is_constant()) {
-					printf("i%d $0x%x", oper->size, oper->value);
+					printf("i%d $0x%lx", oper->size, oper->value);
 				} else if (oper->is_pc()) {
 					printf("i4 pc (%08x)", oper->value);
 				} else if (oper->is_block()) {
