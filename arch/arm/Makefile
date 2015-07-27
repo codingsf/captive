@@ -1,8 +1,9 @@
 top-dir := $(CURDIR)
 local-inc-dir := $(top-dir)/include
 
-src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)"))
-obj := $(src:.cpp=.o)
+src := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.c(|pp)")) 
+asm := $(patsubst %,$(top-dir)/%,$(shell find | grep -E "\.S"))
+obj := $(src:.cpp=.o) $(asm:.S=.o)
 dep := $(src:.cpp=.d)
 
 cflags := -I$(cmn-inc-dir) -I$(local-inc-dir) $(common-cflags)
@@ -17,6 +18,10 @@ clean:
 $(arch-out): $(obj) $(cmn-out)
 	@echo "  LD      $(notdir $@)"
 	$(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start --export-dynamic --whole-archive $(obj) $(cmn-out)
+
+%.o: %.S
+	@echo "  AS      $(patsubst $(src-dir)/%,%,$@)"
+	$(q)$(as) -o $@ $(asflags) $<
 
 %.o: %.cpp
 	@echo "  C++     $(notdir $@)"

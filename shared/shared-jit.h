@@ -184,6 +184,8 @@ namespace captive {
 				FLUSH_DTLB,
 				FLUSH_ITLB_ENTRY,
 				FLUSH_DTLB_ENTRY,
+				
+				ADC_WITH_FLAGS,
 			};
 
 			IRBlockId ir_block;
@@ -233,6 +235,8 @@ namespace captive {
 			static IRInstruction flush_dtlb() { return IRInstruction(FLUSH_DTLB); }
 			static IRInstruction flush_itlb_entry(IROperand addr) { return IRInstruction(FLUSH_ITLB_ENTRY, addr); }
 			static IRInstruction flush_dtlb_entry(IROperand addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
+			
+			static IRInstruction adc_with_flags(IROperand lhs_in, IROperand rhs_in, IROperand carry_in, IROperand flags_out) { return IRInstruction(ADC_WITH_FLAGS, lhs_in, rhs_in, carry_in, flags_out); }
 			
 			//
 			// Data Motion

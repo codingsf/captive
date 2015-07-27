@@ -129,6 +129,10 @@ namespace captive {
 				void shr(const X86Register& amount, const X86Register& dst);
 				void sar(const X86Register& amount, const X86Register& dst);
 
+				void adc(uint32_t src, const X86Register& dst);
+				void adc(const X86Memory& src, const X86Register& dst);
+				void adc(const X86Register& src, const X86Register& dst);
+				
 				void add(const X86Register& src, const X86Register& dst);
 				void add(const X86Memory& src, const X86Register& dst);
 				void add(uint32_t val, const X86Register& dst);
@@ -207,6 +211,8 @@ namespace captive {
 
 				void je(int32_t off);
 				void je(int8_t off);
+
+				void lahf();
 
 				void setcc(uint8_t v, const X86Register& dst);
 

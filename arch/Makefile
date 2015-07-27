@@ -12,6 +12,7 @@ export rm := rm
 export cc := gcc
 export cxx := g++
 export ar := ar
+export as := as
 export ld := ld
 
 archs := arm
@@ -29,10 +30,10 @@ clean: $(arch-cleans)
 	$(q)$(make) -C $(cmn-dir) clean
 
 $(cmn-out): .FORCE
-	$(q)$(make) -C $(cmn-dir)
+	+$(q)$(make) -C $(cmn-dir)
 
 %.arch: $(cmn-out) .FORCE
-	$(q)$(make) arch-dir=$(basename $@) arch-out=$@ -C $(basename $@)
+	+$(q)$(make) arch-dir=$(basename $@) arch-out=$@ -C $(basename $@)
 
 %.arch.clean: .FORCE
 	$(q)$(make) arch-out=$(basename $@) -C $(basename $(basename $@)) clean
