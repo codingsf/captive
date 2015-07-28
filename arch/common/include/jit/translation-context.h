@@ -46,6 +46,7 @@ namespace captive {
 				}
 				
 				inline uint32_t count() const { return _ir_insn_count; }
+				inline uint32_t reg_count() const { return _ir_reg_count; }
 				
 				inline shared::IRInstruction *at(uint32_t idx) const { return &_ir_insns[idx]; }
 				

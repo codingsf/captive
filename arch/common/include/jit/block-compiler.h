@@ -35,6 +35,7 @@ namespace captive {
 				typedef std::list<shared::IRBlockId> block_list_t;
 
 				bool sort_ir();
+				bool peephole();
 				bool analyse(uint32_t& max_stack);
 				bool build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits);
 				bool allocate();

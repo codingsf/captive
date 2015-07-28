@@ -1,7 +1,10 @@
+
 #include <jit/block-compiler.h>
 #include <set>
 #include <list>
 #include <map>
+
+#include <small-set.h>
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
@@ -29,6 +32,9 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	uint32_t max_stack = 0;
 
 	if (!sort_ir()) return false;
+
+	if (!peephole()) return false;
+	
 	
 	if (!analyse(max_stack)) return false;
 	if (!allocate()) return false;
@@ -60,6 +66,79 @@ bool BlockCompiler::sort_ir()
 		}
 	}
 
+	return true;
+}
+
+// If this is an add of a negative value, replace it with a subtract of a positive value
+static bool peephole_add(IRInstruction &insn)
+{
+	IROperand &op1 = insn.operands[0];
+	if(op1.is_constant()) {
+		uint64_t unsigned_negative = 0;
+		switch(op1.size) {
+			case 1: unsigned_negative = 0x80; break;
+			case 2: unsigned_negative = 0x8000; break;
+			case 4: unsigned_negative = 0x80000000; break;
+			case 8: unsigned_negative = 0x8000000000000000; break;
+			default: assert(false);
+		}
+		
+		if(op1.value >= unsigned_negative) {
+			insn.type = IRInstruction::SUB;
+			switch(op1.size) {
+				case 1: op1.value = -(int8_t)op1.value; break;
+				case 2: op1.value = -(int16_t)op1.value; break;
+				case 4: op1.value = -(int32_t)op1.value; break;
+				case 8: op1.value = -(int64_t)op1.value; break;
+				default: assert(false);
+			}
+		}
+	}
+	return true;
+}
+
+// If we shift an n-bit value by n bits, then replace this instruction with a move of 0.
+// We explicitly move in 0, rather than XORing out, in order to avoid creating spurious use-defs
+bool peephole_shift(IRInstruction &insn)
+{
+	IROperand &op1 = insn.operands[0];
+	IROperand &op2 = insn.operands[1];
+	if(op1.is_constant()) {
+		bool zeros_out = false;
+		switch(op2.size) {
+			case 1: zeros_out = op1.value == 8; break;
+			case 2: zeros_out = op1.value == 16; break;
+			case 4: zeros_out = op1.value == 32; break;
+			case 8: zeros_out = op1.value == 64; break;
+		}
+		
+		if(zeros_out) {
+			insn.type = IRInstruction::MOV;
+			op1.type = IROperand::CONSTANT;
+			op1.value = 0;
+		}
+	}
+	
+	return true;
+}
+
+// Perform some basic optimisations
+bool BlockCompiler::peephole()
+{
+	for (int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		
+		switch(insn->type){
+		case IRInstruction::ADD: 
+			peephole_add(*insn); 
+			break;
+		case IRInstruction::SHR:
+		case IRInstruction::SHL:
+			peephole_shift(*insn);
+			break;
+		}
+	}
+	
 	return true;
 }
 
@@ -140,12 +219,14 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	std::map<IRRegId, uint32_t> allocation;			// local register allocation
 	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
 	
-	std::set<IRRegId> live_ins, live_outs;
+	SmallSet<IRRegId, 8> live_ins, live_outs;
 	
 	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	std::map<IRRegId, IRBlockId> vreg_seen_block;
+	
+	//printf("allocating for 0x%08x over %u vregs\n", pa, ctx.reg_count());
 	
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -312,7 +393,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		if(!not_dead && can_be_dead) {
 			insn->type = IRInstruction::NOP;
 			
-			std::set<IRRegId> old_live_ins = live_ins;
+			auto old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
 				if(global_allocation.count(in)) continue;
 				if(live_outs.count(in) == 0) {
@@ -789,6 +870,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.jmp_reloc(reloc_offset);
 
 				block_relocations[reloc_offset] = target->value;
+				
+				encoder.align_up(16);
 			}
 			
 			break;
