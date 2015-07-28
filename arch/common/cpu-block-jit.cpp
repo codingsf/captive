@@ -64,7 +64,7 @@ bool CPU::run_block_jit_safepoint()
 	bool step_ok = true;
 	
 	Region *rgn = NULL;
-	uint32_t region_virt_base;
+	uint32_t region_virt_base = 1;
 	
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
@@ -87,7 +87,7 @@ bool CPU::run_block_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		if(!rgn || PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
+		if(PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
 			MMU::resolution_fault fault;
@@ -191,7 +191,17 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		}
 
 		pc += insn->length;
-	} while (!insn->end_of_block && PAGE_ADDRESS_OF(pc) == page);
+		
+		if(insn->end_of_block) {
+			JumpInfo ji = get_instruction_jump_info(insn);
+			if(!insn->is_predicated && ji.type == JumpInfo::DIRECT) {
+				pc = ji.target;
+				continue;
+			}
+			
+			break;
+		}
+	} while (PAGE_ADDRESS_OF(pc) == page);
 
 	// Branch optimisation log
 	if (insn->end_of_block) {
