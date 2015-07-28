@@ -268,6 +268,8 @@ namespace captive {
 				void hlt();
 				void nop();
 				void nop(const X86Memory& mem);
+				
+				void align_up(uint8_t amount_to_align);
 
 				uint32_t current_offset() const { return _write_offset; }
 

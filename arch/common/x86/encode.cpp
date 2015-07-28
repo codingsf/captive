@@ -308,7 +308,17 @@ void X86Encoder::xorr(uint32_t val, const X86Memory& dst)
 
 void X86Encoder::xorr(uint32_t val, const X86Register& dst)
 {
-	encode_arithmetic(6, val, dst);
+	if(dst.raw_index == 0) {
+		if(dst.size == 1) {
+			emit8(0x34);
+			emit8(val);
+		} else {
+			emit8(0x35);
+			emit32(val);
+		}
+	} else {
+		encode_arithmetic(6, val, dst);
+	}
 }
 
 void X86Encoder::xorr(const X86Register& src, const X86Register& dest)
@@ -343,22 +353,38 @@ void X86Encoder::xorr(const X86Memory& src, const X86Register& dest)
 void X86Encoder::shl(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
-		encode_opcode_mod_rm(0xc0, 4, dst);
-		emit8(amount);
+		if(amount == 1) {
+			encode_opcode_mod_rm(0xd0, 4, dst);	
+		} else {
+			encode_opcode_mod_rm(0xc0, 4, dst);
+			emit8(amount);
+		}
 	} else {
-		encode_opcode_mod_rm(0xc1, 4, dst);
-		emit8(amount);
+		if(amount == 1) {
+			encode_opcode_mod_rm(0xd1, 4, dst);	
+		} else {
+			encode_opcode_mod_rm(0xc1, 4, dst);
+			emit8(amount);
+		}
 	}
 }
 
 void X86Encoder::shr(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
-		encode_opcode_mod_rm(0xc0, 5, dst);
-		emit8(amount);
+		if(amount == 1) {
+			encode_opcode_mod_rm(0xd0, 5, dst);	
+		} else {
+			encode_opcode_mod_rm(0xc0, 5, dst);
+			emit8(amount);
+		}
 	} else {
-		encode_opcode_mod_rm(0xc1, 5, dst);
-		emit8(amount);
+		if(amount == 1) {
+			encode_opcode_mod_rm(0xd1, 5, dst);	
+		} else {
+			encode_opcode_mod_rm(0xc1, 5, dst);
+			emit8(amount);
+		}
 	}
 }
 
@@ -712,6 +738,13 @@ void X86Encoder::hlt()
 void X86Encoder::nop()
 {
 	emit8(0x90);
+}
+
+void X86Encoder::align_up(uint8_t amount)
+{
+	if((_write_offset & (amount-1)) == 0) return;
+	_write_offset += amount;
+	_write_offset &= ~(amount - 1);
 }
 
 void X86Encoder::nop(const X86Memory& mem)
