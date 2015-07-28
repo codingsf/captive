@@ -267,6 +267,7 @@ namespace captive {
 				void ret();
 				void hlt();
 				void nop();
+				void nop(uint8_t bytes);
 				void nop(const X86Memory& mem);
 				
 				void align_up(uint8_t amount_to_align);

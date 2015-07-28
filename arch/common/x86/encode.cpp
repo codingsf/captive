@@ -740,11 +740,44 @@ void X86Encoder::nop()
 	emit8(0x90);
 }
 
+void X86Encoder::nop(uint8_t bytes)
+{
+	while(bytes >= 7) {
+		// 1 byte address override, 2 byte opcode, 4 byte immediate
+		lea(X86Memory(REG_EAX, 0x80808080), REG_EAX);
+		bytes -= 7;
+	}
+	
+	while(bytes >= 6) {
+		// 2 byte opcode, 4 byte immediate
+		lea(X86Memory(REG_RAX, 0x80808080), REG_EAX);
+		bytes -= 6;
+	}
+	
+	while(bytes >= 3) {
+		// 1 byte address override, 2 byte opcode
+		lea(X86Memory(REG_EAX), REG_EAX);
+		bytes -= 3;
+	}
+	
+	while(bytes >= 2) {
+		// 1 byte override, 1 byte opcode
+		emit8(0x66);
+		emit8(0x90);
+		bytes -= 2;
+	}
+	
+	while(bytes) {
+		nop();
+		bytes--;
+	}
+}
+
 void X86Encoder::align_up(uint8_t amount)
 {
 	if((_write_offset & (amount-1)) == 0) return;
-	_write_offset += amount;
-	_write_offset &= ~(amount - 1);
+	uint32_t align_end = (_write_offset + amount) & ~(amount-1);
+	nop(align_end - _write_offset);
 }
 
 void X86Encoder::nop(const X86Memory& mem)
