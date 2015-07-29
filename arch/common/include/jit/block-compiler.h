@@ -14,6 +14,7 @@
 #include <local-memory.h>
 #include <jit/translation-context.h>
 
+#include <small-set.h>
 #include <map>
 #include <vector>
 
@@ -30,6 +31,8 @@ namespace captive {
 				TranslationContext& ctx;
 				x86::X86Encoder encoder;
 				gpa_t pa;
+				
+				PopulatedSet<8> used_phys_regs;
 
 				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
 				typedef std::list<shared::IRBlockId> block_list_t;
@@ -49,8 +52,8 @@ namespace captive {
 				void dump_ir();
 				void make_instruction_nop(shared::IRInstruction *insn);
 
-				void emit_save_reg_state();
-				void emit_restore_reg_state();
+				void emit_save_reg_state(int num_operands);
+				void emit_restore_reg_state(int num_operands);
 				void encode_operand_function_argument(shared::IROperand *oper, const x86::X86Register& reg);
 				void encode_operand_to_reg(shared::IROperand *operand, const x86::X86Register& reg);
 
