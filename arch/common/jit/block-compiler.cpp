@@ -284,7 +284,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	std::map<IRRegId, uint32_t> allocation;			// local register allocation
 	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
-	SmallSet<IRRegId, 8> live_ins, live_outs;
+	std::set<IRRegId> live_ins, live_outs;
 	
 	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
 
@@ -376,12 +376,16 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			// If the live-in is not already allocated, allocate it.
 			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
 				int32_t next_reg = avail_regs.next_avail();
-				assert(next_reg != -1);
-
-				allocation[in] = next_reg;
 				
-				avail_regs.clear(next_reg);
-				used_phys_regs.set(next_reg);
+				if(avail_regs.next_avail() == -1) {
+					global_allocation[in] = next_global;
+					next_global += 8;
+				} else {				
+					allocation[in] = next_reg;
+					
+					avail_regs.clear(next_reg);
+					used_phys_regs.set(next_reg);
+				}
 			}
 		}
 
@@ -615,11 +619,53 @@ bool BlockCompiler::dbe()
 
 bool BlockCompiler::merge_blocks()
 {
+	block_list_t blocks, exits;
+	cfg_t succs, preds;
+
+	if (!build_cfg(blocks, succs, preds, exits))
+		return false;
+
+start:		
+	for(auto block : blocks) {
+		if(succs[block].size() == 1) {
+			IRBlockId successor = succs[block][0];
+			
+			if(preds[successor].size() == 1) {
+				if(merge_block(successor, block)){
+					succs[block] = succs[successor];
+					preds[successor].clear();
+					succs[successor].clear();
+					goto start;
+				}
+			}
+		}
+		
+	}
+	
 	return true;
 }
 
-bool BlockCompiler::merge_block(IRBlockId mergee, IRBlockId merger)
+bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 {
+	// Don't try to merge 'backwards' yet since it's a bit more complicated
+	if(merge_from < merge_into) return false;
+	
+	// Nop out the terminator instruction from the merge_into block
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		
+		// We can only merge if the terminator is a jmp
+		if(insn->ir_block == merge_into && insn->type == IRInstruction::JMP) {
+			make_instruction_nop(insn);
+		}
+	}
+	
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		
+		// Move instructions from the 'from' block to the 'to' block
+		if(insn->ir_block == merge_from) insn->ir_block = merge_into;
+	}
 	return true;
 }
 
@@ -1085,6 +1131,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					encoder.jmp_reloc(reloc_offset);
 					block_relocations[reloc_offset] = ft->value;
 				}
+				
+				encoder.align_up(16);
 			}
 
 			break;
