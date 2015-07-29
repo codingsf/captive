@@ -54,10 +54,12 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!merge_blocks()) return false;
 	if (!sort_ir()) return false;
 	if (!peephole()) return false;
+	if (!sort_ir()) return false;
 	if (!analyse(max_stack)) return false;
+	if (!sort_ir()) return false;
 	if (!allocate()) return false;
 
-	//dump_ir();
+//	dump_ir();
 
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -140,7 +142,7 @@ bool peephole_shift(IRInstruction &insn)
 	return true;
 }
 
-void BlockCompiler::make_instruction_nop(IRInstruction *insn)
+void BlockCompiler::make_instruction_nop(IRInstruction *insn, bool set_block)
 {
 	insn->type = IRInstruction::NOP;
 	insn->operands[0].type = IROperand::NONE;
@@ -149,19 +151,27 @@ void BlockCompiler::make_instruction_nop(IRInstruction *insn)
 	insn->operands[3].type = IROperand::NONE;
 	insn->operands[4].type = IROperand::NONE;
 	insn->operands[5].type = IROperand::NONE;
+	if(set_block) insn->ir_block = 0x7fffffff;
 }
-
 
 // Perform some basic optimisations
 bool BlockCompiler::peephole()
 {
+	IRInstruction *prev_pc_inc = NULL;
+	int prev_block = -1;
+	
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
+
+		if(insn->ir_block != prev_block) {
+			prev_pc_inc = NULL;
+			prev_block = insn->ir_block;
+		}
 
 		switch (insn->type) {
 		case IRInstruction::ADD:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
-				make_instruction_nop(insn);
+				make_instruction_nop(insn, true);
 			} else {
 				peephole_add(*insn);
 			}
@@ -171,7 +181,7 @@ bool BlockCompiler::peephole()
 		case IRInstruction::SHR:
 		case IRInstruction::SHL:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
-				make_instruction_nop(insn);
+				make_instruction_nop(insn, true);
 			} else {
 				peephole_shift(*insn);
 			}
@@ -182,8 +192,39 @@ bool BlockCompiler::peephole()
 		case IRInstruction::OR:
 		case IRInstruction::XOR:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
-				make_instruction_nop(insn);
+				make_instruction_nop(insn, true);
 			}
+			break;
+			
+			
+		case IRInstruction::INCPC:
+			if(prev_pc_inc) {
+				insn->operands[0].value += prev_pc_inc->operands[0].value;
+				prev_pc_inc->type = IRInstruction::NOP;
+			}
+			prev_pc_inc = insn;
+						
+			break;
+			
+		case IRInstruction::READ_REG:
+			// HACK HACK HACK (pc offset)
+			if(insn->operands[0].value == 0x3c) {
+				prev_pc_inc = NULL;
+			}
+			break;
+			
+		case IRInstruction::JMP:
+		case IRInstruction::BRANCH:
+		case IRInstruction::RET:
+		case IRInstruction::DISPATCH:
+		case IRInstruction::READ_MEM:
+		case IRInstruction::WRITE_MEM:
+		case IRInstruction::READ_MEM_USER:
+		case IRInstruction::WRITE_MEM_USER:
+		case IRInstruction::LDPC:
+		case IRInstruction::READ_DEVICE:
+		case IRInstruction::WRITE_DEVICE:
+			prev_pc_inc = NULL;
 			break;
 			
 		default:
@@ -441,7 +482,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		// If this instruction is dead, remove any live ins which are not live outs
 		// in order to propagate dead instruction elimination information
 		if(!not_dead && can_be_dead) {
-			make_instruction_nop(insn);
+			make_instruction_nop(insn, true);
 
 			auto old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
@@ -615,7 +656,7 @@ bool BlockCompiler::dbe()
 		IRInstruction *insn = ctx.at(ir_idx);
 
 		if (to_die.count(insn->ir_block) != 0) {
-			make_instruction_nop(insn);
+			make_instruction_nop(insn, true);
 			insn->ir_block = 0;
 		}
 	}
@@ -631,7 +672,7 @@ bool BlockCompiler::merge_blocks()
 	if (!build_cfg(blocks, succs, preds, exits))
 		return false;
 
-start:		
+start:
 	for(auto block : blocks) {
 		if(succs[block].size() == 1) {
 			IRBlockId successor = succs[block][0];
@@ -662,7 +703,8 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 		
 		// We can only merge if the terminator is a jmp
 		if(insn->ir_block == merge_into && insn->type == IRInstruction::JMP) {
-			make_instruction_nop(insn);
+			make_instruction_nop(insn, true);
+			break;
 		}
 	}
 	
@@ -2074,7 +2116,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	return success;
 }
 
