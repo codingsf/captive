@@ -36,11 +36,15 @@ namespace captive {
 
 				bool sort_ir();
 				bool analyse(uint32_t& max_stack);
-				bool build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits);
+				bool dbe();
+				bool merge_blocks();
+				bool merge_block(shared::IRBlockId mergee, shared::IRBlockId merger);
+				bool thread_jumps();
+				bool build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, block_list_t& exits);
 				bool allocate();
 				bool lower(uint32_t max_stack);
 				bool peeplower(uint32_t max_stack);
-				
+
 				void dump_ir();
 
 				void emit_save_reg_state();
