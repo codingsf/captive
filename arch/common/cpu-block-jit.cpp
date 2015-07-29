@@ -162,6 +162,8 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	printf("jit: translating block %x\n", pa);
 #endif
 
+	std::set<uint32_t> seen_pcs;
+
 	Decode *insn = get_decode(0);
 			
 	gpa_t pc = pa;
@@ -194,8 +196,9 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		
 		if(insn->end_of_block) {
 			JumpInfo ji = get_instruction_jump_info(insn);
-			if(!insn->is_predicated && ji.type == JumpInfo::DIRECT) {
+			if(!insn->is_predicated && ji.type == JumpInfo::DIRECT && !seen_pcs.count(ji.target)) {
 				pc = ji.target;
+				seen_pcs.insert(ji.target);
 				continue;
 			}
 			
