@@ -164,71 +164,81 @@ bool BlockCompiler::peephole()
 struct insn_descriptor {
 	const char *mnemonic;
 	const char format[7];
+	bool has_side_effects;
 };
 
+/**
+ * Descriptor codes:
+ *
+ * X - No Operand
+ * N - No Direction (e.g. constant only)
+ * B - Input & Output
+ * I - Input
+ * O - Output
+ */
 static struct insn_descriptor insn_descriptors[] = {
-	{ .mnemonic = "invalid",	.format = "XXXXXX" },
-	{ .mnemonic = "verify",		.format = "NXXXXX" },
-	{ .mnemonic = "count",		.format = "NNXXXX" },
+	{ .mnemonic = "invalid",	.format = "XXXXXX", .has_side_effects = false },
+	{ .mnemonic = "verify",		.format = "NXXXXX", .has_side_effects = true },
+	{ .mnemonic = "count",		.format = "NNXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "nop",		.format = "XXXXXX" },
-	{ .mnemonic = "trap",		.format = "XXXXXX" },
+	{ .mnemonic = "nop",		.format = "XXXXXX", .has_side_effects = false },
+	{ .mnemonic = "trap",		.format = "XXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "mov",		.format = "IOXXXX" },
-	{ .mnemonic = "cmov",		.format = "XXXXXX" },
-	{ .mnemonic = "ldpc",		.format = "OXXXXX" },
-	{ .mnemonic = "inc-pc",		.format = "IXXXXX" },
+	{ .mnemonic = "mov",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "cmov",		.format = "XXXXXX", .has_side_effects = false },
+	{ .mnemonic = "ldpc",		.format = "OXXXXX", .has_side_effects = false },
+	{ .mnemonic = "inc-pc",		.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "add",		.format = "IBXXXX" },
-	{ .mnemonic = "sub",		.format = "IBXXXX" },
-	{ .mnemonic = "mul",		.format = "IBXXXX" },
-	{ .mnemonic = "div",		.format = "IBXXXX" },
-	{ .mnemonic = "mod",		.format = "IBXXXX" },
+	{ .mnemonic = "add",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "sub",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "mul",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "div",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "mod",		.format = "IBXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "shl",		.format = "IBXXXX" },
-	{ .mnemonic = "shr",		.format = "IBXXXX" },
-	{ .mnemonic = "sar",		.format = "IBXXXX" },
-	{ .mnemonic = "clz",		.format = "IOXXXX" },
+	{ .mnemonic = "shl",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "shr",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "sar",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "clz",		.format = "IOXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "and",		.format = "IBXXXX" },
-	{ .mnemonic = "or",			.format = "IBXXXX" },
-	{ .mnemonic = "xor",		.format = "IBXXXX" },
+	{ .mnemonic = "and",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "or",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "xor",		.format = "IBXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "cmp eq",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp ne",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp gt",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp gte",	.format = "IIOXXX" },
-	{ .mnemonic = "cmp lt",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp lte",	.format = "IIOXXX" },
+	{ .mnemonic = "cmp eq",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp ne",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp gt",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp gte",	.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp lt",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp lte",	.format = "IIOXXX", .has_side_effects = false },
 
-	{ .mnemonic = "mov sx",		.format = "IOXXXX" },
-	{ .mnemonic = "mov zx",		.format = "IOXXXX" },
-	{ .mnemonic = "mov trunc",	.format = "IOXXXX" },
+	{ .mnemonic = "mov sx",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "mov zx",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "mov trunc",	.format = "IOXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "ldreg",		.format = "IOXXXX" },
-	{ .mnemonic = "streg",		.format = "IIXXXX" },
-	{ .mnemonic = "ldmem",		.format = "IOXXXX" },
-	{ .mnemonic = "stmem",		.format = "IIXXXX" },
-	{ .mnemonic = "ldumem",		.format = "IOXXXX" },
-	{ .mnemonic = "stumem",		.format = "IIXXXX" },
+	{ .mnemonic = "ldreg",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "streg",		.format = "IIXXXX", .has_side_effects = true },
+	{ .mnemonic = "ldmem",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "stmem",		.format = "IIXXXX", .has_side_effects = true },
+	{ .mnemonic = "ldumem",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "stumem",		.format = "IIXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "call",		.format = "NIIIII" },
-	{ .mnemonic = "jmp",		.format = "NXXXXX" },
-	{ .mnemonic = "branch",		.format = "INNXXX" },
-	{ .mnemonic = "ret",		.format = "XXXXXX" },
-	{ .mnemonic = "dispatch",	.format = "NNXXXX" },
+	{ .mnemonic = "call",		.format = "NIIIII", .has_side_effects = true },
+	{ .mnemonic = "jmp",		.format = "NXXXXX", .has_side_effects = true },
+	{ .mnemonic = "branch",		.format = "INNXXX", .has_side_effects = true },
+	{ .mnemonic = "ret",		.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "dispatch",	.format = "NNXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "scm",		.format = "IXXXXX" },
-	{ .mnemonic = "stdev",		.format = "IIIXXX" },
-	{ .mnemonic = "lddev",		.format = "IIOXXX" },
+	{ .mnemonic = "scm",		.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "stdev",		.format = "IIIXXX", .has_side_effects = true },
+	{ .mnemonic = "lddev",		.format = "IIOXXX", .has_side_effects = false },
 
-	{ .mnemonic = "flush",		.format = "XXXXXX" },
-	{ .mnemonic = "flush itlb",	.format = "XXXXXX" },
-	{ .mnemonic = "flush dtlb",	.format = "XXXXXX" },
-	{ .mnemonic = "flush itlb",	.format = "IXXXXX" },
-	{ .mnemonic = "flush dtlb",	.format = "IXXXXX" },
+	{ .mnemonic = "flush",		.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush itlb",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush dtlb",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "adc flags",	.format = "IIIOXX" },
+	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = false },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
@@ -338,34 +348,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		// If an instruction has no output or both operands which are live outs then the instruction is dead
 		bool not_dead = false;
-		bool can_be_dead = false;
-		switch(insn->type) {
-			case IRInstruction::MOV:
-			case IRInstruction::TRUNC:
-			case IRInstruction::SX:
-			case IRInstruction::ZX:
-			case IRInstruction::XOR:
-			case IRInstruction::AND:
-			case IRInstruction::OR:
-			case IRInstruction::ADD:
-			case IRInstruction::SUB:
-			case IRInstruction::MUL:
-			case IRInstruction::DIV:
-			case IRInstruction::MOD:
-			case IRInstruction::SHL:
-			case IRInstruction::SHR:
-			case IRInstruction::SAR:
-			case IRInstruction::READ_REG:
-
-			case IRInstruction::CMPEQ:
-			case IRInstruction::CMPNE:
-			case IRInstruction::CMPLT:
-			case IRInstruction::CMPLTE:
-			case IRInstruction::CMPGT:
-			case IRInstruction::CMPGTE:
-				can_be_dead = true;
-				break;
-		}
+		bool can_be_dead = !descr->has_side_effects;
 
 //		printf("About to fuck up %10s\n", insn_descriptors[insn->type].mnemonic);
 		// Loop over operands to update the allocation information on VREG operands.
@@ -1874,35 +1857,60 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 		case IRInstruction::ADC_WITH_FLAGS:
 		{
-			if(register_from_operand(&insn->operands[3], 8) != REG_RAX)
+			bool dest_is_rax = register_from_operand(&insn->operands[3], 8) == REG_RAX;
+			if (!dest_is_rax) {
 				encoder.push(REG_RAX);
+			}
+
+			IROperand *lhs = &insn->operands[0];
+			IROperand *rhs = &insn->operands[1];
+			IROperand *carry_in = &insn->operands[2];
+			IROperand *flags_out = &insn->operands[3];
+
+			assert(flags_out->is_vreg());
 
 			// Load up lhs
-			if(insn->operands[0].is_constant())
-				encoder.mov(insn->operands[0].value, REG_EBX);
-			else if(insn->operands[0].is_alloc_reg()) {
-				encoder.mov(register_from_operand(&insn->operands[0], 4), REG_EBX);
+			if (lhs->is_constant()) {
+				encoder.mov(lhs->value, get_temp(0, 4));
+			} else if (lhs->is_vreg()) {
+				if (lhs->is_alloc_reg()) {
+					encoder.mov(register_from_operand(lhs, 4), get_temp(0, 4));
+				} else if (lhs->is_alloc_stack()) {
+					encoder.mov(stack_from_operand(lhs), get_temp(0, 4));
+				} else {
+					assert(false);
+				}
 			} else {
-				encoder.mov(stack_from_operand(&insn->operands[0]), REG_EBX);
+				assert(false);
 			}
 
 			// Set up carry bit for adc
 			encoder.mov(0xff, REG_CL);
-			if(insn->operands[2].is_constant()) {
-				encoder.add((uint8_t)insn->operands[2].value, REG_CL);
-			} else if(insn->operands[2].is_alloc_reg()) {
-				encoder.add(register_from_operand(&insn->operands[2], 1), REG_CL);
+			if (carry_in->is_constant()) {
+				encoder.add((uint8_t)carry_in->value, REG_CL);
+			} else if (carry_in->is_vreg()) {
+				if (carry_in->is_alloc_reg()) {
+					encoder.add(register_from_operand(carry_in, 1), REG_CL);
+				} else {
+					assert(false);
+				}
 			} else {
 				assert(false);
 			}
 
 			// Perform add with carry to set the flags
-			if(insn->operands[1].is_constant())
-				encoder.adc((uint32_t)insn->operands[1].value, REG_EBX);
-			else if(insn->operands[1].is_alloc_reg()) {
-				encoder.adc(register_from_operand(&insn->operands[1],4), REG_EBX);
+			if (rhs->is_constant()) {
+				encoder.adc((uint32_t)rhs->value, REG_EBX);
+			} else if (rhs->is_vreg()) {
+				if (rhs->is_alloc_reg()) {
+					encoder.adc(register_from_operand(rhs, 4), REG_EBX);
+				} else if (rhs->is_alloc_stack()) {
+					encoder.adc(stack_from_operand(rhs), REG_EBX);
+				} else {
+					assert(false);
+				}
 			} else {
-				encoder.adc(stack_from_operand(&insn->operands[1]), REG_EBX);
+				assert(false);
 			}
 
 			// Read flags out into AX
@@ -1911,10 +1919,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.seto(REG_AL);
 
 			//Move AX into correct destination register
-			if(REG_AX != register_from_operand(&insn->operands[3], 2))
-				encoder.mov(REG_AX, register_from_operand(&insn->operands[3], 2));
-
-			if(register_from_operand(&insn->operands[3], 8) != REG_RAX) {
+			if (!dest_is_rax) {
+				if (flags_out->is_alloc_reg()) {
+					encoder.mov(REG_AX, register_from_operand(flags_out, 2));
+				} else {
+					assert(false);
+				}
+				
 				encoder.pop(REG_RAX);
 			}
 
