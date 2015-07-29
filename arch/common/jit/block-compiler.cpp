@@ -17,7 +17,7 @@ using namespace captive::arch::x86;
 using namespace captive::shared;
 
 /* Registers
- * 
+ *
  * RAX  Allocatable
  * RBX  Temporary
  * RCX  Temporary
@@ -32,7 +32,7 @@ using namespace captive::shared;
  * R13  Not used
  * R14  State variable
  * R15  Register File
- * 
+ *
  */
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
@@ -50,15 +50,15 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
+	if (!thread_jumps()) return false;
+	if (!dbe()) return false;
+	if (!merge_blocks()) return false;
 	if (!sort_ir()) return false;
-
 	if (!peephole()) return false;
-	
-	
 	if (!analyse(max_stack)) return false;
 	if (!allocate()) return false;
 
-//	dump_ir();
+	//dump_ir();
 
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -101,7 +101,7 @@ static bool peephole_add(IRInstruction &insn)
 			case 8: unsigned_negative = 0x8000000000000000; break;
 			default: assert(false);
 		}
-		
+
 		if(op1.value >= unsigned_negative) {
 			insn.type = IRInstruction::SUB;
 			switch(op1.size) {
@@ -130,105 +130,150 @@ bool peephole_shift(IRInstruction &insn)
 			case 4: zeros_out = op1.value == 32; break;
 			case 8: zeros_out = op1.value == 64; break;
 		}
-		
+
 		if(zeros_out) {
 			insn.type = IRInstruction::MOV;
 			op1.type = IROperand::CONSTANT;
 			op1.value = 0;
 		}
 	}
-	
+
 	return true;
 }
+
+void BlockCompiler::make_instruction_nop(IRInstruction *insn)
+{
+	insn->type = IRInstruction::NOP;
+	insn->operands[0].type = IROperand::NONE;
+	insn->operands[1].type = IROperand::NONE;
+	insn->operands[2].type = IROperand::NONE;
+	insn->operands[3].type = IROperand::NONE;
+	insn->operands[4].type = IROperand::NONE;
+	insn->operands[5].type = IROperand::NONE;
+}
+
 
 // Perform some basic optimisations
 bool BlockCompiler::peephole()
 {
-	for (int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		
-		switch(insn->type){
-		case IRInstruction::ADD: 
-			peephole_add(*insn); 
+
+		switch (insn->type) {
+		case IRInstruction::ADD:
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
+				make_instruction_nop(insn);
+			} else {
+				peephole_add(*insn);
+			}
+			
 			break;
+			
 		case IRInstruction::SHR:
 		case IRInstruction::SHL:
-			peephole_shift(*insn);
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
+				make_instruction_nop(insn);
+			} else {
+				peephole_shift(*insn);
+			}
+			break;
+		
+		case IRInstruction::SUB:
+		case IRInstruction::SAR:
+		case IRInstruction::OR:
+		case IRInstruction::XOR:
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
+				make_instruction_nop(insn);
+			}
+			break;
+			
+		default:
 			break;
 		}
+
 	}
-	
+
 	return true;
 }
 
 struct insn_descriptor {
 	const char *mnemonic;
 	const char format[7];
+	bool has_side_effects;
 };
 
+/**
+ * Descriptor codes:
+ *
+ * X - No Operand
+ * N - No Direction (e.g. constant only)
+ * B - Input & Output
+ * I - Input
+ * O - Output
+ */
 static struct insn_descriptor insn_descriptors[] = {
-	{ .mnemonic = "invalid",	.format = "XXXXXX" },
-	{ .mnemonic = "verify",		.format = "NXXXXX" },
-	{ .mnemonic = "count",		.format = "NNXXXX" },
+	{ .mnemonic = "invalid",	.format = "XXXXXX", .has_side_effects = false },
+	{ .mnemonic = "verify",		.format = "NXXXXX", .has_side_effects = true },
+	{ .mnemonic = "count",		.format = "NNXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "nop",		.format = "XXXXXX" },
-	{ .mnemonic = "trap",		.format = "XXXXXX" },
+	{ .mnemonic = "nop",		.format = "XXXXXX", .has_side_effects = false },
+	{ .mnemonic = "trap",		.format = "XXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "mov",		.format = "IOXXXX" },
-	{ .mnemonic = "cmov",		.format = "XXXXXX" },
-	{ .mnemonic = "ldpc",		.format = "OXXXXX" },
-	{ .mnemonic = "inc-pc",		.format = "IXXXXX" },
+	{ .mnemonic = "mov",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "cmov",		.format = "XXXXXX", .has_side_effects = false },
+	{ .mnemonic = "ldpc",		.format = "OXXXXX", .has_side_effects = false },
+	{ .mnemonic = "inc-pc",		.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "add",		.format = "IBXXXX" },
-	{ .mnemonic = "sub",		.format = "IBXXXX" },
-	{ .mnemonic = "mul",		.format = "IBXXXX" },
-	{ .mnemonic = "div",		.format = "IBXXXX" },
-	{ .mnemonic = "mod",		.format = "IBXXXX" },
+	{ .mnemonic = "add",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "sub",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "mul",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "div",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "mod",		.format = "IBXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "shl",		.format = "IBXXXX" },
-	{ .mnemonic = "shr",		.format = "IBXXXX" },
-	{ .mnemonic = "sar",		.format = "IBXXXX" },
-	{ .mnemonic = "clz",		.format = "IOXXXX" },
+	{ .mnemonic = "shl",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "shr",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "sar",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "clz",		.format = "IOXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "and",		.format = "IBXXXX" },
-	{ .mnemonic = "or",			.format = "IBXXXX" },
-	{ .mnemonic = "xor",		.format = "IBXXXX" },
+	{ .mnemonic = "and",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "or",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "xor",		.format = "IBXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "cmp eq",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp ne",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp gt",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp gte",	.format = "IIOXXX" },
-	{ .mnemonic = "cmp lt",		.format = "IIOXXX" },
-	{ .mnemonic = "cmp lte",	.format = "IIOXXX" },
+	{ .mnemonic = "cmp eq",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp ne",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp gt",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp gte",	.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp lt",		.format = "IIOXXX", .has_side_effects = false },
+	{ .mnemonic = "cmp lte",	.format = "IIOXXX", .has_side_effects = false },
 
-	{ .mnemonic = "mov sx",		.format = "IOXXXX" },
-	{ .mnemonic = "mov zx",		.format = "IOXXXX" },
-	{ .mnemonic = "mov trunc",	.format = "IOXXXX" },
+	{ .mnemonic = "mov sx",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "mov zx",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "mov trunc",	.format = "IOXXXX", .has_side_effects = false },
 
-	{ .mnemonic = "ldreg",		.format = "IOXXXX" },
-	{ .mnemonic = "streg",		.format = "IIXXXX" },
-	{ .mnemonic = "ldmem",		.format = "IOXXXX" },
-	{ .mnemonic = "stmem",		.format = "IIXXXX" },
-	{ .mnemonic = "ldumem",		.format = "IOXXXX" },
-	{ .mnemonic = "stumem",		.format = "IIXXXX" },
+	{ .mnemonic = "ldreg",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "streg",		.format = "IIXXXX", .has_side_effects = true },
+	{ .mnemonic = "ldmem",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "stmem",		.format = "IIXXXX", .has_side_effects = true },
+	{ .mnemonic = "ldumem",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "stumem",		.format = "IIXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "call",		.format = "NIIIII" },
-	{ .mnemonic = "jmp",		.format = "NXXXXX" },
-	{ .mnemonic = "branch",		.format = "INNXXX" },
-	{ .mnemonic = "ret",		.format = "XXXXXX" },
-	{ .mnemonic = "dispatch",	.format = "NNXXXX" },
+	{ .mnemonic = "call",		.format = "NIIIII", .has_side_effects = true },
+	{ .mnemonic = "jmp",		.format = "NXXXXX", .has_side_effects = true },
+	{ .mnemonic = "branch",		.format = "INNXXX", .has_side_effects = true },
+	{ .mnemonic = "ret",		.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "dispatch",	.format = "NNXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "scm",		.format = "IXXXXX" },
-	{ .mnemonic = "stdev",		.format = "IIIXXX" },
-	{ .mnemonic = "lddev",		.format = "IIOXXX" },
-	
-	{ .mnemonic = "flush",		.format = "XXXXXX" },
-	{ .mnemonic = "flush itlb",	.format = "XXXXXX" },
-	{ .mnemonic = "flush dtlb",	.format = "XXXXXX" },
-	{ .mnemonic = "flush itlb",	.format = "IXXXXX" },
-	{ .mnemonic = "flush dtlb",	.format = "IXXXXX" },
-	
-	{ .mnemonic = "adc flags",	.format = "IIIOXX" },
+	{ .mnemonic = "scm",		.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "stdev",		.format = "IIIXXX", .has_side_effects = true },
+	{ .mnemonic = "lddev",		.format = "IIOXXX", .has_side_effects = false },
+
+	{ .mnemonic = "flush",		.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush itlb",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush dtlb",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
+
+	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = false },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
@@ -239,21 +284,21 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	std::map<IRRegId, uint32_t> allocation;			// local register allocation
 	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
-	
 	SmallSet<IRRegId, 8> live_ins, live_outs;
 	
 	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
+
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	std::map<IRRegId, IRBlockId> vreg_seen_block;
-	
+
 	//printf("allocating for 0x%08x over %u vregs\n", pa, ctx.reg_count());
-	
+
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		for (int o = 0; o < 6; o++) {
 			IROperand *oper = &insn->operands[o];
-			
+
 			if(oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
 				if(vreg_seen_block.count(oper->value) && vreg_seen_block[oper->value] != insn->ir_block) {
 					//globally allocate
@@ -292,7 +337,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		for (auto in : live_ins) {
 			live_outs.insert(in);
 		}
-
+		
 		// Loop over the VREG operands and update the live-in set accordingly.
 		for (int o = 0; o < 6; o++) {
 			if (insn->operands[o].type != IROperand::VREG) continue;
@@ -330,7 +375,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		for (auto in : live_ins) {
 			// If the live-in is not already allocated, allocate it.
 			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
-				uint32_t next_reg = avail_regs.next_avail();
+				int32_t next_reg = avail_regs.next_avail();
 				assert(next_reg != -1);
 
 				allocation[in] = next_reg;
@@ -342,35 +387,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		// If an instruction has no output or both operands which are live outs then the instruction is dead
 		bool not_dead = false;
-		bool can_be_dead = false;
-		switch(insn->type) {
-			case IRInstruction::MOV:
-			case IRInstruction::TRUNC:
-			case IRInstruction::SX:
-			case IRInstruction::ZX:
-			case IRInstruction::XOR:
-			case IRInstruction::AND:
-			case IRInstruction::OR:
-			case IRInstruction::ADD:
-			case IRInstruction::SUB:
-			case IRInstruction::MUL:
-			case IRInstruction::DIV:
-			case IRInstruction::MOD:
-			case IRInstruction::SHL:
-			case IRInstruction::SHR:
-			case IRInstruction::SAR:
-			case IRInstruction::READ_REG:
-			
-			case IRInstruction::CMPEQ:
-			case IRInstruction::CMPNE:
-			case IRInstruction::CMPLT:
-			case IRInstruction::CMPLTE:
-			case IRInstruction::CMPGT:
-			case IRInstruction::CMPGTE:
-				can_be_dead = true;
-				break;
-		}
-		
+		bool can_be_dead = !descr->has_side_effects;
+
 //		printf("About to fuck up %10s\n", insn_descriptors[insn->type].mnemonic);
 		// Loop over operands to update the allocation information on VREG operands.
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
@@ -378,23 +396,23 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 			if (oper->is_vreg()) {
 				if (descr->format[op_idx] != 'I' && live_outs.count(oper->value)) not_dead = true;
-				
+
 				// If this vreg has been allocated to the stack, then fill in the stack entry location here
 				auto global_alloc = global_allocation.find(oper->value);
 				if(global_alloc != global_allocation.end()) {
 					oper->allocate(IROperand::ALLOCATED_STACK, global_alloc->second);
 					if(descr->format[op_idx] == 'O' || descr->format[op_idx] == 'B') not_dead = true;
 				} else {
-				
+
 					// Otherwise, if the value has been locally allocated, fill in the local allocation
 					auto alloc_reg = allocation.find((IRRegId)oper->value);
 
 	//				printf("Operand %u (%u) is %c and is live out:%u\n", op_idx, oper->value, descr->format[op_idx], live_outs.count(oper->value));
-					
+
 					if (alloc_reg != allocation.end()) {
 						oper->allocate(IROperand::ALLOCATED_REG, alloc_reg->second);
 					}
-				
+
 				}
 			}
 		}
@@ -409,12 +427,12 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				allocation.erase(alloc);
 			}
 		}
-		
+
 		// If this instruction is dead, remove any live ins which are not live outs
 		// in order to propagate dead instruction elimination information
 		if(!not_dead && can_be_dead) {
-			insn->type = IRInstruction::NOP;
-			
+			make_instruction_nop(insn);
+
 			auto old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
 				if(global_allocation.count(in)) continue;
@@ -426,28 +444,14 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 					avail_regs.set(alloc->second);
 
 					allocation.erase(alloc);
-					
+
 					live_ins.erase(in);
 				}
 			}
 		}
 
-		//printf("  [%03d] %10s", ir_idx, insn_descriptors[insn->type].mnemonic);
-		
-		// Quick optimisations
-		switch (insn->type) {
-		case IRInstruction::ADD:
-		case IRInstruction::SUB:
-		case IRInstruction::SHL:
-		case IRInstruction::SHR:
-		case IRInstruction::SAR:
-		case IRInstruction::OR:
-		case IRInstruction::XOR:
-			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) insn->type = IRInstruction::NOP;
-			break;
-		}
-		
-		
+//		printf("  [%03d] %10s\n", ir_idx, insn_descriptors[insn->type].mnemonic);
+
 #if 0
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
@@ -502,16 +506,133 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	return true;
 }
 
-bool BlockCompiler::build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits)
+bool BlockCompiler::thread_jumps()
+{
+	std::map<IRBlockId, IRInstruction *> first_instructions;
+	std::map<IRBlockId, IRInstruction *> last_instructions;
+
+	// Build up a list of the first instructions in each block.
+	IRBlockId current_block_id = -1;
+	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
+
+		if (insn->ir_block != current_block_id) {
+			if (ir_idx > 0) {
+				last_instructions[current_block_id] = ctx.at(ir_idx - 1);
+			}
+
+			current_block_id = insn->ir_block;
+			first_instructions[current_block_id] = insn;
+		}
+	}
+
+	for (auto block : last_instructions) {
+		IRInstruction *source_instruction = block.second;
+
+		switch(source_instruction->type) {
+		case IRInstruction::JMP: {
+			IRInstruction *target_instruction = first_instructions[block.second->operands[0].value];
+
+			while (target_instruction->type == IRInstruction::JMP) {
+				target_instruction = first_instructions[target_instruction->operands[0].value];
+			}
+
+			if (target_instruction->type == IRInstruction::RET) {
+				*source_instruction = *target_instruction;
+				source_instruction->ir_block = block.first;
+			} else if (target_instruction->type == IRInstruction::BRANCH) {
+				*source_instruction = *target_instruction;
+				source_instruction->ir_block = block.first;
+				goto do_branch_thread;
+			} else if (target_instruction->type == IRInstruction::DISPATCH) {
+				*source_instruction = *target_instruction;
+				source_instruction->ir_block = block.first;
+			} else {
+				source_instruction->operands[0].value = target_instruction->ir_block;
+			}
+
+			break;
+		}
+
+		case IRInstruction::BRANCH: {
+			do_branch_thread:
+			IRInstruction *true_target = first_instructions[source_instruction->operands[1].value];
+			IRInstruction *false_target = first_instructions[source_instruction->operands[2].value];
+
+			while (true_target->type == IRInstruction::JMP) {
+				true_target = first_instructions[true_target->operands[0].value];
+			}
+
+			while (false_target->type == IRInstruction::JMP) {
+				false_target = first_instructions[false_target->operands[0].value];
+			}
+
+			source_instruction->operands[1].value = true_target->ir_block;
+			source_instruction->operands[2].value = false_target->ir_block;
+
+			break;
+		}
+
+		case IRInstruction::DISPATCH:
+		case IRInstruction::RET:
+			break;
+		default:
+			assert(false);
+		}
+	}
+
+	return true;
+}
+
+bool BlockCompiler::dbe()
+{
+	block_list_t blocks, exits;
+	cfg_t succs, preds;
+	std::set<IRBlockId> to_die;
+
+	if (!build_cfg(blocks, succs, preds, exits))
+		return false;
+
+	for (auto block : blocks) {
+		if (block == 0) continue;
+
+		if (preds[block].size() == 0) {
+			to_die.insert(block);
+		}
+	}
+
+	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
+
+		if (to_die.count(insn->ir_block) != 0) {
+			make_instruction_nop(insn);
+			insn->ir_block = 0;
+		}
+	}
+
+	return true;
+}
+
+bool BlockCompiler::merge_blocks()
+{
+	return true;
+}
+
+bool BlockCompiler::merge_block(IRBlockId mergee, IRBlockId merger)
+{
+	return true;
+}
+
+bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, block_list_t& exits)
 {
 	IRBlockId current_block_id = -1;
 
-	for (int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
 		if (insn->ir_block != current_block_id) {
 			current_block_id = insn->ir_block;
-			printf("building block %d\n", current_block_id);
+			blocks.push_back(current_block_id);
 		}
 
 		switch (insn->type) {
@@ -568,11 +689,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 	std::map<uint32_t, IRBlockId> block_relocations;
 	std::map<IRBlockId, uint32_t> native_block_offsets;
-	
+
 	// Function prologue
 	encoder.push(REG_RBP);
 	encoder.mov(REG_RSP, REG_RBP);
-	
+
 	if (max_stack > 0) encoder.sub(max_stack, REG_RSP);
 
 	encoder.push(REG_R15);
@@ -769,6 +890,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					case IRInstruction::SUB:
 						encoder.sub(register_from_operand(source), register_from_operand(dest));
 						break;
+					default:
+						assert(false);
+						break;
 					}
 				} else if (source->is_alloc_reg() && dest->is_alloc_stack()) {
 					assert(false);
@@ -779,6 +903,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					case IRInstruction::SUB:
 						encoder.sub(stack_from_operand(source), register_from_operand(dest));
+						break;
+					default:
+						assert(false);
 						break;
 					}
 				} else if (source->is_alloc_stack() && dest->is_alloc_stack()) {
@@ -795,6 +922,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					case IRInstruction::SUB:
 						encoder.sub(X86Memory::get(REG_R15, 60), register_from_operand(dest));
+						break;
+					default:
+						assert(false);
 						break;
 					}
 				} else {
@@ -814,6 +944,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						case IRInstruction::SUB:
 							encoder.sub(tmp, register_from_operand(dest));
 							break;
+						default:
+						assert(false);
+						break;
 						}
 					} else {
 						switch (insn->type) {
@@ -823,6 +956,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						case IRInstruction::SUB:
 							encoder.sub(source->value, register_from_operand(dest));
 							break;
+						default:
+						assert(false);
+						break;
 						}
 					}
 				} else {
@@ -887,17 +1023,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (next_insn && next_insn->ir_block == (IRBlockId)target->value) {
 				// The next instruction is in the block we're about to jump to, so we can
 				// leave this as a fallthrough.
-			} else {			
+			} else {
 				// Create a relocated jump instruction, and store the relocation offset and
 				// target into the relocations list.
 				uint32_t reloc_offset;
 				encoder.jmp_reloc(reloc_offset);
 
 				block_relocations[reloc_offset] = target->value;
-				
+
 				encoder.align_up(16);
 			}
-			
+
 			break;
 		}
 
@@ -921,7 +1057,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
-			
+
 			if (next_insn && next_insn->ir_block == (IRBlockId)tt->value) {
 				// Fallthrough is TRUE block
 				{
@@ -950,14 +1086,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					block_relocations[reloc_offset] = ft->value;
 				}
 			}
-			
+
 			break;
 		}
 
 		case IRInstruction::CALL:
 		{
 			IROperand *target = &insn->operands[0];
-			
+
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
@@ -998,7 +1134,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				emit_restore_reg_state(insn->count_operands());
 			}
-			
+
 			break;
 		}
 
@@ -1015,7 +1151,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			break;
 		}
-		
+
 		case IRInstruction::INCPC:
 		{
 			IROperand *amount = &insn->operands[0];
@@ -1141,7 +1277,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *dev = &insn->operands[0];
 			IROperand *reg = &insn->operands[1];
 			IROperand *val = &insn->operands[2];
-			
+
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
@@ -1260,6 +1396,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					case IRInstruction::XOR:
 						encoder.xorr(register_from_operand(source), register_from_operand(dest));
 						break;
+					default:
+						assert(false);
+						break;
 					}
 				} else if (source->is_alloc_stack() && dest->is_alloc_reg()) {
 					// OPER stack -> reg
@@ -1273,6 +1412,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					case IRInstruction::XOR:
 						encoder.xorr(stack_from_operand(source), register_from_operand(dest));
 						break;
+					default:
+						assert(false);
+						break;
 					}
 				} else if (source->is_alloc_reg() && dest->is_alloc_stack()) {
 					// OPER reg -> stack
@@ -1285,6 +1427,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					case IRInstruction::XOR:
 						encoder.xorr(register_from_operand(source), stack_from_operand(dest));
+						break;
+					default:
+						assert(false);
 						break;
 					}
 				} else if (source->is_alloc_stack() && dest->is_alloc_stack()) {
@@ -1310,6 +1455,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						case IRInstruction::XOR:
 							encoder.xorr(tmp, register_from_operand(dest));
 							break;
+						default:
+							assert(false);
+							break;
 						}
 					} else {
 						switch (insn->type) {
@@ -1321,6 +1469,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 							break;
 						case IRInstruction::XOR:
 							encoder.xorr(source->value, register_from_operand(dest));
+							break;
+						default:
+							assert(false);
 							break;
 						}
 					}
@@ -1338,6 +1489,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					case IRInstruction::XOR:
 						encoder.xorr(source->value, stack_from_operand(dest));
+						break;
+					default:
+						assert(false);
 						break;
 					}
 				} else {
@@ -1420,6 +1574,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						case IRInstruction::SX:
 							encoder.movsx(register_from_operand(source), register_from_operand(dest));
 							break;
+						default:
+							assert(false);
+							break;
 						}
 					} else if (source->is_alloc_reg() && dest->is_alloc_stack()) {
 						assert(false);
@@ -1433,6 +1590,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 						case IRInstruction::SX:
 							encoder.movsx(tmpreg, register_from_operand(dest));
+							break;
+						default:
+							assert(false);
 							break;
 						}
 					} else if (source->is_alloc_stack() && dest->is_alloc_stack()) {
@@ -1458,7 +1618,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			const IROperand *lhs = &insn->operands[0];
 			const IROperand *rhs = &insn->operands[1];
 			const IROperand *dest = &insn->operands[2];
-			
+
 			bool invert = false;
 
 			switch (lhs->type) {
@@ -1505,7 +1665,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 				default: assert(false);
 				}
-				
+
 				break;
 			}
 
@@ -1539,22 +1699,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			default: assert(false);
 			}
-			
+
 			bool should_branch_instead = false;
-			
+
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
-			
+
 			// TODO: Look at this optimisation
 			/*if (next_insn && next_insn->type == IRInstruction::BRANCH) {
 				// If the next instruction is a branch, we need to check to see if it's branching on
 				// this condition, before we go ahead an emit an optimised form.
-				
+
 				if (next_insn->operands[0].is_vreg() && next_insn->operands[0].value == dest->value) {
 					// Right here we go, we've got a compare-and-branch situation.
-					
+
 					// Skip the next instruction (which is the branch)
 					i++;
-					
+
 					// Set the do-a-branch-instead flag
 					should_branch_instead = true;
 				}
@@ -1564,10 +1724,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			case IRInstruction::CMPEQ:
 				if (should_branch_instead) {
 					assert(dest->is_alloc_reg());
-					
+
 					IROperand *tt = &next_insn->operands[1];
 					IROperand *ft = &next_insn->operands[2];
-					
+
 					{
 						uint32_t reloc_offset;
 						encoder.je_reloc(reloc_offset);
@@ -1663,6 +1823,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					case IRInstruction::SAR:
 						encoder.sar(amount->value, operand);
 						break;
+					default:
+						assert(false);
+						break;
 					}
 				} else {
 					assert(false);
@@ -1683,6 +1846,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 							break;
 						case IRInstruction::SAR:
 							encoder.sar(REG_CL, operand);
+							break;
+						default:
+							assert(false);
 							break;
 						}
 					} else {
@@ -1714,17 +1880,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			break;
 		}
-		
+
 		case IRInstruction::COUNT:
 		{
 			X86Register& tmp = get_temp(0, 8);
-			
+
 			load_state_field(32, tmp);
 			encoder.add8(1, tmp);
-			
+
 			break;
 		}
-		
+
 		case IRInstruction::FLUSH:
 		case IRInstruction::FLUSH_ITLB:
 		case IRInstruction::FLUSH_DTLB:
@@ -1732,8 +1898,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov(1, REG_EBX);
 			encoder.intt(0x85);
 			break;
-		}	
-		
+		}
+
 		case IRInstruction::FLUSH_ITLB_ENTRY:
 		case IRInstruction::FLUSH_DTLB_ENTRY:
 		{
@@ -1742,67 +1908,96 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else if (insn->operands[0].is_vreg()) {
 				if (insn->operands[0].is_alloc_reg()) {
 					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
-					encoder.mov(addr, REG_ECX);	
+					encoder.mov(addr, REG_ECX);
 				} else {
 					assert(false);
 				}
 			} else {
 				assert(false);
 			}
-			
+
 			encoder.mov(4, REG_EBX);
 			encoder.intt(0x85);
 			break;
-		}	
-		
+		}
+
 		case IRInstruction::ADC_WITH_FLAGS:
 		{
-			if(register_from_operand(&insn->operands[3], 8) != REG_RAX)
+			bool dest_is_rax = register_from_operand(&insn->operands[3], 8) == REG_RAX;
+			if (!dest_is_rax) {
 				encoder.push(REG_RAX);
-					
-			// Load up lhs
-			if(insn->operands[0].is_constant())
-				encoder.mov(insn->operands[0].value, REG_EBX);
-			else if(insn->operands[0].is_alloc_reg()) {
-				encoder.mov(register_from_operand(&insn->operands[0], 4), REG_EBX);
-			} else {
-				encoder.mov(stack_from_operand(&insn->operands[0]), REG_EBX);
 			}
-			
-			// Set up carry bit for adc
-			encoder.mov(0xff, REG_CL);
-			if(insn->operands[2].is_constant()) {
-				encoder.add((uint8_t)insn->operands[2].value, REG_CL);
-			} else if(insn->operands[2].is_alloc_reg()) {
-				encoder.add(register_from_operand(&insn->operands[2], 1), REG_CL);
+
+			IROperand *lhs = &insn->operands[0];
+			IROperand *rhs = &insn->operands[1];
+			IROperand *carry_in = &insn->operands[2];
+			IROperand *flags_out = &insn->operands[3];
+
+			assert(flags_out->is_vreg());
+
+			// Load up lhs
+			if (lhs->is_constant()) {
+				encoder.mov(lhs->value, get_temp(0, 4));
+			} else if (lhs->is_vreg()) {
+				if (lhs->is_alloc_reg()) {
+					encoder.mov(register_from_operand(lhs, 4), get_temp(0, 4));
+				} else if (lhs->is_alloc_stack()) {
+					encoder.mov(stack_from_operand(lhs), get_temp(0, 4));
+				} else {
+					assert(false);
+				}
 			} else {
 				assert(false);
 			}
-			
-			// Perform add with carry to set the flags
-			if(insn->operands[1].is_constant())
-				encoder.adc((uint32_t)insn->operands[1].value, REG_EBX);
-			else if(insn->operands[1].is_alloc_reg()) {
-				encoder.adc(register_from_operand(&insn->operands[1],4), REG_EBX);
+
+			// Set up carry bit for adc
+			encoder.mov(0xff, REG_CL);
+			if (carry_in->is_constant()) {
+				encoder.add((uint8_t)carry_in->value, REG_CL);
+			} else if (carry_in->is_vreg()) {
+				if (carry_in->is_alloc_reg()) {
+					encoder.add(register_from_operand(carry_in, 1), REG_CL);
+				} else {
+					assert(false);
+				}
 			} else {
-				encoder.adc(stack_from_operand(&insn->operands[1]), REG_EBX);
+				assert(false);
 			}
-			
+
+			// Perform add with carry to set the flags
+			if (rhs->is_constant()) {
+				encoder.adc((uint32_t)rhs->value, REG_EBX);
+			} else if (rhs->is_vreg()) {
+				if (rhs->is_alloc_reg()) {
+					encoder.adc(register_from_operand(rhs, 4), REG_EBX);
+				} else if (rhs->is_alloc_stack()) {
+					encoder.adc(stack_from_operand(rhs), REG_EBX);
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
 			// Read flags out into AX
+			// What are you lahfing at?
 			encoder.lahf();
 			encoder.seto(REG_AL);
-			
+
 			//Move AX into correct destination register
-			if(REG_AX != register_from_operand(&insn->operands[3], 2))
-				encoder.mov(REG_AX, register_from_operand(&insn->operands[3], 2));
-						
-			if(register_from_operand(&insn->operands[3], 8) != REG_RAX) {
+			if (!dest_is_rax) {
+				if (flags_out->is_alloc_reg()) {
+					encoder.mov(REG_AX, register_from_operand(flags_out, 2));
+				} else {
+					assert(false);
+				}
+				
 				encoder.pop(REG_RAX);
 			}
-			
+
 			break;
 		}
-		
+
 		default:
 			printf("unsupported instruction: %s\n", insn_descriptors[insn->type].mnemonic);
 			success = false;
@@ -1823,7 +2018,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	return success;
 }
 
-void BlockCompiler::emit_save_reg_state()
+void BlockCompiler::emit_save_reg_state(int num_operands)
 {
 	encoder.push(REG_RSI);
 	encoder.push(REG_RDI);
