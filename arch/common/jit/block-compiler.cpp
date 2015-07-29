@@ -28,12 +28,14 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
+	if (!thread_jumps()) return false;
+	if (!dbe()) return false;
+	if (!merge_blocks()) return false;
 	if (!sort_ir()) return false;
-	
 	if (!analyse(max_stack)) return false;
 	if (!allocate()) return false;
 
-//	dump_ir();
+	//dump_ir();
 
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -123,7 +125,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "scm",		.format = "IXXXXX" },
 	{ .mnemonic = "stdev",		.format = "IIIXXX" },
 	{ .mnemonic = "lddev",		.format = "IIOXXX" },
-	
+
 	{ .mnemonic = "flush",		.format = "XXXXXX" },
 	{ .mnemonic = "flush itlb",	.format = "XXXXXX" },
 	{ .mnemonic = "flush dtlb",	.format = "XXXXXX" },
@@ -137,19 +139,19 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	std::map<IRRegId, uint32_t> allocation;			// local register allocation
 	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
-	
+
 	std::set<IRRegId> live_ins, live_outs;
-	
+
 	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	std::map<IRRegId, IRBlockId> vreg_seen_block;
-	
+
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		for (int o = 0; o < 6; o++) {
 			IROperand *oper = &insn->operands[o];
-			
+
 			if(oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
 				if(vreg_seen_block.count(oper->value) && vreg_seen_block[oper->value] != insn->ir_block) {
 					//globally allocate
@@ -177,7 +179,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 			// Reset the available register bitfield
 			avail_regs = 0x3f; // 00111111 == 6 available registers
-			
+
 			// Update the latest block id.
 			latest_block_id = insn->ir_block;
 			//printf("block %d:\n", latest_block_id);
@@ -229,7 +231,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				assert(next_reg);
 
 				allocation[in] = next_reg - 1;
-				
+
 				avail_regs &= ~(1 << (next_reg - 1));
 			}
 		}
@@ -257,7 +259,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				can_be_dead = true;
 				break;
 		}
-		
+
 //		printf("About to fuck up %10s\n", insn_descriptors[insn->type].mnemonic);
 		// Loop over operands to update the allocation information on VREG operands.
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
@@ -285,12 +287,12 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				allocation.erase(alloc);
 			}
 		}
-				
+
 		// If this instruction is dead, remove any live ins which are not live outs
 		// in order to propagate dead instruction elimination information
 		if(!not_dead && can_be_dead) {
 			insn->type = IRInstruction::NOP;
-			
+
 			std::set<IRRegId> old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
 				if(live_outs.count(in) == 0) {
@@ -299,14 +301,14 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 					assert(alloc != allocation.end());
 					avail_regs |= 1 << alloc->second;
 					allocation.erase(alloc);
-					
+
 					live_ins.erase(in);
 				}
 			}
 		}
 
 		//printf("  [%03d] %10s", ir_idx, insn_descriptors[insn->type].mnemonic);
-		
+
 		// Quick optimisations
 		switch (insn->type) {
 		case IRInstruction::ADD:
@@ -319,8 +321,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) insn->type = IRInstruction::NOP;
 			break;
 		}
-		
-		
+
+
 #if 0
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
@@ -402,7 +404,130 @@ next_instruction:;
 	return true;
 }
 
-bool BlockCompiler::build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits)
+bool BlockCompiler::thread_jumps()
+{
+	std::map<IRBlockId, IRInstruction *> first_instructions;
+	std::map<IRBlockId, IRInstruction *> last_instructions;
+
+	// Build up a list of the first instructions in each block.
+	IRBlockId current_block_id = -1;
+	for (int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
+
+		if (insn->ir_block != current_block_id) {
+			if (ir_idx > 0) {
+				last_instructions[current_block_id] = ctx.at(ir_idx - 1);
+			}
+
+			current_block_id = insn->ir_block;
+			first_instructions[current_block_id] = insn;
+		}
+	}
+
+	for (auto block : last_instructions) {
+		IRInstruction *source_instruction = block.second;
+
+		switch(source_instruction->type) {
+		case IRInstruction::JMP: {
+			IRInstruction *target_instruction = first_instructions[block.second->operands[0].value];
+
+			while (target_instruction->type == IRInstruction::JMP) {
+				target_instruction = first_instructions[target_instruction->operands[0].value];
+			}
+
+			if (target_instruction->type == IRInstruction::RET) {
+				*source_instruction = *target_instruction;
+				source_instruction->ir_block = block.first;
+			} else if (target_instruction->type == IRInstruction::BRANCH) {
+				*source_instruction = *target_instruction;
+				source_instruction->ir_block = block.first;
+				goto do_branch_thread;
+			} else if (target_instruction->type == IRInstruction::DISPATCH) {
+				*source_instruction = *target_instruction;
+				source_instruction->ir_block = block.first;
+			} else {
+				source_instruction->operands[0].value = target_instruction->ir_block;
+			}
+
+			break;
+		}
+
+		case IRInstruction::BRANCH: {
+			do_branch_thread:
+			IRInstruction *true_target = first_instructions[source_instruction->operands[1].value];
+			IRInstruction *false_target = first_instructions[source_instruction->operands[2].value];
+
+			while (true_target->type == IRInstruction::JMP) {
+				true_target = first_instructions[true_target->operands[0].value];
+			}
+
+			while (false_target->type == IRInstruction::JMP) {
+				false_target = first_instructions[false_target->operands[0].value];
+			}
+
+			source_instruction->operands[1].value = true_target->ir_block;
+			source_instruction->operands[2].value = false_target->ir_block;
+
+			break;
+		}
+
+		case IRInstruction::DISPATCH:
+		case IRInstruction::RET:
+			break;
+		default:
+			assert(false);
+		}
+	}
+
+	return true;
+}
+
+bool BlockCompiler::dbe()
+{
+	block_list_t blocks, exits;
+	cfg_t succs, preds;
+	std::set<IRBlockId> to_die;
+
+	if (!build_cfg(blocks, succs, preds, exits))
+		return false;
+
+	for (auto block : blocks) {
+		if (block == 0) continue;
+
+		if (preds[block].size() == 0) {
+			to_die.insert(block);
+		}
+	}
+
+	for (int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
+
+		if (to_die.count(insn->ir_block) != 0) {
+			insn->type = IRInstruction::NOP;
+			insn->operands[0].type = IROperand::NONE;
+			insn->operands[1].type = IROperand::NONE;
+			insn->operands[2].type = IROperand::NONE;
+			insn->operands[3].type = IROperand::NONE;
+			insn->operands[4].type = IROperand::NONE;
+			insn->operands[5].type = IROperand::NONE;
+			insn->ir_block = 0;
+		}
+	}
+
+	return true;
+}
+
+bool BlockCompiler::merge_blocks()
+{
+	return true;
+}
+
+bool BlockCompiler::merge_block(IRBlockId mergee, IRBlockId merger)
+{
+	return true;
+}
+
+bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, block_list_t& exits)
 {
 	IRBlockId current_block_id = -1;
 
@@ -411,7 +536,7 @@ bool BlockCompiler::build_cfg(cfg_t& succs, cfg_t& preds, block_list_t& exits)
 
 		if (insn->ir_block != current_block_id) {
 			current_block_id = insn->ir_block;
-			printf("building block %d\n", current_block_id);
+			blocks.push_back(current_block_id);
 		}
 
 		switch (insn->type) {
@@ -468,11 +593,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 	std::map<uint32_t, IRBlockId> block_relocations;
 	std::map<IRBlockId, uint32_t> native_block_offsets;
-	
+
 	// Function prologue
 	encoder.push(REG_RBP);
 	encoder.mov(REG_RSP, REG_RBP);
-	
+
 	if (max_stack > 0) encoder.sub(max_stack, REG_RSP);
 
 	encoder.push(REG_R15);
@@ -787,7 +912,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (next_insn && next_insn->ir_block == (IRBlockId)target->value) {
 				// The next instruction is in the block we're about to jump to, so we can
 				// leave this as a fallthrough.
-			} else {			
+			} else {
 				// Create a relocated jump instruction, and store the relocation offset and
 				// target into the relocations list.
 				uint32_t reloc_offset;
@@ -795,7 +920,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 				block_relocations[reloc_offset] = target->value;
 			}
-			
+
 			break;
 		}
 
@@ -819,7 +944,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
-			
+
 			if (next_insn && next_insn->ir_block == (IRBlockId)tt->value) {
 				// Fallthrough is TRUE block
 				{
@@ -848,14 +973,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					block_relocations[reloc_offset] = ft->value;
 				}
 			}
-			
+
 			break;
 		}
 
 		case IRInstruction::CALL:
 		{
 			IROperand *target = &insn->operands[0];
-			
+
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
@@ -896,7 +1021,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				emit_restore_reg_state();
 			}
-			
+
 			break;
 		}
 
@@ -913,7 +1038,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			break;
 		}
-		
+
 		case IRInstruction::INCPC:
 		{
 			IROperand *amount = &insn->operands[0];
@@ -1039,7 +1164,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *dev = &insn->operands[0];
 			IROperand *reg = &insn->operands[1];
 			IROperand *val = &insn->operands[2];
-			
+
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
@@ -1356,7 +1481,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			const IROperand *lhs = &insn->operands[0];
 			const IROperand *rhs = &insn->operands[1];
 			const IROperand *dest = &insn->operands[2];
-			
+
 			bool invert = false;
 
 			switch (lhs->type) {
@@ -1403,7 +1528,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 				default: assert(false);
 				}
-				
+
 				break;
 			}
 
@@ -1437,22 +1562,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			default: assert(false);
 			}
-			
+
 			bool should_branch_instead = false;
-			
+
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
-			
+
 			// TODO: Look at this optimisation
 			/*if (next_insn && next_insn->type == IRInstruction::BRANCH) {
 				// If the next instruction is a branch, we need to check to see if it's branching on
 				// this condition, before we go ahead an emit an optimised form.
-				
+
 				if (next_insn->operands[0].is_vreg() && next_insn->operands[0].value == dest->value) {
 					// Right here we go, we've got a compare-and-branch situation.
-					
+
 					// Skip the next instruction (which is the branch)
 					i++;
-					
+
 					// Set the do-a-branch-instead flag
 					should_branch_instead = true;
 				}
@@ -1462,10 +1587,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			case IRInstruction::CMPEQ:
 				if (should_branch_instead) {
 					assert(dest->is_alloc_reg());
-					
+
 					IROperand *tt = &next_insn->operands[1];
 					IROperand *ft = &next_insn->operands[2];
-					
+
 					{
 						uint32_t reloc_offset;
 						encoder.je_reloc(reloc_offset);
@@ -1612,17 +1737,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			break;
 		}
-		
+
 		case IRInstruction::COUNT:
 		{
 			X86Register& tmp = get_temp(0, 8);
-			
+
 			load_state_field(32, tmp);
 			encoder.add8(1, tmp);
-			
+
 			break;
 		}
-		
+
 		case IRInstruction::FLUSH:
 		case IRInstruction::FLUSH_ITLB:
 		case IRInstruction::FLUSH_DTLB:
@@ -1630,8 +1755,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov(1, REG_EBX);
 			encoder.intt(0x85);
 			break;
-		}	
-		
+		}
+
 		case IRInstruction::FLUSH_ITLB_ENTRY:
 		case IRInstruction::FLUSH_DTLB_ENTRY:
 		{
@@ -1640,19 +1765,19 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else if (insn->operands[0].is_vreg()) {
 				if (insn->operands[0].is_alloc_reg()) {
 					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
-					encoder.mov(addr, REG_ECX);	
+					encoder.mov(addr, REG_ECX);
 				} else {
 					assert(false);
 				}
 			} else {
 				assert(false);
 			}
-			
+
 			encoder.mov(4, REG_EBX);
 			encoder.intt(0x85);
 			break;
-		}	
-		
+		}
+
 		default:
 			printf("unsupported instruction: %s\n", insn_descriptors[insn->type].mnemonic);
 			success = false;
