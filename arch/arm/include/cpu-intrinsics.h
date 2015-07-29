@@ -75,7 +75,7 @@ static inline uint32_t trace_write_reg_bank(captive::arch::CPU& cpu, const char 
 #define set_cpu_mode(_v) cpu.state.isa_mode = _v
 #define get_cpu_mode() cpu.state.isa_mode
 
-static inline void trap() { printf("trap: " __FILE__ " at %d \n", __LINE__); asm volatile ("out %0, $0xff\n" :: "a"(2)); }
+#define trap() do { printf("trap: " __FILE__ " at %d \n", __LINE__); asm volatile ("out %0, $0xff\n" :: "a"(2)); } while(0)
 
 #define halt_cpu() asm volatile ("out %0, $0xff\n" :: "a"(2))
 
@@ -87,6 +87,9 @@ static inline void flush_dtlb_entry(uint32_t v) { asm volatile ("int $0x82\n" ::
 static inline void flush_itlb() { asm volatile ("int $0x82\n" :: "D"(2)); }
 static inline void flush_dtlb() { asm volatile ("int $0x82\n" :: "D"(3)); }
 static inline void flush() { asm volatile ("int $0x82\n" :: "D"(1)); }
+
+#define __builtin_adc_flags genc_adc_flags
+extern "C" uint32_t __builtin_adc_flags(uint32_t lhs, uint32_t rhs, uint32_t carry_in);
 
 #define __mem_read(_addr, _type) (*((_type *)((uint64_t)(_addr))))
 #define __mem_write(_addr, _data, _type) *((_type *)((uint64_t)(_addr))) = (_data)
@@ -164,7 +167,11 @@ define_mem_write_user_func(64, uint64_t)
 
 #undef halt_cpu
 
+#undef trap
+
 #undef write_device
 #undef read_device
+
+#undef __builtin_adc_flags 
 
 #endif

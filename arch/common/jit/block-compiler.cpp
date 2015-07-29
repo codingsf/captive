@@ -1,7 +1,10 @@
+
 #include <jit/block-compiler.h>
 #include <set>
 #include <list>
 #include <map>
+
+#include <small-set.h>
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
@@ -12,6 +15,25 @@ extern "C" void jit_rum(void *cpu);
 using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 using namespace captive::shared;
+
+/* Registers
+ *
+ * RAX  Allocatable
+ * RBX  Temporary
+ * RCX  Temporary
+ * RDX  Allocatable
+ * RSI  Allocatable
+ * RDI  Allocatable
+ * R8   Allocatable
+ * R9   Allocatable
+ * R10  Allocatable
+ * R11  Not used
+ * R12  Not used
+ * R13  Not used
+ * R14  State variable
+ * R15  Register File
+ *
+ */
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
 {
@@ -32,6 +54,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!dbe()) return false;
 	if (!merge_blocks()) return false;
 	if (!sort_ir()) return false;
+	if (!peephole()) return false;
 	if (!analyse(max_stack)) return false;
 	if (!allocate()) return false;
 
@@ -59,6 +82,79 @@ bool BlockCompiler::sort_ir()
 			if (pos > 1) {
 				pos -=1;
 			}
+		}
+	}
+
+	return true;
+}
+
+// If this is an add of a negative value, replace it with a subtract of a positive value
+static bool peephole_add(IRInstruction &insn)
+{
+	IROperand &op1 = insn.operands[0];
+	if(op1.is_constant()) {
+		uint64_t unsigned_negative = 0;
+		switch(op1.size) {
+			case 1: unsigned_negative = 0x80; break;
+			case 2: unsigned_negative = 0x8000; break;
+			case 4: unsigned_negative = 0x80000000; break;
+			case 8: unsigned_negative = 0x8000000000000000; break;
+			default: assert(false);
+		}
+
+		if(op1.value >= unsigned_negative) {
+			insn.type = IRInstruction::SUB;
+			switch(op1.size) {
+				case 1: op1.value = -(int8_t)op1.value; break;
+				case 2: op1.value = -(int16_t)op1.value; break;
+				case 4: op1.value = -(int32_t)op1.value; break;
+				case 8: op1.value = -(int64_t)op1.value; break;
+				default: assert(false);
+			}
+		}
+	}
+	return true;
+}
+
+// If we shift an n-bit value by n bits, then replace this instruction with a move of 0.
+// We explicitly move in 0, rather than XORing out, in order to avoid creating spurious use-defs
+bool peephole_shift(IRInstruction &insn)
+{
+	IROperand &op1 = insn.operands[0];
+	IROperand &op2 = insn.operands[1];
+	if(op1.is_constant()) {
+		bool zeros_out = false;
+		switch(op2.size) {
+			case 1: zeros_out = op1.value == 8; break;
+			case 2: zeros_out = op1.value == 16; break;
+			case 4: zeros_out = op1.value == 32; break;
+			case 8: zeros_out = op1.value == 64; break;
+		}
+
+		if(zeros_out) {
+			insn.type = IRInstruction::MOV;
+			op1.type = IROperand::CONSTANT;
+			op1.value = 0;
+		}
+	}
+
+	return true;
+}
+
+// Perform some basic optimisations
+bool BlockCompiler::peephole()
+{
+	for (int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+
+		switch(insn->type){
+		case IRInstruction::ADD:
+			peephole_add(*insn);
+			break;
+		case IRInstruction::SHR:
+		case IRInstruction::SHL:
+			peephole_shift(*insn);
+			break;
 		}
 	}
 
@@ -131,6 +227,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "XXXXXX" },
 	{ .mnemonic = "flush itlb",	.format = "IXXXXX" },
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX" },
+
+	{ .mnemonic = "adc flags",	.format = "IIIOXX" },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
@@ -139,13 +237,14 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	std::map<IRRegId, uint32_t> allocation;			// local register allocation
 	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
-
-	std::set<IRRegId> live_ins, live_outs;
+	SmallSet<IRRegId, 8> live_ins, live_outs;
 
 	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	std::map<IRRegId, IRBlockId> vreg_seen_block;
+
+	//printf("allocating for 0x%08x over %u vregs\n", pa, ctx.reg_count());
 
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -214,6 +313,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		// Release LIVE-OUTs that are not LIVE-INs
 		for (auto out : live_outs) {
+			if(global_allocation.count(out)) continue;
 			if (!live_ins.count(out)) {
 				auto alloc = allocation.find(out);
 				assert(alloc != allocation.end());
@@ -226,7 +326,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		// Allocate LIVE-INs
 		for (auto in : live_ins) {
 			// If the live-in is not already allocated, allocate it.
-			if (allocation.count(in) == 0) {
+			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
 				uint32_t next_reg = __builtin_ffs(avail_regs);
 				assert(next_reg);
 
@@ -256,6 +356,13 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			case IRInstruction::SHR:
 			case IRInstruction::SAR:
 			case IRInstruction::READ_REG:
+
+			case IRInstruction::CMPEQ:
+			case IRInstruction::CMPNE:
+			case IRInstruction::CMPLT:
+			case IRInstruction::CMPLTE:
+			case IRInstruction::CMPGT:
+			case IRInstruction::CMPGTE:
 				can_be_dead = true;
 				break;
 		}
@@ -266,20 +373,31 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			IROperand *oper = &insn->operands[op_idx];
 
 			if (oper->is_vreg()) {
-				auto alloc_reg = allocation.find((IRRegId)oper->value);
-
-//				printf("Operand %u (%u) is %c and is live out:%u\n", op_idx, oper->value, descr->format[op_idx], live_outs.count(oper->value));
 				if (descr->format[op_idx] != 'I' && live_outs.count(oper->value)) not_dead = true;
-				if (global_allocation.count(oper->value)) not_dead = true;
 
-				if (alloc_reg != allocation.end()) {
-					oper->allocate(IROperand::ALLOCATED_REG, alloc_reg->second);
+				// If this vreg has been allocated to the stack, then fill in the stack entry location here
+				auto global_alloc = global_allocation.find(oper->value);
+				if(global_alloc != global_allocation.end()) {
+					oper->allocate(IROperand::ALLOCATED_STACK, global_alloc->second);
+					if(descr->format[op_idx] == 'O' || descr->format[op_idx] == 'B') not_dead = true;
+				} else {
+
+					// Otherwise, if the value has been locally allocated, fill in the local allocation
+					auto alloc_reg = allocation.find((IRRegId)oper->value);
+
+	//				printf("Operand %u (%u) is %c and is live out:%u\n", op_idx, oper->value, descr->format[op_idx], live_outs.count(oper->value));
+
+					if (alloc_reg != allocation.end()) {
+						oper->allocate(IROperand::ALLOCATED_REG, alloc_reg->second);
+					}
+
 				}
 			}
 		}
 
 		// Remove allocations that are not LIVE-INs
 		for (auto out : live_outs) {
+			if(global_allocation.count(out)) continue;
 			if (!live_ins.count(out)) {
 				auto alloc = allocation.find(out);
 				assert(alloc != allocation.end());
@@ -293,8 +411,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		if(!not_dead && can_be_dead) {
 			insn->type = IRInstruction::NOP;
 
-			std::set<IRRegId> old_live_ins = live_ins;
+			auto old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
+				if(global_allocation.count(in)) continue;
 				if(live_outs.count(in) == 0) {
 					//printf("Found a live in that's not a live out in a dead instruction r%d \n", in);
 					auto alloc = allocation.find(in);
@@ -370,35 +489,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 #endif
 	}
 
-	// Update spanning vreg operand allocations
-	for (int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
-		IRInstruction *insn = ctx.at(ir_idx);
-
-		for (int op_idx = 0; op_idx < 6; op_idx++) {
-			IROperand *oper = &insn->operands[op_idx];
-
-			if (oper->is_vreg()) {
-				auto g = global_allocation.find((IRRegId)oper->value);
-
-				if (g == global_allocation.end()) {
-					// If it's not globally allocated
-
-					if (!oper->is_allocated()) {
-						// If it hasn't been allocated
-						insn->type = IRInstruction::NOP;
-					}
-				} else {
-					// If it's globally allocated
-					oper->allocate(IROperand::ALLOCATED_STACK, g->second);
-				}
-			}
-		}
-
-next_instruction:;
-	}
-
 	//printf("block %08x\n", tb.block_addr);
-	//dump_ir();
+//	dump_ir();
 
 	max_stack = next_global;
 	return true;
@@ -919,6 +1011,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.jmp_reloc(reloc_offset);
 
 				block_relocations[reloc_offset] = target->value;
+
+				encoder.align_up(16);
 			}
 
 			break;
@@ -1778,6 +1872,55 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			break;
 		}
 
+		case IRInstruction::ADC_WITH_FLAGS:
+		{
+			if(register_from_operand(&insn->operands[3], 8) != REG_RAX)
+				encoder.push(REG_RAX);
+
+			// Load up lhs
+			if(insn->operands[0].is_constant())
+				encoder.mov(insn->operands[0].value, REG_EBX);
+			else if(insn->operands[0].is_alloc_reg()) {
+				encoder.mov(register_from_operand(&insn->operands[0], 4), REG_EBX);
+			} else {
+				encoder.mov(stack_from_operand(&insn->operands[0]), REG_EBX);
+			}
+
+			// Set up carry bit for adc
+			encoder.mov(0xff, REG_CL);
+			if(insn->operands[2].is_constant()) {
+				encoder.add((uint8_t)insn->operands[2].value, REG_CL);
+			} else if(insn->operands[2].is_alloc_reg()) {
+				encoder.add(register_from_operand(&insn->operands[2], 1), REG_CL);
+			} else {
+				assert(false);
+			}
+
+			// Perform add with carry to set the flags
+			if(insn->operands[1].is_constant())
+				encoder.adc((uint32_t)insn->operands[1].value, REG_EBX);
+			else if(insn->operands[1].is_alloc_reg()) {
+				encoder.adc(register_from_operand(&insn->operands[1],4), REG_EBX);
+			} else {
+				encoder.adc(stack_from_operand(&insn->operands[1]), REG_EBX);
+			}
+
+			// Read flags out into AX
+			// What are you lahfing at?
+			encoder.lahf();
+			encoder.seto(REG_AL);
+
+			//Move AX into correct destination register
+			if(REG_AX != register_from_operand(&insn->operands[3], 2))
+				encoder.mov(REG_AX, register_from_operand(&insn->operands[3], 2));
+
+			if(register_from_operand(&insn->operands[3], 8) != REG_RAX) {
+				encoder.pop(REG_RAX);
+			}
+
+			break;
+		}
+
 		default:
 			printf("unsupported instruction: %s\n", insn_descriptors[insn->type].mnemonic);
 			success = false;
@@ -1794,7 +1937,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+//	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	return success;
 }
 
