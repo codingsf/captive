@@ -9,6 +9,13 @@ static const char *mem_access_types[] = { "read", "write", "fetch" };
 static const char *mem_access_modes[] = { "user", "kernel" };
 static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
+#define ITLB_SIZE	4096
+
+static struct {
+	gva_t tag;
+	gpa_t value;
+} itlb[ITLB_SIZE];
+
 MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
 	//printf("mmu: allocating guest pdps\n");
@@ -25,6 +32,10 @@ MMU::MMU(CPU& cpu) : _cpu(cpu)
 	}
 
 	Memory::flush_tlb();
+	
+	for (int i = 0; i < ITLB_SIZE; i++) {
+		itlb[i].tag = 0;
+	}
 }
 
 MMU::~MMU()
@@ -129,6 +140,10 @@ void MMU::invalidate_virtual_mappings()
 
 	// Notify the CPU to invalidate virtual mappings
 	_cpu.invalidate_virtual_mappings();
+	
+	for (int i = 0; i < ITLB_SIZE; i++) {
+		itlb[i].tag = 0;
+	}
 }
 
 void MMU::invalidate_virtual_mapping(gva_t va)
@@ -145,6 +160,10 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 	
 	// Notify the CPU to invalidate this virtual mapping
 	_cpu.invalidate_virtual_mapping(va);
+	
+	for (int i = 0; i < 4096; i++) {
+		itlb[(va + i) % ITLB_SIZE].tag = 0;
+	}
 }
 
 void MMU::disable_writes()
@@ -328,5 +347,15 @@ bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 	info.type = ACCESS_FETCH;
 	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
 	
-	return resolve_gpa(va, pa, info, fault, true);
+	if (va != 0 && itlb[va % ITLB_SIZE].tag == va) {
+		pa = itlb[va % ITLB_SIZE].value;
+		return true;
+	} else {
+		if (!resolve_gpa(va, pa, info, fault, true))
+			return false;
+		
+		itlb[va % ITLB_SIZE].tag = va;
+		itlb[va % ITLB_SIZE].value = pa;
+		return true;
+	}
 }
