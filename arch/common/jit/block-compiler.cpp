@@ -1880,15 +1880,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *flags_out = &insn->operands[3];
 
 			assert(flags_out->is_vreg());
+			
+			X86Register& tmp = get_temp(0, 4);
 
 			// Load up lhs
 			if (lhs->is_constant()) {
-				encoder.mov(lhs->value, get_temp(0, 4));
+				encoder.mov(lhs->value, tmp);
 			} else if (lhs->is_vreg()) {
 				if (lhs->is_alloc_reg()) {
-					encoder.mov(register_from_operand(lhs, 4), get_temp(0, 4));
+					encoder.mov(register_from_operand(lhs, 4), tmp);
 				} else if (lhs->is_alloc_stack()) {
-					encoder.mov(stack_from_operand(lhs), get_temp(0, 4));
+					encoder.mov(stack_from_operand(lhs), tmp);
 				} else {
 					assert(false);
 				}
@@ -1897,12 +1899,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			// Set up carry bit for adc
-			encoder.mov(0xff, REG_CL);
 			if (carry_in->is_constant()) {
-				encoder.add((uint8_t)carry_in->value, REG_CL);
+				if (carry_in->value == 0) {
+					encoder.clc();
+				} else {
+					encoder.stc();
+				}
 			} else if (carry_in->is_vreg()) {
+				encoder.mov(0xff, get_temp(1, 1));
 				if (carry_in->is_alloc_reg()) {
-					encoder.add(register_from_operand(carry_in, 1), REG_CL);
+					encoder.add(register_from_operand(carry_in, 1), get_temp(1, 1));
 				} else {
 					assert(false);
 				}
@@ -1912,12 +1918,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			// Perform add with carry to set the flags
 			if (rhs->is_constant()) {
-				encoder.adc((uint32_t)rhs->value, REG_EBX);
+				encoder.adc((uint32_t)rhs->value, tmp);
 			} else if (rhs->is_vreg()) {
 				if (rhs->is_alloc_reg()) {
-					encoder.adc(register_from_operand(rhs, 4), REG_EBX);
+					encoder.adc(register_from_operand(rhs, 4), tmp);
 				} else if (rhs->is_alloc_stack()) {
-					encoder.adc(stack_from_operand(rhs), REG_EBX);
+					encoder.adc(stack_from_operand(rhs), tmp);
 				} else {
 					assert(false);
 				}
@@ -1960,7 +1966,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-//	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	return success;
 }
 

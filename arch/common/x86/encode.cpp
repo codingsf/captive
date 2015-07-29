@@ -699,6 +699,16 @@ void X86Encoder::lahf()
 	emit8(0x9f);
 }
 
+void X86Encoder::stc()
+{
+	emit8(0xf9);
+}
+
+void X86Encoder::clc()
+{
+	emit8(0xf8);
+}
+
 void X86Encoder::bsr(const X86Register& src, const X86Register& dst)
 {
 	assert(src.size == dst.size);

@@ -213,6 +213,8 @@ namespace captive {
 				void je(int8_t off);
 
 				void lahf();
+				void clc();
+				void stc();
 
 				void setcc(uint8_t v, const X86Register& dst);
 
