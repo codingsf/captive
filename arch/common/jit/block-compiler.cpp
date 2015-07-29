@@ -16,23 +16,22 @@ using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
-/* Registers
+/* Register Mapping
  *
- * RAX  Allocatable
+ * RAX  Allocatable			0
  * RBX  Temporary
  * RCX  Temporary
- * RDX  Allocatable
- * RSI  Allocatable
- * RDI  Allocatable
- * R8   Allocatable
- * R9   Allocatable
- * R10  Allocatable
+ * RDX  Allocatable			1
+ * RSI  Allocatable			2
+ * RDI  Allocatable			3
+ * R8   Allocatable			4
+ * R9   Allocatable			5
+ * R10  Allocatable			6
  * R11  Not used
  * R12  Not used
  * R13  Not used
  * R14  State variable
  * R15  Register File
- *
  */
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
@@ -294,17 +293,24 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	//printf("allocating for 0x%08x over %u vregs\n", pa, ctx.reg_count());
 
-	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
+	// Build up a map of which vregs have been seen in which blocks, to detect spanning vregs.
+	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		for (int o = 0; o < 6; o++) {
-			IROperand *oper = &insn->operands[o];
+		
+		for (int op_idx = 0; op_idx < 6; op_idx++) {
+			IROperand *oper = &insn->operands[op_idx];
 
-			if(oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
-				if(vreg_seen_block.count(oper->value) && vreg_seen_block[oper->value] != insn->ir_block) {
-					//globally allocate
+			// If the operand is a vreg, and is not already a global...
+			if (oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
+				auto seen_in_block = vreg_seen_block.find(oper->value);
+				
+				// If we have already seen this operand, and not in the same block, then we
+				// must globally allocate it.
+				if (seen_in_block != vreg_seen_block.end() && seen_in_block->second != insn->ir_block) {
 					global_allocation[oper->value] = next_global;
 					next_global += 8;
 				}
+				
 				vreg_seen_block[oper->value] = insn->ir_block;
 			}
 		}

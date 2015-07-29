@@ -37,11 +37,10 @@ bool ArmMMU::enable()
 {
 	if (_enabled) return true;
 
-	clear_vma();
-	cpu().clear_block_cache();
+	invalidate_virtual_mappings();
+	cpu().invalidate_translations();
 
 	_enabled = true;
-	//printf("mmu: enabled\n");
 	return true;
 }
 
@@ -49,10 +48,10 @@ bool ArmMMU::disable()
 {
 	if (!_enabled) return true;
 
-	clear_vma();
+	invalidate_virtual_mappings();
+	cpu().invalidate_translations();
 
 	_enabled = false;
-	//printf("mmu: disabled\n");
 	return true;
 }
 

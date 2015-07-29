@@ -87,7 +87,7 @@ bool CPU::run_block_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		if(PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
+		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
 			MMU::resolution_fault fault;
@@ -104,7 +104,6 @@ bool CPU::run_block_jit_safepoint()
 			// Mark the physical page corresponding to the PC as executed
 			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 			
-		
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 		}

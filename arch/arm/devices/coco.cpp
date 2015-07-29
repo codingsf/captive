@@ -66,7 +66,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			return false;
 		}
 
-		cpu.mmu().flush();
+		cpu.mmu().invalidate_virtual_mappings();
 		break;
 
 	case 3:
@@ -81,7 +81,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 
 	case 7:
-		cpu.mmu().flush();
+		cpu.mmu().invalidate_virtual_mappings();
 		switch (rm) {
 			case 0:
 				switch (op2) {
@@ -228,7 +228,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		switch (rm) {
 		case 5:
 		case 6:
-			cpu.mmu().flush();
+			cpu.mmu().invalidate_virtual_mappings();
 			break;
 		}
 		
