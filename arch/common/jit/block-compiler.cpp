@@ -294,17 +294,24 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	//printf("allocating for 0x%08x over %u vregs\n", pa, ctx.reg_count());
 
-	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
+	// Build up a map of which vregs have been seen in which blocks, to detect spanning vregs.
+	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		for (int o = 0; o < 6; o++) {
-			IROperand *oper = &insn->operands[o];
+		
+		for (int op_idx = 0; op_idx < 6; op_idx++) {
+			IROperand *oper = &insn->operands[op_idx];
 
-			if(oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
-				if(vreg_seen_block.count(oper->value) && vreg_seen_block[oper->value] != insn->ir_block) {
-					//globally allocate
+			// If the operand is a vreg, and is not already a global...
+			if (oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
+				auto seen_in_block = vreg_seen_block.find(oper->value);
+				
+				// If we have already seen this operand, and not in the same block, then we
+				// must globally allocate it.
+				if (seen_in_block != vreg_seen_block.end() && seen_in_block->second != insn->ir_block) {
 					global_allocation[oper->value] = next_global;
 					next_global += 8;
 				}
+				
 				vreg_seen_block[oper->value] = insn->ir_block;
 			}
 		}
