@@ -47,6 +47,7 @@ namespace captive {
 				bool peeplower(uint32_t max_stack);
 
 				void dump_ir();
+				void make_instruction_nop(shared::IRInstruction *insn);
 
 				void emit_save_reg_state();
 				void emit_restore_reg_state();

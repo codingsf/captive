@@ -141,21 +141,53 @@ bool peephole_shift(IRInstruction &insn)
 	return true;
 }
 
+void BlockCompiler::make_instruction_nop(IRInstruction *insn)
+{
+	insn->type = IRInstruction::NOP;
+	insn->operands[0].type = IROperand::NONE;
+	insn->operands[1].type = IROperand::NONE;
+	insn->operands[2].type = IROperand::NONE;
+	insn->operands[3].type = IROperand::NONE;
+	insn->operands[4].type = IROperand::NONE;
+	insn->operands[5].type = IROperand::NONE;
+}
+
+
 // Perform some basic optimisations
 bool BlockCompiler::peephole()
 {
 	for (int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
-		switch(insn->type){
+		switch (insn->type) {
 		case IRInstruction::ADD:
-			peephole_add(*insn);
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
+				make_instruction_nop(insn);
+			} else {
+				peephole_add(*insn);
+			}
+			
 			break;
+			
 		case IRInstruction::SHR:
 		case IRInstruction::SHL:
-			peephole_shift(*insn);
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
+				make_instruction_nop(insn);
+			} else {
+				peephole_shift(*insn);
+			}
+			break;
+		
+		case IRInstruction::SUB:
+		case IRInstruction::SAR:
+		case IRInstruction::OR:
+		case IRInstruction::XOR:
+			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
+				make_instruction_nop(insn);
+			}
 			break;
 		}
+
 	}
 
 	return true;
@@ -392,7 +424,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		// If this instruction is dead, remove any live ins which are not live outs
 		// in order to propagate dead instruction elimination information
 		if(!not_dead && can_be_dead) {
-			insn->type = IRInstruction::NOP;
+			make_instruction_nop(insn);
 
 			auto old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
@@ -410,20 +442,6 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		}
 
 		//printf("  [%03d] %10s", ir_idx, insn_descriptors[insn->type].mnemonic);
-
-		// Quick optimisations
-		switch (insn->type) {
-		case IRInstruction::ADD:
-		case IRInstruction::SUB:
-		case IRInstruction::SHL:
-		case IRInstruction::SHR:
-		case IRInstruction::SAR:
-		case IRInstruction::OR:
-		case IRInstruction::XOR:
-			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) insn->type = IRInstruction::NOP;
-			break;
-		}
-
 
 #if 0
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
@@ -578,13 +596,7 @@ bool BlockCompiler::dbe()
 		IRInstruction *insn = ctx.at(ir_idx);
 
 		if (to_die.count(insn->ir_block) != 0) {
-			insn->type = IRInstruction::NOP;
-			insn->operands[0].type = IROperand::NONE;
-			insn->operands[1].type = IROperand::NONE;
-			insn->operands[2].type = IROperand::NONE;
-			insn->operands[3].type = IROperand::NONE;
-			insn->operands[4].type = IROperand::NONE;
-			insn->operands[5].type = IROperand::NONE;
+			make_instruction_nop(insn);
 			insn->ir_block = 0;
 		}
 	}
