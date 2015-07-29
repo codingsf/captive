@@ -69,7 +69,7 @@ namespace captive {
 						uint32_t RB_und[17];
 
 						uint8_t C, V, Z, N, X;
-						uint32_t SPSR, DACR, TTBR0, TTBR1;
+						uint32_t SPSR, DACR, TTBR0, TTBR1, CP_Status;
 						uint8_t M, F, I, cpV;
 					} packed regs;
 				};
