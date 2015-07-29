@@ -37,7 +37,7 @@ namespace captive {
 				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
 				typedef std::list<shared::IRBlockId> block_list_t;
 
-				bool sort_ir();
+				bool sort_ir();			
 				bool peephole();
 				bool analyse(uint32_t& max_stack);
 				bool dbe();

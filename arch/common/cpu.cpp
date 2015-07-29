@@ -237,7 +237,7 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 
 void CPU::invalidate_virtual_mappings()
 {
-	bzero(jit_state.region_txln_cache, sizeof(void *) * 0x100000);
+	//bzero(jit_state.region_txln_cache, sizeof(void *) * 0x100000);
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)

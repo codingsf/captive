@@ -85,7 +85,7 @@ bool BlockCompiler::sort_ir()
 			}
 		}
 	}
-
+		
 	return true;
 }
 
