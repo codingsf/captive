@@ -16,23 +16,22 @@ using namespace captive::arch::jit;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
-/* Registers
+/* Register Mapping
  *
- * RAX  Allocatable
+ * RAX  Allocatable			0
  * RBX  Temporary
  * RCX  Temporary
- * RDX  Allocatable
- * RSI  Allocatable
- * RDI  Allocatable
- * R8   Allocatable
- * R9   Allocatable
- * R10  Allocatable
+ * RDX  Allocatable			1
+ * RSI  Allocatable			2
+ * RDI  Allocatable			3
+ * R8   Allocatable			4
+ * R9   Allocatable			5
+ * R10  Allocatable			6
  * R11  Not used
  * R12  Not used
  * R13  Not used
  * R14  State variable
  * R15  Register File
- *
  */
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)

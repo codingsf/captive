@@ -66,6 +66,10 @@ bool CPU::run_region_jit_safepoint()
 	
 	bool reset_trace = true;
 	gpa_t last_phys_pc = 0;
+	
+	Region *rgn = NULL;
+	uint32_t region_virt_base = 1;
+	
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -86,22 +90,28 @@ bool CPU::run_region_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-
-		// This will perform a FETCH with side effects, so that we can impose the
-		// correct permissions checking for the block we're about to execute.
-		MMU::resolution_fault fault;
-		if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) abort();
-
-		// If there was a fault, then switch back to the safe-point.
-		if (unlikely(fault)) {
-			restore_safepoint(&cpu_safepoint, (int)fault);
-			
-			// Since we've just destroyed the stack, we should never get here.
-			assert(false);
-		}
 		
-		// Mark the physical page corresponding to the PC as executed
-		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
+		// If we've changed page...
+		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
+			// This will perform a FETCH with side effects, so that we can impose the
+			// correct permissions checking for the block we're about to execute.
+			MMU::resolution_fault fault;
+			if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) abort();
+
+			// If there was a fault, then switch back to the safe-point.
+			if (unlikely(fault)) {
+				restore_safepoint(&cpu_safepoint, (int)fault);
+
+				// Since we've just destroyed the stack, we should never get here.
+				assert(false);
+			}
+
+			// Mark the physical page corresponding to the PC as executed
+			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
+
+			rgn = image->get_region(phys_pc);
+			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
+		}		
 		
 		// Signal the hypervisor to make a profiling run
 		if (unlikely(trace_interval > 3000000)) {
@@ -113,8 +123,7 @@ bool CPU::run_region_jit_safepoint()
 			trace_interval++;
 		}
 		
-		Region *rgn = image->get_region(phys_pc);
-		Block *blk = rgn->get_block(phys_pc);
+		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		
 		if (unlikely(reset_trace) || PAGE_INDEX_OF(last_phys_pc) != PAGE_INDEX_OF(phys_pc)) {
 			blk->entry = true;
@@ -133,13 +142,14 @@ bool CPU::run_region_jit_safepoint()
 		}
 		
 		if (rgn->rwu == NULL) blk->exec_count++;
+		
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, phys_pc);
+			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc));
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;
