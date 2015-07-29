@@ -21,7 +21,7 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 	asm volatile("" ::: "memory");
 
 	captive::arch::x86::MemoryInstruction inst;
-	assert(decode_memory_instruction((const uint8_t *)mctx->rip, inst));
+	decode_memory_instruction((const uint8_t *)mctx->rip, inst);
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {
