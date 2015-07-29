@@ -137,6 +137,7 @@ bool CPU::run_region_jit_safepoint()
 		last_phys_pc = phys_pc;
 		
 		if (rgn->txln) {
+			((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
 			rgn->txln(&jit_state);
 			if (virt_pc != read_pc()) continue;
 		}

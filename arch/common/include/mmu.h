@@ -78,24 +78,8 @@ namespace captive {
 
 			bool virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault);
 
-			inline void flush() {
-				clear_vma();
-				clear_cache();
-			}
-
-			inline void invalidate(gva_t va)
-			{
-				page_map_entry_t *pm;
-				page_dir_ptr_entry_t *pdp;
-				page_dir_entry_t *pd;
-				page_table_entry_t *pt;
-
-				Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
-				pt->present(false);
-
-				Memory::flush_page((va_t)(uint64_t)va);
-				clear_cache();
-			}
+			void invalidate_virtual_mappings();
+			void invalidate_virtual_mapping(gva_t va);
 
 			void disable_writes();
 
@@ -111,10 +95,6 @@ namespace captive {
 			}
 
 			bool is_device(gpa_t gpa);
-			void clear_cache();
-
-		protected:
-			bool clear_vma();
 		};
 	}
 }

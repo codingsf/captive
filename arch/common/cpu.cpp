@@ -38,7 +38,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	image = new profile::Image();
 	
 	jit_state.cpu = this;
-	jit_state.region_txln_cache = NULL;
+	jit_state.region_txln_cache = malloc(sizeof(void *) * 0x100000);
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.isr = &cpu_data().isr;
 }
@@ -219,12 +219,12 @@ bool CPU::interpret_block()
 	} while(!insn->end_of_block && step_ok);
 }
 
-void CPU::clear_block_cache()
+void CPU::invalidate_translations()
 {
 	image->invalidate();
 }
 
-void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
+void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 {
 	if (virt_addr >= (va_t)0x100000000) return;
 
@@ -233,6 +233,16 @@ void CPU::invalidate_executed_page(pa_t phys_addr, va_t virt_addr)
 	if (rgn) {
 		rgn->invalidate();
 	}
+}
+
+void CPU::invalidate_virtual_mappings()
+{
+	bzero(jit_state.region_txln_cache, sizeof(void *) * 0x100000);
+}
+
+void CPU::invalidate_virtual_mapping(gva_t va)
+{
+	((void **)jit_state.region_txln_cache)[va >> 12] = NULL;
 }
 
 static uint32_t pc_ring_buffer[256];
