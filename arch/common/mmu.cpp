@@ -9,6 +9,13 @@ static const char *mem_access_types[] = { "read", "write", "fetch" };
 static const char *mem_access_modes[] = { "user", "kernel" };
 static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
+#define ITLB_SIZE	4096
+
+static struct {
+	gva_t tag;
+	gpa_t value;
+} itlb[ITLB_SIZE];
+
 MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
 	//printf("mmu: allocating guest pdps\n");
@@ -25,6 +32,10 @@ MMU::MMU(CPU& cpu) : _cpu(cpu)
 	}
 
 	Memory::flush_tlb();
+	
+	for (int i = 0; i < ITLB_SIZE; i++) {
+		itlb[i].tag = 0;
+	}
 }
 
 MMU::~MMU()
@@ -113,7 +124,7 @@ uint32_t MMU::page_checksum(va_t va)
 	return checksum;
 }
 
-bool MMU::clear_vma()
+void MMU::invalidate_virtual_mappings()
 {
 	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
@@ -127,7 +138,32 @@ bool MMU::clear_vma()
 	// Flush the TLB
 	Memory::flush_tlb();
 
-	return true;
+	// Notify the CPU to invalidate virtual mappings
+	_cpu.invalidate_virtual_mappings();
+	
+	for (int i = 0; i < ITLB_SIZE; i++) {
+		itlb[i].tag = 0;
+	}
+}
+
+void MMU::invalidate_virtual_mapping(gva_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
+	pt->present(false);
+
+	Memory::flush_page((va_t)(uint64_t)va);
+	
+	// Notify the CPU to invalidate this virtual mapping
+	_cpu.invalidate_virtual_mapping(va);
+	
+	for (int i = 0; i < 4096; i++) {
+		itlb[(va + i) % ITLB_SIZE].tag = 0;
+	}
 }
 
 void MMU::disable_writes()
@@ -273,9 +309,8 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	if (pt->present() && info.is_write()) {
 		va_t va_for_gpa = (va_t)(0x100000000ULL | pt->base_address());
 
-		// TODO: TEST+CLEAR
 		if (clear_if_page_executed(va_for_gpa)) {
-			cpu().invalidate_executed_page((pa_t)pt->base_address(), (va_t)(uint64_t)va);
+			cpu().invalidate_translation((pa_t)pt->base_address(), (va_t)(uint64_t)va);
 		}
 	}
 
@@ -305,13 +340,6 @@ bool MMU::is_device(gpa_t gpa)
 	return false;
 }
 
-#define CACHE_SIZE 4096
-
-static struct {
-	gva_t tag;
-	gpa_t value;
-} cache[CACHE_SIZE];
-
 bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 {
 	access_info info;
@@ -319,24 +347,15 @@ bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 	info.type = ACCESS_FETCH;
 	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
 	
-	if (va != 0 && cache[va % CACHE_SIZE].tag == va) {
-		pa = cache[va % CACHE_SIZE].value;
+	if (va != 0 && itlb[va % ITLB_SIZE].tag == va) {
+		pa = itlb[va % ITLB_SIZE].value;
 		return true;
 	} else {
-		bool r = resolve_gpa(va, pa, info, fault, true);
+		if (!resolve_gpa(va, pa, info, fault, true))
+			return false;
 		
-		if (r) {
-			cache[va % CACHE_SIZE].tag = va;
-			cache[va % CACHE_SIZE].value = pa;
-		}
-		
-		return r;
-	}
-}
-
-void MMU::clear_cache()
-{
-	for (int i = 0; i < CACHE_SIZE; i++) {
-		cache[i].tag = 0;
+		itlb[va % ITLB_SIZE].tag = va;
+		itlb[va % ITLB_SIZE].value = pa;
+		return true;
 	}
 }

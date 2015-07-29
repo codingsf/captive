@@ -87,7 +87,7 @@ bool CPU::run_block_jit_safepoint()
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 
-		if(PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
+		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
 			MMU::resolution_fault fault;
@@ -104,7 +104,6 @@ bool CPU::run_block_jit_safepoint()
 			// Mark the physical page corresponding to the PC as executed
 			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 			
-		
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 		}
@@ -137,7 +136,7 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa)
 		printf("jit: block translation failed\n");
 		return NULL;
 	}
-	
+
 	BlockCompiler compiler(ctx, pa);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
@@ -161,6 +160,8 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 #ifdef DEBUG_TRANSLATION
 	printf("jit: translating block %x\n", pa);
 #endif
+
+	std::set<uint32_t> seen_pcs;
 
 	Decode *insn = get_decode(0);
 			
@@ -194,8 +195,9 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		
 		if(insn->end_of_block) {
 			JumpInfo ji = get_instruction_jump_info(insn);
-			if(!insn->is_predicated && ji.type == JumpInfo::DIRECT) {
+			if(!insn->is_predicated && ji.type == JumpInfo::DIRECT && !seen_pcs.count(ji.target)) {
 				pc = ji.target;
+				seen_pcs.insert(ji.target);
 				continue;
 			}
 			

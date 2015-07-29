@@ -65,7 +65,7 @@ bool CPU::run_region_jit_safepoint()
 	bool step_ok = true;
 	
 	bool reset_trace = true;
-	gpa_t last_phys_pc = 0;
+	gpa_t last_phys_pc = 0;	
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -86,7 +86,7 @@ bool CPU::run_region_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-
+		
 		// This will perform a FETCH with side effects, so that we can impose the
 		// correct permissions checking for the block we're about to execute.
 		MMU::resolution_fault fault;
@@ -95,16 +95,16 @@ bool CPU::run_region_jit_safepoint()
 		// If there was a fault, then switch back to the safe-point.
 		if (unlikely(fault)) {
 			restore_safepoint(&cpu_safepoint, (int)fault);
-			
+
 			// Since we've just destroyed the stack, we should never get here.
 			assert(false);
 		}
-		
+
 		// Mark the physical page corresponding to the PC as executed
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
-		
+
 		// Signal the hypervisor to make a profiling run
-		if (unlikely(trace_interval > 3000000)) {
+		if (unlikely(trace_interval > 30000000)) {
 			reset_trace = true;
 			
 			analyse_blocks();
@@ -114,7 +114,7 @@ bool CPU::run_region_jit_safepoint()
 		}
 		
 		Region *rgn = image->get_region(phys_pc);
-		Block *blk = rgn->get_block(phys_pc);
+		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		
 		if (unlikely(reset_trace) || PAGE_INDEX_OF(last_phys_pc) != PAGE_INDEX_OF(phys_pc)) {
 			blk->entry = true;
@@ -128,11 +128,13 @@ bool CPU::run_region_jit_safepoint()
 		last_phys_pc = phys_pc;
 		
 		if (rgn->txln) {
+			((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
 			rgn->txln(&jit_state);
 			if (virt_pc != read_pc()) continue;
 		}
 		
 		if (rgn->rwu == NULL) blk->exec_count++;
+		
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;

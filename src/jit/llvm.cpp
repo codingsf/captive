@@ -104,6 +104,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.jit_state = rcc.builder.CreateLoad(jit_state_ptr_val, "jit_state");
 	rcc.cpu_obj = rcc.builder.CreateExtractValue(rcc.jit_state, {0}, "cpu_obj");
 	rcc.reg_state = rcc.builder.CreateExtractValue(rcc.jit_state, {1}, "reg_state");
+	rcc.region_table = rcc.builder.CreateExtractValue(rcc.jit_state, {3}, "region_table");
 
 	rcc.pc_ptr = rcc.builder.CreateBitCast(rcc.builder.CreateGEP(rcc.reg_state, rcc.constu64(60)), rcc.types.pi32);
 	set_aa_metadata(rcc.pc_ptr, AA_MD_REGISTER, rcc.consti64(60));
@@ -124,12 +125,34 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.builder.SetInsertPoint(rcc.exit_handle_block);
 	rcc.builder.CreateRet(rcc.constu32(1));
 	
+	BasicBlock *chain_block = BasicBlock::Create(rcc.ctx, "chain", rcc.rgn_func);
+	BasicBlock *do_chain_block = BasicBlock::Create(rcc.ctx, "do_chain", rcc.rgn_func);
 	BasicBlock *do_dispatch_block = BasicBlock::Create(rcc.ctx, "do_dispatch", rcc.rgn_func);
 
 	// --- DISPATCH
 	rcc.builder.SetInsertPoint(rcc.dispatch_block);
 	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(rcc.builder.CreateLShr(dispatch_loaded_pc, 12), rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
+	Value *dispatch_pc_page_idx = rcc.builder.CreateLShr(dispatch_loaded_pc, 12);
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, chain_block);
+	
+	// --- CHAIN
+	rcc.builder.SetInsertPoint(chain_block);
+	
+	std::vector<Value *> chain_slot_gep;
+	chain_slot_gep.push_back(dispatch_pc_page_idx);
+	
+	Value *chain_slot = rcc.builder.CreateGEP(rcc.region_table, chain_slot_gep, "chain_slot");
+	Value *region_fn_ptr = rcc.builder.CreateLoad(chain_slot);
+	
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(rcc.builder.CreatePtrToInt(region_fn_ptr, rcc.types.i64), rcc.constu64(0)), rcc.exit_normal_block, do_chain_block);
+	
+	// --- DO CHAIN
+	rcc.builder.SetInsertPoint(do_chain_block);
+	Value *real_fn_ptr = rcc.builder.CreateBitCast(region_fn_ptr, rgn_func_ty->getPointerTo(0));
+	CallInst *region_tail_call = rcc.builder.CreateCall(real_fn_ptr, jit_state_ptr_val);
+	region_tail_call->setTailCall(true);
+	
+	rcc.builder.CreateRet(region_tail_call);
 	
 	// Create Blocks
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
@@ -668,6 +691,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	const shared::IROperand *op0 = &insn->operands[0];
 	const shared::IROperand *op1 = &insn->operands[1];
 	const shared::IROperand *op2 = &insn->operands[2];
+	const shared::IROperand *op3 = &insn->operands[3];
 	
 	bcc.builder.SetInsertPoint(get_ir_block(bcc, insn->ir_block));
 	
@@ -1116,6 +1140,30 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		iac->setCallingConv(CallingConv::C);
 		iac->setTailCall(false);
 
+		return true;
+	}
+	
+	case IRInstruction::ADC_WITH_FLAGS:
+	{
+		std::vector<Type *> params;
+		params.push_back(type_for_operand(bcc, op0, false));
+		params.push_back(type_for_operand(bcc, op1, false));
+		params.push_back(type_for_operand(bcc, op2, false));
+
+		FunctionType *fntype = FunctionType::get(type_for_operand(bcc, op3, false), params, false);
+		Constant *fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("genc_adc_flags", fntype);
+
+		assert(fn);
+
+		Value *lhs = value_for_operand(bcc, op0);
+		Value *rhs = value_for_operand(bcc, op1);
+		Value *carry_in = value_for_operand(bcc, op2);
+		Value *result = vreg_for_operand(bcc, op3);
+
+		assert(lhs && rhs && carry_in && result);
+		
+		Value *r = bcc.builder.CreateCall3(fn, lhs, rhs, carry_in);
+		bcc.builder.CreateStore(r, result);
 		return true;
 	}
 	

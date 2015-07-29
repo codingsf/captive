@@ -26,6 +26,8 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
+#define VERBOSE_ENABLED false
+
 #define PT_PRESENT	(1 << 0)
 #define PT_WRITABLE	(1 << 1)
 #define PT_USER_ACCESS	(1 << 2)
@@ -181,7 +183,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		per_cpu_data->verify_tid = 0;
 	}
 	
-	per_cpu_data->verbose_enabled = true;
+	per_cpu_data->verbose_enabled = VERBOSE_ENABLED;
 
 	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
 	kvm_cpus.push_back(cpu);

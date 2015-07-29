@@ -84,8 +84,6 @@ namespace captive {
 
 			inline bool executing_translation() const { return _exec_txl; }
 
-			void invalidate_executed_page(pa_t phys_page_base_addr, va_t virt_page_base_addr);
-
 			static inline CPU *get_active_cpu() {
 				return current_cpu;
 			}
@@ -99,12 +97,11 @@ namespace captive {
 			virtual void *reg_state() = 0;
 			virtual uint32_t reg_state_size() = 0;
 
-			void clear_block_cache();
+			void invalidate_virtual_mappings();
+			void invalidate_virtual_mapping(gva_t va);
+			void invalidate_translations();
+			void invalidate_translation(pa_t phys_page_base_addr, va_t virt_page_base_addr);
 
-			void tlb_flush();
-			
-			inline void release_analysis_lock() { _analysing = false; }
-			
 			void register_region(shared::RegionWorkUnit *rwu);
 			
 		protected:
@@ -159,7 +156,7 @@ namespace captive {
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
 
-			bool _exec_txl, _analysing;
+			bool _exec_txl;
 
 			uint8_t decode_cache[DECODE_CACHE_SIZE];
 

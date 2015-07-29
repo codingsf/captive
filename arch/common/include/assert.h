@@ -8,7 +8,7 @@
 #ifndef ASSERT_H
 #define	ASSERT_H
 
-extern void __assertion_failure(const char *filename, int lineno, const char *expression);
+extern void __assertion_failure(const char *filename, int lineno, const char *expression) __attribute__((noreturn));
 
 extern void dump_code(unsigned long int rip);
 extern void dump_stack(void);

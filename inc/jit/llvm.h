@@ -79,6 +79,7 @@ namespace captive {
 				llvm::Value *jit_state;
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
+				llvm::Value *region_table;
 				llvm::Value *pc_ptr;
 				llvm::Value *entry_page;
 				llvm::Value *exit_code_var;
