@@ -235,12 +235,14 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 {
 	IRBlockId latest_block_id = -1;
 
+	used_phys_regs.clear();
+
 	std::map<IRRegId, uint32_t> allocation;			// local register allocation
 	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
 	
 	SmallSet<IRRegId, 8> live_ins, live_outs;
 	
-	uint32_t avail_regs = 0;	// Bit-field of register indicies that are available for allocation.
+	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	std::map<IRRegId, IRBlockId> vreg_seen_block;
@@ -278,7 +280,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			allocation.clear();
 
 			// Reset the available register bitfield
-			avail_regs = 0x3f; // 00111111 == 6 available registers
+			avail_regs.fill(0x7f);
 			
 			// Update the latest block id.
 			latest_block_id = insn->ir_block;
@@ -320,7 +322,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				assert(alloc != allocation.end());
 
 				// Make the released register available again.
-				avail_regs |= (1 << alloc->second);
+				avail_regs.set(alloc->second);
 			}
 		}
 
@@ -328,12 +330,13 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		for (auto in : live_ins) {
 			// If the live-in is not already allocated, allocate it.
 			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
-				uint32_t next_reg = __builtin_ffs(avail_regs);
-				assert(next_reg);
+				uint32_t next_reg = avail_regs.next_avail();
+				assert(next_reg != -1);
 
-				allocation[in] = next_reg - 1;
+				allocation[in] = next_reg;
 				
-				avail_regs &= ~(1 << (next_reg - 1));
+				avail_regs.clear(next_reg);
+				used_phys_regs.set(next_reg);
 			}
 		}
 
@@ -419,7 +422,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 					//printf("Found a live in that's not a live out in a dead instruction r%d \n", in);
 					auto alloc = allocation.find(in);
 					assert(alloc != allocation.end());
-					avail_regs |= 1 << alloc->second;
+
+					avail_regs.set(alloc->second);
+
 					allocation.erase(alloc);
 					
 					live_ins.erase(in);
@@ -957,13 +962,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
 			if (prev_insn) {
-				if (prev_insn->type == IRInstruction::CALL) {
+				if (prev_insn->type == IRInstruction::CALL && insn->count_operands() == prev_insn->count_operands()) {
 					// Don't save the state, because the previous instruction was a call and it is already saved.
 				} else {
-					emit_save_reg_state();
+					emit_save_reg_state(insn->count_operands());
 				}
 			} else {
-				emit_save_reg_state();
+				emit_save_reg_state(insn->count_operands());
 			}
 
 			//emit_save_reg_state();
@@ -985,13 +990,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.call(get_temp(0, 8));
 
 			if (next_insn) {
-				if (next_insn->type == IRInstruction::CALL) {
+				if (next_insn->type == IRInstruction::CALL && insn->count_operands() == next_insn->count_operands()) {
 					// Don't restore the state, because the next instruction is a call and it will use it.
 				} else {
-					emit_restore_reg_state();
+					emit_restore_reg_state(insn->count_operands());
 				}
 			} else {
-				emit_restore_reg_state();
+				emit_restore_reg_state(insn->count_operands());
 			}
 			
 			break;
@@ -1143,7 +1148,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (prev_insn && prev_insn->type == IRInstruction::WRITE_DEVICE) {
 				//
 			} else {
-				emit_save_reg_state();
+				emit_save_reg_state(4);
 			}
 
 			load_state_field(0, REG_RDI);
@@ -1159,7 +1164,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (next_insn && next_insn->type == IRInstruction::WRITE_DEVICE) {
 				//
 			} else {
-				emit_restore_reg_state();
+				emit_restore_reg_state(4);
 			}
 
 			break;
@@ -1177,7 +1182,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// Load the address of the stack slot into RCX
 			encoder.mov(REG_RSP, REG_RCX);
 
-			emit_save_reg_state();
+			emit_save_reg_state(4);
 
 			load_state_field(0, REG_RDI);
 
@@ -1188,7 +1193,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&cpu_read_device, get_temp(0, 8));
 			encoder.call(get_temp(0, 8));
 
-			emit_restore_reg_state();
+			emit_restore_reg_state(4);
 
 			// Pop the reference argument value into the destination register
 			if (val->is_alloc_reg()) {
@@ -1697,7 +1702,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			encoder.nop(X86Memory::get(REG_RAX, insn->operands[0].value));
 
-			emit_save_reg_state();
+			emit_save_reg_state(1);
 
 			load_state_field(0, REG_RDI);
 
@@ -1705,7 +1710,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&jit_verify, get_temp(0, 8));
 			encoder.call(get_temp(0, 8));
 
-			emit_restore_reg_state();
+			emit_restore_reg_state(1);
 
 			break;
 		}
@@ -1829,7 +1834,7 @@ void BlockCompiler::emit_save_reg_state()
 	encoder.push(REG_R10);
 }
 
-void BlockCompiler::emit_restore_reg_state()
+void BlockCompiler::emit_restore_reg_state(int num_operands)
 {
 	encoder.pop(REG_R10);
 	encoder.pop(REG_R9);
