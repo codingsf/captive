@@ -86,7 +86,7 @@ bool CPU::run_block_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-
+		
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
@@ -106,9 +106,12 @@ bool CPU::run_block_jit_safepoint()
 			
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
+			
 		}
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
+		
+		//printf("B %x\n", PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc));
 		
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
@@ -164,6 +167,8 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	std::set<uint32_t> seen_pcs;
 
 	Decode *insn = get_decode(0);
+	
+	int insn_count = 0;
 			
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
@@ -192,6 +197,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		}
 
 		pc += insn->length;
+		insn_count++;
 		
 		if(insn->end_of_block) {
 			JumpInfo ji = get_instruction_jump_info(insn);
@@ -203,7 +209,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			
 			break;
 		}
-	} while (PAGE_ADDRESS_OF(pc) == page);
+	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 100);
 
 	// Branch optimisation log
 	if (insn->end_of_block) {
