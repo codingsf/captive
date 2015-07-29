@@ -2112,7 +2112,7 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 			default: assert(false);
 			}
 		} else {
-			assert(false);
+			encoder.mov(X86Memory::get(REG_RBP, (oper->alloc_data * -1) - 8), target_reg);
 		}
 	} else {
 		assert(false);
