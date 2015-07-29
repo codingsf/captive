@@ -26,17 +26,19 @@ template<> class PopulatedSet<8> {
 		uint8_t _bits;
 		
 	public:
+		PopulatedSet() { clear(); }
+	
 		void set(int i) { assert(i < 8); assert(i >= 0); _bits |= 1 << i; }
 		bool get(int i) { assert(i < 8); assert(i >= 0); return _bits & (1 << i); }
 		
-		int count() { int i; asm volatile("popcnt %0, %1" : "=r"(i) : "r"(_bits)); return i; }
+		int count() const { return __builtin_popcount(_bits); }
 		void clear() { _bits = 0; }
 		void clear(int i) { assert(i < 8); assert(i >= 0); _bits &= ~(1 << i); }
 		
 		bool empty() { return _bits == 0; }
 		bool full() { return _bits == 0xff; }
 		
-		int next_avail() { if(empty()) return -1; uint8_t avail =__builtin_ffs(_bits)-1; assert(get(avail)); return avail; }
+		int next_avail() { if(empty()) return -1; int8_t avail =__builtin_ffs(_bits)-1; assert(get(avail)); return avail; }
 		
 		void fill(int d) { _bits = d; }
 };

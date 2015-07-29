@@ -220,6 +220,8 @@ namespace captive {
 				: type(type),
 				operands { op1, op2, op3, op4, op5, op6 } { }
 
+			uint8_t count_operands() const { int count = 0; for(int i = 0; i < 6; ++i) count += operands[i].type == IROperand::NONE; return count; }
+
 			static IRInstruction nop() { return IRInstruction(NOP); }
 			static IRInstruction ret() { return IRInstruction(RET); }
 			static IRInstruction dispatch(IROperand target, IROperand fallthrough) { assert(target.is_constant() && fallthrough.is_constant()); return IRInstruction(DISPATCH, target, fallthrough); }
