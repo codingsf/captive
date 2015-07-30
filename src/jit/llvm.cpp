@@ -1170,6 +1170,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		return true;
 	}
 	
+	case IRInstruction::BARRIER: return true;
 	case IRInstruction::NOP: return true;
 	
 	default: ERROR << "Unhandled instruction type: " << insn->type; assert(false);
