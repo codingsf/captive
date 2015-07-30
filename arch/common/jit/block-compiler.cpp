@@ -6,6 +6,8 @@
 
 #include <small-set.h>
 
+#define NOP_BLOCK 0x7fffffff
+
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
@@ -61,9 +63,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!peephole()) return false;
 	if (!sort_ir()) return false;
 	if (!analyse(max_stack)) return false;
-	if (!sort_ir()) return false;
-	if (!allocate()) return false;
-
+	
 	if( !post_allocate_peephole()) return false;
 	
 	if (!lower(max_stack)) {
@@ -143,7 +143,7 @@ static void make_instruction_nop(IRInstruction *insn, bool set_block)
 	insn->operands[3].type = IROperand::NONE;
 	insn->operands[4].type = IROperand::NONE;
 	insn->operands[5].type = IROperand::NONE;
-	if(set_block) insn->ir_block = 0x7fffffff;
+	if(set_block) insn->ir_block = NOP_BLOCK;
 }
 
 // Perform some basic optimisations
@@ -228,86 +228,105 @@ bool BlockCompiler::peephole()
 	return true;
 }
 
-static bool is_mov_nop(IRInstruction *insn)
+static bool is_mov_nop(IRInstruction *insn, bool set_block)
 {
 	bool is_nop = (insn->type == IRInstruction::MOV) && (insn->operands[0].alloc_mode == insn->operands[1].alloc_mode) && (insn->operands[0].alloc_data == insn->operands[1].alloc_data);
-	if(is_nop)make_instruction_nop(insn, false);
+	if(is_nop)make_instruction_nop(insn, set_block);
 	return is_nop;
+}
+
+// We can merge the instruction if it is an add or subtract of a constant value into a register
+static bool is_add_candidate(IRInstruction *insn)
+{
+	return ((insn->type == IRInstruction::ADD) || (insn->type == IRInstruction::SUB)) 
+			&& insn->operands[0].is_constant() && insn->operands[1].is_alloc_reg();
+}
+
+// We can merge the instructions if the mem instruction is a load, from the add's target, into the add's target
+static bool is_mem_candidate(IRInstruction *mem, IRInstruction *add)
+{
+	if(mem->type != IRInstruction::READ_MEM) return false;
+	
+	IROperand *add_target = &add->operands[1];
+	
+	// We should only be here if the add is a candidate
+	assert(add_target->is_alloc_reg());
+	
+	IROperand *mem_source = &mem->operands[0];
+	IROperand *mem_target = &mem->operands[2];
+	
+	if(!mem_source->is_alloc_reg() || !mem_target->is_alloc_reg()) return false;
+	if(mem_source->alloc_data != mem_target->alloc_data) return false;
+	if(mem_source->alloc_data != add_target->alloc_data) return false;
+	
+	return true;
+}
+
+static bool is_breaker(IRInstruction *add, IRInstruction *test)
+{
+	assert(add->type == IRInstruction::ADD || add->type == IRInstruction::SUB);
+	if((add->ir_block != test->ir_block) && (test->ir_block != NOP_BLOCK)) {
+		return true;
+	}
+	
+	// If the instruction under test touches the target of the add, then it is a breaker
+	if(test->type != IRInstruction::READ_MEM) {
+		IROperand *add_target = &add->operands[1];
+		for(int op_idx = 0; op_idx < 6; ++op_idx) {
+			if((test->operands[op_idx].alloc_mode == add_target->alloc_mode) && (test->operands[op_idx].alloc_data == add_target->alloc_data)) return true;
+		}
+	}
+	return false;
 }
 
 bool BlockCompiler::post_allocate_peephole()
 {
-	uint32_t this_insn_idx = 0;
-	uint32_t next_insn_idx = 0;
+	for(uint32_t ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		is_mov_nop(ctx.at(ir_idx), true);
+	}
+	
+	sort_ir();
+	
+	uint32_t add_insn_idx = 0;
+	uint32_t mem_insn_idx = 0;
+	IRInstruction *add_insn, *mem_insn;
+
+	//~ printf("*****\n");
+	//~ dump_ir();
 
 	while(true) {
-		IRInstruction *insn;
-		IRInstruction *next_insn;
-		
+		// get the next add instruction
 		do {
-			insn = ctx.at(this_insn_idx);
-			this_insn_idx++;
-			if(this_insn_idx >= ctx.count()) goto exit;
-			
-		} while(is_mov_nop(insn));
+			if(add_insn_idx >= ctx.count()) goto exit;
+			add_insn = ctx.at(add_insn_idx++);
+		} while(!is_add_candidate(add_insn));
 		
-		if(next_insn_idx <= this_insn_idx) next_insn_idx = this_insn_idx+1;
+		//~ printf("Considering add=%u\n", add_insn_idx-1);
 		
+		mem_insn_idx = add_insn_idx;
+		bool broken = false;
 		do {
-			next_insn = ctx.at(next_insn_idx);
-			next_insn_idx++;
-			if(next_insn_idx >= ctx.count()) goto exit;
-		} while(is_mov_nop(next_insn));
-		
-		// If we have an add, then a memory operation
-		// If the add is of a constant to reg A, and the memory op is from and to reg A
-		// Then nop out the add and add the add's source to the mem op's displacement
-		// e.g.
-		// add $0x10, %eax
-		// mov (%eax), %eax
-		// becomes
-		// mov $0x10(%eax), %eax
-		
-		if(insn->ir_block != next_insn->ir_block) continue;
-		
-		// if we have an add...
-		if(insn->type == IRInstruction::ADD || insn->type == IRInstruction::SUB)
-		{
-			// then a memory op...
-			if(next_insn->type == IRInstruction::READ_MEM || next_insn->type == IRInstruction::WRITE_MEM)
-			{
-				IRInstruction *add = insn;
-				IRInstruction *mem = next_insn;
-				// if the add is of a constant to reg A...
-				if(add->operands[0].is_constant() && add->operands[1].is_alloc_reg())
-				{
-					// and the memory op is from and to reg A
-					uint16_t reg_a_data = add->operands[1].alloc_data; 
-					if(mem->operands[0].is_alloc_reg() && mem->operands[2].is_alloc_reg()) {
-						if((mem->operands[0].alloc_data == reg_a_data) && mem->operands[2].alloc_data == reg_a_data) {
-							// then nop out the add and add the add's source to the mem op's displacement
-							assert(mem->operands[1].is_constant());
-							
-							if(insn->type == IRInstruction::ADD)
-								mem->operands[1].value += add->operands[0].value;
-							else 
-								mem->operands[1].value -= add->operands[0].value;
-							make_instruction_nop(add, false);
-							
-							this_insn_idx = next_insn_idx;
-							next_insn_idx++;
-							
-						}
-					}
-				}
+			if(mem_insn_idx >= ctx.count()) goto exit;
+			mem_insn = ctx.at(mem_insn_idx++);
+			if(is_breaker(add_insn, mem_insn)) {
+				//~ printf("Broken by %u\n", mem_insn_idx);
+				broken = true;
+				break;
 			}
-		} else {
-			// If this instruction isn't an add or subtract, just skip these instructions
-			// TODO: do this optimisation more intelligently since we miss quite a few opportunities caused by this
-						
-			this_insn_idx++;
-			next_insn_idx = this_insn_idx;
-		}
+			
+		} while(!is_mem_candidate(mem_insn, add_insn));
+		
+		if(broken) continue;
+		
+		//~ printf("Considering mem=%u\n", mem_insn_idx-1);
+		
+		assert(mem_insn->operands[1].is_constant());
+		if(add_insn->type == IRInstruction::ADD)
+			mem_insn->operands[1].value += add_insn->operands[0].value;
+		else
+			mem_insn->operands[1].value -= add_insn->operands[0].value;
+			
+		make_instruction_nop(add_insn, true);
 	}
 	exit:
 	return true;
@@ -417,6 +436,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
+		if(insn->ir_block == NOP_BLOCK) continue;
 		if(insn->type == IRInstruction::BARRIER) next_global = 0;
 		
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
@@ -442,7 +462,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
 		IRInstruction *insn = ctx.at(ir_idx);
-
+		if(insn->ir_block == NOP_BLOCK) continue;
+		
 		// Make sure it has a descriptor.
 		assert(insn->type < ARRAY_SIZE(insn_descriptors));
 		const struct insn_descriptor *descr = &insn_descriptors[insn->type];
@@ -887,6 +908,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
+		
+		if(insn->ir_block == NOP_BLOCK) continue;
 
 		// Record the native offset of an IR block
 		if (current_block_id != insn->ir_block) {
