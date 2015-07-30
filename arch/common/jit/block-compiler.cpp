@@ -50,6 +50,10 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
+	//printf("*** %x\n", pa);
+
+	//dump_ir();
+
 	if (!thread_jumps()) return false;
 	if (!dbe()) return false;
 	if (!merge_blocks()) return false;
@@ -60,7 +64,11 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!sort_ir()) return false;
 	if (!allocate()) return false;
 
-//	dump_ir();
+	//printf("*** after opt\n");
+
+	//dump_ir();
+
+	//printf("***\n");
 
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -302,6 +310,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = false },
+	
+	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
@@ -326,6 +336,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
+		if(insn->type == IRInstruction::BARRIER) next_global = 0;
+		
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 
@@ -338,6 +350,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				if (seen_in_block != vreg_seen_block.end() && seen_in_block->second != insn->ir_block) {
 					global_allocation[oper->value] = next_global;
 					next_global += 8;
+					if(next_global > max_stack) max_stack = next_global;
 				}
 				
 				vreg_seen_block[oper->value] = insn->ir_block;
@@ -365,6 +378,10 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			// Update the latest block id.
 			latest_block_id = insn->ir_block;
 			//printf("block %d:\n", latest_block_id);
+		}
+
+		if(insn->type == IRInstruction::BARRIER) {
+			next_global = 0;			
 		}
 
 		// Clear the live-out set, and make every current live-in a live-out.
@@ -415,6 +432,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				if (avail_regs.next_avail() == -1) {
 					global_allocation[in] = next_global;
 					next_global += 8;
+					if(max_stack < next_global) max_stack = next_global;
+					
 				} else {				
 					allocation[in] = next_reg;
 					
@@ -541,7 +560,6 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	//printf("block %08x\n", tb.block_addr);
 //	dump_ir();
 
-	max_stack = next_global;
 	return true;
 }
 
@@ -796,6 +814,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		}
 
 		switch (insn->type) {
+		case IRInstruction::BARRIER:
 		case IRInstruction::NOP:
 			break;
 
