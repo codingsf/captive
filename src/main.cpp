@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 	
 	captive::logging::configure_logging_contexts();
 
-	if (argc < 5 || argc > 7 || argc == 6) {
+	if (argc < 5 || argc > 7) {
 		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
 		return 1;
 	}
@@ -68,6 +68,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	GuestCPUConfiguration::CPUExecutionMode default_execution_mode = GuestCPUConfiguration::BlockJIT;
+	
 	if (argc == 7) {
 		if (strcmp(argv[5], "--verify")) {
 			ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
@@ -76,6 +78,17 @@ int main(int argc, char **argv)
 
 		if (verify_prepare(atoi(argv[6]))) {
 			ERROR << "Unable to prepare verification mode";
+			return 1;
+		}
+	} else if (argc == 6) {
+		if (strcmp(argv[5], "--region") == 0) {
+			default_execution_mode = GuestCPUConfiguration::RegionJIT;
+		} else if (strcmp(argv[5], "--block") == 0) {
+			default_execution_mode = GuestCPUConfiguration::BlockJIT;
+		} else if (strcmp(argv[5], "--interp") == 0) {
+			default_execution_mode = GuestCPUConfiguration::Interpreter;
+		} else {
+			ERROR << "Invalid execution mode";
 			return 1;
 		}
 	}
@@ -264,7 +277,7 @@ int main(int argc, char **argv)
 		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::BlockJIT : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
 		cpu = guest->create_cpu(cpu_cfg);
 	} else {
-		GuestCPUConfiguration cpu_cfg(GuestCPUConfiguration::RegionJIT);
+		GuestCPUConfiguration cpu_cfg(default_execution_mode);
 		cpu = guest->create_cpu(cpu_cfg);
 	}
 
