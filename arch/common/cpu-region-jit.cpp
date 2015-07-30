@@ -16,6 +16,7 @@
 #include <set>
 #include <map>
 #include <list>
+#include <bitset>
 
 //#define REG_STATE_PROTECTION
 //#define DEBUG_TRANSLATION
@@ -59,7 +60,7 @@ bool CPU::run_region_jit()
 	return run_region_jit_safepoint();
 }
 
-static PopulatedSet<0x100000> hot_regions;
+static std::bitset<0x100000> hot_regions;
 
 bool CPU::run_region_jit_safepoint()
 {
@@ -140,7 +141,7 @@ bool CPU::run_region_jit_safepoint()
 			blk->exec_count++;
 			
 			if (rgn->heat > 20)
-				hot_regions.set(phys_pc >> 12);
+				hot_regions.set(phys_pc >> 12, true);
 		}
 		
 		if (blk->txln) {
@@ -167,7 +168,9 @@ bool CPU::run_region_jit_safepoint()
 
 void CPU::analyse_blocks()
 {
-	for (auto ri : hot_regions) {
+	for (int ri = 0; ri < 0x100000; ri++) {
+		if (!hot_regions[ri]) continue;
+		
 		Region *rgn = image->regions[ri];
 		if (!rgn) continue;
 		if (rgn->rwu) continue;
@@ -175,7 +178,7 @@ void CPU::analyse_blocks()
 		compile_region(rgn, ri);
 	}
 	
-	hot_regions.clear();
+	hot_regions.reset();
 }
 
 void CPU::compile_region(Region *rgn, uint32_t region_index)
