@@ -106,7 +106,6 @@ bool CPU::run_block_jit_safepoint()
 			
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
-			
 		}
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));

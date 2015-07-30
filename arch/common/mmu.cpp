@@ -212,7 +212,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pm->present(true);
 	}
 
-	if (!pdp->present()) {
+	if (!pdp->present() || !pdp->writable()) {
 		// The associated Page Directory Table is not marked as present,
 		// so invalidate the page directory table and mark it as
 		// present.
@@ -222,16 +222,16 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
-			base->entries[i].present(false);
+			if (!pdp->present()) base->entries[i].present(false);
+			if (!pdp->writable()) base->entries[i].writable(false);
 		}
 
 		// Set the PRESENT flag for the page directory table.
 		pdp->present(true);
+		pdp->writable(true);
 	}
 
-	pdp->writable(true);
-
-	if (!pd->present()) {
+	if (!pd->present() || !pd->writable()) {
 		// The associated Page Table is not marked as present, so
 		// invalidate the page table and mark it as present.
 
@@ -240,13 +240,18 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
-			base->entries[i].present(false);
-			base->entries[i].device(false);
-			base->entries[i].allow_user(false);
+			if (!pd->present()) {
+				base->entries[i].present(false);
+				base->entries[i].device(false);
+				base->entries[i].allow_user(false);
+			}
+			
+			if (!pd->writable()) base->entries[i].writable(false);
 		}
 
 		// Set the PRESENT flag for the page table.
 		pd->present(true);
+		pd->writable(true);
 	}
 
 	// If the fault happened because of a device access, catch this early
