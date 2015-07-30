@@ -2210,7 +2210,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-//	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	return success;
 }
 

@@ -59,6 +59,8 @@ bool CPU::run_region_jit()
 	return run_region_jit_safepoint();
 }
 
+static PopulatedSet<0x100000> hot_regions;
+
 bool CPU::run_region_jit_safepoint()
 {
 	uint32_t trace_interval = 0;
@@ -104,7 +106,7 @@ bool CPU::run_region_jit_safepoint()
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 
 		// Signal the hypervisor to make a profiling run
-		if (unlikely(trace_interval > 30000000)) {
+		if (unlikely(trace_interval > 100000)) {
 			reset_trace = true;
 			
 			analyse_blocks();
@@ -128,12 +130,18 @@ bool CPU::run_region_jit_safepoint()
 		last_phys_pc = phys_pc;
 		
 		if (rgn->txln) {
-			((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
+			reset_trace = true;
+			//((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
 			rgn->txln(&jit_state);
-			if (virt_pc != read_pc()) continue;
+			if (virt_pc != read_pc()) continue; 
 		}
 		
-		if (rgn->rwu == NULL) blk->exec_count++;
+		if (rgn->rwu == NULL) {
+			blk->exec_count++;
+			
+			if (rgn->heat > 20)
+				hot_regions.set(phys_pc >> 12);
+		}
 		
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
@@ -141,7 +149,11 @@ bool CPU::run_region_jit_safepoint()
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, phys_pc);
+			if (rgn->rwu == NULL) {
+				rgn->heat++;
+			}
+			
+			blk->txln = compile_block(blk, phys_pc, false);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;
@@ -155,32 +167,28 @@ bool CPU::run_region_jit_safepoint()
 
 void CPU::analyse_blocks()
 {
-	for (int ri = 0; ri < 0x100000; ri++) {
+	for (auto ri : hot_regions) {
 		Region *rgn = image->regions[ri];
 		if (!rgn) continue;
 		if (rgn->rwu) continue;
-		
-		for (int bi = 0; bi < 0x1000; bi++) {
-			Block *blk = rgn->blocks[bi];
-			if (!blk) continue;
-			
-			if (blk->exec_count >= 100) {
-				compile_region(rgn, ri);
-				break;
-			}
-		}
+
+		compile_region(rgn, ri);
 	}
+	
+	hot_regions.clear();
 }
 
 void CPU::compile_region(Region *rgn, uint32_t region_index)
 {
+	rgn->heat = 0;
+	
 	rgn->rwu = (shared::RegionWorkUnit *) shalloc(sizeof(shared::RegionWorkUnit));
 	rgn->rwu->region_index = region_index;
 	rgn->rwu->valid = 1;
 	rgn->rwu->block_count = 0;
 	rgn->rwu->blocks = NULL;
 	
-	//printf("compiling region %p %08x\n", rgn, region_index << 12);
+	printf("compiling region %p %08x\n", rgn, region_index << 12);
 	
 	for (int bi = 0; bi < 0x1000; bi++) {
 		Block *blk = rgn->blocks[bi];
@@ -212,7 +220,7 @@ void CPU::register_region(shared::RegionWorkUnit* rwu)
 	assert(rgn->rwu == rwu);
 	rgn->rwu = NULL;
 
-	//printf("registering region %p %08x\n", rgn, rwu->region_index << 12);
+	printf("registering region %p %08x\n", rgn, rwu->region_index << 12);
 	if (rwu->valid) {
 		if (rgn->txln)
 			shfree((void *)rgn->txln);

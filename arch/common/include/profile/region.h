@@ -28,24 +28,27 @@ namespace captive {
 				Block *blocks[0x1000];
 				captive::shared::region_txln_fn txln;
 				shared::RegionWorkUnit *rwu;
+				uint32_t heat;
 				
 				inline Block *get_block(uint32_t addr)
 				{
 					Block **block_ptr = &blocks[addr & 0xfff];
-					if (*block_ptr == NULL) *block_ptr = new Block();
+					if (*block_ptr == NULL) {
+						*block_ptr = new Block();
+					}
 					
 					return *block_ptr;
 				}
 				
 				inline void invalidate()
 				{
+					if (rwu) {
+						rwu->valid = 0;
+					}
+
 					if (txln) {
 						shfree((void *)txln);
 						txln = NULL;
-					}
-					
-					if (rwu) {
-						rwu->valid = 0;
 					}
 					
 					for (int i = 0; i < 0x1000; i++) {

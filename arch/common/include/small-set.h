@@ -3,22 +3,50 @@
 
 template<int size> class PopulatedSet {
 	private:
-		bool _populated[size];
+		typedef uint64_t storage_t;
+		
+		storage_t _populated[(size / sizeof(storage_t)) + 1];
 		
 	public:
-		void set(int i) { _populated[i] = true; }
-		bool get(int i) { return _populated[i]; }
+		void set(int i) { _populated[i / sizeof(storage_t)] |= 1 << (i % sizeof(storage_t)); }
+		bool get(int i) { return !!(_populated[i / sizeof(storage_t)] & (1 << (i % sizeof(storage_t)))); }
 		
-		int count() { int c = 0; for(auto i : _populated) c++; return c; }
-		void clear() { for(auto &i : _populated) i = 0; }
-		void clear(int i) { _populated[i] = 0; }
+		int count() { int c = 0; for (int i = 0; i < size; i++) c += __builtin_popcount(_populated[i]); return c; }
+		void clear() { for (int i = 0; i < size; i++) _populated[i] = 0; }
+		void clear(int i) { _populated[i / sizeof(storage_t)] &= ~(1 << (i % sizeof(storage_t))); }
 		
 		bool empty() { return count() == 0; }
 		bool full() { return count() == size; }
 		
-		int next_avail() { for(int i = 0; i < size; ++i) if(get(i)) return i; return -1; }
+		typedef PopulatedSet<size> populated_set_t;
+	
+		class iterator {
+			friend populated_set_t;
+			private:
+				populated_set_t &_target;
+				int _ptr;
+
+				iterator(populated_set_t &target, int ptr) : _target(target), _ptr(ptr) { }
+
+				void advance() {
+					while ((_ptr < size) && !_target.get(_ptr)) {
+						_ptr += 1;
+					}
+				}
+
+			public:
+				iterator(populated_set_t &target) : _target(target), _ptr(0) { advance(); }
+
+				bool operator==(const iterator &other) { return _ptr == other._ptr; }
+				bool operator!=(const iterator &other) { return _ptr != other._ptr; }
+				int &operator*() { return _ptr; }
+
+				// preincrement
+				iterator &operator++() { _ptr++; advance(); return *this; }
+		};
 		
-		void fill(int d) { clear(); for(int i = 0; i < size; ++i) if((1 << i) & d) set(i); }
+		iterator begin() { return iterator(*this); }
+		iterator end() { return iterator(*this, size); }
 };
 
 template<> class PopulatedSet<8> {
