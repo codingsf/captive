@@ -73,7 +73,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 bool BlockCompiler::sort_ir()
 {
-	GnomeSort sorter(ctx);
+	MergeSort sorter(ctx);
 	return sorter.sort();
 }
 

@@ -25,8 +25,9 @@ namespace captive {
 			protected:
 				TranslationContext& ctx;
 				
-				inline uint32_t key(uint32_t idx) const { return ctx.at(idx)->ir_block; }
+				inline shared::IRBlockId key(uint32_t idx) const { return ctx.at(idx)->ir_block; }
 				inline void exchange(uint32_t a, uint32_t b) { ctx.swap(a, b); }
+				inline int32_t compare(uint32_t a, uint32_t b) { return key(a) - key(b); }
 			};
 			
 			namespace algo {
@@ -42,6 +43,16 @@ namespace captive {
 				public:
 					MergeSort(TranslationContext& ctx) : IRSorter(ctx) { }
 					bool sort() override;
+					
+				private:
+					bool sort(int from, int to);
+					void merge(int from, int pivot, int to, int len1, int len2);
+					void rotate(int from, int mid, int to);
+					void reverse(int from, int to);
+					bool insert_sort(int from, int to);
+					int upper(int from, int to, int val);
+					int lower(int from, int to, int val);
+					inline int gcd(int m, int n) { while (n != 0) { int t = m % n; m = n; n = t; } return m; }
 				};
 			}
 		}
