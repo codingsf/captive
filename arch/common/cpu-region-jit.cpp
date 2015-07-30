@@ -104,7 +104,7 @@ bool CPU::run_region_jit_safepoint()
 		mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 
 		// Signal the hypervisor to make a profiling run
-		if (unlikely(trace_interval > 30000000)) {
+		if (unlikely(trace_interval > 3000000)) {
 			reset_trace = true;
 			
 			analyse_blocks();
@@ -141,7 +141,7 @@ bool CPU::run_region_jit_safepoint()
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, phys_pc);
+			blk->txln = compile_block(blk, phys_pc, false);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;
@@ -160,14 +160,18 @@ void CPU::analyse_blocks()
 		if (!rgn) continue;
 		if (rgn->rwu) continue;
 		
+		int hot_blocks = 0;
 		for (int bi = 0; bi < 0x1000; bi++) {
 			Block *blk = rgn->blocks[bi];
 			if (!blk) continue;
 			
 			if (blk->exec_count >= 100) {
-				compile_region(rgn, ri);
-				break;
+				hot_blocks++;
 			}
+		}
+		
+		if (hot_blocks > 20) {
+			compile_region(rgn, ri);
 		}
 	}
 }

@@ -551,6 +551,9 @@ bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWork
 	
 	for (uint32_t ir_idx = 0; ir_idx < bwu->ir_count; ir_idx++) {
 		const IRInstruction *insn = &bwu->ir[ir_idx];
+		
+		if (insn->ir_block == 0x7fffffff) continue;
+		
 		lower_instruction(bcc, insn);
 	}
 	
@@ -659,7 +662,7 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 Value *LLVMJIT::vreg_for_operand(BlockCompilationContext& bcc, const shared::IROperand* oper)
 {
 	if (oper->is_vreg()) {
-		return get_ir_vreg(bcc, (IRRegId)oper->value, oper->size);
+		return get_ir_vreg(bcc, oper->value, oper->size);			
 	} else {
 		return NULL;
 	}

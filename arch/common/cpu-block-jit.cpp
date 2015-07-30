@@ -86,7 +86,7 @@ bool CPU::run_block_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-
+		
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
@@ -110,13 +110,15 @@ bool CPU::run_block_jit_safepoint()
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		
+		//printf("B %x\n", PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc));
+		
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc));
+			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), true);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;
@@ -129,7 +131,7 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa)
+captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, bool free_ir)
 {
 	TranslationContext ctx;
 	if (!translate_block(ctx, pa)) {
@@ -144,8 +146,12 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa)
 		return NULL;
 	}
 
-	blk->ir_count = ctx.count();
-	blk->ir = ctx.get_ir_buffer();
+	if (free_ir) {
+		free((void *)ctx.get_ir_buffer());
+	} else {
+		blk->ir_count = ctx.count();
+		blk->ir = ctx.get_ir_buffer();
+	}
 	
 	return fn;
 }
@@ -164,10 +170,13 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	std::set<uint32_t> seen_pcs;
 
 	Decode *insn = get_decode(0);
+	
+	int insn_count = 0;
 			
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
 	do {
+		ctx.add_instruction(IRInstruction::barrier());
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(pc, insn)) {
 			printf("jit: unhandled decode fault @ %08x\n", pc);
@@ -192,6 +201,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		}
 
 		pc += insn->length;
+		insn_count++;
 		
 		if(insn->end_of_block) {
 			JumpInfo ji = get_instruction_jump_info(insn);
@@ -203,7 +213,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			
 			break;
 		}
-	} while (PAGE_ADDRESS_OF(pc) == page);
+	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 100);
 
 	// Branch optimisation log
 	if (insn->end_of_block) {

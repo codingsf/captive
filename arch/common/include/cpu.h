@@ -180,7 +180,7 @@ namespace captive {
 			void analyse_blocks();
 			void compile_region(profile::Region *rgn, uint32_t region_index);
 			
-			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa);
+			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, bool free_ir = false);
 			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
 			
 			shared::BlockTranslation *alloc_block_translation();

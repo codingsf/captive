@@ -23,6 +23,8 @@ namespace captive {
 		typedef uint32_t IRBlockId;
 		typedef uint32_t IRRegId;
 		
+#define INVALID_BLOCK_ID ((IRBlockId)-1)
+		
 		struct IRInstruction;
 		
 		typedef uint32_t (*block_txln_fn)(void *);
@@ -186,6 +188,8 @@ namespace captive {
 				FLUSH_DTLB_ENTRY,
 				
 				ADC_WITH_FLAGS,
+				
+				BARRIER,
 			};
 
 			IRBlockId ir_block;
@@ -240,6 +244,7 @@ namespace captive {
 			
 			static IRInstruction adc_with_flags(IROperand lhs_in, IROperand rhs_in, IROperand carry_in, IROperand flags_out) { return IRInstruction(ADC_WITH_FLAGS, lhs_in, rhs_in, carry_in, flags_out); }
 			
+			static IRInstruction barrier() { return IRInstruction(BARRIER); }
 			//
 			// Data Motion
 			//

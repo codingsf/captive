@@ -1,5 +1,5 @@
-
 #include <jit/block-compiler.h>
+#include <jit/ir-sorter.h>
 #include <set>
 #include <list>
 #include <map>
@@ -13,6 +13,7 @@ extern "C" void jit_verify(void *cpu);
 extern "C" void jit_rum(void *cpu);
 
 using namespace captive::arch::jit;
+using namespace captive::arch::jit::algo;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
@@ -49,15 +50,25 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
+	//printf("*** %x\n", pa);
+
+	//dump_ir();
+
 	if (!thread_jumps()) return false;
 	if (!dbe()) return false;
 	if (!merge_blocks()) return false;
 	if (!sort_ir()) return false;
 	if (!peephole()) return false;
+	if (!sort_ir()) return false;
 	if (!analyse(max_stack)) return false;
+	if (!sort_ir()) return false;
 	if (!allocate()) return false;
 
+	//printf("*** after opt\n");
+
 	//dump_ir();
+
+	//printf("***\n");
 
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -70,21 +81,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 bool BlockCompiler::sort_ir()
 {
-	uint32_t pos = 1;
-
-	while (pos < ctx.count()) {
-		if (ctx.at(pos)->ir_block >= ctx.at(pos - 1)->ir_block) {
-			pos += 1;
-		} else {
-			ctx.swap(pos, pos - 1);
-
-			if (pos > 1) {
-				pos -=1;
-			}
-		}
-	}
-		
-	return true;
+	MergeSort sorter(ctx);
+	return sorter.sort();
 }
 
 // If this is an add of a negative value, replace it with a subtract of a positive value
@@ -140,7 +138,7 @@ bool peephole_shift(IRInstruction &insn)
 	return true;
 }
 
-void BlockCompiler::make_instruction_nop(IRInstruction *insn)
+void BlockCompiler::make_instruction_nop(IRInstruction *insn, bool set_block)
 {
 	insn->type = IRInstruction::NOP;
 	insn->operands[0].type = IROperand::NONE;
@@ -149,19 +147,27 @@ void BlockCompiler::make_instruction_nop(IRInstruction *insn)
 	insn->operands[3].type = IROperand::NONE;
 	insn->operands[4].type = IROperand::NONE;
 	insn->operands[5].type = IROperand::NONE;
+	if(set_block) insn->ir_block = 0x7fffffff;
 }
-
 
 // Perform some basic optimisations
 bool BlockCompiler::peephole()
 {
+	IRInstruction *prev_pc_inc = NULL;
+	IRBlockId prev_block = INVALID_BLOCK_ID;
+	
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
+
+		if(insn->ir_block != prev_block) {
+			prev_pc_inc = NULL;
+			prev_block = insn->ir_block;
+		}
 
 		switch (insn->type) {
 		case IRInstruction::ADD:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
-				make_instruction_nop(insn);
+				make_instruction_nop(insn, true);
 			} else {
 				peephole_add(*insn);
 			}
@@ -171,7 +177,7 @@ bool BlockCompiler::peephole()
 		case IRInstruction::SHR:
 		case IRInstruction::SHL:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
-				make_instruction_nop(insn);
+				make_instruction_nop(insn, true);
 			} else {
 				peephole_shift(*insn);
 			}
@@ -182,8 +188,39 @@ bool BlockCompiler::peephole()
 		case IRInstruction::OR:
 		case IRInstruction::XOR:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
-				make_instruction_nop(insn);
+				make_instruction_nop(insn, true);
 			}
+			break;
+			
+			
+		case IRInstruction::INCPC:
+			if(prev_pc_inc) {
+				insn->operands[0].value += prev_pc_inc->operands[0].value;
+				prev_pc_inc->type = IRInstruction::NOP;
+			}
+			prev_pc_inc = insn;
+						
+			break;
+			
+		case IRInstruction::READ_REG:
+			// HACK HACK HACK (pc offset)
+			if(insn->operands[0].value == 0x3c) {
+				prev_pc_inc = NULL;
+			}
+			break;
+			
+		case IRInstruction::JMP:
+		case IRInstruction::BRANCH:
+		case IRInstruction::RET:
+		case IRInstruction::DISPATCH:
+		case IRInstruction::READ_MEM:
+		case IRInstruction::WRITE_MEM:
+		case IRInstruction::READ_MEM_USER:
+		case IRInstruction::WRITE_MEM_USER:
+		case IRInstruction::LDPC:
+		case IRInstruction::READ_DEVICE:
+		case IRInstruction::WRITE_DEVICE:
+			prev_pc_inc = NULL;
 			break;
 			
 		default:
@@ -273,11 +310,13 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = false },
+	
+	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
 {
-	IRBlockId latest_block_id = -1;
+	IRBlockId latest_block_id = INVALID_BLOCK_ID;
 
 	used_phys_regs.clear();
 
@@ -297,6 +336,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
+		if(insn->type == IRInstruction::BARRIER) next_global = 0;
+		
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 
@@ -309,6 +350,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				if (seen_in_block != vreg_seen_block.end() && seen_in_block->second != insn->ir_block) {
 					global_allocation[oper->value] = next_global;
 					next_global += 8;
+					if(next_global > max_stack) max_stack = next_global;
 				}
 				
 				vreg_seen_block[oper->value] = insn->ir_block;
@@ -336,6 +378,10 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			// Update the latest block id.
 			latest_block_id = insn->ir_block;
 			//printf("block %d:\n", latest_block_id);
+		}
+
+		if(insn->type == IRInstruction::BARRIER) {
+			next_global = 0;			
 		}
 
 		// Clear the live-out set, and make every current live-in a live-out.
@@ -383,9 +429,11 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
 				int32_t next_reg = avail_regs.next_avail();
 				
-				if(avail_regs.next_avail() == -1) {
+				if (avail_regs.next_avail() == -1) {
 					global_allocation[in] = next_global;
 					next_global += 8;
+					if(max_stack < next_global) max_stack = next_global;
+					
 				} else {				
 					allocation[in] = next_reg;
 					
@@ -441,7 +489,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		// If this instruction is dead, remove any live ins which are not live outs
 		// in order to propagate dead instruction elimination information
 		if(!not_dead && can_be_dead) {
-			make_instruction_nop(insn);
+			make_instruction_nop(insn, true);
 
 			auto old_live_ins = live_ins;
 			for(auto in : old_live_ins) {
@@ -512,7 +560,6 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	//printf("block %08x\n", tb.block_addr);
 //	dump_ir();
 
-	max_stack = next_global;
 	return true;
 }
 
@@ -522,7 +569,7 @@ bool BlockCompiler::thread_jumps()
 	std::map<IRBlockId, IRInstruction *> last_instructions;
 
 	// Build up a list of the first instructions in each block.
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
@@ -615,7 +662,7 @@ bool BlockCompiler::dbe()
 		IRInstruction *insn = ctx.at(ir_idx);
 
 		if (to_die.count(insn->ir_block) != 0) {
-			make_instruction_nop(insn);
+			make_instruction_nop(insn, true);
 			insn->ir_block = 0;
 		}
 	}
@@ -631,7 +678,7 @@ bool BlockCompiler::merge_blocks()
 	if (!build_cfg(blocks, succs, preds, exits))
 		return false;
 
-start:		
+start:
 	for(auto block : blocks) {
 		if(succs[block].size() == 1) {
 			IRBlockId successor = succs[block][0];
@@ -662,7 +709,8 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 		
 		// We can only merge if the terminator is a jmp
 		if(insn->ir_block == merge_into && insn->type == IRInstruction::JMP) {
-			make_instruction_nop(insn);
+			make_instruction_nop(insn, true);
+			break;
 		}
 	}
 	
@@ -677,7 +725,7 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 
 bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, block_list_t& exits)
 {
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -755,7 +803,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	encoder.mov(REG_RDI, REG_R14);	// JIT state ptr
 	load_state_field(8, REG_R15);	// Register state ptr
 
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
@@ -766,6 +814,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		}
 
 		switch (insn->type) {
+		case IRInstruction::BARRIER:
 		case IRInstruction::NOP:
 			break;
 
@@ -2127,7 +2176,7 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 
 void BlockCompiler::dump_ir()
 {
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
