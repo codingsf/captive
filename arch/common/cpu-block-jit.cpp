@@ -173,6 +173,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
 	do {
+		ctx.add_instruction(IRInstruction::barrier());
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(pc, insn)) {
 			printf("jit: unhandled decode fault @ %08x\n", pc);
