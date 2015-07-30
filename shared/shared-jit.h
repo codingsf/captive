@@ -23,6 +23,8 @@ namespace captive {
 		typedef uint32_t IRBlockId;
 		typedef uint32_t IRRegId;
 		
+#define INVALID_BLOCK_ID ((IRBlockId)-1)
+		
 		struct IRInstruction;
 		
 		typedef uint32_t (*block_txln_fn)(void *);

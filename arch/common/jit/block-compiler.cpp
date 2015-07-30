@@ -1,5 +1,5 @@
-
 #include <jit/block-compiler.h>
+#include <jit/ir-sorter.h>
 #include <set>
 #include <list>
 #include <map>
@@ -13,6 +13,7 @@ extern "C" void jit_verify(void *cpu);
 extern "C" void jit_rum(void *cpu);
 
 using namespace captive::arch::jit;
+using namespace captive::arch::jit::algo;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
@@ -72,21 +73,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 bool BlockCompiler::sort_ir()
 {
-	uint32_t pos = 1;
-
-	while (pos < ctx.count()) {
-		if (ctx.at(pos)->ir_block >= ctx.at(pos - 1)->ir_block) {
-			pos += 1;
-		} else {
-			ctx.swap(pos, pos - 1);
-
-			if (pos > 1) {
-				pos -=1;
-			}
-		}
-	}
-		
-	return true;
+	GnomeSort sorter(ctx);
+	return sorter.sort();
 }
 
 // If this is an add of a negative value, replace it with a subtract of a positive value
@@ -158,7 +146,7 @@ void BlockCompiler::make_instruction_nop(IRInstruction *insn, bool set_block)
 bool BlockCompiler::peephole()
 {
 	IRInstruction *prev_pc_inc = NULL;
-	int prev_block = -1;
+	IRBlockId prev_block = INVALID_BLOCK_ID;
 	
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -318,7 +306,7 @@ static struct insn_descriptor insn_descriptors[] = {
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
 {
-	IRBlockId latest_block_id = -1;
+	IRBlockId latest_block_id = INVALID_BLOCK_ID;
 
 	used_phys_regs.clear();
 
@@ -424,7 +412,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
 				int32_t next_reg = avail_regs.next_avail();
 				
-				if(avail_regs.next_avail() == -1) {
+				if (avail_regs.next_avail() == -1) {
 					global_allocation[in] = next_global;
 					next_global += 8;
 				} else {				
@@ -563,7 +551,7 @@ bool BlockCompiler::thread_jumps()
 	std::map<IRBlockId, IRInstruction *> last_instructions;
 
 	// Build up a list of the first instructions in each block.
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
@@ -719,7 +707,7 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 
 bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, block_list_t& exits)
 {
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -797,7 +785,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	encoder.mov(REG_RDI, REG_R14);	// JIT state ptr
 	load_state_field(8, REG_R15);	// Register state ptr
 
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
@@ -2169,7 +2157,7 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 
 void BlockCompiler::dump_ir()
 {
-	IRBlockId current_block_id = -1;
+	IRBlockId current_block_id = INVALID_BLOCK_ID;
 
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
