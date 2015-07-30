@@ -118,7 +118,7 @@ bool CPU::run_block_jit_safepoint()
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc));
+			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), true);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;
@@ -131,7 +131,7 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa)
+captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, bool free_ir)
 {
 	TranslationContext ctx;
 	if (!translate_block(ctx, pa)) {
@@ -146,8 +146,12 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa)
 		return NULL;
 	}
 
-	blk->ir_count = ctx.count();
-	blk->ir = ctx.get_ir_buffer();
+	if (free_ir) {
+		free((void *)ctx.get_ir_buffer());
+	} else {
+		blk->ir_count = ctx.count();
+		blk->ir = ctx.get_ir_buffer();
+	}
 	
 	return fn;
 }

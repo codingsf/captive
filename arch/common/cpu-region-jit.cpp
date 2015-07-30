@@ -141,7 +141,7 @@ bool CPU::run_region_jit_safepoint()
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, phys_pc);
+			blk->txln = compile_block(blk, phys_pc, false);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;
