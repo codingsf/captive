@@ -204,23 +204,23 @@ namespace captive {
 				: type(type),
 				operands { op1, IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
 
-			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2)
+			IRInstruction(IRInstructionType type, const IROperand& op1, const IROperand& op2)
 				: type(type),
 				operands { op1, op2, IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
 
-			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2, IROperand& op3)
+			IRInstruction(IRInstructionType type, const IROperand& op1, const IROperand& op2, const IROperand& op3)
 				: type(type),
 				operands { op1, op2, op3, IROperand::none(), IROperand::none(), IROperand::none() } { }
 
-			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2, IROperand& op3, IROperand& op4)
+			IRInstruction(IRInstructionType type, const IROperand& op1, const IROperand& op2, const IROperand& op3, const IROperand& op4)
 				: type(type),
 				operands { op1, op2, op3, op4, IROperand::none(), IROperand::none() } { }
 
-			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2, IROperand& op3, IROperand& op4, IROperand& op5)
+			IRInstruction(IRInstructionType type, const IROperand& op1, const IROperand& op2, const IROperand& op3, const IROperand& op4, const IROperand& op5)
 				: type(type),
 				operands { op1, op2, op3, op4, op5, IROperand::none() } { }
 
-			IRInstruction(IRInstructionType type, IROperand& op1, IROperand& op2, IROperand& op3, IROperand& op4, IROperand& op5, IROperand& op6)
+			IRInstruction(IRInstructionType type, const IROperand& op1, const IROperand& op2, const IROperand& op3, const IROperand& op4, const IROperand& op5, const IROperand& op6)
 				: type(type),
 				operands { op1, op2, op3, op4, op5, op6 } { }
 
@@ -472,7 +472,7 @@ namespace captive {
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(dst.is_vreg());
 
-				return IRInstruction(READ_MEM, offset, dst);
+				return IRInstruction(READ_MEM, offset, IROperand::const32(0), dst);
 			}
 
 			static IRInstruction stmem(IROperand src, IROperand offset)
@@ -480,7 +480,7 @@ namespace captive {
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(src.is_constant() || src.is_vreg());
 
-				return IRInstruction(WRITE_MEM, src, offset);
+				return IRInstruction(WRITE_MEM, src, IROperand::const32(0), offset);
 			}
 
 			static IRInstruction ldmem_user(IROperand offset, IROperand dst)

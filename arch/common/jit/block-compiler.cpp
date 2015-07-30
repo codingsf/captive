@@ -64,12 +64,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!sort_ir()) return false;
 	if (!allocate()) return false;
 
-	//printf("*** after opt\n");
-
-	//dump_ir();
-
-	//printf("***\n");
-
+	if( !post_allocate_peephole()) return false;
+	
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
@@ -138,7 +134,7 @@ bool peephole_shift(IRInstruction &insn)
 	return true;
 }
 
-void BlockCompiler::make_instruction_nop(IRInstruction *insn, bool set_block)
+static void make_instruction_nop(IRInstruction *insn, bool set_block)
 {
 	insn->type = IRInstruction::NOP;
 	insn->operands[0].type = IROperand::NONE;
@@ -232,6 +228,91 @@ bool BlockCompiler::peephole()
 	return true;
 }
 
+static bool is_mov_nop(IRInstruction *insn)
+{
+	bool is_nop = (insn->type == IRInstruction::MOV) && (insn->operands[0].alloc_mode == insn->operands[1].alloc_mode) && (insn->operands[0].alloc_data == insn->operands[1].alloc_data);
+	if(is_nop)make_instruction_nop(insn, false);
+	return is_nop;
+}
+
+bool BlockCompiler::post_allocate_peephole()
+{
+	uint32_t this_insn_idx = 0;
+	uint32_t next_insn_idx = 0;
+
+	while(true) {
+		IRInstruction *insn;
+		IRInstruction *next_insn;
+		
+		do {
+			insn = ctx.at(this_insn_idx);
+			this_insn_idx++;
+			if(this_insn_idx >= ctx.count()) goto exit;
+			
+		} while(is_mov_nop(insn));
+		
+		if(next_insn_idx <= this_insn_idx) next_insn_idx = this_insn_idx+1;
+		
+		do {
+			next_insn = ctx.at(next_insn_idx);
+			next_insn_idx++;
+			if(next_insn_idx >= ctx.count()) goto exit;
+		} while(is_mov_nop(next_insn));
+		
+		// If we have an add, then a memory operation
+		// If the add is of a constant to reg A, and the memory op is from and to reg A
+		// Then nop out the add and add the add's source to the mem op's displacement
+		// e.g.
+		// add $0x10, %eax
+		// mov (%eax), %eax
+		// becomes
+		// mov $0x10(%eax), %eax
+		
+		if(insn->ir_block != next_insn->ir_block) continue;
+		
+		// if we have an add...
+		if(insn->type == IRInstruction::ADD || insn->type == IRInstruction::SUB)
+		{
+			// then a memory op...
+			if(next_insn->type == IRInstruction::READ_MEM || next_insn->type == IRInstruction::WRITE_MEM)
+			{
+				IRInstruction *add = insn;
+				IRInstruction *mem = next_insn;
+				// if the add is of a constant to reg A...
+				if(add->operands[0].is_constant() && add->operands[1].is_alloc_reg())
+				{
+					// and the memory op is from and to reg A
+					uint16_t reg_a_data = add->operands[1].alloc_data; 
+					if(mem->operands[0].is_alloc_reg() && mem->operands[2].is_alloc_reg()) {
+						if((mem->operands[0].alloc_data == reg_a_data) && mem->operands[2].alloc_data == reg_a_data) {
+							// then nop out the add and add the add's source to the mem op's displacement
+							assert(mem->operands[1].is_constant());
+							
+							if(insn->type == IRInstruction::ADD)
+								mem->operands[1].value += add->operands[0].value;
+							else 
+								mem->operands[1].value -= add->operands[0].value;
+							make_instruction_nop(add, false);
+							
+							this_insn_idx = next_insn_idx;
+							next_insn_idx++;
+							
+						}
+					}
+				}
+			}
+		} else {
+			// If this instruction isn't an add or subtract, just skip these instructions
+			// TODO: do this optimisation more intelligently since we miss quite a few opportunities caused by this
+						
+			this_insn_idx++;
+			next_insn_idx = this_insn_idx;
+		}
+	}
+	exit:
+	return true;
+}
+
 struct insn_descriptor {
 	const char *mnemonic;
 	const char format[7];
@@ -288,9 +369,9 @@ static struct insn_descriptor insn_descriptors[] = {
 
 	{ .mnemonic = "ldreg",		.format = "IOXXXX", .has_side_effects = false },
 	{ .mnemonic = "streg",		.format = "IIXXXX", .has_side_effects = true },
-	{ .mnemonic = "ldmem",		.format = "IOXXXX", .has_side_effects = false },
-	{ .mnemonic = "stmem",		.format = "IIXXXX", .has_side_effects = true },
-	{ .mnemonic = "ldumem",		.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "ldmem",		.format = "IIOXXX", .has_side_effects = true },
+	{ .mnemonic = "stmem",		.format = "IIIXXX", .has_side_effects = true },
+	{ .mnemonic = "ldumem",		.format = "IOXXXX", .has_side_effects = true },
 	{ .mnemonic = "stumem",		.format = "IIXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "call",		.format = "NIIIII", .has_side_effects = true },
@@ -1272,12 +1353,15 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::READ_MEM:
 		{
 			IROperand *offset = &insn->operands[0];
-			IROperand *dest = &insn->operands[1];
+			IROperand *disp = &insn->operands[1];
+			IROperand *dest = &insn->operands[2];
+
+			assert(disp->is_constant());
 
 			if (offset->is_vreg()) {
 				if (offset->is_alloc_reg() && dest->is_alloc_reg()) {
 					// mov (reg), reg
-					encoder.mov(X86Memory::get(register_from_operand(offset)), register_from_operand(dest));
+					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
 				} else {
 					assert(false);
 				}
@@ -1291,14 +1375,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::WRITE_MEM:
 		{
 			IROperand *value = &insn->operands[0];
-			IROperand *offset = &insn->operands[1];
+			IROperand *disp = &insn->operands[1];
+			IROperand *offset = &insn->operands[2];
+
+			assert(disp->is_constant());
 
 			if (offset->is_vreg()) {
 				if (value->is_vreg()) {
 					if (offset->is_alloc_reg() && value->is_alloc_reg()) {
 						// mov reg, (reg)
 
-						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset)));
+						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset), disp->value));
 					} else {
 						assert(false);
 					}

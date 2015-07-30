@@ -46,11 +46,11 @@ namespace captive {
 				bool thread_jumps();
 				bool build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, block_list_t& exits);
 				bool allocate();
+				bool post_allocate_peephole();
 				bool lower(uint32_t max_stack);
 				bool peeplower(uint32_t max_stack);
 
 				void dump_ir();
-				void make_instruction_nop(shared::IRInstruction *insn, bool set_block);
 
 				void emit_save_reg_state(int num_operands);
 				void emit_restore_reg_state(int num_operands);
