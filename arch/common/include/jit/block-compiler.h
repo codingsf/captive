@@ -18,6 +18,9 @@
 #include <map>
 #include <vector>
 
+#define REGSTATE_REG REG_RDI
+#define JITSTATE_REG REG_R14
+
 namespace captive {
 	namespace arch {
 		namespace jit {
@@ -61,6 +64,17 @@ namespace captive {
 				std::map<uint64_t, const x86::X86Register *> register_assignments_2;
 				std::map<uint64_t, const x86::X86Register *> register_assignments_4;
 				std::map<uint64_t, const x86::X86Register *> register_assignments_8;
+
+				inline const x86::X86Register &get_allocable_register(int index, int size)
+				{
+					switch(size) {
+						case 1: return *register_assignments_1[index];
+						case 2: return *register_assignments_2[index];
+						case 4: return *register_assignments_4[index];
+						case 8: return *register_assignments_8[index];
+					}
+					assert(false);
+				}
 
 				inline void assign(uint8_t id, const x86::X86Register& r8, const x86::X86Register& r4, const x86::X86Register& r2, const x86::X86Register& r1)
 				{
@@ -127,7 +141,7 @@ namespace captive {
 
 				inline void load_state_field(uint8_t slot, const x86::X86Register& reg)
 				{
-					encoder.mov(x86::X86Memory::get(x86::REG_R14, slot), reg);
+					encoder.mov(x86::X86Memory::get(x86::JITSTATE_REG, slot), reg);
 				}
 			};
 		}
