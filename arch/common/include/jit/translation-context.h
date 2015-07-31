@@ -13,6 +13,8 @@
 #include <shared-jit.h>
 #include <shared-memory.h>
 
+#include <algorithm>
+
 namespace captive {
 	namespace arch {
 		namespace jit {
@@ -53,9 +55,16 @@ namespace captive {
 				
 				inline void swap(uint32_t a, uint32_t b)
 				{
-					shared::IRInstruction tmp = _ir_insns[a];
-					_ir_insns[a] = _ir_insns[b];
-					_ir_insns[b] = tmp;
+					if(a == b) return;
+					
+					// If we're swapping NOPs, just swap the block index and nothing else
+					if(_ir_insns[a].type == shared::IRInstruction::NOP && _ir_insns[b].type == shared::IRInstruction::NOP) {
+						uint32_t tmp = _ir_insns[a].ir_block;
+						_ir_insns[a].ir_block = _ir_insns[b].ir_block;
+						_ir_insns[b].ir_block = tmp;
+					} else {
+						std::swap(_ir_insns[a], _ir_insns[b]);
+					}
 				}
 				
 				inline const shared::IRInstruction *get_ir_buffer() const { return _ir_insns; }
