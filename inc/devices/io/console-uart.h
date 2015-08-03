@@ -8,23 +8,20 @@
 #ifndef CONSOLE_UART_H
 #define	CONSOLE_UART_H
 
-#include <devices/io/uart.h>
+#include <devices/io/fd-uart.h>
 #include <termios.h>
 
 namespace captive {
 	namespace devices {
 		namespace io {
-			class ConsoleUART : public UART
+			class ConsoleUART : public FDUART
 			{
 			public:
 				ConsoleUART();
 				virtual ~ConsoleUART();
 
-				virtual bool open();
-				virtual bool close();
-
-				virtual bool read_char(uint8_t& ch);
-				virtual bool write_char(uint8_t ch);
+				bool open() override;
+				bool close() override;
 				
 			private:
 				struct termios orig_settings;

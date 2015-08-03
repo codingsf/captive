@@ -38,6 +38,8 @@
 #include <devices/timers/microsecond-tick-source.h>
 #include <devices/timers/callback-tick-source.h>
 
+#include <socket.h>
+
 DECLARE_CONTEXT(Main);
 
 using namespace captive;
@@ -48,6 +50,26 @@ using namespace captive::loader;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 using namespace captive::util;
+
+static devices::io::UART *create_socket_uart(std::string name)
+{
+	UnixDomainSocket *socket = new UnixDomainSocket("/tmp/" + name + ".sock");
+	if (!socket->create()) {
+		if (name == "uart0")
+			return new devices::io::ConsoleUART();
+		else
+			return new devices::io::NullUART();
+	}
+
+	if (socket->connect()) {
+		return new devices::io::FDUART(socket->get_fd(), socket->get_fd());
+	} else {
+		if (name == "uart0")
+			return new devices::io::ConsoleUART();
+		else
+			return new devices::io::NullUART();
+	}
+}
 
 int main(int argc, char **argv)
 {
@@ -130,19 +152,13 @@ int main(int argc, char **argv)
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC(*vic->get_irq_line(31));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
-	devices::io::NullUART *null_uart = new devices::io::NullUART();
-	null_uart->open();
-
-	devices::io::ConsoleUART *console_uart = new devices::io::ConsoleUART();
-	console_uart->open();
-	
-	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12), *console_uart);
+	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12), *create_socket_uart("uart0"));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, *uart0));
 
-	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13), *null_uart);
+	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13), *create_socket_uart("uart1"));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f2000, *uart1));
 
-	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14), *null_uart);
+	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14), *create_socket_uart("uart2"));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, *uart2));
 
 	devices::arm::PL031 *rtc = new devices::arm::PL031();
@@ -319,8 +335,6 @@ int main(int argc, char **argv)
 	ts->stop();
 	delete ts;
 	
-	console_uart->close();
-
 	// Clean-up
 	delete cpu;
 	delete guest;
