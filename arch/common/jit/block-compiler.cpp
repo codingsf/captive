@@ -1385,7 +1385,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			if (offset->is_vreg()) {
 				if (offset->is_alloc_reg() && dest->is_alloc_reg()) {
-					// mov (reg), reg
+					// mov const(reg), reg
 					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
 				} else {
 					assert(false);
@@ -1408,7 +1408,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (offset->is_vreg()) {
 				if (value->is_vreg()) {
 					if (offset->is_alloc_reg() && value->is_alloc_reg()) {
-						// mov reg, (reg)
+						// mov reg, const(reg)
 
 						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset), disp->value));
 					} else {

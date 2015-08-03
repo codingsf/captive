@@ -913,14 +913,15 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	case shared::IRInstruction::READ_MEM:
 	case shared::IRInstruction::READ_MEM_USER:
 	{
-		Value *addr = value_for_operand(bcc, op0), *dst = vreg_for_operand(bcc, op1);
-		assert(addr && dst);
+		Value *addr = value_for_operand(bcc, op0), *disp = value_for_operand(bcc, op1), *dst = vreg_for_operand(bcc, op2);
+		assert(addr && disp && dst);
 
 		if (insn->type == shared::IRInstruction::READ_MEM) {
 			Type *memptrtype = type_for_operand(bcc, op1, true);
 			assert(memptrtype);
 
-			Value *memptr = bcc.builder.CreateIntToPtr(addr, memptrtype);
+			Value *memptr = bcc.builder.CreateAdd(addr, disp);
+			memptr = bcc.builder.CreateIntToPtr(memptr, memptrtype);
 			set_aa_metadata(memptr, AA_MD_MEMORY);
 
 			bcc.builder.CreateStore(bcc.builder.CreateLoad(memptr, true), dst);
@@ -943,7 +944,8 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read32", fntype);
 			}
 
-			bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, addr, dst);
+			Value *calc_addr = bcc.builder.CreateAdd(addr, disp);
+			bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, calc_addr, dst);
 		}
 		return true;
 	}
@@ -951,12 +953,13 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	case shared::IRInstruction::WRITE_MEM:
 	case shared::IRInstruction::WRITE_MEM_USER:
 	{
-		Value *addr = value_for_operand(bcc, op1), *src = value_for_operand(bcc, op0);
+		Value *addr = value_for_operand(bcc, op2), *disp = value_for_operand(bcc, op1), *src = value_for_operand(bcc, op0);
 
-		assert(addr && src);
+		assert(addr && disp && src);
 
 		if (insn->type == shared::IRInstruction::WRITE_MEM) {
-			Value *memptr = bcc.builder.CreateIntToPtr(addr, type_for_operand(bcc, op0, true));
+			Value *memptr = bcc.builder.CreateAdd(addr, disp);
+			memptr = bcc.builder.CreateIntToPtr(memptr, type_for_operand(bcc, op0, true));
 			set_aa_metadata(memptr, AA_MD_MEMORY);
 
 			bcc.builder.CreateStore(src, memptr, true);
@@ -979,7 +982,8 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write32", fntype);
 			}
 
-			bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, addr, src);
+			Value *calc_addr = bcc.builder.CreateAdd(addr, disp);
+			bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, calc_addr, src);
 		}
 
 		return true;
