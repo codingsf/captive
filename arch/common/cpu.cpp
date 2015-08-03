@@ -14,6 +14,8 @@
 #include <profile/region.h>
 #include <profile/block.h>
 
+extern "C" { void tail_call_ret0_only(); }
+
 using namespace captive::arch;
 using namespace captive::arch::jit;
 using namespace captive::arch::profile;
@@ -38,9 +40,11 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	image = new profile::Image();
 	
 	jit_state.cpu = this;
-	jit_state.region_txln_cache = malloc(sizeof(void *) * 0x100000);
+	jit_state.region_txln_cache = (void **)calloc(0x100000, sizeof(void *));
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.isr = &cpu_data().isr;
+	
+	invalidate_virtual_mappings();
 }
 
 CPU::~CPU()
@@ -237,12 +241,14 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 
 void CPU::invalidate_virtual_mappings()
 {
-	//bzero(jit_state.region_txln_cache, sizeof(void *) * 0x100000);
+	for (int i = 0; i < 0x100000; i++) {
+		jit_state.region_txln_cache[i] = (void *)&tail_call_ret0_only;
+	}
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
-	((void **)jit_state.region_txln_cache)[va >> 12] = NULL;
+	jit_state.region_txln_cache[va >> 12] = (void *)&tail_call_ret0_only;
 }
 
 static uint32_t pc_ring_buffer[256];

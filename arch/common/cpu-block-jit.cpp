@@ -110,8 +110,6 @@ bool CPU::run_block_jit_safepoint()
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		
-		//printf("B %x\n", PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc));
-		
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;

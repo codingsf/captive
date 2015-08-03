@@ -126,7 +126,6 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.builder.CreateRet(rcc.constu32(1));
 	
 	BasicBlock *chain_block = BasicBlock::Create(rcc.ctx, "chain", rcc.rgn_func);
-	BasicBlock *do_chain_block = BasicBlock::Create(rcc.ctx, "do_chain", rcc.rgn_func);
 	BasicBlock *do_dispatch_block = BasicBlock::Create(rcc.ctx, "do_dispatch", rcc.rgn_func);
 
 	// --- DISPATCH
@@ -143,11 +142,6 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	
 	Value *chain_slot = rcc.builder.CreateGEP(rcc.region_table, chain_slot_gep, "chain_slot");
 	Value *region_fn_ptr = rcc.builder.CreateLoad(chain_slot);
-	
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(rcc.builder.CreatePtrToInt(region_fn_ptr, rcc.types.i64), rcc.constu64(0)), rcc.exit_normal_block, do_chain_block);
-	
-	// --- DO CHAIN
-	rcc.builder.SetInsertPoint(do_chain_block);
 	Value *real_fn_ptr = rcc.builder.CreateBitCast(region_fn_ptr, rgn_func_ty->getPointerTo(0));
 	CallInst *region_tail_call = rcc.builder.CreateCall(real_fn_ptr, jit_state_ptr_val);
 	region_tail_call->setTailCall(true);

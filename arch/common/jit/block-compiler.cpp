@@ -1065,13 +1065,20 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
+			//load_state_field(24, REG_RAX);
+			
 			// Function Epilogue
 			encoder.pop(REG_RBX);
 			encoder.pop(REG_R14);
 			encoder.pop(REG_R15);
-			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.leave();
+						
+			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();
+			
+			/* TODO: chaining encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_ECX);
+			encoder.andd(0xfffff, REG_ECX);
+			encoder.jmp(X86Memory::get(REG_RAX, REG_RCX, 8));*/
 			break;
 		}
 

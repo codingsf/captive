@@ -128,7 +128,7 @@ namespace captive {
 				void *cpu;										// 0
 				void *registers;								// 8
 				uint64_t registers_size;						// 16
-				void *region_txln_cache;						// 24
+				void **region_txln_cache;						// 24
 				uint64_t *insn_counter;							// 32
 				uint32_t *isr;									// 40
 			} jit_state;
