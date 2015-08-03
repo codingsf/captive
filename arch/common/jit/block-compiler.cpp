@@ -67,6 +67,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!dbe()) return false;
 	timer.tick("DBE");
 	sort_ir();
+	timer.tick("sort");
 	if (!merge_blocks()) return false;
 	timer.tick("MB");
 	if (!peephole()) return false;
@@ -288,6 +289,9 @@ static bool is_mem_candidate(IRInstruction *mem, IRInstruction *add)
 static bool is_breaker(IRInstruction *add, IRInstruction *test)
 {
 	assert(add->type == IRInstruction::ADD || add->type == IRInstruction::SUB);
+	
+	if(test->ir_block == NOP_BLOCK) return false;
+	
 	if((add->ir_block != test->ir_block) && (test->ir_block != NOP_BLOCK)) {
 		return true;
 	}
@@ -307,9 +311,7 @@ bool BlockCompiler::post_allocate_peephole()
 	for(uint32_t ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		is_mov_nop(ctx.at(ir_idx), true);
 	}
-	
-	sort_ir();
-	
+		
 	uint32_t add_insn_idx = 0;
 	uint32_t mem_insn_idx = 0;
 	IRInstruction *add_insn, *mem_insn;
@@ -786,13 +788,21 @@ bool BlockCompiler::dbe()
 			to_die.insert(block);
 		}
 	}
-
+	
+	int32_t prev_block = 0;
+	bool block_should_die = 0;
+	
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
 
-		if (to_die.count(insn->ir_block) != 0) {
+		if(insn->ir_block != prev_block) {
+			block_should_die = to_die.count(insn->ir_block);
+			prev_block = insn->ir_block;
+		}
+
+		if (block_should_die) {
 			make_instruction_nop(insn, true);
-			insn->ir_block = 0;
 		}
 	}
 
@@ -804,26 +814,41 @@ bool BlockCompiler::merge_blocks()
 	block_list_t blocks, exits;
 	cfg_t succs, preds;
 
+	tick_timer timer(0);
+	timer.reset();
+
 	if (!build_cfg(blocks, succs, preds, exits))
 		return false;
+	timer.tick("CFG");
+
+	std::vector<IRBlockId> work_list;
+	work_list.reserve(blocks.size());
+	for(auto block : blocks) {
+		if(succs[block].size() == 1) work_list.push_back(block);
+	}
 
 start:
-	for(auto block : blocks) {
-		if(succs[block].size() == 1) {
-			IRBlockId successor = succs[block][0];
-			
-			if(preds[successor].size() == 1) {
-				if(merge_block(successor, block)){
-					succs[block] = succs[successor];
-					preds[successor].clear();
-					succs[successor].clear();
-					goto start;
-				}
+	while(work_list.size()) {
+		IRBlockId block = work_list.back();
+		work_list.pop_back();
+		
+		IRBlockId successor = succs[block][0];
+		
+		if(preds[successor].size() == 1) {
+			if(merge_block(successor, block)){
+				succs[block] = succs[successor];
+
+				succs[successor].clear();
+				
+				if(succs[block].size() == 1) work_list.push_back(block);
+				
+				continue;
 			}
 		}
-		
 	}
-	
+
+	timer.tick("Merge");
+	timer.dump("merge blocks");
 	return true;
 }
 
@@ -832,8 +857,9 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 	// Don't try to merge 'backwards' yet since it's a bit more complicated
 	if(merge_from < merge_into) return false;
 	
+	unsigned int ir_idx = 0;
 	// Nop out the terminator instruction from the merge_into block
-	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+	for(; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
 		// We can only merge if the terminator is a jmp
@@ -843,7 +869,7 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 		}
 	}
 	
-	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+	for(; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		if(insn->ir_block == NOP_BLOCK) continue;
 		
