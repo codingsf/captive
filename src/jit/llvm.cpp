@@ -649,6 +649,13 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 		
 		return vreg_alloc;
 	} else {
+		switch (size) {
+		case 1: assert(llvm_vreg->second->getType() == bcc.rcc.types.i8); break;
+		case 2: assert(llvm_vreg->second->getType() == bcc.rcc.types.i16); break;
+		case 4: assert(llvm_vreg->second->getType() == bcc.rcc.types.i32); break;
+		case 8: assert(llvm_vreg->second->getType() == bcc.rcc.types.i64); break;
+		default: assert(false); return NULL;
+		}
 		return llvm_vreg->second;
 	}
 }
@@ -656,7 +663,7 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 Value *LLVMJIT::vreg_for_operand(BlockCompilationContext& bcc, const shared::IROperand* oper)
 {
 	if (oper->is_vreg()) {
-		return get_ir_vreg(bcc, oper->value, oper->size);			
+		return get_ir_vreg(bcc, (IRRegId)oper->value, oper->size);			
 	} else {
 		return NULL;
 	}
@@ -685,10 +692,10 @@ BasicBlock *LLVMJIT::block_for_operand(BlockCompilationContext& bcc, const IROpe
 
 bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRInstruction* insn)
 {
-	const shared::IROperand *op0 = &insn->operands[0];
-	const shared::IROperand *op1 = &insn->operands[1];
-	const shared::IROperand *op2 = &insn->operands[2];
-	const shared::IROperand *op3 = &insn->operands[3];
+	const shared::IROperand *const op0 = &insn->operands[0];
+	const shared::IROperand *const op1 = &insn->operands[1];
+	const shared::IROperand *const op2 = &insn->operands[2];
+	const shared::IROperand *const op3 = &insn->operands[3];
 	
 	bcc.builder.SetInsertPoint(get_ir_block(bcc, insn->ir_block));
 	
@@ -726,8 +733,12 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	{
 		Value *dst = vreg_for_operand(bcc, op0);
 		assert(dst);
-
-		bcc.builder.CreateStore(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), dst);
+		
+		Value *v = bcc.builder.CreateLoad(bcc.rcc.pc_ptr);
+		fprintf(stderr, "v type: %p\n", v->getType());
+		fprintf(stderr, "dst elem type: %p\n", ((PointerType *)dst->getType())->getElementType());
+		
+		bcc.builder.CreateStore(v, dst);
 		return true;
 	}
 

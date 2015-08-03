@@ -80,11 +80,11 @@ namespace captive {
 				llvm::Value *cpu_obj;
 				llvm::Value *reg_state;
 				llvm::Value *region_table;
-				llvm::Value *pc_ptr;
 				llvm::Value *entry_page;
 				llvm::Value *exit_code_var;
 				llvm::Value *insn_counter;
 				llvm::Value *isr;
+				llvm::Value *pc_ptr;
 				
 				llvm::Constant *jump_table_entries[2048];
 				llvm::GlobalVariable *jump_table;
