@@ -9,6 +9,7 @@
 #define	CONSOLE_UART_H
 
 #include <devices/io/uart.h>
+#include <termios.h>
 
 namespace captive {
 	namespace devices {
@@ -24,6 +25,9 @@ namespace captive {
 
 				virtual bool read_char(uint8_t& ch);
 				virtual bool write_char(uint8_t ch);
+				
+			private:
+				struct termios orig_settings;
 			};
 		}
 	}

@@ -318,6 +318,8 @@ int main(int argc, char **argv)
 	// Stop the tick source
 	ts->stop();
 	delete ts;
+	
+	console_uart->close();
 
 	// Clean-up
 	delete cpu;

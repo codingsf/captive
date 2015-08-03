@@ -1,6 +1,5 @@
 #include <devices/io/console-uart.h>
 
-#include <termios.h>
 #include <unistd.h>
 
 using namespace captive::devices::io;
@@ -18,7 +17,7 @@ bool ConsoleUART::open()
 {
 	struct termios settings;
 	tcgetattr(fileno(stdout), &settings);
-	//orig_settings = settings;
+	orig_settings = settings;
 	
 	cfmakeraw(&settings);
 	settings.c_cc[VTIME] = 0;
@@ -31,6 +30,7 @@ bool ConsoleUART::open()
 
 bool ConsoleUART::close()
 {
+	tcsetattr(0, TCSANOW, &orig_settings);
 	return true;
 }
 
