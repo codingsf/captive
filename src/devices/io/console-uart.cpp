@@ -4,12 +4,13 @@
 
 using namespace captive::devices::io;
 
-ConsoleUART::ConsoleUART()
+ConsoleUART::ConsoleUART() : FDUART(STDIN_FILENO, STDOUT_FILENO)
 {
 	
 }
 
-ConsoleUART::~ConsoleUART() {
+ConsoleUART::~ConsoleUART()
+{
 
 }
 
@@ -31,19 +32,5 @@ bool ConsoleUART::open()
 bool ConsoleUART::close()
 {
 	tcsetattr(0, TCSANOW, &orig_settings);
-	return true;
-}
-
-bool ConsoleUART::read_char(uint8_t& ch)
-{
-	ch = fgetc(stdin);
-	return true;
-}
-
-bool ConsoleUART::write_char(uint8_t ch)
-{
-	fprintf(stdout, "%c", ch);
-	fflush(stdout);
-	
 	return true;
 }
