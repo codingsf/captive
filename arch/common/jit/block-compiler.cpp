@@ -439,8 +439,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	used_phys_regs.clear();
 
-	
-	int32_t *allocation = (int32_t*)malloc(ctx.reg_count() * sizeof(int32_t));
+	std::vector<int32_t> allocation (ctx.reg_count());
 	maybe_map<IRRegId, uint32_t, 128> global_allocation (ctx.reg_count());	// global register allocation
 	
 	typedef std::set<IRRegId> live_set_t;
@@ -450,8 +449,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
-	int32_t *vreg_seen_block = (int32_t*)malloc(ctx.reg_count() * sizeof(int32_t));
-	memset(vreg_seen_block, 0xff, ctx.reg_count() * sizeof(int32_t));
+	std::vector<int32_t> vreg_seen_block (ctx.reg_count(), -1);
 
 	tick_timer timer(0);
 	timer.tick();
@@ -483,7 +481,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 	}
-	free(vreg_seen_block);
+
 	timer.tick();
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
@@ -498,7 +496,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		if (latest_block_id != insn->ir_block) {
 			// Clear the live-in working set and current allocations.
 			live_ins.clear();
-			memset(allocation, 0xff, ctx.reg_count() * sizeof(int32_t));
+			allocation.assign(ctx.reg_count(), -1);
 
 			// Reset the available register bitfield
 			avail_regs.fill(0xff);
