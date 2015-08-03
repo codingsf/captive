@@ -4,9 +4,10 @@
 #include <list>
 #include <map>
 
-#include <tick-timer.h>
+
 #include <small-set.h>
 #include <maybe-set.h>
+#include <tick-timer.h>
 
 #define NOP_BLOCK 0x7fffffff
 
@@ -59,27 +60,30 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	//printf("*** %x\n", pa);
 
 	tick_timer timer(0);
+	
 	timer.reset();
-	
-	timer.tick();
 	if (!thread_jumps()) return false;
+	timer.tick("JT");
 	if (!dbe()) return false;
+	timer.tick("DBE");
+	sort_ir();
 	if (!merge_blocks()) return false;
+	timer.tick("MB");
 	if (!peephole()) return false;
-	
-	timer.tick();
+		
+	timer.tick("Peep");
 	if (!sort_ir()) return false;
-	timer.tick();
+	timer.tick("Sort");
 	
 	if (!analyse(max_stack)) return false;
-	timer.tick();
+	timer.tick("Analyse");
 	if( !post_allocate_peephole()) return false;
-	timer.tick();
+	timer.tick("PAP");
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
 	}
-	timer.tick();
+	timer.tick("Lower");
 	
 	timer.dump();
 	
@@ -689,9 +693,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 bool BlockCompiler::thread_jumps()
 {
-	std::map<IRBlockId, IRInstruction *> first_instructions;
-	std::map<IRBlockId, IRInstruction *> last_instructions;
-
+	std::vector<IRInstruction*> first_instructions(ctx.block_count(), NULL);
+	std::vector<IRInstruction*> last_instructions(ctx.block_count(), NULL);
+	
 	// Build up a list of the first instructions in each block.
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
@@ -707,12 +711,13 @@ bool BlockCompiler::thread_jumps()
 		}
 	}
 
-	for (auto block : last_instructions) {
-		IRInstruction *source_instruction = block.second;
+	for(int block_id = 0; block_id < last_instructions.size(); ++block_id) {
+		IRInstruction *source_instruction = last_instructions[block_id];
+		if(!source_instruction) continue;
 
 		switch(source_instruction->type) {
 		case IRInstruction::JMP: {
-			IRInstruction *target_instruction = first_instructions[block.second->operands[0].value];
+			IRInstruction *target_instruction = first_instructions[source_instruction->operands[0].value];
 
 			while (target_instruction->type == IRInstruction::JMP) {
 				target_instruction = first_instructions[target_instruction->operands[0].value];
@@ -720,14 +725,14 @@ bool BlockCompiler::thread_jumps()
 
 			if (target_instruction->type == IRInstruction::RET) {
 				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block.first;
+				source_instruction->ir_block = block_id;
 			} else if (target_instruction->type == IRInstruction::BRANCH) {
 				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block.first;
+				source_instruction->ir_block = block_id;
 				goto do_branch_thread;
 			} else if (target_instruction->type == IRInstruction::DISPATCH) {
 				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block.first;
+				source_instruction->ir_block = block_id;
 			} else {
 				source_instruction->operands[0].value = target_instruction->ir_block;
 			}
@@ -840,9 +845,11 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 	
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
 		
 		// Move instructions from the 'from' block to the 'to' block
 		if(insn->ir_block == merge_from) insn->ir_block = merge_into;
+		if(insn->ir_block > merge_from) break;
 	}
 	return true;
 }
@@ -851,9 +858,13 @@ bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, 
 {
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 
+	blocks.reserve(ctx.block_count());
+	exits.reserve(ctx.block_count());
+
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-
+		if(insn->ir_block == NOP_BLOCK) continue;
+		
 		if (insn->ir_block != current_block_id) {
 			current_block_id = insn->ir_block;
 			blocks.push_back(current_block_id);
