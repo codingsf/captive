@@ -4,9 +4,10 @@
 #include <list>
 #include <map>
 
-#include <tick-timer.h>
+
 #include <small-set.h>
 #include <maybe-set.h>
+#include <tick-timer.h>
 
 #define NOP_BLOCK 0x7fffffff
 
@@ -59,27 +60,31 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	//printf("*** %x\n", pa);
 
 	tick_timer timer(0);
+	
 	timer.reset();
-	
-	timer.tick();
 	if (!thread_jumps()) return false;
+	timer.tick("JT");
 	if (!dbe()) return false;
+	timer.tick("DBE");
+	sort_ir();
+	timer.tick("sort");
 	if (!merge_blocks()) return false;
+	timer.tick("MB");
 	if (!peephole()) return false;
-	
-	timer.tick();
+		
+	timer.tick("Peep");
 	if (!sort_ir()) return false;
-	timer.tick();
+	timer.tick("Sort");
 	
 	if (!analyse(max_stack)) return false;
-	timer.tick();
+	timer.tick("Analyse");
 	if( !post_allocate_peephole()) return false;
-	timer.tick();
+	timer.tick("PAP");
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
 	}
-	timer.tick();
+	timer.tick("Lower");
 	
 	timer.dump();
 	
@@ -284,6 +289,9 @@ static bool is_mem_candidate(IRInstruction *mem, IRInstruction *add)
 static bool is_breaker(IRInstruction *add, IRInstruction *test)
 {
 	assert(add->type == IRInstruction::ADD || add->type == IRInstruction::SUB);
+	
+	if(test->ir_block == NOP_BLOCK) return false;
+	
 	if((add->ir_block != test->ir_block) && (test->ir_block != NOP_BLOCK)) {
 		return true;
 	}
@@ -303,9 +311,7 @@ bool BlockCompiler::post_allocate_peephole()
 	for(uint32_t ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		is_mov_nop(ctx.at(ir_idx), true);
 	}
-	
-	sort_ir();
-	
+		
 	uint32_t add_insn_idx = 0;
 	uint32_t mem_insn_idx = 0;
 	IRInstruction *add_insn, *mem_insn;
@@ -439,8 +445,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	used_phys_regs.clear();
 
-	
-	int32_t *allocation = (int32_t*)malloc(ctx.reg_count() * sizeof(int32_t));
+	std::vector<int32_t> allocation (ctx.reg_count());
 	maybe_map<IRRegId, uint32_t, 128> global_allocation (ctx.reg_count());	// global register allocation
 	
 	typedef std::set<IRRegId> live_set_t;
@@ -450,8 +455,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
-	int32_t *vreg_seen_block = (int32_t*)malloc(ctx.reg_count() * sizeof(int32_t));
-	memset(vreg_seen_block, 0xff, ctx.reg_count() * sizeof(int32_t));
+	std::vector<int32_t> vreg_seen_block (ctx.reg_count(), -1);
 
 	tick_timer timer(0);
 	timer.tick();
@@ -483,7 +487,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 	}
-	free(vreg_seen_block);
+
 	timer.tick();
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
@@ -498,7 +502,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		if (latest_block_id != insn->ir_block) {
 			// Clear the live-in working set and current allocations.
 			live_ins.clear();
-			memset(allocation, 0xff, ctx.reg_count() * sizeof(int32_t));
+			allocation.assign(ctx.reg_count(), -1);
 
 			// Reset the available register bitfield
 			avail_regs.fill(0xff);
@@ -691,9 +695,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 bool BlockCompiler::thread_jumps()
 {
-	std::map<IRBlockId, IRInstruction *> first_instructions;
-	std::map<IRBlockId, IRInstruction *> last_instructions;
-
+	std::vector<IRInstruction*> first_instructions(ctx.block_count(), NULL);
+	std::vector<IRInstruction*> last_instructions(ctx.block_count(), NULL);
+	
 	// Build up a list of the first instructions in each block.
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
@@ -709,12 +713,13 @@ bool BlockCompiler::thread_jumps()
 		}
 	}
 
-	for (auto block : last_instructions) {
-		IRInstruction *source_instruction = block.second;
+	for(int block_id = 0; block_id < last_instructions.size(); ++block_id) {
+		IRInstruction *source_instruction = last_instructions[block_id];
+		if(!source_instruction) continue;
 
 		switch(source_instruction->type) {
 		case IRInstruction::JMP: {
-			IRInstruction *target_instruction = first_instructions[block.second->operands[0].value];
+			IRInstruction *target_instruction = first_instructions[source_instruction->operands[0].value];
 
 			while (target_instruction->type == IRInstruction::JMP) {
 				target_instruction = first_instructions[target_instruction->operands[0].value];
@@ -722,14 +727,14 @@ bool BlockCompiler::thread_jumps()
 
 			if (target_instruction->type == IRInstruction::RET) {
 				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block.first;
+				source_instruction->ir_block = block_id;
 			} else if (target_instruction->type == IRInstruction::BRANCH) {
 				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block.first;
+				source_instruction->ir_block = block_id;
 				goto do_branch_thread;
 			} else if (target_instruction->type == IRInstruction::DISPATCH) {
 				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block.first;
+				source_instruction->ir_block = block_id;
 			} else {
 				source_instruction->operands[0].value = target_instruction->ir_block;
 			}
@@ -783,13 +788,21 @@ bool BlockCompiler::dbe()
 			to_die.insert(block);
 		}
 	}
-
+	
+	int32_t prev_block = 0;
+	bool block_should_die = 0;
+	
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
 
-		if (to_die.count(insn->ir_block) != 0) {
+		if(insn->ir_block != prev_block) {
+			block_should_die = to_die.count(insn->ir_block);
+			prev_block = insn->ir_block;
+		}
+
+		if (block_should_die) {
 			make_instruction_nop(insn, true);
-			insn->ir_block = 0;
 		}
 	}
 
@@ -801,26 +814,41 @@ bool BlockCompiler::merge_blocks()
 	block_list_t blocks, exits;
 	cfg_t succs, preds;
 
+	tick_timer timer(0);
+	timer.reset();
+
 	if (!build_cfg(blocks, succs, preds, exits))
 		return false;
+	timer.tick("CFG");
+
+	std::vector<IRBlockId> work_list;
+	work_list.reserve(blocks.size());
+	for(auto block : blocks) {
+		if(succs[block].size() == 1) work_list.push_back(block);
+	}
 
 start:
-	for(auto block : blocks) {
-		if(succs[block].size() == 1) {
-			IRBlockId successor = succs[block][0];
-			
-			if(preds[successor].size() == 1) {
-				if(merge_block(successor, block)){
-					succs[block] = succs[successor];
-					preds[successor].clear();
-					succs[successor].clear();
-					goto start;
-				}
+	while(work_list.size()) {
+		IRBlockId block = work_list.back();
+		work_list.pop_back();
+		
+		IRBlockId successor = succs[block][0];
+		
+		if(preds[successor].size() == 1) {
+			if(merge_block(successor, block)){
+				succs[block] = succs[successor];
+
+				succs[successor].clear();
+				
+				if(succs[block].size() == 1) work_list.push_back(block);
+				
+				continue;
 			}
 		}
-		
 	}
-	
+
+	timer.tick("Merge");
+	timer.dump("merge blocks");
 	return true;
 }
 
@@ -829,8 +857,9 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 	// Don't try to merge 'backwards' yet since it's a bit more complicated
 	if(merge_from < merge_into) return false;
 	
+	unsigned int ir_idx = 0;
 	// Nop out the terminator instruction from the merge_into block
-	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+	for(; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
 		// We can only merge if the terminator is a jmp
@@ -840,11 +869,13 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 		}
 	}
 	
-	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+	for(; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
 		
 		// Move instructions from the 'from' block to the 'to' block
 		if(insn->ir_block == merge_from) insn->ir_block = merge_into;
+		if(insn->ir_block > merge_from) break;
 	}
 	return true;
 }
@@ -853,9 +884,13 @@ bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, 
 {
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 
+	blocks.reserve(ctx.block_count());
+	exits.reserve(ctx.block_count());
+
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-
+		if(insn->ir_block == NOP_BLOCK) continue;
+		
 		if (insn->ir_block != current_block_id) {
 			current_block_id = insn->ir_block;
 			blocks.push_back(current_block_id);

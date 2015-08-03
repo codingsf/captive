@@ -38,7 +38,7 @@ namespace captive {
 				PopulatedSet<8> used_phys_regs;
 
 				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
-				typedef std::list<shared::IRBlockId> block_list_t;
+				typedef std::vector<shared::IRBlockId> block_list_t;
 
 				bool sort_ir();			
 				bool peephole();
