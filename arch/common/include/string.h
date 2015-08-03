@@ -25,5 +25,7 @@ extern char *strncat(char *, const char *, int n);
 extern int strcmp(const char *, const char *);
 extern int strncmp(const char *, const char *, size_t n);
 
+extern char *strdup(const char *str);
+
 #endif	/* STRING_H */
 

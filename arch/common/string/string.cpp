@@ -1,4 +1,5 @@
 #include <string.h>
+#include <malloc.h>
 
 int strlen(const char *str)
 {
@@ -56,4 +57,11 @@ char *strncat(char *dest, const char *src, int n)
 	*dest = '\0';
 
 	return orig;
+}
+
+char *strdup(const char *str)
+{
+	char *newstr = (char*)captive::arch::malloc(strlen(str)+1);
+	strcpy(newstr, str);
+	return newstr;
 }
