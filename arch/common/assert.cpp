@@ -26,6 +26,15 @@ void dump_code(unsigned long int rip)
 	printf("\n");
 }
 
+void dump_mcontext(const struct mcontext *mctx)
+{
+	printf("machine context:\n");
+	printf("  rax = %016lx\n", mctx->rax);
+	printf("  rbx = %016lx\n", mctx->rbx);
+	printf("  rcx = %016lx\n", mctx->rcx);
+	printf("  rdx = %016lx\n", mctx->rdx);
+}
+
 void dump_stack()
 {
 	int count = 0;
