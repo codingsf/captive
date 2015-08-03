@@ -66,3 +66,8 @@ int85_handler:
 	pop_regs
 	add $8, %rsp
 	iretq
+
+.globl tail_call_ret0_only
+tail_call_ret0_only:
+	xor %eax, %eax
+	ret

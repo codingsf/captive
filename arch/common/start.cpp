@@ -151,7 +151,8 @@ extern "C" {
 
 	void handle_trap_unk(struct mcontext *mctx)
 	{
-		printf("unhandled exception: rip=0x%lx\n", mctx->rip);		
+		printf("unhandled exception: rip=0x%lx\n", mctx->rip);
+		dump_mcontext(mctx);
 		abort();
 	}
 
@@ -172,7 +173,7 @@ extern "C" {
 		}
 
 		printf("general protection fault: rip=0x%lx, code=0x%x, pc=0x%08x, ir=%08x\n", mctx->rip, mctx->extra, cpu ? cpu->read_pc() : 0, cpu ? *((uint32_t *)cpu->read_pc()) : 0);
-		dump_code(mctx->rip);
+		dump_mcontext(mctx);
 		dump_stack();
 		abort();
 	}

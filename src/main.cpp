@@ -28,6 +28,8 @@
 #include <devices/io/keyboard.h>
 #include <devices/io/mouse.h>
 #include <devices/io/ps2.h>
+#include <devices/io/null-uart.h>
+#include <devices/io/console-uart.h>
 #include <devices/io/file-backed-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
 
@@ -128,13 +130,19 @@ int main(int argc, char **argv)
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC(*vic->get_irq_line(31));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
-	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12));
+	devices::io::NullUART *null_uart = new devices::io::NullUART();
+	null_uart->open();
+
+	devices::io::ConsoleUART *console_uart = new devices::io::ConsoleUART();
+	console_uart->open();
+	
+	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12), *console_uart);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, *uart0));
 
-	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13));
+	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13), *null_uart);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f2000, *uart1));
 
-	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14));
+	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14), *null_uart);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, *uart2));
 
 	devices::arm::PL031 *rtc = new devices::arm::PL031();
@@ -310,6 +318,8 @@ int main(int argc, char **argv)
 	// Stop the tick source
 	ts->stop();
 	delete ts;
+	
+	console_uart->close();
 
 	// Clean-up
 	delete cpu;
