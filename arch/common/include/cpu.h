@@ -124,14 +124,24 @@ namespace captive {
 				uint32_t last_exception_action;
 			} local_state;
 
+			struct block_chain_cache_entry {
+				uint32_t tag;
+				void *fn;
+			} packed;
+			
+			struct region_chain_cache_entry {
+				void *fn;
+			} packed;
+			
 			struct {
-				void *cpu;										// 0
-				void *registers;								// 8
-				uint64_t registers_size;						// 16
-				void **region_txln_cache;						// 24
-				uint64_t *insn_counter;							// 32
-				uint32_t *isr;									// 40
-			} jit_state;
+				void *cpu;												// 0
+				void *registers;										// 8
+				uint64_t registers_size;								// 16
+				struct region_chain_cache_entry *region_txln_cache;		// 24
+				struct block_chain_cache_entry *block_txln_cache;		// 32
+				uint64_t *insn_counter;									// 40
+				uint32_t *isr;											// 48
+			} packed jit_state;
 
 		private:
 			inline void assert_privilege_mode()
@@ -181,13 +191,7 @@ namespace captive {
 			void compile_region(profile::Region *rgn, uint32_t region_index);
 			
 			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, bool free_ir = false);
-			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
-			
-			shared::BlockTranslation *alloc_block_translation();
-			void release_block_translation(shared::BlockTranslation *txln);
-			
-			shared::RegionTranslation *alloc_region_translation();
-			void release_region_translation(shared::RegionTranslation *txln);
+			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);			
 		};
 	}
 }

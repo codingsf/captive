@@ -67,6 +67,11 @@ namespace captive {
 				{
 					return X86Memory(base, index, scale);
 				}
+				
+				static X86Memory get(const X86Register& base, int32_t disp, const X86Register& index, int scale)
+				{
+					return X86Memory(base, disp, index, scale);
+				}
 
 				static X86Memory get(const X86Register& base, int32_t disp)
 				{
@@ -214,11 +219,14 @@ namespace captive {
 				inline void jnle_reloc(uint32_t& reloc_offset) { jcc_reloc(15, reloc_offset); }
 				inline void jg_reloc(uint32_t& reloc_offset) { jcc_reloc(15, reloc_offset); }
 
-				void jnz(int32_t off);
-				void jnz(int8_t off);
+				void jcc(uint8_t v, int32_t off);
+				void jcc(uint8_t v, int8_t off);
+				
+				inline void je(int32_t off) { jcc(4, off); }
+				inline void je(int8_t off) { jcc(4, off); }
 
-				void je(int32_t off);
-				void je(int8_t off);
+				inline void jnz(int32_t off) { jcc(5, off); }
+				inline void jnz(int8_t off) { jcc(5, off); }
 
 				void lahf();
 				void clc();

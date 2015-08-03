@@ -40,7 +40,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	image = new profile::Image();
 	
 	jit_state.cpu = this;
-	jit_state.region_txln_cache = (void **)calloc(0x100000, sizeof(void *));
+	jit_state.block_txln_cache = (struct block_chain_cache_entry *)calloc(0x10000, sizeof(struct block_chain_cache_entry));
+	jit_state.region_txln_cache = NULL; //(struct region_chain_cache_entry *)calloc(0x100000, sizeof(void *));
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.isr = &cpu_data().isr;
 	
@@ -49,6 +50,11 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 CPU::~CPU()
 {
+	if (jit_state.region_txln_cache)
+		free(jit_state.region_txln_cache);
+	
+	if (jit_state.block_txln_cache)
+		free(jit_state.block_txln_cache);
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -241,14 +247,28 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 
 void CPU::invalidate_virtual_mappings()
 {
-	for (int i = 0; i < 0x100000; i++) {
-		jit_state.region_txln_cache[i] = (void *)&tail_call_ret0_only;
+	if (jit_state.block_txln_cache) {
+		for (int i = 0; i < 0x10000; i++) {
+			jit_state.block_txln_cache[i].tag = 1;
+		}		
+	}
+	
+	if (jit_state.region_txln_cache) {
+		for (int i = 0; i < 0x100000; i++) {
+			jit_state.region_txln_cache[i].fn = (void *)&tail_call_ret0_only;
+		}
 	}
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
-	jit_state.region_txln_cache[va >> 12] = (void *)&tail_call_ret0_only;
+	if (jit_state.block_txln_cache) {
+		jit_state.block_txln_cache[va % 0x10000].tag = 1;
+	}
+	
+	if (jit_state.region_txln_cache) {
+		jit_state.region_txln_cache[va >> 12].fn = (void *)&tail_call_ret0_only;
+	}
 }
 
 static uint32_t pc_ring_buffer[256];
@@ -369,27 +389,4 @@ bool CPU::device_read(uint32_t address, uint8_t length, uint64_t& value)
 
 	//printf("device read: addr=%x, value=%u\n", address, value);
 	return true;
-}
-
-captive::shared::BlockTranslation* CPU::alloc_block_translation()
-{
-	return (captive::shared::BlockTranslation *)shalloc(sizeof(captive::shared::BlockTranslation));
-}
-
-void CPU::release_block_translation(shared::BlockTranslation *txln)
-{
-	shfree((void *)txln->ir);
-	free((void *)txln->native_fn_ptr);
-	shfree(txln);
-}
-
-captive::shared::RegionTranslation* CPU::alloc_region_translation()
-{
-	return (captive::shared::RegionTranslation *)shalloc(sizeof(captive::shared::RegionTranslation));
-}
-
-void CPU::release_region_translation(shared::RegionTranslation *txln)
-{
-	shfree((void *)txln->native_fn_ptr);
-	shfree(txln);
 }

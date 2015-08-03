@@ -1094,7 +1094,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
-			//load_state_field(24, REG_RAX);
+			load_state_field(24, REG_RAX);
 			
 			// Function Epilogue
 			encoder.pop(REG_RBX);
@@ -1105,9 +1105,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();
 			
-			/* TODO: chaining encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_ECX);
-			encoder.andd(0xfffff, REG_ECX);
-			encoder.jmp(X86Memory::get(REG_RAX, REG_RCX, 8));*/
+			/*encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_ECX);		// Load PC
+			encoder.mov(REG_ECX, REG_EDX);									// Save PC in EDX
+			
+			encoder.andd(0xffff, REG_ECX);									// Mask PC for cache entry
+			encoder.shl(1, REG_ECX);										// Shift left 1 because cache entries are 16-bytes
+			encoder.cmp(REG_EDX, X86Memory::get(REG_RAX, REG_RCX, 8));		// Compare PC with cache entry tag
+			encoder.jnz((int8_t)4);
+			encoder.jmp(X86Memory::get(REG_RAX, 8, REG_RCX, 8));
+			encoder.ret();*/
+			
 			break;
 		}
 
@@ -2129,7 +2136,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			X86Register& tmp = get_temp(0, 8);
 
-			load_state_field(32, tmp);
+			load_state_field(40, tmp);
 			encoder.add8(1, tmp);
 
 			break;

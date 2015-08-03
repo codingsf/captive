@@ -677,15 +677,9 @@ void X86Encoder::jcc_reloc(uint8_t v, uint32_t& reloc_offset)
 	emit32(0);
 }
 
-void X86Encoder::jnz(int8_t off)
+void X86Encoder::jcc(uint8_t v, int8_t off)
 {
-	emit8(0x75);
-	emit8(off);
-}
-
-void X86Encoder::je(int8_t off)
-{
-	emit8(0x74);
+	emit8(0x70 | (v & 0xf));
 	emit8(off);
 }
 
