@@ -656,6 +656,12 @@ void X86Encoder::call(const X86Register& reg)
 	encode_mod_reg_rm(REG_RDX, reg);
 }
 
+void X86Encoder::jmp(const X86Memory& tgt)
+{
+	emit8(0xff);
+	encode_mod_reg_rm(4, tgt);
+}
+
 void X86Encoder::jmp_reloc(uint32_t& reloc_offset)
 {
 	emit8(0xe9);
@@ -841,7 +847,9 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 	} else if (rm.base == REG_R12) {
 		mrm = 4; // Need a SIB byte
 	} else if (rm.base == REG_RIP) {
-		assert(false); // Need to think about this
+		assert(false); // Need to think about this]
+	} else if (rm.scale != 0) {
+		mrm = 4; // Need a SIB byte
 	} else {
 		mrm = rm.base.raw_index;
 	}
@@ -855,8 +863,8 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 	// Emit the MODRM byte
 	emit8((mod & 3) << 6 | (mreg & 7) << 3 | (mrm & 7));
 
-	// Determine if we need to emit a SIB byte
-	if (mrm == 4 && mod != 3) {
+	// Determine if we need to emit a SIB byte (mod cannot be 3 here)
+	if (mrm == 4) {
 		uint8_t s, i, b;
 
 		if (rm.scale == 0) {
@@ -864,7 +872,21 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 			i = 4;
 			b = rm.base.raw_index;
 		} else {
-			assert(false); // Not supported yet
+			switch (rm.scale) {
+				case 1:	s = 0; break;
+				case 2: s = 1; break;
+				case 4: s = 2; break;
+				case 8: s = 3; break;
+				default: assert(false);
+			}
+			
+			if (rm.index == REG_RIZ) {
+				i = 4;
+			} else {
+				i = rm.index.raw_index;
+			}
+			
+			b = rm.base.raw_index;
 		}
 
 		emit8((s & 3) << 6 | (i & 7) << 3 | (b & 7));
