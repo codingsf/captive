@@ -20,12 +20,16 @@ namespace captive {
 		namespace irq {
 			class IRQLine;
 		}
+		
+		namespace io {
+			class UART;
+		}
 
 		namespace arm {
 			class PL011 : public Primecell
 			{
 			public:
-				PL011(irq::IRQLine& irq);
+				PL011(irq::IRQLine& irq, io::UART& uart);
 				virtual ~PL011();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -33,8 +37,11 @@ namespace captive {
 
 				virtual std::string name() const { return "pl011"; }
 
+				void enqueue(uint8_t ch);
+				
 			private:
 				irq::IRQLine& _irq;
+				io::UART& _uart;
 
 				uint32_t control_word;
 				uint32_t baud_rate, fractional_baud, line_control;
@@ -58,6 +65,8 @@ namespace captive {
 					irq_status |= IRQ_RXINTR;
 					update_irq();
 				}
+				
+				static void read_thread(PL011 *obj);
 			};
 		}
 	}

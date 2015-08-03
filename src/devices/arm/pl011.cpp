@@ -1,6 +1,9 @@
 #include <devices/arm/pl011.h>
 #include <devices/irq/irq-line.h>
+#include <devices/io/uart.h>
 #include <captive.h>
+
+#include <thread>
 
 using namespace captive::devices::arm;
 
@@ -15,9 +18,10 @@ using namespace captive::devices::arm;
 #define IRQ_TXINTR (1 << 5)
 #define IRQ_RXINTR (1 << 4)
 
-PL011::PL011(irq::IRQLine& irq) 
+PL011::PL011(irq::IRQLine& irq, io::UART& uart) 
 	: Primecell(0x00141011),
 	_irq(irq),
+	_uart(uart),
 	control_word(0x300),
 	baud_rate(0),
 	fractional_baud(0),
@@ -27,13 +31,28 @@ PL011::PL011(irq::IRQLine& irq)
 	rsr(0),
 	ifl(0x12)
 {
-
+	new std::thread(read_thread, this);
 }
 
 PL011::~PL011()
 {
 
 }
+
+void PL011::read_thread(PL011 *pl011)
+{
+	uint8_t ch;
+	while (pl011->_uart.read_char(ch)) {
+		pl011->enqueue(ch);
+	}
+}
+
+void PL011::enqueue(uint8_t ch)
+{
+	fifo.push_back(ch);
+	raise_rx_irq();
+}
+
 
 bool PL011::read(uint64_t off, uint8_t len, uint64_t& data)
 {
@@ -118,12 +137,7 @@ bool PL011::write(uint64_t off, uint8_t len, uint64_t data)
 	
 	switch (off) {
 	case 0x000: // Data register
-		/*if (serial) {
-			serial->WriteChar(data & 0xff);
-		}*/
-		fprintf(stdout, "%c", (uint8_t)(data & 0xff));
-		fflush(stdout);
-		
+		_uart.write_char((uint8_t)(data & 0xff));		
 		raise_tx_irq();
 		break;
 
