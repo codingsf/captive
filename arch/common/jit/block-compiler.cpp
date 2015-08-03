@@ -4,6 +4,7 @@
 #include <list>
 #include <map>
 
+#include <tick-timer.h>
 #include <small-set.h>
 #include <maybe-set.h>
 
@@ -57,21 +58,31 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 	//printf("*** %x\n", pa);
 
-	//dump_ir();
-
+	tick_timer timer(0);
+	timer.reset();
+	
+	timer.tick();
 	if (!thread_jumps()) return false;
 	if (!dbe()) return false;
 	if (!merge_blocks()) return false;
 	if (!peephole()) return false;
+	
+	timer.tick();
 	if (!sort_ir()) return false;
+	timer.tick();
+	
 	if (!analyse(max_stack)) return false;
-	
+	timer.tick();
 	if( !post_allocate_peephole()) return false;
-	
+	timer.tick();
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
 	}
+	timer.tick();
+	
+	timer.dump();
+	
 
 	fn = (block_txln_fn)encoder.get_buffer();
 	return true;
@@ -80,7 +91,13 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 bool BlockCompiler::sort_ir()
 {
 	MergeSort sorter(ctx);
-	return sorter.sort();
+	auto new_buffer = sorter.perform_sort();
+	if(new_buffer != ctx.get_ir_buffer()) {
+		auto old_buffer = ctx.get_ir_buffer();
+		ctx.set_ir_buffer(new_buffer);
+		free(old_buffer);
+	}
+	return true;
 }
 
 // If this is an add of a negative value, replace it with a subtract of a positive value
@@ -422,16 +439,22 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	used_phys_regs.clear();
 
-	maybe_map<IRRegId, uint32_t, 100> allocation (ctx.reg_count());
 	
-	std::map<IRRegId, uint32_t> global_allocation;	// global register allocation
+	int32_t *allocation = (int32_t*)malloc(ctx.reg_count() * sizeof(int32_t));
+	maybe_map<IRRegId, uint32_t, 128> global_allocation (ctx.reg_count());	// global register allocation
 	
-	std::set<IRRegId> live_ins, live_outs;
+	typedef std::set<IRRegId> live_set_t;
+	live_set_t live_ins, live_outs;
+	std::vector<live_set_t::iterator> to_erase;
+	
 	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
-	std::map<IRRegId, IRBlockId> vreg_seen_block;
-	//printf("allocating for 0x%08x over %u vregs\n", pa, ctx.reg_count());
+	int32_t *vreg_seen_block = (int32_t*)malloc(ctx.reg_count() * sizeof(int32_t));
+	memset(vreg_seen_block, 0xff, ctx.reg_count() * sizeof(int32_t));
+
+	tick_timer timer(0);
+	timer.tick();
 
 	// Build up a map of which vregs have been seen in which blocks, to detect spanning vregs.
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
@@ -446,11 +469,11 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			
 			// If the operand is a vreg, and is not already a global...
 			if (oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
-				auto seen_in_block = vreg_seen_block.find(oper->value);
+				auto seen_in_block = vreg_seen_block[oper->value];
 				
 				// If we have already seen this operand, and not in the same block, then we
 				// must globally allocate it.
-				if (seen_in_block != vreg_seen_block.end() && seen_in_block->second != insn->ir_block) {
+				if (seen_in_block != -1 && seen_in_block != insn->ir_block) {
 					global_allocation[oper->value] = next_global;
 					next_global += 8;
 					if(next_global > max_stack) max_stack = next_global;
@@ -460,7 +483,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			}
 		}
 	}
-	
+	free(vreg_seen_block);
+	timer.tick();
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -474,7 +498,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		if (latest_block_id != insn->ir_block) {
 			// Clear the live-in working set and current allocations.
 			live_ins.clear();
-			allocation.clear();
+			memset(allocation, 0xff, ctx.reg_count() * sizeof(int32_t));
 
 			// Reset the available register bitfield
 			avail_regs.fill(0xff);
@@ -516,7 +540,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		for (auto out : live_outs) {
 			if(global_allocation.count(out)) continue;
 			if (!live_ins.count(out)) {
-				assert(allocation.count(out));
+				assert(allocation[out] != -1);
 
 				// Make the released register available again.
 				avail_regs.set(allocation[out]);
@@ -526,7 +550,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		// Allocate LIVE-INs
 		for (auto in : live_ins) {
 			// If the live-in is not already allocated, allocate it.
-			if (allocation.count(in) == 0 && global_allocation.count(in) == 0) {
+			if (allocation[in] == -1 && global_allocation.count(in) == 0) {
 				int32_t next_reg = avail_regs.next_avail();
 				
 				if (avail_regs.next_avail() == -1) {
@@ -557,9 +581,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 				if (descr->format[op_idx] != 'I' && live_outs.count(oper->value)) not_dead = true;
 
 				// If this vreg has been allocated to the stack, then fill in the stack entry location here
-				auto global_alloc = global_allocation.find(oper->value);
-				if(global_alloc != global_allocation.end()) {
-					oper->allocate(IROperand::ALLOCATED_STACK, global_alloc->second);
+				//auto global_alloc = global_allocation.find(oper->value);
+				if(global_allocation.count(oper->value)) {
+					oper->allocate(IROperand::ALLOCATED_STACK, global_allocation[oper->value]);
 					if(descr->format[op_idx] == 'O' || descr->format[op_idx] == 'B') not_dead = true;
 				} else {
 
@@ -568,7 +592,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	//				printf("Operand %u (%u) is %c and is live out:%u\n", op_idx, oper->value, descr->format[op_idx], live_outs.count(oper->value));
 
-					if (allocation.count(oper->value)) {
+					if (allocation[oper->value] != -1) {
 						oper->allocate(IROperand::ALLOCATED_REG, allocation[oper->value]);
 					}
 
@@ -580,9 +604,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		for (auto out : live_outs) {
 			if(global_allocation.count(out)) continue;
 			if (!live_ins.count(out)) {
-				assert(allocation.count(out));
+				assert(allocation[out] != -1);
 
-				allocation.erase(out);
+				allocation[out] = -1;
 			}
 		}
 
@@ -591,18 +615,21 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		if(!not_dead && can_be_dead) {
 			make_instruction_nop(insn, true);
 
-			auto old_live_ins = live_ins;
-			for(auto in : old_live_ins) {
+			to_erase.clear();
+			to_erase.reserve(live_ins.size());
+			for(auto i = live_ins.begin(); i != live_ins.end(); ++i) {
+				const auto &in = *i;
 				if(global_allocation.count(in)) continue;
 				if(live_outs.count(in) == 0) {
-					assert(allocation.count(in));
+					assert(allocation[in] != -1);
 
 					avail_regs.set(allocation[in]);
 
-					allocation.erase(in);
-					live_ins.erase(in);
+					allocation[in] = -1;
+					to_erase.push_back(i);
 				}
 			}
+			for(auto e : to_erase)live_ins.erase(e);
 		}
 
 //		printf("  [%03d] %10s\n", ir_idx, insn_descriptors[insn->type].mnemonic);
@@ -656,7 +683,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	//printf("block %08x\n", tb.block_addr);
 //	dump_ir();
-
+	timer.tick();	
+	//printf("lol ");
+	timer.dump();
 	return true;
 }
 
