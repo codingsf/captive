@@ -10,24 +10,30 @@
 
 #include <define.h>
 #include <jit/translation-context.h>
+#include <shared-jit.h>
 
 namespace captive {
 	namespace arch {
 		namespace jit {
 			class TranslationContext;
-			
+						
 			class IRSorter
 			{
 			public:
 				IRSorter(TranslationContext& _ctx) : ctx(_ctx) { }
-				virtual bool sort() = 0;
+				shared::IRInstruction *perform_sort();
 				
 			protected:
-				TranslationContext& ctx;
+				virtual bool do_sort() = 0;
 				
-				inline shared::IRBlockId key(uint32_t idx) const { return ctx.at(idx)->ir_block; }
-				inline void exchange(uint32_t a, uint32_t b) { ctx.swap(a, b); }
+				inline shared::IRBlockId key(uint32_t idx) const { return ctx.at(insn_idxs[idx])->ir_block; }
+				inline void exchange(uint32_t a, uint32_t b) { std::swap(insn_idxs[a], insn_idxs[b]); }
 				inline int32_t compare(uint32_t a, uint32_t b) { return key(a) - key(b); }
+				inline uint32_t count() { return ctx.count(); }
+				
+			private:
+				uint32_t *insn_idxs;
+				TranslationContext& ctx;
 			};
 			
 			namespace algo {
@@ -35,16 +41,18 @@ namespace captive {
 				{
 				public:
 					GnomeSort(TranslationContext& ctx) : IRSorter(ctx) { }
-					bool sort() override;
+				protected:
+					 bool do_sort() override;
 				};
 				
 				class MergeSort : public IRSorter
 				{
 				public:
 					MergeSort(TranslationContext& ctx) : IRSorter(ctx) { }
-					bool sort() override;
+				protected:
+					 bool do_sort() override;
 					
-				private:
+				private:			
 					bool sort(int from, int to);
 					void merge(int from, int pivot, int to, int len1, int len2);
 					void rotate(int from, int mid, int to);

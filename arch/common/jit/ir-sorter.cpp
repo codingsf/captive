@@ -4,11 +4,34 @@ using namespace captive::arch::jit;
 using namespace captive::arch::jit::algo;
 using namespace captive::shared;
 
-bool GnomeSort::sort()
+IRInstruction *IRSorter::perform_sort()
+{
+	insn_idxs = (uint32_t*)malloc(count() * sizeof(uint32_t));
+	
+	for(uint32_t i = 0; i < ctx.count(); ++i) {
+		insn_idxs[i] = i;
+	}
+	
+	do_sort();
+	
+	IRInstruction *new_buffer = (IRInstruction*)malloc(ctx.count() * sizeof(IRInstruction));
+	bzero(new_buffer, ctx.count() * sizeof(IRInstruction));
+	for(uint32_t i = 0; i < ctx.count(); ++i) {
+		new_buffer[i] = *ctx.at(insn_idxs[i]);
+	}
+	
+	free(insn_idxs);
+	
+	insn_idxs = NULL;
+	
+	return new_buffer;
+}
+
+bool GnomeSort::do_sort()
 {
 	uint32_t pos = 1;
 
-	while (pos < ctx.count()) {
+	while (pos < count()) {
 		if (key(pos) >= key(pos - 1)) {
 			pos += 1;
 		} else {
@@ -23,9 +46,10 @@ bool GnomeSort::sort()
 	return true;
 }
 
-bool MergeSort::sort()
+bool MergeSort::do_sort()
 {
-	return sort(0, ctx.count());
+	sort(0, count());
+	return true;
 }
 
 bool MergeSort::sort(int from, int to)
@@ -77,10 +101,11 @@ void MergeSort::merge(int from, int pivot, int to, int len1, int len2)
 
 void MergeSort::rotate(int from, int mid, int to)
 {
-	/*reverse(from, mid - 1);
+	reverse(from, mid - 1);
 	reverse(mid, to - 1);
-	reverse(from, to - 1);*/
+	reverse(from, to - 1);
 	
+	/*
 	if (from == mid || mid == to) return;
 	int n = gcd(to - from, mid - from);
 	while (n-- != 0) {
@@ -96,6 +121,7 @@ void MergeSort::rotate(int from, int mid, int to)
 		
 		ctx.put(p1, val);
 	}
+	*/
 }
 
 void MergeSort::reverse(int from, int to)

@@ -49,6 +49,7 @@ namespace captive {
 				
 				inline uint32_t count() const { return _ir_insn_count; }
 				inline uint32_t reg_count() const { return _ir_reg_count; }
+				inline uint32_t block_count() const { return _ir_block_count; }
 				
 				inline shared::IRInstruction *at(uint32_t idx) const { return &_ir_insns[idx]; }
 				inline void put(uint32_t idx, shared::IRInstruction& insn) { _ir_insns[idx] = insn; }
@@ -68,6 +69,9 @@ namespace captive {
 				}
 				
 				inline const shared::IRInstruction *get_ir_buffer() const { return _ir_insns; }
+				inline shared::IRInstruction *get_ir_buffer() { return _ir_insns; }
+				
+				inline void set_ir_buffer(shared::IRInstruction *new_buffer) { _ir_insns = new_buffer; }
 				
 			private:
 				shared::IRBlockId _current_block_id;
