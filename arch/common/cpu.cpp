@@ -232,6 +232,7 @@ bool CPU::interpret_block()
 void CPU::invalidate_translations()
 {
 	image->invalidate();
+	invalidate_virtual_mappings();
 }
 
 void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
@@ -243,6 +244,8 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 	if (rgn) {
 		rgn->invalidate();
 	}
+	
+	invalidate_virtual_mappings();
 }
 
 void CPU::invalidate_virtual_mappings()
@@ -269,6 +272,18 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 	if (jit_state.region_txln_cache) {
 		jit_state.region_txln_cache[va >> 12].fn = (void *)&tail_call_ret0_only;
 	}
+}
+
+void CPU::handle_irq_raised(uint8_t irq_line)
+{
+	//printf("*** raised %d\n", irq_line);
+	jit_state.exit_chain = cpu_data().isr;
+}
+
+void CPU::handle_irq_rescinded(uint8_t irq_line)
+{
+	//printf("*** rescinded %d\n", irq_line);
+	jit_state.exit_chain = cpu_data().isr;
 }
 
 static uint32_t pc_ring_buffer[256];

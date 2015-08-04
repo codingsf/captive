@@ -170,6 +170,7 @@ namespace captive {
 				void test(uint64_t val, const X86Register& op2);
 				void test(const X86Register& op1, const X86Register& op2);
 
+				void jmp(const X86Register& tgt);
 				void jmp(const X86Memory& tgt);
 				void jmp_reloc(uint32_t& reloc_offset);
 

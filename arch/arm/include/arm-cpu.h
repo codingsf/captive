@@ -36,27 +36,11 @@ namespace captive {
 
 				bool init() override;
 
-				/*uint32_t read_pc() const override { return state.regs.RB[15]; }
-
-				uint32_t write_pc(uint32_t value) override {
-					uint32_t tmp = state.regs.RB[15];
-					state.regs.RB[15] = value;
-					return tmp;
-				}
-
-				uint32_t inc_pc(uint32_t delta) override {
-					uint32_t tmp = state.regs.RB[15];
-					state.regs.RB[15] += delta;
-					return tmp;
-				}*/
-
 				void dump_state() const;
 
 				virtual MMU& mmu() const override { return (MMU&)*_mmu; }
 				virtual Interpreter& interpreter() const override { return (Interpreter&)*_interp; }
 				virtual JIT& jit() const override { return (JIT&)*_jit; }
-
-				virtual void enqueue_irq_check_if_enabled() override;
 
 				struct cpu_state {
 					uint32_t isa_mode;
@@ -81,7 +65,12 @@ namespace captive {
 				bool decode_instruction_phys(gpa_t addr, Decode* insn) override;
 				JumpInfo get_instruction_jump_info(Decode* insn) override;
 
-				bool interrupts_enabled() const override { return !state.regs.I; }
+				bool interrupts_enabled(uint8_t irq_line) const override
+				{
+					if (irq_line == 0) return !state.regs.F;
+					if (irq_line == 1) return !state.regs.I;
+					return false;
+				}
 
 				void* reg_state() override { return &state.regs; }
 				uint32_t reg_state_size() override { return sizeof(state.regs); }

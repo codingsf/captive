@@ -950,17 +950,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 	std::map<uint32_t, IRBlockId> block_relocations;
 	std::map<IRBlockId, uint32_t> native_block_offsets;
-
+	
 	// Function prologue
-	if (max_stack > 0) {
-		encoder.push(REG_RBP);
-		encoder.mov(REG_RSP, REG_RBP);
-		encoder.sub(max_stack, REG_RSP);
-	}
-
 	encoder.push(REG_R15);
 	encoder.push(REG_R14);
 	encoder.push(REG_RBX);
+
+	encoder.push(REG_RBP);
+	encoder.mov(REG_RSP, REG_RBP);
+
+	uint32_t prologue_offset = encoder.current_offset();
+	encoder.sub(max_stack, REG_RSP);
 
 	encoder.mov(REG_RDI, JITSTATE_REG);	// JIT state ptr
 	load_state_field(8, REGSTATE_REG);	// Register state ptr
@@ -1130,41 +1130,40 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
-			encoder.mov(JITSTATE_REG, REG_RCX);
-			load_state_field(32, REG_RSI);
+			encoder.mov(JITSTATE_REG, REG_RDI);
 
 			// Function Epilogue
+			
+			if (ichk) {
+				encoder.cmp1(0, X86Memory::get(REG_RDI, 48));
+				encoder.jnz((int8_t)26);
+			}
+
+			//encoder.xorr(REG_EAX, REG_EAX);
+			//encoder.ret();
+
+			encoder.mov(X86Memory::get(REG_RDI, 8), REG_RAX);				
+			encoder.mov(X86Memory::get(REG_RAX, 0x3c), REG_EAX);			// Load the PC
+			encoder.movzx(REG_AX, REG_EDX);									// Mask the PC
+			encoder.lea(X86Memory::get(REG_RDX, REG_RDX, 2), REG_RCX);		// Calculate block cache entry offset
+			encoder.mov(X86Memory::get(REG_RDI, 32), REG_RDX);
+			encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
+			encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
+			encoder.je((int8_t)9);											// Tags match?
+
+			encoder.leave();
 			encoder.pop(REG_RBX);
 			encoder.pop(REG_R14);
 			encoder.pop(REG_R15);
 
-			if (max_stack > 0) {
-				encoder.leave();
-			}
-
-#ifndef BLOCK_CHAINING
 			encoder.xorr(REG_EAX, REG_EAX);
-			encoder.ret();
-#else
-			if (ichk) {
-				encoder.cmp8(0, X86Memory::get(REG_RCX, 48));
-				encoder.je((int8_t)7);
-				encoder.xorr(REG_EAX, REG_EAX);
-				encoder.mov(REG_RAX, X86Memory::get(REG_RCX, 48));
-				encoder.ret();
-			}
+			encoder.ret(); // Nope, return.
 
+			encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
+			encoder.add(prologue_offset, REG_RAX);
+			encoder.add(max_stack, REG_RSP);
+			encoder.jmp(REG_RAX);											// Yep, tail call.
 
-			encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EDX);
-			encoder.movzx(REG_DX, REG_EAX);
-			encoder.shl(4, REG_RAX);
-			encoder.add(REG_RAX, REG_RSI);
-			encoder.xorr(REG_EAX, REG_EAX);
-			encoder.cmp(REG_EDX, X86Memory::get(REG_RSI));
-			encoder.je((int8_t)1);
-			encoder.ret();
-			encoder.jmp(X86Memory::get(REG_RSI, 8));
-#endif
 			break;
 		}
 

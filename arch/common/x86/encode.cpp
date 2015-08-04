@@ -661,6 +661,12 @@ void X86Encoder::call(const X86Register& reg)
 	encode_mod_reg_rm(REG_RDX, reg);
 }
 
+void X86Encoder::jmp(const X86Register& tgt)
+{
+	emit8(0xff);
+	encode_mod_reg_rm(4, tgt);
+}
+
 void X86Encoder::jmp(const X86Memory& tgt)
 {
 	emit8(0xff);

@@ -104,12 +104,8 @@ namespace captive {
 
 			void register_region(shared::RegionWorkUnit *rwu);
 
-			virtual void enqueue_irq_check_if_enabled() = 0;
-
-			inline void enqueue_irq_check()
-			{
-				jit_state.exit_chain = 1;
-			}
+			void handle_irq_raised(uint8_t irq_line);
+			void handle_irq_rescinded(uint8_t irq_line);
 
 		protected:
 			volatile uint32_t *_pc_reg_ptr;
@@ -118,7 +114,7 @@ namespace captive {
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
 			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
 
-			virtual bool interrupts_enabled() const = 0;
+			virtual bool interrupts_enabled(uint8_t irq_line) const = 0;
 
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;
@@ -142,12 +138,12 @@ namespace captive {
 
 			struct {
 				void *cpu;												// 0
-				void *registers;						// 8
-				uint64_t registers_size;					// 16
+				void *registers;										// 8
+				uint64_t registers_size;								// 16
 				struct region_chain_cache_entry *region_txln_cache;		// 24
 				struct block_chain_cache_entry *block_txln_cache;		// 32
-				uint64_t *insn_counter;						// 40
-				uint64_t exit_chain;						// 48
+				uint64_t *insn_counter;									// 40
+				uint8_t exit_chain;										// 48
 			} packed jit_state;
 
 		private:

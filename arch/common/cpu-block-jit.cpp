@@ -69,7 +69,6 @@ bool CPU::run_block_jit_safepoint()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-
 		if (unlikely(cpu_data().isr)) {
 			if (interpreter().handle_irq(cpu_data().isr)) {
 				cpu_data().interrupts_taken++;
@@ -111,14 +110,15 @@ bool CPU::run_block_jit_safepoint()
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 
 		if (blk->txln) {
+			jit_state.block_txln_cache[virt_pc % 0x10000].tag = virt_pc;
+			jit_state.block_txln_cache[virt_pc % 0x10000].fn = (void *)blk->txln;
+
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;
 		}
 
 		if (blk->exec_count > 10) {
 			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), true);
-			jit_state.block_txln_cache[virt_pc % 0x10000].tag = virt_pc;
-			jit_state.block_txln_cache[virt_pc % 0x10000].fn = (void *)blk->txln;
 
 			mmu().disable_writes();
 
