@@ -31,11 +31,11 @@ class tick_timer
 			uint64_t last = ticks[0];
 			for(uint32_t i = 1; i < ticks.size(); ++i) {
 				uint64_t current = ticks[i];
-				if(names[i])printf("%s: %lu ::", names[i], current-last);
+				if(names[i])printf("%s: %lu\t", names[i], current-last);
 				last = current;
 			}
 			
-			printf("\n");
+			printf("Total: %lu\n", ticks[ticks.size()-1] - ticks[0]);
 		}
 		
 	private:
