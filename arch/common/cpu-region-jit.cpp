@@ -30,7 +30,7 @@ using namespace captive::arch::profile;
 bool CPU::run_region_jit()
 {
 	printf("cpu: starting region-jit cpu execution\n");
-	
+
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
@@ -66,13 +66,13 @@ bool CPU::run_region_jit_safepoint()
 {
 	uint32_t trace_interval = 0;
 	bool step_ok = true;
-	
+
 	bool reset_trace = true;
-	gpa_t last_phys_pc = 0;	
+	gpa_t last_phys_pc = 0;
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		
+
 		if (unlikely(cpu_data().isr)) {
 			if (interpreter().handle_irq(cpu_data().isr)) {
 				cpu_data().interrupts_taken++;
@@ -89,7 +89,7 @@ bool CPU::run_region_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-		
+
 		// This will perform a FETCH with side effects, so that we can impose the
 		// correct permissions checking for the block we're about to execute.
 		MMU::resolution_fault fault;
@@ -109,16 +109,16 @@ bool CPU::run_region_jit_safepoint()
 		// Signal the hypervisor to make a profiling run
 		if (unlikely(trace_interval > 100000)) {
 			reset_trace = true;
-			
+
 			analyse_blocks();
 			trace_interval = 0;
 		} else {
 			trace_interval++;
 		}
-		
+
 		Region *rgn = image->get_region(phys_pc);
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
-		
+
 		if (unlikely(reset_trace) || PAGE_INDEX_OF(last_phys_pc) != PAGE_INDEX_OF(phys_pc)) {
 			blk->entry = true;
 			reset_trace = false;
@@ -127,23 +127,23 @@ bool CPU::run_region_jit_safepoint()
 				rgn->get_block(last_phys_pc)->loop_header = true;
 			}
 		}
-				
+
 		last_phys_pc = phys_pc;
-		
+
 		if (rgn->txln) {
 			reset_trace = true;
 			((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
 			rgn->txln(&jit_state);
-			if (virt_pc != read_pc()) continue; 
+			if (virt_pc != read_pc()) continue;
 		}
-		
+
 		if (rgn->rwu == NULL) {
 			blk->exec_count++;
-			
+
 			if (rgn->heat > 50)
 				hot_regions.set(phys_pc >> 12, true);
 		}
-		
+
 		if (blk->txln) {
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;
@@ -153,10 +153,10 @@ bool CPU::run_region_jit_safepoint()
 			if (rgn->rwu == NULL) {
 				rgn->heat++;
 			}
-			
+
 			blk->txln = compile_block(blk, phys_pc, MODE_REGION);
 			mmu().disable_writes();
-			
+
 			step_ok = blk->txln(&jit_state) == 0;
 		} else {
 			interpret_block();
@@ -170,49 +170,51 @@ void CPU::analyse_blocks()
 {
 	for (int ri = 0; ri < 0x100000; ri++) {
 		if (!hot_regions[ri]) continue;
-		
+
 		Region *rgn = image->regions[ri];
 		if (!rgn) continue;
 		if (rgn->rwu) continue;
 
 		compile_region(rgn, ri);
 	}
-	
+
 	hot_regions.reset();
 }
 
 void CPU::compile_region(Region *rgn, uint32_t region_index)
 {
 	rgn->heat = 0;
-	
+
 	rgn->rwu = (shared::RegionWorkUnit *) shalloc(sizeof(shared::RegionWorkUnit));
 	rgn->rwu->region_index = region_index;
 	rgn->rwu->valid = 1;
 	rgn->rwu->block_count = 0;
 	rgn->rwu->blocks = NULL;
-	
+
 	printf("compiling region %p %08x\n", rgn, region_index << 12);
-	
+
 	for (int bi = 0; bi < 0x1000; bi++) {
 		Block *blk = rgn->blocks[bi];
 		if (!blk) continue;
-		
+
 		blk->exec_count = 0;
-		
+
 		if (!blk->ir) continue;
-		
+
 		rgn->rwu->block_count++;
 		rgn->rwu->blocks = (shared::BlockWorkUnit *) shrealloc(rgn->rwu->blocks, sizeof(shared::BlockWorkUnit) * rgn->rwu->block_count);
-		
+
 		shared::BlockWorkUnit *bwu = &rgn->rwu->blocks[rgn->rwu->block_count - 1];
 		bwu->offset = bi;
 		bwu->interrupt_check = blk->loop_header || blk->entry;
 		bwu->entry_block = blk->entry;
-		
+
 		bwu->ir_count = blk->ir_count;
 		bwu->ir = (const shared::IRInstruction *)shalloc(sizeof(shared::IRInstruction) * bwu->ir_count);
 		memcpy((void *)bwu->ir, (const void *)blk->ir, sizeof(shared::IRInstruction) * bwu->ir_count);
 	}
+
+	assert(rgn->rwu->block_count);
 	
 	asm volatile("out %0, $0xff" :: "a"(14), "D"(rgn->rwu));
 }
@@ -227,18 +229,18 @@ void CPU::register_region(shared::RegionWorkUnit* rwu)
 	if (rwu->valid) {
 		if (rgn->txln)
 			shfree((void *)rgn->txln);
-		
+
 		rgn->txln = (shared::region_txln_fn)rwu->fn_ptr;
 	} else {
 		shfree(rwu->fn_ptr);
 	}
-	
+
 	for (int i = 0; i < rwu->block_count; i++) {
 		shfree((void *)rwu->blocks[i].ir);
 	}
-	
+
 	shfree(rwu->blocks);
 	shfree(rwu);
-	
+
 	mmu().disable_writes();
 }

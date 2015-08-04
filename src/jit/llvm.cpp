@@ -65,17 +65,17 @@ bool LLVMJIT::init()
 void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 {
 	RegionCompilationContext rcc;
-	
+
 	rcc.phys_region_index = rwu->region_index;
 	rcc.rgn_module = new Module("region", rcc.ctx);
-	
+
 	rcc.types.voidty = Type::getVoidTy(rcc.ctx);
 	rcc.types.pi1 = (rcc.types.i1 = Type::getInt1Ty(rcc.ctx))->getPointerTo(0);
 	rcc.types.pi8 = (rcc.types.i8 = Type::getInt8Ty(rcc.ctx))->getPointerTo(0);
 	rcc.types.pi16 = (rcc.types.i16 = Type::getInt16Ty(rcc.ctx))->getPointerTo(0);
 	rcc.types.pi32 = (rcc.types.i32 = Type::getInt32Ty(rcc.ctx))->getPointerTo(0);
 	rcc.types.pi64 = (rcc.types.i64 = Type::getInt64Ty(rcc.ctx))->getPointerTo(0);
-	
+
 	std::vector<Type *> jit_state_elements;
 	jit_state_elements.push_back(rcc.types.pi8);					// CPU
 	jit_state_elements.push_back(rcc.types.pi8);					// Registers
@@ -83,23 +83,23 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	jit_state_elements.push_back(rcc.types.pi8->getPointerTo(0));	// Region Chaining Table
 	jit_state_elements.push_back(rcc.types.pi64);					// Instruction Counter
 	jit_state_elements.push_back(rcc.types.pi32);					// ISR
-	
+
 	rcc.types.jit_state_ty = StructType::get(rcc.ctx, jit_state_elements, false);
 	rcc.types.jit_state_ptr = rcc.types.jit_state_ty->getPointerTo(0);
-	
+
 	FunctionType *rgn_func_ty = FunctionType::get(rcc.types.i32, { rcc.types.jit_state_ptr }, false);
 	rcc.rgn_func = Function::Create(rgn_func_ty, Function::ExternalLinkage, "region", rcc.rgn_module);
 	rcc.rgn_func->addFnAttr(Attribute::NoRedZone);
-	
+
 	llvm::Value *jit_state_ptr_val = &(rcc.rgn_func->getArgumentList().front());
 	jit_state_ptr_val->setName("sausage");
-	
+
 	rcc.entry_block = BasicBlock::Create(rcc.ctx, "entry", rcc.rgn_func);
 	rcc.dispatch_block = BasicBlock::Create(rcc.ctx, "dispatch", rcc.rgn_func);
 	rcc.exit_normal_block = BasicBlock::Create(rcc.ctx, "exit_normal", rcc.rgn_func);
 	rcc.exit_handle_block = BasicBlock::Create(rcc.ctx, "exit_handle_interrupt", rcc.rgn_func);
 	rcc.alloca_block = rcc.entry_block;
-	
+
 	rcc.builder.SetInsertPoint(rcc.entry_block);
 	rcc.jit_state = rcc.builder.CreateLoad(jit_state_ptr_val, "jit_state");
 	rcc.cpu_obj = rcc.builder.CreateExtractValue(rcc.jit_state, {0}, "cpu_obj");
@@ -114,17 +114,17 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	set_aa_metadata(rcc.insn_counter, AA_MD_INSN_COUNTER);
 	rcc.isr = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "isr");
 	set_aa_metadata(rcc.isr, AA_MD_ISR);
-	
+
 	rcc.builder.CreateBr(rcc.dispatch_block);
 
 	// --- EXIT NORMAL
 	rcc.builder.SetInsertPoint(rcc.exit_normal_block);
 	rcc.builder.CreateRet(rcc.constu32(0));
-	
+
 	// --- EXIT HANDLE
 	rcc.builder.SetInsertPoint(rcc.exit_handle_block);
 	rcc.builder.CreateRet(rcc.constu32(1));
-	
+
 	BasicBlock *chain_block = BasicBlock::Create(rcc.ctx, "chain", rcc.rgn_func);
 	BasicBlock *do_dispatch_block = BasicBlock::Create(rcc.ctx, "do_dispatch", rcc.rgn_func);
 
@@ -133,27 +133,27 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
 	Value *dispatch_pc_page_idx = rcc.builder.CreateLShr(dispatch_loaded_pc, 12);
 	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
-	
+
 	// --- CHAIN
 	rcc.builder.SetInsertPoint(chain_block);
-	
+
 	std::vector<Value *> chain_slot_gep;
 	chain_slot_gep.push_back(dispatch_pc_page_idx);
-	
+
 	Value *chain_slot = rcc.builder.CreateGEP(rcc.region_table, chain_slot_gep, "chain_slot");
 	Value *region_fn_ptr = rcc.builder.CreateLoad(chain_slot);
 	Value *real_fn_ptr = rcc.builder.CreateBitCast(region_fn_ptr, rgn_func_ty->getPointerTo(0));
 	CallInst *region_tail_call = rcc.builder.CreateCall(real_fn_ptr, jit_state_ptr_val);
 	region_tail_call->setTailCall(true);
-	
+
 	rcc.builder.CreateRet(region_tail_call);
-	
+
 	// Create Blocks
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
 		BasicBlock *gbb = BasicBlock::Create(rcc.ctx, "gbb-" + std::to_string(rwu->blocks[i].offset), rcc.rgn_func);
 		rcc.guest_basic_blocks[rwu->blocks[i].offset] = gbb;
 	}
-	
+
 	// Create Jump Table
 	uint32_t jump_table_slots = 2048;
 	for (uint32_t slot = 0; slot < jump_table_slots; slot++) {
@@ -163,17 +163,17 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	// Lower Blocks
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
 		shared::BlockWorkUnit *bwu = &rwu->blocks[i];
-		
+
 		lower_block(rcc, bwu);
 	}
-	
+
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
 		shared::BlockWorkUnit *bwu = &rwu->blocks[i];
 		if (rwu->blocks[i].entry_block || rcc.direct_blocks.count(bwu->offset) == 0) {
 			rcc.jump_table_entries[bwu->offset >> 1] = (Constant *)BlockAddress::get(rcc.guest_basic_blocks[bwu->offset]);
 		}
 	}
-	
+
 	ArrayType *jump_table_type = ArrayType::get(rcc.types.pi8, jump_table_slots);
 	Constant *jump_table_init = ConstantArray::get(jump_table_type, ArrayRef<Constant *>(rcc.jump_table_entries, jump_table_slots));
 	rcc.jump_table = new GlobalVariable(*rcc.rgn_module, jump_table_type, true, GlobalValue::InternalLinkage, jump_table_init, "jump_table");
@@ -181,14 +181,14 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	// --- DO DISPATCH
 	rcc.builder.SetInsertPoint(do_dispatch_block);
 	Value *jt_slot = rcc.builder.CreateLShr(rcc.builder.CreateAnd(dispatch_loaded_pc, 0xfff), 1);
-	
+
 	std::vector<Value *> indicies;
 	indicies.push_back(rcc.constu32(0));
 	indicies.push_back(jt_slot);
-	
+
 	Value *jt_elem = rcc.builder.CreateInBoundsGEP(rcc.jump_table, indicies, "jt_element");
 	set_aa_metadata(jt_elem, AA_MD_JT_ELEM);
-	
+
 	IndirectBrInst *ibr = rcc.builder.CreateIndirectBr(rcc.builder.CreateLoad(jt_elem), rwu->block_count + 1);
 	ibr->addDestination(rcc.exit_normal_block);
 
@@ -199,21 +199,21 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 			ibr->addDestination(rcc.guest_basic_blocks[block_offset]);
 		}
 	}
-	
+
 	// Verify
 	/*{
 		PassManager verifyManager;
 		verifyManager.add(createVerifierPass(true));
 		verifyManager.run(*rcc.rgn_module);
 	}*/
-	
+
 	// Dump
-	{
+	/*{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}
-	
+	}*/
+
 	// Optimise
 	{
 		PassManager optManager;
@@ -223,12 +223,12 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 
 	// Dump
-	{
+	/*{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".opt.ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}
-	
+	}*/
+
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
 	target_opts.DisableTailCalls = false;
@@ -356,7 +356,7 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 	if (L1.Ptr == L2.Ptr) return MustAlias;
 
 	const Value *v1 = L1.Ptr, *v2 = L2.Ptr;
-	
+
 	// First, if we've got two instructions...
 	if (IsInstr(v1) && IsInstr(v2)) {
 		const MDNode *md1 = ((Instruction *)v1)->getMetadata("cai");
@@ -371,7 +371,7 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 			}
 		}
 	}
-	
+
 	if (v1->getName() == "sausage" || v2->getName() == "sausage") return AliasAnalysis::NoAlias;
 
 	if (IsAlloca(v1) || IsAlloca(v2)) {
@@ -382,57 +382,66 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 		const MDNode *md2 = ((Instruction *)v2)->getMetadata("cai");
 
 		if (md1 && md2) {
-			if (md1->getOperand(0).get() == md2->getOperand(0).get()) {
-				uint32_t aa_class = CONSTVAL(((ConstantAsMetadata *)md1->getOperand(0).get())->getValue());
+			uint32_t aa_class = CONSTVAL(((ConstantAsMetadata *)md1->getOperand(0).get())->getValue());
 
-				if (aa_class == 2) { // Register
-					/*if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
-						uint32_t reg_offset1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
-						uint32_t reg_offset2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
-
-						// This would break if we got some weird overlapping offsets
-						// but, of course, we never generate rubbish code like that!
-						if (reg_offset1 == reg_offset2) {
-							return AliasAnalysis::MustAlias;
-						} else {
-							return AliasAnalysis::NoAlias;
-						}
-					}*/
-					
+			if (aa_class == 2) { // Register
+				if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
 					uint32_t reg_offset1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
 					uint32_t reg_offset2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
-					
+
+					// This would break if we got some weird overlapping offsets
+					// but, of course, we never generate rubbish code like that!
 					if (reg_offset1 == reg_offset2) {
-						return AliasAnalysis::MayAlias;
+						return AliasAnalysis::MustAlias;
 					} else {
 						return AliasAnalysis::NoAlias;
 					}
 				}
+			} else if (aa_class == 1) { // VREG
+				uint32_t vreg_idx1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
+				uint32_t vreg_idx2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
 
-				return AliasAnalysis::MayAlias;
-			} else {
-				return AliasAnalysis::NoAlias;
+				if (vreg_idx1 == vreg_idx2) {
+					if (v1->getType() == v2->getType())
+						return AliasAnalysis::MustAlias;
+					return AliasAnalysis::PartialAlias;
+				} else {
+					return AliasAnalysis::NoAlias;
+				}
 			}
-		} else {
-			/*fprintf(stderr, "*** UNDECORATED INTTOPTR\n");
-			v1->dump();
-			v2->dump();*/
+
+			return AliasAnalysis::MayAlias;
 		}
 	}
 
-	if (!(IsPHI(v1) || IsPHI(v2))) {
+	if (IsBitCast(v1) && IsBitCast(v2)) {
+		BitCastInst *bc1 = (BitCastInst *)v1, *bc2 = (BitCastInst *)v2;
+		Value *bc1op = bc1->getOperand(0), *bc2op = bc2->getOperand(0);
+
+		if (bc1op == bc2op) {
+			if (bc1->getType() == bc2->getType()) {
+				return AliasAnalysis::MustAlias;
+			} else {
+				return AliasAnalysis::PartialAlias;
+			}
+		} else if (IsAlloca(bc1op) || IsAlloca(bc2op)) {
+			return AliasAnalysis::NoAlias;
+		}
+	}
+
+	/*if (!(IsPHI(v1) || IsPHI(v2))) {
 		fprintf(stderr, "*** MAY ALIAS '%s' and '%s'\n", v1->getName().str().c_str(), v2->getName().str().c_str());
 		v1->dump();
 		v2->dump();
-	}
-	
+	}*/
+
 	return AliasAnalysis::MayAlias;
 }
 
 bool CaptiveAA::runOnFunction(Function& F)
 {
 	AliasAnalysis::InitializeAliasAnalysis(this);
-	
+
 	bool changed = false;
 	for (auto& bb : F) {
 		for (auto& insn : bb) {
@@ -454,7 +463,7 @@ bool CaptiveAA::runOnFunction(Function& F)
 			}
 		}
 	}
-	
+
 	return changed;
 }
 
@@ -548,18 +557,18 @@ bool LLVMJIT::initialise_pass_manager(PassManagerBase* pm)
 bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWorkUnit *bwu)
 {
 	BlockCompilationContext bcc(rcc, bwu->offset);
-	
+
 	BasicBlock *entry_block = rcc.guest_basic_blocks[bwu->offset];
 	bcc.alloca_block = rcc.alloca_block;
-	
+
 	for (uint32_t ir_idx = 0; ir_idx < bwu->ir_count; ir_idx++) {
 		const IRInstruction *insn = &bwu->ir[ir_idx];
-		
+
 		if (insn->ir_block == 0x7fffffff) continue;
-		
+
 		lower_instruction(bcc, insn);
 	}
-	
+
 	bcc.builder.SetInsertPoint(entry_block);
 
 	if (bwu->interrupt_check) {
@@ -576,7 +585,7 @@ bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWork
 	} else {
 		rcc.builder.CreateBr(get_ir_block(bcc, (IRBlockId)0));
 	}
-	
+
 	return true;
 }
 
@@ -652,17 +661,17 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 		alloca_block_builder.SetInsertPoint(&(bcc.alloca_block->back()));
 
 		AllocaInst *vreg_alloc = alloca_block_builder.CreateAlloca(bcc.rcc.types.i64, NULL, "vreg-" + std::to_string(id));
-		
+
 		bcc.ir_vregs[(uint32_t)id] = vreg_alloc;
-		
+
 		Value *ptr = bcc.builder.CreatePointerCast(vreg_alloc, vreg_type);
 		set_aa_metadata(ptr, AA_MD_VREG, bcc.rcc.constu32(id));
-		
+
 		return ptr;
 	} else {
 		Value *ptr = bcc.builder.CreatePointerCast(llvm_vreg->second, vreg_type);
 		set_aa_metadata(ptr, AA_MD_VREG, bcc.rcc.constu32(id));
-		
+
 		return ptr;
 	}
 }
@@ -671,9 +680,9 @@ Value *LLVMJIT::vreg_for_operand(BlockCompilationContext& bcc, const shared::IRO
 {
 	if (oper->is_vreg()) {
 		if (oper->is_alloc_reg()) {
-			return get_ir_vreg(bcc, (IRRegId)oper->alloc_data, oper->size);			
+			return get_ir_vreg(bcc, (IRRegId)oper->alloc_data, oper->size);
 		} else if (oper->is_alloc_stack()) {
-			return get_ir_vreg(bcc, (IRRegId)(10000 + oper->alloc_data), oper->size);			
+			return get_ir_vreg(bcc, (IRRegId)(10000 + oper->alloc_data), oper->size);
 		} else {
 			return NULL;
 		}
@@ -709,9 +718,9 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	const shared::IROperand *const op1 = &insn->operands[1];
 	const shared::IROperand *const op2 = &insn->operands[2];
 	const shared::IROperand *const op3 = &insn->operands[3];
-	
+
 	bcc.builder.SetInsertPoint(get_ir_block(bcc, insn->ir_block));
-	
+
 	switch (insn->type) {
 	case IRInstruction::VERIFY:
 	{
@@ -722,31 +731,31 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 		Constant *fn = bcc.rcc.rgn_module->getOrInsertFunction("jit_verify", fntype);
 		bcc.builder.CreateCall(fn, bcc.rcc.cpu_obj);
-		
-		return true;	
+
+		return true;
 	}
-	
+
 	case IRInstruction::COUNT:
 	{
 		Value *counter_val = bcc.builder.CreateLoad(bcc.rcc.insn_counter);
 		bcc.builder.CreateStore(bcc.builder.CreateAdd(bcc.rcc.consti64(1), counter_val), bcc.rcc.insn_counter);
-		
+
 		return true;
 	}
-	
+
 	case IRInstruction::INCPC:
 	{
 		Value *pc_val = bcc.builder.CreateLoad(bcc.rcc.pc_ptr);
 		bcc.builder.CreateStore(bcc.builder.CreateAdd(value_for_operand(bcc, op0), pc_val), bcc.rcc.pc_ptr);
-		
-		return true;		
+
+		return true;
 	}
-	
+
 	case shared::IRInstruction::LDPC:
 	{
 		Value *dst = vreg_for_operand(bcc, op0);
 		assert(dst);
-		
+
 		bcc.builder.CreateStore(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), dst);
 		return true;
 	}
@@ -756,10 +765,10 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		Value *src = value_for_operand(bcc, op0), *dst = vreg_for_operand(bcc, op1);
 		assert(src && dst);
 		bcc.builder.CreateStore(src, dst);
-		
+
 		return true;
 	}
-	
+
 	// Arithmetic
 	case shared::IRInstruction::ADD:
 	case shared::IRInstruction::SUB:
@@ -802,7 +811,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		bcc.builder.CreateStore(result, dst);
 		return true;
 	}
-	
+
 	// Comparison
 	case IRInstruction::CMPEQ:
 	case IRInstruction::CMPNE:
@@ -833,7 +842,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 		return true;
 	}
-	
+
 	case IRInstruction::CALL:
 	{
 		std::vector<Type *> param_types;
@@ -863,11 +872,11 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 		fn = bcc.builder.CreateIntToPtr(fn, fntype);
 		assert(fn);
-		
+
 		bcc.builder.CreateCall(fn, param_vals);
 		return true;
 	}
-	
+
 	case shared::IRInstruction::CLZ:
 	{
 		std::vector<Type *> params;
@@ -886,7 +895,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 		return true;
 	}
-	
+
 	case shared::IRInstruction::SX:
 	case shared::IRInstruction::ZX:
 	case shared::IRInstruction::TRUNC:
@@ -903,15 +912,15 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		bcc.builder.CreateStore(bcc.builder.CreateCast(op, src, type_for_operand(bcc, op1, false)), dst);
 		return true;
 	}
-	
+
 	case shared::IRInstruction::READ_REG:
 	{
 		Value *offset = value_for_operand(bcc, op0), *dst = vreg_for_operand(bcc, op1);
 		assert(offset && dst);
-				
+
 		Value *regptr = bcc.builder.CreateBitCast(bcc.builder.CreateGEP(bcc.rcc.reg_state, offset), type_for_operand(bcc, op1, true));
 		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
-		
+
 		bcc.builder.CreateStore(bcc.builder.CreateLoad(regptr), dst);
 
 		return true;
@@ -921,10 +930,10 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	{
 		Value *offset = value_for_operand(bcc, op1), *val = value_for_operand(bcc, op0);
 		assert(offset && val);
-		
+
 		Value *regptr = bcc.builder.CreateBitCast(bcc.builder.CreateGEP(bcc.rcc.reg_state, offset), type_for_operand(bcc, op0, true));
 		set_aa_metadata(regptr, AA_MD_REGISTER, offset);
-		
+
 		bcc.builder.CreateStore(val, regptr);
 
 		return true;
@@ -943,10 +952,10 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		set_aa_metadata(memptr, AA_MD_MEMORY);
 
 		bcc.builder.CreateStore(bcc.builder.CreateLoad(memptr, true), dst);
-		
+
 		return true;
 	}
-	
+
 	case shared::IRInstruction::READ_MEM_USER:
 	{
 		Value *addr = value_for_operand(bcc, op0);
@@ -986,7 +995,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		bcc.builder.CreateStore(src, memptr, true);
 		return true;
 	}
-	
+
 	case shared::IRInstruction::WRITE_MEM_USER:
 	{
 		Value *addr = value_for_operand(bcc, op1), *src = value_for_operand(bcc, op0);
@@ -1009,7 +1018,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		}
 
 		bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, addr, src);
-		
+
 		return true;
 	}
 
@@ -1075,47 +1084,47 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		bcc.builder.CreateCall4(fn, bcc.rcc.cpu_obj, v1, v2, v3);
 		return true;
 	}
-	
+
 	// Control Flow
 	case IRInstruction::JMP:
 	{
 		bcc.builder.CreateBr(block_for_operand(bcc, op0));
-		return true;	
-	}	
+		return true;
+	}
 
 	case IRInstruction::BRANCH:
 	{
 		Value *cond = value_for_operand(bcc, op0);
 		BasicBlock *tt = block_for_operand(bcc, op1);
 		BasicBlock *ft = block_for_operand(bcc, op2);
-		
+
 		bcc.builder.CreateCondBr(bcc.builder.CreateCast(Instruction::Trunc, cond, bcc.rcc.types.i1), tt, ft);
-		return true;	
+		return true;
 	}
-	
+
 	case IRInstruction::DISPATCH:
 	{
 		assert(op0->is_constant() && op1->is_constant());
 		uint32_t target_address = op0->value;
 		uint32_t fallthrough_address = op1->value;
-		
+
 		BasicBlock *target_block = bcc.rcc.exit_normal_block;
 		BasicBlock *fallthrough_block = bcc.rcc.exit_normal_block;
-		
+
 		if (target_address >> 12 == bcc.rcc.phys_region_index) {
 			if (bcc.rcc.guest_basic_blocks.count(target_address & 0xfff)) {
 				bcc.rcc.direct_blocks.insert(target_address & 0xfff);
 				target_block = bcc.rcc.guest_basic_blocks[target_address & 0xfff];
 			}
 		}
-		
+
 		if (fallthrough_address && (fallthrough_address >> 12 == bcc.rcc.phys_region_index)) {
 			if (bcc.rcc.guest_basic_blocks.count(fallthrough_address & 0xfff)) {
 				bcc.rcc.direct_blocks.insert(fallthrough_address & 0xfff);
 				fallthrough_block = bcc.rcc.guest_basic_blocks[fallthrough_address & 0xfff];
 			}
 		}
-				
+
 		if (fallthrough_address == 0) {
 			// Non-predicated Direct
 			bcc.builder.CreateBr(target_block);
@@ -1124,50 +1133,50 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 			Value *target_match = bcc.builder.CreateICmpEQ(bcc.builder.CreateAnd(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), 0xfff), bcc.rcc.constu32(target_address & 0xfff));
 			bcc.builder.CreateCondBr(target_match, target_block, fallthrough_block);
 		}
-		
+
 		return true;
 	}
-	
+
 	case IRInstruction::RET:
 	{
 		bcc.builder.CreateBr(bcc.rcc.dispatch_block);
 		return true;
 	}
-	
+
 	case IRInstruction::FLUSH:
 	case IRInstruction::FLUSH_ITLB:
 	case IRInstruction::FLUSH_DTLB:
 	{
 		std::vector<Type *> args;
 		args.push_back(bcc.rcc.types.i32);
-		
+
 		FunctionType *iaty = FunctionType::get(bcc.rcc.types.voidty, args, false);
 		InlineAsm* ia = InlineAsm::get(iaty, "int $$0x85", "{bx},~{dirflag},~{fpsr},~{flags}", true);
-		
+
 		CallInst* iac = bcc.builder.CreateCall(ia, bcc.rcc.consti32(1));
 		iac->setCallingConv(CallingConv::C);
 		iac->setTailCall(false);
 
 		return true;
 	}
-	
+
 	case IRInstruction::FLUSH_ITLB_ENTRY:
 	case IRInstruction::FLUSH_DTLB_ENTRY:
 	{
 		std::vector<Type *> args;
 		args.push_back(bcc.rcc.types.i32);
 		args.push_back(bcc.rcc.types.i32);
-		
+
 		FunctionType *iaty = FunctionType::get(bcc.rcc.types.voidty, args, false);
 		InlineAsm* ia = InlineAsm::get(iaty, "int $$0x85", "{bx},{cx},~{dirflag},~{fpsr},~{flags}", true);
-		
+
 		CallInst* iac = bcc.builder.CreateCall2(ia, bcc.rcc.consti32(1), value_for_operand(bcc, &insn->operands[0]));
 		iac->setCallingConv(CallingConv::C);
 		iac->setTailCall(false);
 
 		return true;
 	}
-	
+
 	case IRInstruction::ADC_WITH_FLAGS:
 	{
 		std::vector<Type *> params;
@@ -1179,22 +1188,22 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		Constant *fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("genc_adc_flags", fntype);
 
 		assert(fn);
-		
+
 		Value *lhs = value_for_operand(bcc, op0);
 		Value *rhs = value_for_operand(bcc, op1);
 		Value *carry_in = value_for_operand(bcc, op2);
 		Value *result = vreg_for_operand(bcc, op3);
 
 		assert(lhs && rhs && carry_in && result);
-		
+
 		Value *r = bcc.builder.CreateCall3(fn, lhs, rhs, carry_in);
 		bcc.builder.CreateStore(r, result);
 		return true;
 	}
-	
+
 	case IRInstruction::BARRIER: return true;
 	case IRInstruction::NOP: return true;
-	
+
 	default: ERROR << "Unhandled instruction type: " << insn->type; assert(false);
 	//default: return false;
 	}
