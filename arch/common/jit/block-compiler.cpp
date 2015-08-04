@@ -774,36 +774,27 @@ bool BlockCompiler::thread_jumps()
 
 bool BlockCompiler::dbe()
 {
-	block_list_t blocks, exits;
-	cfg_t succs, preds;
-	std::set<IRBlockId> to_die;
-
-	if (!build_cfg(blocks, succs, preds, exits))
-		return false;
-
-	for (auto block : blocks) {
-		if (block == 0) continue;
-
-		if (preds[block].size() == 0) {
-			to_die.insert(block);
+	std::vector<bool> live_blocks (ctx.block_count(), false);
+	live_blocks[0] = true;
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		
+		switch(insn->type) {
+			case IRInstruction::JMP:
+				live_blocks[insn->operands[0].value] = true;
+				break;
+			case IRInstruction::BRANCH:
+				live_blocks[insn->operands[1].value] = true;
+				live_blocks[insn->operands[2].value] = true;
+				break;
+			default:
+				break;
 		}
 	}
-	
-	int32_t prev_block = 0;
-	bool block_should_die = 0;
-	
-	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
+
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		if(insn->ir_block == NOP_BLOCK) continue;
-
-		if(insn->ir_block != prev_block) {
-			block_should_die = to_die.count(insn->ir_block);
-			prev_block = insn->ir_block;
-		}
-
-		if (block_should_die) {
-			make_instruction_nop(insn, true);
-		}
+		if(!live_blocks[insn->ir_block]) make_instruction_nop(insn, true);
 	}
 
 	return true;
