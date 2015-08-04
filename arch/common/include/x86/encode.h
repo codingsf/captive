@@ -320,32 +320,24 @@ namespace captive {
 				{
 					ensure_buffer(2);
 
-					_buffer[_write_offset++] = v & 0xff;
-					_buffer[_write_offset++] = (v >> 8) & 0xff;
+					*(uint16_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 2;
 				}
 
 				inline void emit32(uint32_t v)
 				{
 					ensure_buffer(4);
 
-					_buffer[_write_offset++] = v & 0xff;
-					_buffer[_write_offset++] = (v >> 8) & 0xff;
-					_buffer[_write_offset++] = (v >> 16) & 0xff;
-					_buffer[_write_offset++] = (v >> 24) & 0xff;
+					*(uint32_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 4;
 				}
 
 				inline void emit64(uint64_t v)
 				{
 					ensure_buffer(8);
-
-					_buffer[_write_offset++] = v & 0xff;
-					_buffer[_write_offset++] = (v >> 8) & 0xff;
-					_buffer[_write_offset++] = (v >> 16) & 0xff;
-					_buffer[_write_offset++] = (v >> 24) & 0xff;
-					_buffer[_write_offset++] = (v >> 32) & 0xff;
-					_buffer[_write_offset++] = (v >> 40) & 0xff;
-					_buffer[_write_offset++] = (v >> 48) & 0xff;
-					_buffer[_write_offset++] = (v >> 56) & 0xff;
+					
+					*(uint64_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 8;
 				}
 
 				void encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst);
