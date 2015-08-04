@@ -201,11 +201,11 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 	
 	// Verify
-	{
+	/*{
 		PassManager verifyManager;
 		verifyManager.add(createVerifierPass(true));
 		verifyManager.run(*rcc.rgn_module);
-	}
+	}*/
 	
 	// Dump
 	{
@@ -386,7 +386,7 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 				uint32_t aa_class = CONSTVAL(((ConstantAsMetadata *)md1->getOperand(0).get())->getValue());
 
 				if (aa_class == 2) { // Register
-					if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
+					/*if (md1->getNumOperands() > 1 && md2->getNumOperands() > 1) {
 						uint32_t reg_offset1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
 						uint32_t reg_offset2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
 
@@ -397,6 +397,15 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 						} else {
 							return AliasAnalysis::NoAlias;
 						}
+					}*/
+					
+					uint32_t reg_offset1 = CONSTVAL(((ValueAsMetadata *)md1->getOperand(1).get())->getValue());
+					uint32_t reg_offset2 = CONSTVAL(((ValueAsMetadata *)md2->getOperand(1).get())->getValue());
+					
+					if (reg_offset1 == reg_offset2) {
+						return AliasAnalysis::MayAlias;
+					} else {
+						return AliasAnalysis::NoAlias;
 					}
 				}
 
@@ -411,11 +420,11 @@ AliasAnalysis::AliasResult CaptiveAA::alias(const AliasAnalysis::Location &L1, c
 		}
 	}
 
-	/*if (!(IsPHI(v1) || IsPHI(v2))) {
+	if (!(IsPHI(v1) || IsPHI(v2))) {
 		fprintf(stderr, "*** MAY ALIAS '%s' and '%s'\n", v1->getName().str().c_str(), v2->getName().str().c_str());
 		v1->dump();
 		v2->dump();
-	}*/
+	}
 	
 	return AliasAnalysis::MayAlias;
 }
@@ -628,42 +637,46 @@ Type *LLVMJIT::type_for_operand(BlockCompilationContext& bcc, const IROperand *o
 
 llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId id, uint8_t size)
 {
+	Type *vreg_type = NULL;
+	switch (size) {
+	case 1: vreg_type = bcc.rcc.types.pi8; break;
+	case 2: vreg_type = bcc.rcc.types.pi16; break;
+	case 4: vreg_type = bcc.rcc.types.pi32; break;
+	case 8: vreg_type = bcc.rcc.types.pi64; break;
+	default: assert(false); return NULL;
+	}
+
 	auto llvm_vreg = bcc.ir_vregs.find(id);
 	if (llvm_vreg == bcc.ir_vregs.end()) {
 		IRBuilder<> alloca_block_builder(bcc.alloca_block);
 		alloca_block_builder.SetInsertPoint(&(bcc.alloca_block->back()));
 
-		Type *vreg_type = NULL;
-		switch (size) {
-		case 1: vreg_type = bcc.rcc.types.i8; break;
-		case 2: vreg_type = bcc.rcc.types.i16; break;
-		case 4: vreg_type = bcc.rcc.types.i32; break;
-		case 8: vreg_type = bcc.rcc.types.i64; break;
-		default: assert(false); return NULL;
-		}
-
-		AllocaInst *vreg_alloc = alloca_block_builder.CreateAlloca(vreg_type, NULL, "vreg-" + std::to_string(id));
-		set_aa_metadata(vreg_alloc, AA_MD_VREG);
+		AllocaInst *vreg_alloc = alloca_block_builder.CreateAlloca(bcc.rcc.types.i64, NULL, "vreg-" + std::to_string(id));
 		
 		bcc.ir_vregs[(uint32_t)id] = vreg_alloc;
 		
-		return vreg_alloc;
+		Value *ptr = bcc.builder.CreatePointerCast(vreg_alloc, vreg_type);
+		set_aa_metadata(ptr, AA_MD_VREG, bcc.rcc.constu32(id));
+		
+		return ptr;
 	} else {
-		switch (size) {
-		case 1: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi8); break;
-		case 2: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi16); break;
-		case 4: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi32); break;
-		case 8: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi64); break;
-		default: assert(false); return NULL;
-		}
-		return llvm_vreg->second;
+		Value *ptr = bcc.builder.CreatePointerCast(llvm_vreg->second, vreg_type);
+		set_aa_metadata(ptr, AA_MD_VREG, bcc.rcc.constu32(id));
+		
+		return ptr;
 	}
 }
 
 Value *LLVMJIT::vreg_for_operand(BlockCompilationContext& bcc, const shared::IROperand* oper)
 {
 	if (oper->is_vreg()) {
-		return get_ir_vreg(bcc, (IRRegId)oper->value, oper->size);			
+		if (oper->is_alloc_reg()) {
+			return get_ir_vreg(bcc, (IRRegId)oper->alloc_data, oper->size);			
+		} else if (oper->is_alloc_stack()) {
+			return get_ir_vreg(bcc, (IRRegId)(10000 + oper->alloc_data), oper->size);			
+		} else {
+			return NULL;
+		}
 	} else {
 		return NULL;
 	}
