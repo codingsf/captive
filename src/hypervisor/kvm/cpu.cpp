@@ -144,7 +144,7 @@ bool KVMCpu::run()
 					trap = false;
 					DEBUG << CONTEXT(CPU) << "Received SIGTRAP";
 					
-					printf("*** insns executed: %llu\n", per_cpu_data().insns_executed);
+					printf("*** insns executed: %lu\n", per_cpu_data().insns_executed);
 					
 					dump_regs();
 				}
@@ -183,8 +183,6 @@ bool KVMCpu::run()
 				}
 			} else if (cpu_run_struct->io.port == 0xfd) {
 				dump_regs();
-			} else if (cpu_run_struct->io.port == 0xfc) {
-				trigger_irq_latency_measure();
 			} else if (cpu_run_struct->io.port == 0xf0) {
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);
@@ -271,6 +269,7 @@ void KVMCpu::stop()
 	per_cpu_data().halt = true;
 }
 
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run& rs)
 {
 	uint64_t offset = pa & (device->size() - 1);
@@ -284,6 +283,7 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 		return true;
 	}
 }
+#pragma GCC diagnostic pop
 
 bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 {

@@ -33,6 +33,8 @@ void dump_mcontext(const struct mcontext *mctx)
 	printf("  rbx = %016lx\n", mctx->rbx);
 	printf("  rcx = %016lx\n", mctx->rcx);
 	printf("  rdx = %016lx\n", mctx->rdx);
+	printf("  rsi = %016lx\n", mctx->rsi);
+	printf("  rdi = %016lx\n", mctx->rdi);
 }
 
 void dump_stack()

@@ -31,7 +31,7 @@ namespace captive {
 		namespace jit {
 			class TranslationContext;
 		}
-		
+
 		namespace profile {
 			struct Image;
 			struct Region;
@@ -103,16 +103,19 @@ namespace captive {
 			void invalidate_translation(pa_t phys_page_base_addr, va_t virt_page_base_addr);
 
 			void register_region(shared::RegionWorkUnit *rwu);
-			
+
+			void handle_irq_raised(uint8_t irq_line);
+			void handle_irq_rescinded(uint8_t irq_line);
+
 		protected:
 			volatile uint32_t *_pc_reg_ptr;
-			
+
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
 			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
 
-			virtual bool interrupts_enabled() const = 0;
-			
+			virtual bool interrupts_enabled(uint8_t irq_line) const = 0;
+
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;
 			}
@@ -124,14 +127,24 @@ namespace captive {
 				uint32_t last_exception_action;
 			} local_state;
 
+			struct block_chain_cache_entry {
+				uint32_t tag;
+				void *fn;
+			} packed;
+
+			struct region_chain_cache_entry {
+				void *fn;
+			} packed;
+
 			struct {
-				void *cpu;										// 0
-				void *registers;								// 8
-				uint64_t registers_size;						// 16
-				void **region_txln_cache;						// 24
-				uint64_t *insn_counter;							// 32
-				uint32_t *isr;									// 40
-			} jit_state;
+				void *cpu;												// 0
+				void *registers;										// 8
+				uint64_t registers_size;								// 16
+				struct region_chain_cache_entry *region_txln_cache;		// 24
+				struct block_chain_cache_entry *block_txln_cache;		// 32
+				uint64_t *insn_counter;									// 40
+				uint8_t exit_chain;										// 48
+			} packed jit_state;
 
 		private:
 			inline void assert_privilege_mode()
@@ -179,15 +192,15 @@ namespace captive {
 
 			void analyse_blocks();
 			void compile_region(profile::Region *rgn, uint32_t region_index);
+
+			enum block_compilation_mode
+			{
+				MODE_BLOCK,
+				MODE_REGION,
+			};
 			
-			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, bool free_ir = false);
+			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, enum block_compilation_mode mode);
 			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
-			
-			shared::BlockTranslation *alloc_block_translation();
-			void release_block_translation(shared::BlockTranslation *txln);
-			
-			shared::RegionTranslation *alloc_region_translation();
-			void release_region_translation(shared::RegionTranslation *txln);
 		};
 	}
 }

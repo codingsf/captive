@@ -40,7 +40,11 @@ using namespace captive::shared;
  * R15  Register File
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa) : ctx(ctx), pa(pa)
+BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check, bool emit_chaining_logic) 
+	: ctx(ctx),
+		pa(pa),
+		emit_interrupt_check(emit_interrupt_check),
+		emit_chaining_logic(emit_chaining_logic)
 {
 	int i = 0;
 	assign(i++, REG_RAX, REG_EAX, REG_AX, REG_AL);
@@ -60,7 +64,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	//printf("*** %x\n", pa);
 
 	tick_timer timer(0);
-	
+
 	timer.reset();
 	if (!thread_jumps()) return false;
 	timer.tick("JT");
@@ -71,11 +75,11 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!merge_blocks()) return false;
 	timer.tick("MB");
 	if (!peephole()) return false;
-		
+
 	timer.tick("Peep");
 	if (!sort_ir()) return false;
 	timer.tick("Sort");
-	
+
 	if (!analyse(max_stack)) return false;
 	timer.tick("Analyse");
 	if( !post_allocate_peephole()) return false;
@@ -85,9 +89,9 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}
 	timer.tick("Lower");
-	
+
 	timer.dump();
-	
+
 
 	fn = (block_txln_fn)encoder.get_buffer();
 	return true;
@@ -175,7 +179,7 @@ bool BlockCompiler::peephole()
 {
 	IRInstruction *prev_pc_inc = NULL;
 	IRBlockId prev_block = INVALID_BLOCK_ID;
-	
+
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
@@ -191,9 +195,9 @@ bool BlockCompiler::peephole()
 			} else {
 				peephole_add(*insn);
 			}
-			
+
 			break;
-			
+
 		case IRInstruction::SHR:
 		case IRInstruction::SHL:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
@@ -202,7 +206,7 @@ bool BlockCompiler::peephole()
 				peephole_shift(*insn);
 			}
 			break;
-		
+
 		case IRInstruction::SUB:
 		case IRInstruction::SAR:
 		case IRInstruction::OR:
@@ -211,24 +215,24 @@ bool BlockCompiler::peephole()
 				make_instruction_nop(insn, true);
 			}
 			break;
-			
-			
+
+
 		case IRInstruction::INCPC:
 			if(prev_pc_inc) {
 				insn->operands[0].value += prev_pc_inc->operands[0].value;
 				prev_pc_inc->type = IRInstruction::NOP;
 			}
 			prev_pc_inc = insn;
-						
+
 			break;
-			
+
 		case IRInstruction::READ_REG:
 			// HACK HACK HACK (pc offset)
 			if(insn->operands[0].value == 0x3c) {
 				prev_pc_inc = NULL;
 			}
 			break;
-			
+
 		case IRInstruction::JMP:
 		case IRInstruction::BRANCH:
 		case IRInstruction::RET:
@@ -242,7 +246,7 @@ bool BlockCompiler::peephole()
 		case IRInstruction::WRITE_DEVICE:
 			prev_pc_inc = NULL;
 			break;
-			
+
 		default:
 			break;
 		}
@@ -262,7 +266,7 @@ static bool is_mov_nop(IRInstruction *insn, bool set_block)
 // We can merge the instruction if it is an add or subtract of a constant value into a register
 static bool is_add_candidate(IRInstruction *insn)
 {
-	return ((insn->type == IRInstruction::ADD) || (insn->type == IRInstruction::SUB)) 
+	return ((insn->type == IRInstruction::ADD) || (insn->type == IRInstruction::SUB))
 			&& insn->operands[0].is_constant() && insn->operands[1].is_alloc_reg();
 }
 
@@ -270,32 +274,32 @@ static bool is_add_candidate(IRInstruction *insn)
 static bool is_mem_candidate(IRInstruction *mem, IRInstruction *add)
 {
 	if(mem->type != IRInstruction::READ_MEM) return false;
-	
+
 	IROperand *add_target = &add->operands[1];
-	
+
 	// We should only be here if the add is a candidate
 	assert(add_target->is_alloc_reg());
-	
+
 	IROperand *mem_source = &mem->operands[0];
 	IROperand *mem_target = &mem->operands[2];
-	
+
 	if(!mem_source->is_alloc_reg() || !mem_target->is_alloc_reg()) return false;
 	if(mem_source->alloc_data != mem_target->alloc_data) return false;
 	if(mem_source->alloc_data != add_target->alloc_data) return false;
-	
+
 	return true;
 }
 
 static bool is_breaker(IRInstruction *add, IRInstruction *test)
 {
 	assert(add->type == IRInstruction::ADD || add->type == IRInstruction::SUB);
-	
+
 	if(test->ir_block == NOP_BLOCK) return false;
-	
+
 	if((add->ir_block != test->ir_block) && (test->ir_block != NOP_BLOCK)) {
 		return true;
 	}
-	
+
 	// If the instruction under test touches the target of the add, then it is a breaker
 	if(test->type != IRInstruction::READ_MEM) {
 		IROperand *add_target = &add->operands[1];
@@ -311,7 +315,7 @@ bool BlockCompiler::post_allocate_peephole()
 	for(uint32_t ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		is_mov_nop(ctx.at(ir_idx), true);
 	}
-		
+
 	uint32_t add_insn_idx = 0;
 	uint32_t mem_insn_idx = 0;
 	IRInstruction *add_insn, *mem_insn;
@@ -325,9 +329,9 @@ bool BlockCompiler::post_allocate_peephole()
 			if(add_insn_idx >= ctx.count()) goto exit;
 			add_insn = ctx.at(add_insn_idx++);
 		} while(!is_add_candidate(add_insn));
-		
+
 		//~ printf("Considering add=%u\n", add_insn_idx-1);
-		
+
 		mem_insn_idx = add_insn_idx;
 		bool broken = false;
 		do {
@@ -338,19 +342,19 @@ bool BlockCompiler::post_allocate_peephole()
 				broken = true;
 				break;
 			}
-			
+
 		} while(!is_mem_candidate(mem_insn, add_insn));
-		
+
 		if(broken) continue;
-		
+
 		//~ printf("Considering mem=%u\n", mem_insn_idx-1);
-		
+
 		assert(mem_insn->operands[1].is_constant());
 		if(add_insn->type == IRInstruction::ADD)
 			mem_insn->operands[1].value += add_insn->operands[0].value;
 		else
 			mem_insn->operands[1].value -= add_insn->operands[0].value;
-			
+
 		make_instruction_nop(add_insn, true);
 	}
 	exit:
@@ -435,7 +439,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = false },
-	
+
 	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
 };
 
@@ -447,11 +451,11 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	std::vector<int32_t> allocation (ctx.reg_count());
 	maybe_map<IRRegId, uint32_t, 128> global_allocation (ctx.reg_count());	// global register allocation
-	
+
 	typedef std::set<IRRegId> live_set_t;
 	live_set_t live_ins, live_outs;
 	std::vector<live_set_t::iterator> to_erase;
-	
+
 	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
@@ -463,18 +467,18 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	// Build up a map of which vregs have been seen in which blocks, to detect spanning vregs.
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		
+
 		if(insn->ir_block == NOP_BLOCK) continue;
 		if(insn->type == IRInstruction::BARRIER) next_global = 0;
-		
+
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 			if(!oper->is_valid()) break;
-			
+
 			// If the operand is a vreg, and is not already a global...
 			if (oper->is_vreg() && (global_allocation.count(oper->value) == 0)) {
 				auto seen_in_block = vreg_seen_block[oper->value];
-				
+
 				// If we have already seen this operand, and not in the same block, then we
 				// must globally allocate it.
 				if (seen_in_block != -1 && seen_in_block != insn->ir_block) {
@@ -482,7 +486,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 					next_global += 8;
 					if(next_global > max_stack) max_stack = next_global;
 				}
-				
+
 				vreg_seen_block[oper->value] = insn->ir_block;
 			}
 		}
@@ -493,7 +497,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		// Grab a pointer to the instruction we're looking at.
 		IRInstruction *insn = ctx.at(ir_idx);
 		if(insn->ir_block == NOP_BLOCK) continue;
-		
+
 		// Make sure it has a descriptor.
 		assert(insn->type < ARRAY_SIZE(insn_descriptors));
 		const struct insn_descriptor *descr = &insn_descriptors[insn->type];
@@ -506,7 +510,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 			// Reset the available register bitfield
 			avail_regs.fill(0xff);
-			
+
 			// Update the latest block id.
 			latest_block_id = insn->ir_block;
 		}
@@ -517,7 +521,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		// Clear the live-out set, and make every current live-in a live-out.
 		live_outs = live_ins;
-		
+
 		// Loop over the VREG operands and update the live-in set accordingly.
 		for (int o = 0; o < 6; o++) {
 			if (!insn->operands[o].is_valid()) break;
@@ -556,15 +560,15 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			// If the live-in is not already allocated, allocate it.
 			if (allocation[in] == -1 && global_allocation.count(in) == 0) {
 				int32_t next_reg = avail_regs.next_avail();
-				
+
 				if (avail_regs.next_avail() == -1) {
 					global_allocation[in] = next_global;
 					next_global += 8;
 					if(max_stack < next_global) max_stack = next_global;
-					
+
 				} else {
 					allocation[in] = next_reg;
-					
+
 					avail_regs.clear(next_reg);
 					used_phys_regs.set(next_reg);
 				}
@@ -687,7 +691,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	//printf("block %08x\n", tb.block_addr);
 //	dump_ir();
-	timer.tick();	
+	timer.tick();
 	//printf("lol ");
 	timer.dump();
 	return true;
@@ -697,7 +701,7 @@ bool BlockCompiler::thread_jumps()
 {
 	std::vector<IRInstruction*> first_instructions(ctx.block_count(), NULL);
 	std::vector<IRInstruction*> last_instructions(ctx.block_count(), NULL);
-	
+
 	// Build up a list of the first instructions in each block.
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
@@ -822,17 +826,17 @@ start:
 	while(work_list.size()) {
 		IRBlockId block = work_list.back();
 		work_list.pop_back();
-		
+
 		IRBlockId successor = succs[block][0];
-		
+
 		if(preds[successor].size() == 1) {
 			if(merge_block(successor, block)){
 				succs[block] = succs[successor];
 
 				succs[successor].clear();
-				
+
 				if(succs[block].size() == 1) work_list.push_back(block);
-				
+
 				continue;
 			}
 		}
@@ -847,23 +851,23 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 {
 	// Don't try to merge 'backwards' yet since it's a bit more complicated
 	if(merge_from < merge_into) return false;
-	
+
 	unsigned int ir_idx = 0;
 	// Nop out the terminator instruction from the merge_into block
 	for(; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		
+
 		// We can only merge if the terminator is a jmp
 		if(insn->ir_block == merge_into && insn->type == IRInstruction::JMP) {
 			make_instruction_nop(insn, true);
 			break;
 		}
 	}
-	
+
 	for(; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		if(insn->ir_block == NOP_BLOCK) continue;
-		
+
 		// Move instructions from the 'from' block to the 'to' block
 		if(insn->ir_block == merge_from) insn->ir_block = merge_into;
 		if(insn->ir_block > merge_from) break;
@@ -881,7 +885,7 @@ bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, 
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		if(insn->ir_block == NOP_BLOCK) continue;
-		
+
 		if (insn->ir_block != current_block_id) {
 			current_block_id = insn->ir_block;
 			blocks.push_back(current_block_id);
@@ -941,16 +945,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 	std::map<uint32_t, IRBlockId> block_relocations;
 	std::map<IRBlockId, uint32_t> native_block_offsets;
-
+	
 	// Function prologue
-	encoder.push(REG_RBP);
-	encoder.mov(REG_RSP, REG_RBP);
-
-	if (max_stack > 0) encoder.sub(max_stack, REG_RSP);
-
 	encoder.push(REG_R15);
 	encoder.push(REG_R14);
 	encoder.push(REG_RBX);
+
+	encoder.push(REG_RBP);
+	encoder.mov(REG_RSP, REG_RBP);
+
+	uint32_t prologue_offset = encoder.current_offset();
+	encoder.sub(max_stack, REG_RSP);
 
 	encoder.mov(REG_RDI, JITSTATE_REG);	// JIT state ptr
 	load_state_field(8, REGSTATE_REG);	// Register state ptr
@@ -958,7 +963,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		
+
 		if(insn->ir_block == NOP_BLOCK) continue;
 
 		// Record the native offset of an IR block
@@ -1120,20 +1125,47 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
-			//load_state_field(24, REG_RAX);
-			
+			encoder.mov(JITSTATE_REG, REG_RDI);
+
 			// Function Epilogue
-			encoder.pop(REG_RBX);
-			encoder.pop(REG_R14);
-			encoder.pop(REG_R15);
-			encoder.leave();
-						
-			encoder.xorr(REG_EAX, REG_EAX);
-			encoder.ret();
 			
-			/* TODO: chaining encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_ECX);
-			encoder.andd(0xfffff, REG_ECX);
-			encoder.jmp(X86Memory::get(REG_RAX, REG_RCX, 8));*/
+			if (emit_interrupt_check) {
+				encoder.cmp1(0, X86Memory::get(REG_RDI, 48));
+				encoder.jnz((int8_t)26);
+			}
+
+			if (emit_chaining_logic) {
+				encoder.mov(X86Memory::get(REG_RDI, 8), REG_RAX);				
+				encoder.mov(X86Memory::get(REG_RAX, 0x3c), REG_EAX);			// Load the PC
+				encoder.movzx(REG_AX, REG_EDX);									// Mask the PC
+				encoder.lea(X86Memory::get(REG_RDX, REG_RDX, 2), REG_RCX);		// Calculate block cache entry offset
+				encoder.mov(X86Memory::get(REG_RDI, 32), REG_RDX);
+				encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
+				encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
+				encoder.je((int8_t)9);											// Tags match?
+
+				encoder.leave();
+				encoder.pop(REG_RBX);
+				encoder.pop(REG_R14);
+				encoder.pop(REG_R15);
+
+				encoder.xorr(REG_EAX, REG_EAX);
+				encoder.ret(); // Nope, return.
+
+				encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
+				encoder.add(prologue_offset, REG_RAX);
+				encoder.add(max_stack, REG_RSP);
+				encoder.jmp(REG_RAX);											// Yep, tail call.
+			} else {
+				encoder.leave();
+				encoder.pop(REG_RBX);
+				encoder.pop(REG_R14);
+				encoder.pop(REG_R15);
+
+				encoder.xorr(REG_EAX, REG_EAX);
+				encoder.ret();
+			}
+			
 			break;
 		}
 
@@ -1347,7 +1379,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					encoder.jmp_reloc(reloc_offset);
 					block_relocations[reloc_offset] = ft->value;
 				}
-				
+
 				encoder.align_up(16);
 			}
 
@@ -2155,7 +2187,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			X86Register& tmp = get_temp(0, 8);
 
-			load_state_field(32, tmp);
+			load_state_field(40, tmp);
 			encoder.add8(1, tmp);
 
 			break;
@@ -2204,7 +2236,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *flags_out = &insn->operands[3];
 
 			assert(flags_out->is_vreg());
-			
+
 			X86Register& tmp = get_temp(0, 4);
 
 			// Load up lhs
@@ -2267,7 +2299,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				} else {
 					assert(false);
 				}
-				
+
 				encoder.pop(REG_RAX);
 			}
 

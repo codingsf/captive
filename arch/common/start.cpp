@@ -177,7 +177,7 @@ extern "C" {
 		dump_stack();
 		abort();
 	}
-
+	
 	void handle_trap_irq(struct mcontext *mctx)
 	{
 		apic_write(EOI, 0);
@@ -199,15 +199,17 @@ extern "C" {
 			} while(true);
 
 			break;
-			
+
 		case 2:
 			cpu->dump_state();
 			break;
-			
-		/*case 2:
-			printf("handling irq\n");
-			cpu->interpreter().handle_irq(cpu->cpu_data().isr);
-			break;*/
+
+		case 0x100 ... 0x1ff:
+			cpu->handle_irq_raised(cpu->cpu_data().signal_code & 0xff);
+			break;
+		case 0x200 ... 0x2ff:
+			cpu->handle_irq_rescinded(cpu->cpu_data().signal_code & 0xff);
+			break;
 		}
 	}
 

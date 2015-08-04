@@ -38,17 +38,23 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	// Initialise the profiling image
 	image = new profile::Image();
-	
+
 	jit_state.cpu = this;
-	jit_state.region_txln_cache = (void **)calloc(0x100000, sizeof(void *));
+	jit_state.block_txln_cache = (struct block_chain_cache_entry *)calloc(0x10000, sizeof(struct block_chain_cache_entry));
+	jit_state.region_txln_cache = (struct region_chain_cache_entry *)calloc(0x100000, sizeof(void *));
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
-	jit_state.isr = &cpu_data().isr;
-	
+	jit_state.exit_chain = 0;
+
 	invalidate_virtual_mappings();
 }
 
 CPU::~CPU()
 {
+	if (jit_state.region_txln_cache)
+		free(jit_state.region_txln_cache);
+
+	if (jit_state.block_txln_cache)
+		free(jit_state.block_txln_cache);
 }
 
 bool CPU::handle_pending_action(uint32_t action)
@@ -59,7 +65,7 @@ bool CPU::handle_pending_action(uint32_t action)
 		struct mallinfo mi = dlmallinfo();
 		printf("*** malloc info ***\n");
 		printf("used: %d\nfree: %d\n", mi.uordblks, mi.fordblks);
-		
+
 		dump_state();
 		return true;
 	}
@@ -215,7 +221,7 @@ bool CPU::interpret_block()
 		if (unlikely(cpu_data().verbose_enabled)) {
 			inc_insns_executed();
 		}
-		
+
 		// Perhaps finish tracing this instruction.
 		if (unlikely(trace().enabled())) {
 			trace().end_record();
@@ -226,6 +232,7 @@ bool CPU::interpret_block()
 void CPU::invalidate_translations()
 {
 	image->invalidate();
+	invalidate_virtual_mappings();
 }
 
 void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
@@ -233,22 +240,50 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 	if (virt_addr >= (va_t)0x100000000) return;
 
 	Region *rgn = image->get_region((uint32_t)(uint64_t)phys_addr);
-	
+
 	if (rgn) {
 		rgn->invalidate();
 	}
+	
+	invalidate_virtual_mappings();
 }
 
 void CPU::invalidate_virtual_mappings()
 {
-	for (int i = 0; i < 0x100000; i++) {
-		jit_state.region_txln_cache[i] = (void *)&tail_call_ret0_only;
+	if (jit_state.block_txln_cache) {
+		for (int i = 0; i < 0x10000; i++) {
+			jit_state.block_txln_cache[i].tag = 1;
+		}
+	}
+
+	if (jit_state.region_txln_cache) {
+		for (int i = 0; i < 0x100000; i++) {
+			jit_state.region_txln_cache[i].fn = (void *)&tail_call_ret0_only;
+		}
 	}
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
-	jit_state.region_txln_cache[va >> 12] = (void *)&tail_call_ret0_only;
+	if (jit_state.block_txln_cache) {
+		jit_state.block_txln_cache[va % 0x10000].tag = 1;
+	}
+
+	if (jit_state.region_txln_cache) {
+		jit_state.region_txln_cache[va >> 12].fn = (void *)&tail_call_ret0_only;
+	}
+}
+
+void CPU::handle_irq_raised(uint8_t irq_line)
+{
+	//printf("*** raised %d\n", irq_line);
+	jit_state.exit_chain = cpu_data().isr;
+}
+
+void CPU::handle_irq_rescinded(uint8_t irq_line)
+{
+	//printf("*** rescinded %d\n", irq_line);
+	jit_state.exit_chain = cpu_data().isr;
 }
 
 static uint32_t pc_ring_buffer[256];
@@ -369,27 +404,4 @@ bool CPU::device_read(uint32_t address, uint8_t length, uint64_t& value)
 
 	//printf("device read: addr=%x, value=%u\n", address, value);
 	return true;
-}
-
-captive::shared::BlockTranslation* CPU::alloc_block_translation()
-{
-	return (captive::shared::BlockTranslation *)shalloc(sizeof(captive::shared::BlockTranslation));
-}
-
-void CPU::release_block_translation(shared::BlockTranslation *txln)
-{
-	shfree((void *)txln->ir);
-	free((void *)txln->native_fn_ptr);
-	shfree(txln);
-}
-
-captive::shared::RegionTranslation* CPU::alloc_region_translation()
-{
-	return (captive::shared::RegionTranslation *)shalloc(sizeof(captive::shared::RegionTranslation));
-}
-
-void CPU::release_region_translation(shared::RegionTranslation *txln)
-{
-	shfree((void *)txln->native_fn_ptr);
-	shfree(txln);
 }

@@ -132,7 +132,7 @@ bool CPU::run_region_jit_safepoint()
 		
 		if (rgn->txln) {
 			reset_trace = true;
-			//((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
+			((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
 			rgn->txln(&jit_state);
 			if (virt_pc != read_pc()) continue; 
 		}
@@ -140,7 +140,7 @@ bool CPU::run_region_jit_safepoint()
 		if (rgn->rwu == NULL) {
 			blk->exec_count++;
 			
-			if (rgn->heat > 20)
+			if (rgn->heat > 50)
 				hot_regions.set(phys_pc >> 12, true);
 		}
 		
@@ -154,7 +154,7 @@ bool CPU::run_region_jit_safepoint()
 				rgn->heat++;
 			}
 			
-			blk->txln = compile_block(blk, phys_pc, false);
+			blk->txln = compile_block(blk, phys_pc, MODE_REGION);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;

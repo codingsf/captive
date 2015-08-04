@@ -68,6 +68,11 @@ namespace captive {
 					return X86Memory(base, index, scale);
 				}
 
+				static X86Memory get(const X86Register& base, int32_t disp, const X86Register& index, int scale)
+				{
+					return X86Memory(base, disp, index, scale);
+				}
+
 				static X86Memory get(const X86Register& base, int32_t disp)
 				{
 					return X86Memory(base, disp);
@@ -97,7 +102,7 @@ namespace captive {
 
 				void movzx(const X86Register& src, const X86Register& dst);
 				void movsx(const X86Register& src, const X86Register& dst);
-				
+
 				void incq(const X86Memory& loc);
 				void incl(const X86Memory& loc);
 
@@ -139,7 +144,7 @@ namespace captive {
 				void adc(uint32_t src, const X86Register& dst);
 				void adc(const X86Memory& src, const X86Register& dst);
 				void adc(const X86Register& src, const X86Register& dst);
-				
+
 				void add(const X86Register& src, const X86Register& dst);
 				void add(const X86Memory& src, const X86Register& dst);
 				void add(uint32_t val, const X86Register& dst);
@@ -165,60 +170,68 @@ namespace captive {
 				void test(uint64_t val, const X86Register& op2);
 				void test(const X86Register& op1, const X86Register& op2);
 
+				void jmp(const X86Register& tgt);
 				void jmp(const X86Memory& tgt);
 				void jmp_reloc(uint32_t& reloc_offset);
-				
+
 				void jcc_reloc(uint8_t v, uint32_t& reloc_offset);
-				
+
 				inline void jo_reloc(uint32_t& reloc_offset) { jcc_reloc(0, reloc_offset); }
 				inline void jno_reloc(uint32_t& reloc_offset) { jcc_reloc(1, reloc_offset); }
-				
+
 				inline void jb_reloc(uint32_t& reloc_offset) { jcc_reloc(2, reloc_offset); }
 				inline void jnae_reloc(uint32_t& reloc_offset) { jcc_reloc(2, reloc_offset); }
 				inline void jc_reloc(uint32_t& reloc_offset) { jcc_reloc(2, reloc_offset); }
-				
+
 				inline void jnb_reloc(uint32_t& reloc_offset) { jcc_reloc(3, reloc_offset); }
 				inline void jae_reloc(uint32_t& reloc_offset) { jcc_reloc(3, reloc_offset); }
 				inline void jnc_reloc(uint32_t& reloc_offset) { jcc_reloc(3, reloc_offset); }
-				
+
 				inline void jz_reloc(uint32_t& reloc_offset) { jcc_reloc(4, reloc_offset); }
 				inline void je_reloc(uint32_t& reloc_offset) { jcc_reloc(4, reloc_offset); }
-				
+
 				inline void jnz_reloc(uint32_t& reloc_offset) { jcc_reloc(5, reloc_offset); }
 				inline void jne_reloc(uint32_t& reloc_offset) { jcc_reloc(5, reloc_offset); }
-				
+
 				inline void jbe_reloc(uint32_t& reloc_offset) { jcc_reloc(6, reloc_offset); }
 				inline void jna_reloc(uint32_t& reloc_offset) { jcc_reloc(6, reloc_offset); }
-				
+
 				inline void jnbe_reloc(uint32_t& reloc_offset) { jcc_reloc(7, reloc_offset); }
 				inline void ja_reloc(uint32_t& reloc_offset) { jcc_reloc(7, reloc_offset); }
-				
+
 				inline void js_reloc(uint32_t& reloc_offset) { jcc_reloc(8, reloc_offset); }
 				inline void jns_reloc(uint32_t& reloc_offset) { jcc_reloc(9, reloc_offset); }
-				
+
 				inline void jp_reloc(uint32_t& reloc_offset) { jcc_reloc(10, reloc_offset); }
 				inline void jpe_reloc(uint32_t& reloc_offset) { jcc_reloc(10, reloc_offset); }
-				
+
 				inline void jnp_reloc(uint32_t& reloc_offset) { jcc_reloc(11, reloc_offset); }
 				inline void jpo_reloc(uint32_t& reloc_offset) { jcc_reloc(11, reloc_offset); }
-				
+
 				inline void jl_reloc(uint32_t& reloc_offset) { jcc_reloc(12, reloc_offset); }
 				inline void jnge_reloc(uint32_t& reloc_offset) { jcc_reloc(12, reloc_offset); }
-				
+
 				inline void jnl_reloc(uint32_t& reloc_offset) { jcc_reloc(13, reloc_offset); }
 				inline void jge_reloc(uint32_t& reloc_offset) { jcc_reloc(13, reloc_offset); }
-				
+
 				inline void jle_reloc(uint32_t& reloc_offset) { jcc_reloc(14, reloc_offset); }
 				inline void jng_reloc(uint32_t& reloc_offset) { jcc_reloc(14, reloc_offset); }
-				
+
 				inline void jnle_reloc(uint32_t& reloc_offset) { jcc_reloc(15, reloc_offset); }
 				inline void jg_reloc(uint32_t& reloc_offset) { jcc_reloc(15, reloc_offset); }
 
-				void jnz(int32_t off);
-				void jnz(int8_t off);
+				void jcc(uint8_t v, int32_t off);
+				void jcc(uint8_t v, int8_t off);
 
-				void je(int32_t off);
-				void je(int8_t off);
+				inline void je(int32_t off) { jcc(4, off); }
+				inline void je(int8_t off) { jcc(4, off); }
+				inline void jz(int32_t off) { jcc(4, off); }
+				inline void jz(int8_t off) { jcc(4, off); }
+
+				inline void jnz(int32_t off) { jcc(5, off); }
+				inline void jnz(int8_t off) { jcc(5, off); }
+				inline void jne(int32_t off) { jcc(5, off); }
+				inline void jne(int8_t off) { jcc(5, off); }
 
 				void lahf();
 				void clc();
@@ -279,7 +292,7 @@ namespace captive {
 				void nop();
 				void nop(uint8_t bytes);
 				void nop(const X86Memory& mem);
-				
+
 				void align_up(uint8_t amount_to_align);
 
 				uint32_t current_offset() const { return _write_offset; }

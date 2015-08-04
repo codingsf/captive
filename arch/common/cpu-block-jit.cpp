@@ -29,7 +29,7 @@ using namespace captive::arch::profile;
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
-	
+
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
@@ -62,14 +62,13 @@ bool CPU::run_block_jit()
 bool CPU::run_block_jit_safepoint()
 {
 	bool step_ok = true;
-	
+
 	Region *rgn = NULL;
 	uint32_t region_virt_base = 1;
-	
+
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		
 		if (unlikely(cpu_data().isr)) {
 			if (interpreter().handle_irq(cpu_data().isr)) {
 				cpu_data().interrupts_taken++;
@@ -86,7 +85,7 @@ bool CPU::run_block_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-		
+
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
@@ -96,32 +95,37 @@ bool CPU::run_block_jit_safepoint()
 			// If there was a fault, then switch back to the safe-point.
 			if (unlikely(fault)) {
 				restore_safepoint(&cpu_safepoint, (int)fault);
-				
+
 				// Since we've just destroyed the stack, we should never get here.
 				assert(false);
 			}
-			
+
 			// Mark the physical page corresponding to the PC as executed
 			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
-			
+
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 		}
-		
+
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
-		
+
 		if (blk->txln) {
+			jit_state.block_txln_cache[virt_pc % 0x10000].tag = virt_pc;
+			jit_state.block_txln_cache[virt_pc % 0x10000].fn = (void *)blk->txln;
+
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), true);
+			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
+
 			mmu().disable_writes();
-			
+
 			step_ok = blk->txln(&jit_state) == 0;
 		} else {
 			blk->exec_count++;
+			blk->loop_header = true;
 			interpret_block();
 		}
 	} while(step_ok);
@@ -129,7 +133,7 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, bool free_ir)
+captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_compilation_mode mode)
 {
 	TranslationContext ctx;
 	if (!translate_block(ctx, pa)) {
@@ -137,27 +141,30 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, bool fre
 		return NULL;
 	}
 
-	BlockCompiler compiler(ctx, pa);
+	bool emit_interrupt_check = mode == MODE_BLOCK && blk->loop_header;
+	bool emit_chaining_logic = mode == MODE_BLOCK;
+	
+	BlockCompiler compiler(ctx, pa, emit_interrupt_check, emit_chaining_logic);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		printf("jit: block compilation failed\n");
 		return NULL;
 	}
 
-	if (free_ir) {
+	if (mode == MODE_BLOCK) {
 		free((void *)ctx.get_ir_buffer());
 	} else {
 		blk->ir_count = ctx.count();
 		blk->ir = ctx.get_ir_buffer();
 	}
-	
+
 	return fn;
 }
 
 bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 {
 	using namespace captive::shared;
-	
+
 	// We MUST begin in block zero.
 	assert(ctx.current_block() == 0);
 
@@ -168,9 +175,9 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	std::set<uint32_t> seen_pcs;
 
 	Decode *insn = get_decode(0);
-	
+
 	int insn_count = 0;
-			
+
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
 	do {
@@ -188,7 +195,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		if (unlikely(cpu_data().verify_enabled)) {
 			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));
 		}
-		
+
 		if (unlikely(cpu_data().verbose_enabled)) {
 			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));
 		}
@@ -200,7 +207,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 
 		pc += insn->length;
 		insn_count++;
-		
+
 		if(insn->end_of_block) {
 			JumpInfo ji = get_instruction_jump_info(insn);
 			if(!insn->is_predicated && ji.type == JumpInfo::DIRECT && !seen_pcs.count(ji.target)) {
@@ -208,7 +215,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 				seen_pcs.insert(ji.target);
 				continue;
 			}
-			
+
 			break;
 		}
 	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 100);

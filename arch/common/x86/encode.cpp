@@ -354,14 +354,14 @@ void X86Encoder::shl(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
 		if(amount == 1) {
-			encode_opcode_mod_rm(0xd0, 4, dst);	
+			encode_opcode_mod_rm(0xd0, 4, dst);
 		} else {
 			encode_opcode_mod_rm(0xc0, 4, dst);
 			emit8(amount);
 		}
 	} else {
 		if(amount == 1) {
-			encode_opcode_mod_rm(0xd1, 4, dst);	
+			encode_opcode_mod_rm(0xd1, 4, dst);
 		} else {
 			encode_opcode_mod_rm(0xc1, 4, dst);
 			emit8(amount);
@@ -373,14 +373,14 @@ void X86Encoder::shr(uint8_t amount, const X86Register& dst)
 {
 	if (dst.size == 1) {
 		if(amount == 1) {
-			encode_opcode_mod_rm(0xd0, 5, dst);	
+			encode_opcode_mod_rm(0xd0, 5, dst);
 		} else {
 			encode_opcode_mod_rm(0xc0, 5, dst);
 			emit8(amount);
 		}
 	} else {
 		if(amount == 1) {
-			encode_opcode_mod_rm(0xd1, 5, dst);	
+			encode_opcode_mod_rm(0xd1, 5, dst);
 		} else {
 			encode_opcode_mod_rm(0xc1, 5, dst);
 			emit8(amount);
@@ -482,7 +482,7 @@ void X86Encoder::add4(uint32_t val, const X86Memory& dst)
 {
 	if (val < 127) {
 		encode_opcode_mod_rm(0x83, 0, 4, dst);
-		emit8(val);		
+		emit8(val);
 	} else {
 		encode_opcode_mod_rm(0x81, 0, 4, dst);
 		emit32(val);
@@ -577,7 +577,12 @@ void X86Encoder::cmp4(uint32_t val, const X86Memory& dst)
 
 void X86Encoder::cmp8(uint64_t val, const X86Memory& dst)
 {
-	assert(false);
+	if (val < 0x80) {
+		encode_opcode_mod_rm(0x83, 7, 8, dst);
+		emit8(val & 0xff);
+	} else {
+		assert(false);
+	}
 }
 
 void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst)
@@ -656,6 +661,12 @@ void X86Encoder::call(const X86Register& reg)
 	encode_mod_reg_rm(REG_RDX, reg);
 }
 
+void X86Encoder::jmp(const X86Register& tgt)
+{
+	emit8(0xff);
+	encode_mod_reg_rm(4, tgt);
+}
+
 void X86Encoder::jmp(const X86Memory& tgt)
 {
 	emit8(0xff);
@@ -677,15 +688,9 @@ void X86Encoder::jcc_reloc(uint8_t v, uint32_t& reloc_offset)
 	emit32(0);
 }
 
-void X86Encoder::jnz(int8_t off)
+void X86Encoder::jcc(uint8_t v, int8_t off)
 {
-	emit8(0x75);
-	emit8(off);
-}
-
-void X86Encoder::je(int8_t off)
-{
-	emit8(0x74);
+	emit8(0x70 | (v & 0xf));
 	emit8(off);
 }
 
@@ -763,26 +768,26 @@ void X86Encoder::nop(uint8_t bytes)
 		lea(X86Memory(REG_EAX, 0x80808080), REG_EAX);
 		bytes -= 7;
 	}
-	
+
 	while(bytes >= 6) {
 		// 2 byte opcode, 4 byte immediate
 		lea(X86Memory(REG_RAX, 0x80808080), REG_EAX);
 		bytes -= 6;
 	}
-	
+
 	while(bytes >= 3) {
 		// 1 byte address override, 2 byte opcode
 		lea(X86Memory(REG_EAX), REG_EAX);
 		bytes -= 3;
 	}
-	
+
 	while(bytes >= 2) {
 		// 1 byte override, 1 byte opcode
 		emit8(0x66);
 		emit8(0x90);
 		bytes -= 2;
 	}
-	
+
 	while(bytes) {
 		nop();
 		bytes--;
@@ -879,13 +884,13 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 				case 8: s = 3; break;
 				default: assert(false);
 			}
-			
+
 			if (rm.index == REG_RIZ) {
 				i = 4;
 			} else {
 				i = rm.index.raw_index;
 			}
-			
+
 			b = rm.base.raw_index;
 		}
 
