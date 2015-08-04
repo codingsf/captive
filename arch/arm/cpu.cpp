@@ -23,6 +23,11 @@ ArmCPU::~ArmCPU()
 
 }
 
+void ArmCPU::enqueue_irq_check_if_enabled()
+{
+	if (!state.regs.I) enqueue_irq_check();
+}
+
 void ArmCPU::dump_state() const
 {
 	printf("*** CPU STATE ***\n");

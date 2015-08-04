@@ -199,11 +199,15 @@ extern "C" {
 			} while(true);
 
 			break;
-			
+
 		case 2:
 			cpu->dump_state();
 			break;
-			
+
+		case 3:
+			cpu->enqueue_irq_check_if_enabled();
+			break;
+
 		/*case 2:
 			printf("handling irq\n");
 			cpu->interpreter().handle_irq(cpu->cpu_data().isr);

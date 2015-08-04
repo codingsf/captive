@@ -38,13 +38,13 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	// Initialise the profiling image
 	image = new profile::Image();
-	
+
 	jit_state.cpu = this;
 	jit_state.block_txln_cache = (struct block_chain_cache_entry *)calloc(0x10000, sizeof(struct block_chain_cache_entry));
 	jit_state.region_txln_cache = NULL; //(struct region_chain_cache_entry *)calloc(0x100000, sizeof(void *));
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
-	jit_state.isr = &cpu_data().isr;
-	
+	jit_state.exit_chain = 0;
+
 	invalidate_virtual_mappings();
 }
 
@@ -52,7 +52,7 @@ CPU::~CPU()
 {
 	if (jit_state.region_txln_cache)
 		free(jit_state.region_txln_cache);
-	
+
 	if (jit_state.block_txln_cache)
 		free(jit_state.block_txln_cache);
 }
@@ -65,7 +65,7 @@ bool CPU::handle_pending_action(uint32_t action)
 		struct mallinfo mi = dlmallinfo();
 		printf("*** malloc info ***\n");
 		printf("used: %d\nfree: %d\n", mi.uordblks, mi.fordblks);
-		
+
 		dump_state();
 		return true;
 	}
@@ -221,7 +221,7 @@ bool CPU::interpret_block()
 		if (unlikely(cpu_data().verbose_enabled)) {
 			inc_insns_executed();
 		}
-		
+
 		// Perhaps finish tracing this instruction.
 		if (unlikely(trace().enabled())) {
 			trace().end_record();
@@ -239,7 +239,7 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 	if (virt_addr >= (va_t)0x100000000) return;
 
 	Region *rgn = image->get_region((uint32_t)(uint64_t)phys_addr);
-	
+
 	if (rgn) {
 		rgn->invalidate();
 	}
@@ -250,9 +250,9 @@ void CPU::invalidate_virtual_mappings()
 	if (jit_state.block_txln_cache) {
 		for (int i = 0; i < 0x10000; i++) {
 			jit_state.block_txln_cache[i].tag = 1;
-		}		
+		}
 	}
-	
+
 	if (jit_state.region_txln_cache) {
 		for (int i = 0; i < 0x100000; i++) {
 			jit_state.region_txln_cache[i].fn = (void *)&tail_call_ret0_only;
@@ -265,7 +265,7 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 	if (jit_state.block_txln_cache) {
 		jit_state.block_txln_cache[va % 0x10000].tag = 1;
 	}
-	
+
 	if (jit_state.region_txln_cache) {
 		jit_state.region_txln_cache[va >> 12].fn = (void *)&tail_call_ret0_only;
 	}

@@ -13,7 +13,7 @@ static std::chrono::high_resolution_clock::time_point xxx;
 void trigger_irq_latency_measure()
 {
 	std::chrono::high_resolution_clock::time_point yyy = std::chrono::high_resolution_clock::now();
-	
+
 	//fprintf(stderr, "LATENCY: %d ms\n", std::chrono::duration_cast<std::chrono::milliseconds>(yyy - xxx).count());
 }
 
@@ -24,10 +24,10 @@ void ArmCpuIRQController::irq_raised(IRQLine& line)
 {
 	// DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Raised: " << line.index();
 	cpu().per_cpu_data().isr |= (1 << line.index());
-	
+
 	xxx = std::chrono::high_resolution_clock::now();
-	
-	//cpu().interrupt(2);
+
+	cpu().interrupt(3);
 }
 
 void ArmCpuIRQController::irq_rescinded(IRQLine& line)

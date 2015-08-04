@@ -31,7 +31,7 @@ namespace captive {
 		namespace jit {
 			class TranslationContext;
 		}
-		
+
 		namespace profile {
 			struct Image;
 			struct Region;
@@ -103,16 +103,23 @@ namespace captive {
 			void invalidate_translation(pa_t phys_page_base_addr, va_t virt_page_base_addr);
 
 			void register_region(shared::RegionWorkUnit *rwu);
-			
+
+			virtual void enqueue_irq_check_if_enabled() = 0;
+
+			inline void enqueue_irq_check()
+			{
+				jit_state.exit_chain = 1;
+			}
+
 		protected:
 			volatile uint32_t *_pc_reg_ptr;
-			
+
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
 			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
 
 			virtual bool interrupts_enabled() const = 0;
-			
+
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;
 			}
@@ -128,19 +135,19 @@ namespace captive {
 				uint32_t tag;
 				void *fn;
 			} packed;
-			
+
 			struct region_chain_cache_entry {
 				void *fn;
 			} packed;
-			
+
 			struct {
 				void *cpu;												// 0
-				void *registers;										// 8
-				uint64_t registers_size;								// 16
+				void *registers;						// 8
+				uint64_t registers_size;					// 16
 				struct region_chain_cache_entry *region_txln_cache;		// 24
 				struct block_chain_cache_entry *block_txln_cache;		// 32
-				uint64_t *insn_counter;									// 40
-				uint32_t *isr;											// 48
+				uint64_t *insn_counter;						// 40
+				uint64_t exit_chain;						// 48
 			} packed jit_state;
 
 		private:
@@ -189,9 +196,9 @@ namespace captive {
 
 			void analyse_blocks();
 			void compile_region(profile::Region *rgn, uint32_t region_index);
-			
+
 			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, bool free_ir = false);
-			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);			
+			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
 		};
 	}
 }

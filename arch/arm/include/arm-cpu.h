@@ -56,6 +56,8 @@ namespace captive {
 				virtual Interpreter& interpreter() const override { return (Interpreter&)*_interp; }
 				virtual JIT& jit() const override { return (JIT&)*_jit; }
 
+				virtual void enqueue_irq_check_if_enabled() override;
+
 				struct cpu_state {
 					uint32_t isa_mode;
 
