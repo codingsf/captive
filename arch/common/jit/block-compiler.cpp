@@ -70,9 +70,9 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	timer.tick("JT");
 	if (!dbe()) return false;
 	timer.tick("DBE");
-	sort_ir();
-	timer.tick("sort");
+	
 	if (!merge_blocks()) return false;
+	
 	timer.tick("MB");
 	if (!peephole()) return false;
 
@@ -99,6 +99,18 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 bool BlockCompiler::sort_ir()
 {
+	bool not_sorted = false;
+	IRBlockId id = 0;
+	for(unsigned int i = 0; i < ctx.count(); ++i) {
+		IRInstruction *insn = ctx.at(i);
+		if(insn->ir_block < id) {
+			not_sorted = true;
+			break;
+		}
+		id = insn->ir_block;
+	}
+	if(!not_sorted) return true;
+	
 	MergeSort sorter(ctx);
 	auto new_buffer = sorter.perform_sort();
 	if(new_buffer != ctx.get_ir_buffer()) {
@@ -445,6 +457,9 @@ static struct insn_descriptor insn_descriptors[] = {
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
 {
+	tick_timer timer(0);
+	timer.reset();
+	
 	IRBlockId latest_block_id = INVALID_BLOCK_ID;
 
 	used_phys_regs.clear();
@@ -461,8 +476,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	std::vector<int32_t> vreg_seen_block (ctx.reg_count(), -1);
 
-	tick_timer timer(0);
-	timer.tick();
+	timer.tick("Init");
 
 	// Build up a map of which vregs have been seen in which blocks, to detect spanning vregs.
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
@@ -492,7 +506,8 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		}
 	}
 
-	timer.tick();
+	timer.tick("Globals");
+	
 	for (int ir_idx = ctx.count() - 1; ir_idx >= 0; ir_idx--) {
 		// Grab a pointer to the instruction we're looking at.
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -691,16 +706,21 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 	//printf("block %08x\n", tb.block_addr);
 //	dump_ir();
-	timer.tick();
+	timer.tick("Allocation");
 	//printf("lol ");
-	timer.dump();
+	timer.dump("Analysis");
 	return true;
 }
 
 bool BlockCompiler::thread_jumps()
 {
+	tick_timer timer(0);
+	timer.reset();
+	
 	std::vector<IRInstruction*> first_instructions(ctx.block_count(), NULL);
 	std::vector<IRInstruction*> last_instructions(ctx.block_count(), NULL);
+
+	timer.tick("Init");
 
 	// Build up a list of the first instructions in each block.
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
@@ -716,6 +736,8 @@ bool BlockCompiler::thread_jumps()
 			first_instructions[current_block_id] = insn;
 		}
 	}
+	
+	timer.tick("Analysis");
 
 	for(int block_id = 0; block_id < last_instructions.size(); ++block_id) {
 		IRInstruction *source_instruction = last_instructions[block_id];
@@ -772,14 +794,23 @@ bool BlockCompiler::thread_jumps()
 			assert(false);
 		}
 	}
+	
+	timer.tick("Threading");
+	timer.dump("Jump Threading");
 
 	return true;
 }
 
 bool BlockCompiler::dbe()
 {
+	tick_timer timer(0);
+	timer.reset();
+	
 	std::vector<bool> live_blocks (ctx.block_count(), false);
 	live_blocks[0] = true;
+	
+	timer.tick("Init");
+	
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
@@ -795,55 +826,77 @@ bool BlockCompiler::dbe()
 				break;
 		}
 	}
+	
+	timer.tick("Liveness");
 
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		if(!live_blocks[insn->ir_block]) make_instruction_nop(insn, true);
 	}
+	
+	timer.tick("Killing");
+	timer.dump("DBE");
 
 	return true;
 }
 
 bool BlockCompiler::merge_blocks()
 {
-	block_list_t blocks, exits;
-	cfg_t succs, preds;
-
-	tick_timer timer(0);
+	tick_timer timer (0);
 	timer.reset();
-
-	if (!build_cfg(blocks, succs, preds, exits))
-		return false;
-	timer.tick("CFG");
-
+	std::vector<IRBlockId> succs (ctx.block_count(), -1);
+	std::vector<int> pred_count (ctx.block_count(), 0);
+	
 	std::vector<IRBlockId> work_list;
-	work_list.reserve(blocks.size());
-	for(auto block : blocks) {
-		if(succs[block].size() == 1) work_list.push_back(block);
+	work_list.reserve(ctx.block_count());
+	
+	timer.tick("Init");
+	
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
+		
+		switch(insn->type) {
+			case IRInstruction::JMP:
+				//If a block ends in a jump, we should consider it a candidate for merging into
+				work_list.push_back(insn->ir_block);
+				succs[insn->ir_block] = insn->operands[0].value;
+				pred_count[insn->operands[0].value]++;
+				
+				break;
+			case IRInstruction::BRANCH:
+				pred_count[insn->operands[1].value]++;
+				pred_count[insn->operands[2].value]++;
+				break;
+			default:
+				break;
+		}
 	}
-
-start:
+	
+	timer.tick("Identify");
+		
 	while(work_list.size()) {
 		IRBlockId block = work_list.back();
 		work_list.pop_back();
-
-		IRBlockId successor = succs[block][0];
-
-		if(preds[successor].size() == 1) {
-			if(merge_block(successor, block)){
-				succs[block] = succs[successor];
-
-				succs[successor].clear();
-
-				if(succs[block].size() == 1) work_list.push_back(block);
-
-				continue;
-			}
-		}
+		
+		// This block is only in the work list if it has only one successor, so we don't need to check for that
+		
+		// Look up the single successor of this block
+		IRBlockId block_successor = succs[block];
+		
+		// If the successor has multiple predecessors, we can't merge it
+		if(pred_count[block_successor] != 1) continue;
+		
+		if(!merge_block(block_successor, block)) continue;
+		
+		succs[block] = succs[block_successor];
+		
+		// If, post merging, the block has one successor, then put it on the work list
+		if(succs[block] == 1) work_list.push_back(block);
 	}
-
+	
 	timer.tick("Merge");
-	timer.dump("merge blocks");
+	timer.dump("MB");
 	return true;
 }
 
