@@ -40,7 +40,11 @@ using namespace captive::shared;
  * R15  Register File
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool ichk) : ctx(ctx), pa(pa), ichk(ichk)
+BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check, bool emit_chaining_logic) 
+	: ctx(ctx),
+		pa(pa),
+		emit_interrupt_check(emit_interrupt_check),
+		emit_chaining_logic(emit_chaining_logic)
 {
 	int i = 0;
 	assign(i++, REG_RAX, REG_EAX, REG_AX, REG_AL);
@@ -1134,36 +1138,43 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			// Function Epilogue
 			
-			if (ichk) {
+			if (emit_interrupt_check) {
 				encoder.cmp1(0, X86Memory::get(REG_RDI, 48));
 				encoder.jnz((int8_t)26);
 			}
 
-			//encoder.xorr(REG_EAX, REG_EAX);
-			//encoder.ret();
+			if (emit_chaining_logic) {
+				encoder.mov(X86Memory::get(REG_RDI, 8), REG_RAX);				
+				encoder.mov(X86Memory::get(REG_RAX, 0x3c), REG_EAX);			// Load the PC
+				encoder.movzx(REG_AX, REG_EDX);									// Mask the PC
+				encoder.lea(X86Memory::get(REG_RDX, REG_RDX, 2), REG_RCX);		// Calculate block cache entry offset
+				encoder.mov(X86Memory::get(REG_RDI, 32), REG_RDX);
+				encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
+				encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
+				encoder.je((int8_t)9);											// Tags match?
 
-			encoder.mov(X86Memory::get(REG_RDI, 8), REG_RAX);				
-			encoder.mov(X86Memory::get(REG_RAX, 0x3c), REG_EAX);			// Load the PC
-			encoder.movzx(REG_AX, REG_EDX);									// Mask the PC
-			encoder.lea(X86Memory::get(REG_RDX, REG_RDX, 2), REG_RCX);		// Calculate block cache entry offset
-			encoder.mov(X86Memory::get(REG_RDI, 32), REG_RDX);
-			encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
-			encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
-			encoder.je((int8_t)9);											// Tags match?
+				encoder.leave();
+				encoder.pop(REG_RBX);
+				encoder.pop(REG_R14);
+				encoder.pop(REG_R15);
 
-			encoder.leave();
-			encoder.pop(REG_RBX);
-			encoder.pop(REG_R14);
-			encoder.pop(REG_R15);
+				encoder.xorr(REG_EAX, REG_EAX);
+				encoder.ret(); // Nope, return.
 
-			encoder.xorr(REG_EAX, REG_EAX);
-			encoder.ret(); // Nope, return.
+				encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
+				encoder.add(prologue_offset, REG_RAX);
+				encoder.add(max_stack, REG_RSP);
+				encoder.jmp(REG_RAX);											// Yep, tail call.
+			} else {
+				encoder.leave();
+				encoder.pop(REG_RBX);
+				encoder.pop(REG_R14);
+				encoder.pop(REG_R15);
 
-			encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
-			encoder.add(prologue_offset, REG_RAX);
-			encoder.add(max_stack, REG_RSP);
-			encoder.jmp(REG_RAX);											// Yep, tail call.
-
+				encoder.xorr(REG_EAX, REG_EAX);
+				encoder.ret();
+			}
+			
 			break;
 		}
 

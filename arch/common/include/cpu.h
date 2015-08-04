@@ -193,7 +193,13 @@ namespace captive {
 			void analyse_blocks();
 			void compile_region(profile::Region *rgn, uint32_t region_index);
 
-			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, bool free_ir = false);
+			enum block_compilation_mode
+			{
+				MODE_BLOCK,
+				MODE_REGION,
+			};
+			
+			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, enum block_compilation_mode mode);
 			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
 		};
 	}

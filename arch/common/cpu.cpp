@@ -41,7 +41,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	jit_state.cpu = this;
 	jit_state.block_txln_cache = (struct block_chain_cache_entry *)calloc(0x10000, sizeof(struct block_chain_cache_entry));
-	jit_state.region_txln_cache = NULL; //(struct region_chain_cache_entry *)calloc(0x100000, sizeof(void *));
+	jit_state.region_txln_cache = (struct region_chain_cache_entry *)calloc(0x100000, sizeof(void *));
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.exit_chain = 0;
 

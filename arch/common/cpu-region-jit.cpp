@@ -154,7 +154,7 @@ bool CPU::run_region_jit_safepoint()
 				rgn->heat++;
 			}
 			
-			blk->txln = compile_block(blk, phys_pc, false);
+			blk->txln = compile_block(blk, phys_pc, MODE_REGION);
 			mmu().disable_writes();
 			
 			step_ok = blk->txln(&jit_state) == 0;

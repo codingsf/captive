@@ -27,14 +27,15 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check = false);
+				BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check = false, bool emit_chaining_logic = false);
 				bool compile(shared::block_txln_fn& fn);
 
 			private:
 				TranslationContext& ctx;
 				x86::X86Encoder encoder;
 				gpa_t pa;
-				bool ichk;
+				bool emit_interrupt_check;
+				bool emit_chaining_logic;
 
 				PopulatedSet<8> used_phys_regs;
 

@@ -132,7 +132,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.builder.SetInsertPoint(rcc.dispatch_block);
 	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
 	Value *dispatch_pc_page_idx = rcc.builder.CreateLShr(dispatch_loaded_pc, 12);
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, chain_block);
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
 	
 	// --- CHAIN
 	rcc.builder.SetInsertPoint(chain_block);
@@ -208,11 +208,11 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 	
 	// Dump
-	/*{
+	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}*/
+	}
 	
 	// Optimise
 	{
@@ -223,11 +223,11 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	}
 
 	// Dump
-	/*{
+	{
 		std::stringstream filename;
 		filename << "region-" << std::hex << (uint64_t)(rwu->region_index << 12) << ".opt.ll";
 		print_module(filename.str(), rcc.rgn_module);
-	}*/
+	}
 	
 	// Initialise a new MCJIT engine
 	TargetOptions target_opts;
@@ -650,10 +650,10 @@ llvm::Value* LLVMJIT::get_ir_vreg(BlockCompilationContext& bcc, shared::IRRegId 
 		return vreg_alloc;
 	} else {
 		switch (size) {
-		case 1: assert(llvm_vreg->second->getType() == bcc.rcc.types.i8); break;
-		case 2: assert(llvm_vreg->second->getType() == bcc.rcc.types.i16); break;
-		case 4: assert(llvm_vreg->second->getType() == bcc.rcc.types.i32); break;
-		case 8: assert(llvm_vreg->second->getType() == bcc.rcc.types.i64); break;
+		case 1: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi8); break;
+		case 2: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi16); break;
+		case 4: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi32); break;
+		case 8: assert(llvm_vreg->second->getType() == bcc.rcc.types.pi64); break;
 		default: assert(false); return NULL;
 		}
 		return llvm_vreg->second;
@@ -734,11 +734,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		Value *dst = vreg_for_operand(bcc, op0);
 		assert(dst);
 		
-		Value *v = bcc.builder.CreateLoad(bcc.rcc.pc_ptr);
-		fprintf(stderr, "v type: %p\n", v->getType());
-		fprintf(stderr, "dst elem type: %p\n", ((PointerType *)dst->getType())->getElementType());
-		
-		bcc.builder.CreateStore(v, dst);
+		bcc.builder.CreateStore(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), dst);
 		return true;
 	}
 
@@ -922,81 +918,85 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 	}
 
 	case shared::IRInstruction::READ_MEM:
-	case shared::IRInstruction::READ_MEM_USER:
 	{
 		Value *addr = value_for_operand(bcc, op0), *disp = value_for_operand(bcc, op1), *dst = vreg_for_operand(bcc, op2);
 		assert(addr && disp && dst);
 
-		if (insn->type == shared::IRInstruction::READ_MEM) {
-			Type *memptrtype = type_for_operand(bcc, op1, true);
-			assert(memptrtype);
+		Type *memptrtype = type_for_operand(bcc, op2, true);
+		assert(memptrtype);
 
-			Value *memptr = bcc.builder.CreateAdd(addr, disp);
-			memptr = bcc.builder.CreateIntToPtr(memptr, memptrtype);
-			set_aa_metadata(memptr, AA_MD_MEMORY);
+		Value *memptr = bcc.builder.CreateAdd(addr, disp);
+		memptr = bcc.builder.CreateIntToPtr(memptr, memptrtype);
+		set_aa_metadata(memptr, AA_MD_MEMORY);
 
-			bcc.builder.CreateStore(bcc.builder.CreateLoad(memptr, true), dst);
+		bcc.builder.CreateStore(bcc.builder.CreateLoad(memptr, true), dst);
+		
+		return true;
+	}
+	
+	case shared::IRInstruction::READ_MEM_USER:
+	{
+		Value *addr = value_for_operand(bcc, op0);
+		Value *dst = vreg_for_operand(bcc, op1);
+		Type *dst_type = type_for_operand(bcc, op1, true);
+
+		std::vector<Type *> params;
+		params.push_back(bcc.rcc.types.pi8);
+		params.push_back(bcc.rcc.types.i32);
+		params.push_back(dst_type);
+
+		FunctionType *fntype = FunctionType::get(bcc.rcc.types.voidty, params, false);
+
+		Constant *fn = NULL;
+		if (dst_type == bcc.rcc.types.pi8) {
+			fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read8", fntype);
+		} else if (dst_type == bcc.rcc.types.pi16) {
+			fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read16", fntype);
 		} else {
-			Type *dst_type = type_for_operand(bcc, op1, true);
-
-			std::vector<Type *> params;
-			params.push_back(bcc.rcc.types.pi8);
-			params.push_back(bcc.rcc.types.i32);
-			params.push_back(dst_type);
-
-			FunctionType *fntype = FunctionType::get(bcc.rcc.types.voidty, params, false);
-
-			Constant *fn = NULL;
-			if (dst_type == bcc.rcc.types.pi8) {
-				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read8", fntype);
-			} else if (dst_type == bcc.rcc.types.pi16) {
-				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read16", fntype);
-			} else {
-				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read32", fntype);
-			}
-
-			Value *calc_addr = bcc.builder.CreateAdd(addr, disp);
-			bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, calc_addr, dst);
+			fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_read32", fntype);
 		}
+
+		bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, addr, dst);
 		return true;
 	}
 
 	case shared::IRInstruction::WRITE_MEM:
-	case shared::IRInstruction::WRITE_MEM_USER:
 	{
 		Value *addr = value_for_operand(bcc, op2), *disp = value_for_operand(bcc, op1), *src = value_for_operand(bcc, op0);
 
 		assert(addr && disp && src);
 
-		if (insn->type == shared::IRInstruction::WRITE_MEM) {
-			Value *memptr = bcc.builder.CreateAdd(addr, disp);
-			memptr = bcc.builder.CreateIntToPtr(memptr, type_for_operand(bcc, op0, true));
-			set_aa_metadata(memptr, AA_MD_MEMORY);
+		Value *memptr = bcc.builder.CreateAdd(addr, disp);
+		memptr = bcc.builder.CreateIntToPtr(memptr, type_for_operand(bcc, op0, true));
+		set_aa_metadata(memptr, AA_MD_MEMORY);
 
-			bcc.builder.CreateStore(src, memptr, true);
+		bcc.builder.CreateStore(src, memptr, true);
+		return true;
+	}
+	
+	case shared::IRInstruction::WRITE_MEM_USER:
+	{
+		Value *addr = value_for_operand(bcc, op1), *src = value_for_operand(bcc, op0);
+		Type *src_type = type_for_operand(bcc, op0, false);
+
+		std::vector<Type *> params;
+		params.push_back(bcc.rcc.types.pi8);
+		params.push_back(bcc.rcc.types.i32);
+		params.push_back(src_type);
+
+		FunctionType *fntype = FunctionType::get(bcc.rcc.types.voidty, params, false);
+
+		Constant *fn = NULL;
+		if (src_type == bcc.rcc.types.i8) {
+			fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write8", fntype);
+		} else if (src_type == bcc.rcc.types.i16) {
+			fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write16", fntype);
 		} else {
-			Type *src_type = type_for_operand(bcc, op0, false);
-
-			std::vector<Type *> params;
-			params.push_back(bcc.rcc.types.pi8);
-			params.push_back(bcc.rcc.types.i32);
-			params.push_back(src_type);
-
-			FunctionType *fntype = FunctionType::get(bcc.rcc.types.voidty, params, false);
-
-			Constant *fn = NULL;
-			if (src_type == bcc.rcc.types.i8) {
-				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write8", fntype);
-			} else if (src_type == bcc.rcc.types.i16) {
-				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write16", fntype);
-			} else {
-				fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write32", fntype);
-			}
-
-			Value *calc_addr = bcc.builder.CreateAdd(addr, disp);
-			bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, calc_addr, src);
+			fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("mem_user_write32", fntype);
 		}
 
+		bcc.builder.CreateCall3(fn, bcc.rcc.cpu_obj, addr, src);
+		
 		return true;
 	}
 
@@ -1166,7 +1166,7 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		Constant *fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("genc_adc_flags", fntype);
 
 		assert(fn);
-
+		
 		Value *lhs = value_for_operand(bcc, op0);
 		Value *rhs = value_for_operand(bcc, op1);
 		Value *carry_in = value_for_operand(bcc, op2);

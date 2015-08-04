@@ -118,7 +118,7 @@ bool CPU::run_block_jit_safepoint()
 		}
 
 		if (blk->exec_count > 10) {
-			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), true);
+			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 
 			mmu().disable_writes();
 
@@ -133,7 +133,7 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, bool free_ir)
+captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_compilation_mode mode)
 {
 	TranslationContext ctx;
 	if (!translate_block(ctx, pa)) {
@@ -141,14 +141,17 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, bool fre
 		return NULL;
 	}
 
-	BlockCompiler compiler(ctx, pa, blk->loop_header);
+	bool emit_interrupt_check = mode == MODE_BLOCK && blk->loop_header;
+	bool emit_chaining_logic = mode == MODE_BLOCK;
+	
+	BlockCompiler compiler(ctx, pa, emit_interrupt_check, emit_chaining_logic);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		printf("jit: block compilation failed\n");
 		return NULL;
 	}
 
-	if (free_ir) {
+	if (mode == MODE_BLOCK) {
 		free((void *)ctx.get_ir_buffer());
 	} else {
 		blk->ir_count = ctx.count();
