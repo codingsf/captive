@@ -136,6 +136,7 @@ bool KVMGuest::load(loader::Loader& loader)
 	}
 
 	if (!loader.install((uint8_t *)get_phys_buffer(GPM_PHYS_BASE))) {
+		ERROR << CONTEXT(Guest) << "Loader failed to install";
 		return false;
 	}
 

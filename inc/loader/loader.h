@@ -17,7 +17,7 @@ namespace captive {
 		public:
 			virtual bool install(uint8_t *gpm) = 0;
 		};
-
+		
 		class FileBasedLoader : public Loader
 		{
 		public:
@@ -26,7 +26,7 @@ namespace captive {
 			inline const std::string& filename() const { return _filename; }
 			inline bool is_open() const { return _opened; }
 			inline size_t size() const { return mmap_size; }
-
+			
 		protected:
 			bool open();
 			void close();
