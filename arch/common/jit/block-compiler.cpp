@@ -77,6 +77,10 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!peephole()) return false;
 
 	timer.tick("Peep");
+	
+	if (!constant_prop()) return false;
+	timer.tick("Cprop");
+		
 	if (!sort_ir()) return false;
 	timer.tick("Sort");
 
@@ -208,6 +212,8 @@ bool BlockCompiler::peephole()
 
 	for (unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
+
+		if(insn->ir_block == NOP_BLOCK) continue;
 
 		if(insn->ir_block != prev_block) {
 			prev_pc_inc = NULL;
@@ -1443,6 +1449,15 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					encoder.test(tmp, tmp);
 				}
 			} else {
+				if(cond->is_constant()) {
+					IRBlockId target = cond->value ? tt->value : ft->value;
+					uint32_t reloc_offset;
+					encoder.jmp_reloc(reloc_offset);
+					block_relocations[reloc_offset] = target;
+					
+					encoder.align_up(8);
+					break;
+				}
 				assert(false);
 			}
 
@@ -2598,6 +2613,50 @@ bool BlockCompiler::lower_stack_to_reg()
 					selected_reg = lowered_entries[op.alloc_data];
 				}
 				op.allocate(IROperand::ALLOCATED_REG, selected_reg);
+			}
+		}
+	}
+	
+	return true;
+}
+
+bool BlockCompiler::constant_prop()
+{
+	std::map<IRRegId, IROperand*> constant_operands;
+	
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx)
+	{
+		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->type == IRInstruction::MOV) {
+			assert(insn->operands[1].is_vreg());
+			if(insn->operands[0].type == IROperand::CONSTANT) {
+				constant_operands[insn->operands[1].value] = &insn->operands[0];
+				continue;
+			}
+		} 
+		if(insn->type == IRInstruction::ADD || insn->type == IRInstruction::SUB) {
+			assert(insn->operands[1].is_vreg());
+			if(insn->operands[0].type == IROperand::CONSTANT) {
+				if(constant_operands.count(insn->operands[1].value)) {
+					if(insn->type == IRInstruction::ADD) {
+						constant_operands[insn->operands[1].value] += insn->operands[0].value;
+					} else {
+						constant_operands[insn->operands[1].value] -= insn->operands[0].value;
+					}
+				}
+			}
+		}
+
+		struct insn_descriptor &descr = insn_descriptors[insn->type];
+		
+		for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
+			IROperand *operand = &(insn->operands[op_idx]);
+			if(descr.format[op_idx] == 'I') {
+				if(operand->is_vreg() && constant_operands.count(operand->value)) {
+					*operand = *constant_operands[operand->value];
+				}
+			} else {
+				if(operand->is_vreg()) constant_operands.erase(operand->value);
 			}
 		}
 	}
