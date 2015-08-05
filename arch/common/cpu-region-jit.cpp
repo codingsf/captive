@@ -191,7 +191,7 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 	rgn->rwu->block_count = 0;
 	rgn->rwu->blocks = NULL;
 
-	printf("compiling region %p %08x\n", rgn, region_index << 12);
+	//printf("compiling region %p %08x\n", rgn, region_index << 12);
 
 	for (int bi = 0; bi < 0x1000; bi++) {
 		Block *blk = rgn->blocks[bi];
@@ -215,7 +215,7 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 	}
 
 	assert(rgn->rwu->block_count);
-	
+
 	asm volatile("out %0, $0xff" :: "a"(14), "D"(rgn->rwu));
 }
 
@@ -225,7 +225,7 @@ void CPU::register_region(shared::RegionWorkUnit* rwu)
 	assert(rgn->rwu == rwu);
 	rgn->rwu = NULL;
 
-	printf("registering region %p %08x\n", rgn, rwu->region_index << 12);
+	//printf("registering region %p %08x\n", rgn, rwu->region_index << 12);
 	if (rwu->valid) {
 		if (rgn->txln)
 			shfree((void *)rgn->txln);

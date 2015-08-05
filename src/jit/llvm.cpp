@@ -132,7 +132,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.builder.SetInsertPoint(rcc.dispatch_block);
 	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
 	Value *dispatch_pc_page_idx = rcc.builder.CreateLShr(dispatch_loaded_pc, 12);
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, rcc.exit_normal_block);
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, chain_block);
 
 	// --- CHAIN
 	rcc.builder.SetInsertPoint(chain_block);
