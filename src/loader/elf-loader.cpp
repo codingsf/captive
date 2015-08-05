@@ -18,6 +18,11 @@ gpa_t ELFLoader::entrypoint() const
 	return _entrypoint;
 }
 
+bool ELFLoader::requires_device_tree() const
+{
+	return false;
+}
+
 bool ELFLoader::install(uint8_t* gpm)
 {
 	// Attempt to open the file.
@@ -27,8 +32,6 @@ bool ELFLoader::install(uint8_t* gpm)
 	}
 
 	const Elf32_Ehdr *hdr = (const Elf32_Ehdr *)read(0, sizeof(Elf32_Ehdr));
-
-	captive::logging::LogContextELF.enable();
 
 	if (hdr->e_ident[EI_MAG0] != ELFMAG0 || hdr->e_ident[EI_MAG1] != ELFMAG1 || hdr->e_ident[EI_MAG2] != ELFMAG2 || hdr->e_ident[EI_MAG3] != ELFMAG3) {
 		close();
@@ -74,5 +77,16 @@ bool ELFLoader::install(uint8_t* gpm)
 
 	close();
 
+	return true;
+}
+
+bool ELFLoader::match(const uint8_t* buffer)
+{
+	const Elf32_Ehdr *hdr = (const Elf32_Ehdr *)buffer;
+	
+	if (hdr->e_ident[EI_MAG0] != ELFMAG0 || hdr->e_ident[EI_MAG1] != ELFMAG1 || hdr->e_ident[EI_MAG2] != ELFMAG2 || hdr->e_ident[EI_MAG3] != ELFMAG3) {
+		return false;
+	}
+	
 	return true;
 }

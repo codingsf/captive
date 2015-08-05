@@ -9,6 +9,9 @@
 
 using namespace captive::loader;
 
+DECLARE_CONTEXT(Loader)
+DECLARE_CHILD_CONTEXT(FileBasedLoader, Loader)
+
 FileBasedLoader::FileBasedLoader(std::string filename) : _filename(filename), _opened(false), mmap_base(NULL), mmap_size(0)
 {
 

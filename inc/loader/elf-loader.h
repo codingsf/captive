@@ -10,16 +10,20 @@
 
 #include <define.h>
 #include <loader/loader.h>
+#include <loader/kernel-loader.h>
 
 namespace captive {
 	namespace loader {
-		class ELFLoader : public FileBasedLoader
+		class ELFLoader : public FileBasedLoader, public KernelLoader
 		{
 		public:
 			ELFLoader(std::string filename);
 
 			virtual bool install(uint8_t* gpm) override;
-			virtual gpa_t entrypoint() const;
+			virtual gpa_t entrypoint() const override;
+			virtual bool requires_device_tree() const override;
+			
+			static bool match(const uint8_t *buffer);
 
 		private:
 			gpa_t _entrypoint;

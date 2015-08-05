@@ -82,7 +82,7 @@ int main(int argc, char **argv)
 	captive::logging::configure_logging_contexts();
 
 	if (argc < 5 || argc > 7) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [{--interp | --block | --region} | --verify {0 | 1}]";
 		return 1;
 	}
 
@@ -274,9 +274,16 @@ int main(int argc, char **argv)
 	}
 
 	// Load the kernel
-	ZImageLoader kernel(argv[2]);
-	//ELFLoader kernel(argv[2]);
-	if (!guest->load(kernel)) {
+	KernelLoader *kernel = KernelLoader::create_from_file(argv[2]);
+	if (!kernel) {
+		delete guest;
+		delete hv;
+
+		ERROR << "Unable to detect type of guest kernel";
+		return 1;
+	}
+	
+	if (!guest->load(*kernel)) {
 		delete guest;
 		delete hv;
 
@@ -284,21 +291,23 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	guest->guest_entrypoint(kernel.entrypoint());
+	guest->guest_entrypoint(kernel->entrypoint());
 
 	// Load the device-tree
-	DeviceTreeLoader device_tree(argv[3], 0x1000);
-	if (!guest->load(device_tree)) {
-		delete guest;
-		delete hv;
+	if (kernel->requires_device_tree()) {
+		DeviceTreeLoader device_tree(argv[3], 0x1000);
+		if (!guest->load(device_tree)) {
+			delete guest;
+			delete hv;
 
-		ERROR << "Unable to load device tree";
-		return 1;
+			ERROR << "Unable to load device tree";
+			return 1;
+		}
 	}
 
 	CPU *cpu = NULL;
 	if (verify_enabled()) {
-		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::BlockJIT : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
+		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::Interpreter : GuestCPUConfiguration::RegionJIT, true, (devices::timers::CallbackTickSource *)ts);
 		cpu = guest->create_cpu(cpu_cfg);
 	} else {
 		GuestCPUConfiguration cpu_cfg(default_execution_mode);
