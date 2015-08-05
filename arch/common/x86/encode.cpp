@@ -594,6 +594,9 @@ void X86Encoder::encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register
 		if (imm < 128) {
 			encode_opcode_mod_rm(0x83, oper, dst);
 			emit8(imm);
+		} else if(((int32_t)imm < 0) && ((int32_t)imm > -127)) {
+			encode_opcode_mod_rm(0x83, oper, dst);
+			emit8(imm & 0xff);
 		} else {
 			encode_opcode_mod_rm(0x81, oper, dst);
 

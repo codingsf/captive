@@ -54,6 +54,7 @@ namespace captive {
 				bool post_allocate_peephole();
 				bool lower(uint32_t max_stack);
 				bool peeplower(uint32_t max_stack);
+				bool lower_stack_to_reg();
 
 				void dump_ir();
 

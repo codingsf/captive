@@ -19,6 +19,7 @@ template<int size> class PopulatedSet {
 		int next_avail() { for(int i = 0; i < size; ++i) if(get(i)) return i; return -1; }
 		
 		void fill(int d) { clear(); for(int i = 0; i < size; ++i) if((1 << i) & d) set(i); }
+		void invert() { for(int i = 0; i < size; ++i) _populated[i] = !_populated[i]; }
 };
 
 template<> class PopulatedSet<8> {
@@ -41,6 +42,7 @@ template<> class PopulatedSet<8> {
 		int next_avail() { if(empty()) return -1; int8_t avail =__builtin_ffs(_bits)-1; assert(get(avail)); return avail; }
 		
 		void fill(int d) { _bits = d; }
+		void invert() { _bits = ~_bits; }
 };
 
 template<typename innertype, int tsize> class SmallSet {
