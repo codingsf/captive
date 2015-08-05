@@ -40,7 +40,6 @@ public:
 			}
 		}
 
-		assert(dirty_pages.count() == 0);
 		assert(dirty_pages.none());
 	}
 	
@@ -53,8 +52,8 @@ private:
 	static const uint32_t cache_page_count = cache_size >> cache_bits;
 	static const uint32_t cache_entry_count = 1 << cache_bits;
 	
-	std::bitset<cache_page_count> dirty_pages;
 	inner_type_t entries[cache_size];
+	std::bitset<cache_page_count> dirty_pages;
 	
 	inner_type_t *GetEntryPtrClean(uint64_t entry_idx) {
 		return &entries[entry_idx % cache_size];
