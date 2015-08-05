@@ -191,6 +191,15 @@ static void make_instruction_nop(IRInstruction *insn, bool set_block)
 	if(set_block) insn->ir_block = NOP_BLOCK;
 }
 
+static void peephole_mov(IRInstruction *insn, IRInstruction *next)
+{
+	/*if (next->type == IRInstruction::OR) {
+		if (insn->operands[0].type == IROperand::CONSTANT && insn->operands[0].value == 0) {
+			printf("got a candidate\n", insn->type, next->type);
+		}
+	}*/
+}
+
 // Perform some basic optimisations
 bool BlockCompiler::peephole()
 {
@@ -263,6 +272,13 @@ bool BlockCompiler::peephole()
 		case IRInstruction::WRITE_DEVICE:
 			prev_pc_inc = NULL;
 			break;
+			
+		case IRInstruction::MOV:
+			if (ir_idx < ctx.count() - 1) {
+				peephole_mov(insn, ctx.at(ir_idx + 1));
+			}
+			
+			break;
 
 		default:
 			break;
@@ -273,11 +289,29 @@ bool BlockCompiler::peephole()
 	return true;
 }
 
-static bool is_mov_nop(IRInstruction *insn, bool set_block)
+static bool is_mov_nop(IRInstruction *insn, IRInstruction *next, bool set_block)
 {
-	bool is_nop = (insn->type == IRInstruction::MOV) && (insn->operands[0].alloc_mode == insn->operands[1].alloc_mode) && (insn->operands[0].alloc_data == insn->operands[1].alloc_data);
-	if(is_nop)make_instruction_nop(insn, set_block);
-	return is_nop;
+	if (insn->type == IRInstruction::MOV) {
+		if ((insn->operands[0].alloc_mode == insn->operands[1].alloc_mode) && (insn->operands[0].alloc_data == insn->operands[1].alloc_data)) {
+			make_instruction_nop(insn, set_block);	
+			return true;
+		}
+		
+		if (next->type == IRInstruction::MOV) {
+			if (insn->operands[0].alloc_mode == next->operands[1].alloc_mode && 
+					insn->operands[0].alloc_data == next->operands[1].alloc_data && 
+					insn->operands[1].alloc_mode == next->operands[0].alloc_mode &&
+					insn->operands[1].alloc_data == next->operands[0].alloc_data) {
+				
+				make_instruction_nop(next, set_block);	
+				return false;
+			}
+		}
+		
+		return false;
+	} else {
+		return false;
+	}
 }
 
 // We can merge the instruction if it is an add or subtract of a constant value into a register
@@ -329,8 +363,8 @@ static bool is_breaker(IRInstruction *add, IRInstruction *test)
 
 bool BlockCompiler::post_allocate_peephole()
 {
-	for(uint32_t ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
-		is_mov_nop(ctx.at(ir_idx), true);
+	for(uint32_t ir_idx = 0; ir_idx < ctx.count() - 1; ++ir_idx) {
+		is_mov_nop(ctx.at(ir_idx), ctx.at(ir_idx + 1), true);
 	}
 
 	uint32_t add_insn_idx = 0;
@@ -2406,6 +2440,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	}
 
 	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	
 	return success;
 }
 
