@@ -302,9 +302,9 @@ namespace captive {
 				uint32_t _buffer_size;
 				uint32_t _write_offset;
 
-				inline void ensure_buffer()
+				inline void ensure_buffer(int extra=0)
 				{
-					if (_write_offset >= _buffer_size) {
+					if ((_write_offset+extra) >= _buffer_size) {
 						_buffer_size += 1024;
 						_buffer = (uint8_t *)captive::arch::realloc(_buffer, _buffer_size);
 					}
@@ -312,40 +312,32 @@ namespace captive {
 
 				inline void emit8(uint8_t b)
 				{
-					ensure_buffer();
+					ensure_buffer(1);
 					_buffer[_write_offset++] = b;
 				}
 
 				inline void emit16(uint16_t v)
 				{
-					ensure_buffer();
+					ensure_buffer(2);
 
-					_buffer[_write_offset++] = v & 0xff;
-					_buffer[_write_offset++] = (v >> 8) & 0xff;
+					*(uint16_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 2;
 				}
 
 				inline void emit32(uint32_t v)
 				{
-					ensure_buffer();
+					ensure_buffer(4);
 
-					_buffer[_write_offset++] = v & 0xff;
-					_buffer[_write_offset++] = (v >> 8) & 0xff;
-					_buffer[_write_offset++] = (v >> 16) & 0xff;
-					_buffer[_write_offset++] = (v >> 24) & 0xff;
+					*(uint32_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 4;
 				}
 
 				inline void emit64(uint64_t v)
 				{
-					ensure_buffer();
-
-					_buffer[_write_offset++] = v & 0xff;
-					_buffer[_write_offset++] = (v >> 8) & 0xff;
-					_buffer[_write_offset++] = (v >> 16) & 0xff;
-					_buffer[_write_offset++] = (v >> 24) & 0xff;
-					_buffer[_write_offset++] = (v >> 32) & 0xff;
-					_buffer[_write_offset++] = (v >> 40) & 0xff;
-					_buffer[_write_offset++] = (v >> 48) & 0xff;
-					_buffer[_write_offset++] = (v >> 56) & 0xff;
+					ensure_buffer(8);
+					
+					*(uint64_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 8;
 				}
 
 				void encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst);
