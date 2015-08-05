@@ -273,7 +273,7 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 	}
 	
 	if(region_txln_cache) {
-		region_txln_cache->invalidate_entry(va);
+		region_txln_cache->invalidate_entry(va >> 12);
 	}
 }
 
