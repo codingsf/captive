@@ -134,18 +134,13 @@ namespace captive {
 				uint32_t tag;
 				void *fn;
 				
-				void invalidate() {
-					tag = 1;
-				}
+				inline void invalidate() { tag = 1; }
 			} packed;
 
 			struct region_chain_cache_entry {
 				void *fn;
 				
-				void invalidate()
-				{
-					fn = (void *)&tail_call_ret0_only;
-				}
+				inline void invalidate() { fn = (void *)&tail_call_ret0_only; }
 			} packed;
 
 			struct {
@@ -181,8 +176,8 @@ namespace captive {
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
 
-			typedef cache<struct region_chain_cache_entry, 0x100000> region_txln_cache_t;
-			typedef cache<struct block_chain_cache_entry, 0x10000>   block_txln_cache_t;
+			typedef Cache<struct region_chain_cache_entry, 0x100000> region_txln_cache_t;
+			typedef Cache<struct block_chain_cache_entry, 0x10000> block_txln_cache_t;
 			region_txln_cache_t *region_txln_cache;
 			block_txln_cache_t  *block_txln_cache;
 

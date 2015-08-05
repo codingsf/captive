@@ -41,10 +41,10 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	jit_state.cpu = this;
 	
-	jit_state.block_txln_cache = block_txln_cache->GetPtr();
+	jit_state.block_txln_cache = block_txln_cache->ptr();
 	
-	if(_per_cpu_data->execution_mode == 3) { // if we're a region jit
-		jit_state.region_txln_cache = region_txln_cache->GetPtr();
+	if (_per_cpu_data->execution_mode == 3) { // if we're a region jit
+		jit_state.region_txln_cache = region_txln_cache->ptr();
 	} else {
 		jit_state.region_txln_cache = NULL;
 	}
@@ -258,22 +258,22 @@ void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 void CPU::invalidate_virtual_mappings()
 {
 	if (block_txln_cache) {
-		block_txln_cache->InvalidateDirty();
+		block_txln_cache->invalidate_dirty();
 	}
 
 	if (region_txln_cache) {
-		region_txln_cache->InvalidateDirty();
+		region_txln_cache->invalidate_dirty();
 	}
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
 	if(block_txln_cache ) {
-		block_txln_cache->InvalidateEntry(va);
+		block_txln_cache->invalidate_entry(va);
 	}
 	
 	if(region_txln_cache) {
-		region_txln_cache->InvalidateEntry(va);
+		region_txln_cache->invalidate_entry(va);
 	}
 }
 
