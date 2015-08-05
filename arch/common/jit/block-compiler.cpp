@@ -2278,11 +2278,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 		case IRInstruction::ADC_WITH_FLAGS:
 		{
-			bool dest_is_rax = register_from_operand(&insn->operands[3], 8) == REG_RAX;
-			if (!dest_is_rax) {
-				encoder.push(REG_RAX);
-			}
-
 			IROperand *lhs = &insn->operands[0];
 			IROperand *rhs = &insn->operands[1];
 			IROperand *carry_in = &insn->operands[2];
@@ -2307,10 +2302,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
+			bool just_do_an_add = false;
+			
 			// Set up carry bit for adc
 			if (carry_in->is_constant()) {
 				if (carry_in->value == 0) {
-					encoder.clc();
+					just_do_an_add = true;
 				} else {
 					encoder.stc();
 				}
@@ -2327,12 +2324,24 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			// Perform add with carry to set the flags
 			if (rhs->is_constant()) {
-				encoder.adc((uint32_t)rhs->value, tmp);
+				if (just_do_an_add) {
+					encoder.add((uint32_t)rhs->value, tmp);
+				} else {
+					encoder.adc((uint32_t)rhs->value, tmp);
+				}
 			} else if (rhs->is_vreg()) {
 				if (rhs->is_alloc_reg()) {
-					encoder.adc(register_from_operand(rhs, 4), tmp);
+					if (just_do_an_add) {
+						encoder.add(register_from_operand(rhs, 4), tmp);
+					} else {
+						encoder.adc(register_from_operand(rhs, 4), tmp);
+					}
 				} else if (rhs->is_alloc_stack()) {
-					encoder.adc(stack_from_operand(rhs), tmp);
+					if (just_do_an_add) {
+						encoder.add(stack_from_operand(rhs), tmp);
+					} else {
+						encoder.adc(stack_from_operand(rhs), tmp);
+					}
 				} else {
 					assert(false);
 				}
@@ -2340,10 +2349,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
+			bool dest_is_rax = register_from_operand(&insn->operands[3], 8) == REG_RAX;
+			if (!dest_is_rax) {
+				encoder.mov(REG_AX, REG_CX);
+			}
+
 			// Read flags out into AX
 			// What are you lahfing at?
 			encoder.lahf();
-			encoder.seto(REG_AL);
 
 			//Move AX into correct destination register
 			if (!dest_is_rax) {
@@ -2353,8 +2366,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					assert(false);
 				}
 
-				encoder.pop(REG_RAX);
+				encoder.mov(REG_CX, REG_AX);
 			}
+
+			encoder.seto(register_from_operand(flags_out, 1));
 
 			break;
 		}
