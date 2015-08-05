@@ -108,11 +108,12 @@ bool CPU::run_block_jit_safepoint()
 		}
 
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
-
+		
 		if (blk->txln) {
-			jit_state.block_txln_cache[virt_pc % 0x10000].tag = virt_pc;
-			jit_state.block_txln_cache[virt_pc % 0x10000].fn = (void *)blk->txln;
-
+			auto ptr = block_txln_cache->GetEntryPtr(virt_pc);
+			ptr->tag = virt_pc;
+			ptr->fn = (void *)blk->txln;
+						
 			step_ok = blk->txln(&jit_state) == 0;
 			continue;
 		}
