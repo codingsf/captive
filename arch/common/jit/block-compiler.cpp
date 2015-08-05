@@ -84,6 +84,10 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	timer.tick("Analyse");
 	if( !post_allocate_peephole()) return false;
 	timer.tick("PAP");
+	
+	if( !lower_stack_to_reg()) return false;
+	timer.tick("LSTR");
+
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
@@ -92,6 +96,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 	timer.dump();
 
+	
 
 	fn = (block_txln_fn)encoder.get_buffer();
 	return true;
@@ -1036,6 +1041,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	// Function prologue
 	encoder.push(REG_R15);
 	encoder.push(REG_R14);
+	encoder.push(REG_R13);
 	encoder.push(REG_RBX);
 
 	encoder.push(REG_RBP);
@@ -1217,6 +1223,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// Function Epilogue
 			
 			if (emit_interrupt_check) {
+				assert(emit_chaining_logic);
 				encoder.cmp1(0, X86Memory::get(REG_RDI, 48));
 				encoder.jnz((int8_t)26);
 			}
@@ -1229,10 +1236,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.mov(X86Memory::get(REG_RDI, 32), REG_RDX);
 				encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
 				encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
-				encoder.je((int8_t)9);											// Tags match?
+				encoder.je((int8_t)11);											// Tags match?
 
 				encoder.leave();
 				encoder.pop(REG_RBX);
+				encoder.pop(REG_R13);
 				encoder.pop(REG_R14);
 				encoder.pop(REG_R15);
 
@@ -1246,6 +1254,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				encoder.leave();
 				encoder.pop(REG_RBX);
+				encoder.pop(REG_R13);
 				encoder.pop(REG_R14);
 				encoder.pop(REG_R15);
 
@@ -1412,7 +1421,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 				block_relocations[reloc_offset] = target->value;
 
-				encoder.align_up(16);
+				encoder.align_up(8);
 			}
 
 			break;
@@ -1467,7 +1476,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					block_relocations[reloc_offset] = ft->value;
 				}
 
-				encoder.align_up(16);
+				encoder.align_up(8);
 			}
 
 			break;
@@ -2021,8 +2030,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					} else if (lhs->is_alloc_stack() && rhs->is_alloc_reg()) {
 						assert(false);
 					} else if (lhs->is_alloc_reg() && rhs->is_alloc_stack()) {
-						assert(false);
+						// Apparently we can't yet encode cmp (stack), (reg) so encode cmp (reg), (stack) instead
+						// and invert the result
+						invert = true;
+						
+						encoder.cmp(register_from_operand(lhs), stack_from_operand(rhs));
 					} else if (lhs->is_alloc_stack() && rhs->is_alloc_stack()) {
+						// Apparently we can't yet encode cmp (stack), (reg) so encode cmp (reg), (stack) instead
+						// and invert the result
 						invert = true;
 
 						X86Register& tmp = unspill_temp(lhs, 0);
@@ -2546,4 +2561,46 @@ void BlockCompiler::encode_operand_to_reg(shared::IROperand *operand, const x86:
 	default:
 		assert(false);
 	}
+}
+
+bool BlockCompiler::lower_stack_to_reg()
+{
+	std::map<uint32_t, uint32_t> lowered_entries;
+	PopulatedSet<8> avail_phys_regs = used_phys_regs;
+	avail_phys_regs.invert();
+		
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx)
+	{
+		IRInstruction *insn = ctx.at(ir_idx);
+		/*
+		if(insn->type == IRInstruction::BARRIER) {
+			lowered_entries.clear();
+			avail_phys_regs = used_phys_regs;
+			avail_phys_regs.invert();
+		}
+		*/
+		for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
+			IROperand &op = insn->operands[op_idx];
+			if(!op.is_valid()) break;
+			
+			if(op.is_alloc_stack()) {
+				int32_t selected_reg;
+				if(!lowered_entries.count(op.alloc_data)) {
+					if(avail_phys_regs.empty()) continue;
+					
+					selected_reg = avail_phys_regs.next_avail();
+					avail_phys_regs.clear(selected_reg);
+					assert(selected_reg != -1);
+					lowered_entries[op.alloc_data] = selected_reg;
+					used_phys_regs.set(selected_reg);
+					
+				} else {
+					selected_reg = lowered_entries[op.alloc_data];
+				}
+				op.allocate(IROperand::ALLOCATED_REG, selected_reg);
+			}
+		}
+	}
+	
+	return true;
 }
