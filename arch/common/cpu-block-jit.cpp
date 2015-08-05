@@ -110,7 +110,7 @@ bool CPU::run_block_jit_safepoint()
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		
 		if (blk->txln) {
-			auto ptr = block_txln_cache->GetEntryPtr(virt_pc);
+			auto ptr = block_txln_cache->entry_ptr(virt_pc);
 			ptr->tag = virt_pc;
 			ptr->fn = (void *)blk->txln;
 						
