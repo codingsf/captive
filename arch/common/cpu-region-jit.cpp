@@ -69,6 +69,8 @@ bool CPU::run_region_jit_safepoint()
 
 	bool reset_trace = true;
 	gpa_t last_phys_pc = 0;
+	Block *last_block = NULL;
+	
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -123,12 +125,13 @@ bool CPU::run_region_jit_safepoint()
 			blk->entry = true;
 			reset_trace = false;
 		} else {
-			if (last_phys_pc > phys_pc) {
-				rgn->get_block(last_phys_pc)->loop_header = true;
+			if (last_phys_pc > phys_pc && last_block) {
+				last_block->loop_header = true;
 			}
 		}
 
 		last_phys_pc = phys_pc;
+		last_block = blk;
 
 		if (rgn->txln) {
 			reset_trace = true;
