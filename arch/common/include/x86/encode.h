@@ -117,6 +117,8 @@ namespace captive {
 				void mov2(uint16_t imm, const X86Memory& dst);
 				void mov1(uint8_t imm, const X86Memory& dst);
 
+				void xchg(const X86Register& a, const X86Register& b);
+				
 				void andd(uint32_t val, const X86Register& dst);
 				void andd(uint32_t val, const X86Memory& dst);
 				void orr(uint32_t val, const X86Register& dst);

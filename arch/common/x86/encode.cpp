@@ -223,6 +223,17 @@ void X86Encoder::movsx(const X86Register& src, const X86Register& dst)
 	}
 }
 
+void X86Encoder::xchg(const X86Register& a, const X86Register& b)
+{
+	assert(a.size == b.size);
+	
+	if (a.size == 1) {
+		encode_opcode_mod_rm(0x86, a, b);
+	} else {
+		encode_opcode_mod_rm(0x87, a, b);
+	}
+}
+
 void X86Encoder::andd(uint32_t val, const X86Memory& dst)
 {
 	assert(false);
