@@ -217,7 +217,11 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 		memcpy((void *)bwu->ir, (const void *)blk->ir, sizeof(shared::IRInstruction) * bwu->ir_count);
 	}
 
-	assert(rgn->rwu->block_count);
+	if (!rgn->rwu->block_count) {
+		shfree(rgn->rwu);
+		rgn->rwu = NULL;
+		return;
+	}
 
 	asm volatile("out %0, $0xff" :: "a"(14), "D"(rgn->rwu));
 }

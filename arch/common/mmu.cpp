@@ -161,9 +161,7 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 	// Notify the CPU to invalidate this virtual mapping
 	_cpu.invalidate_virtual_mapping(va);
 	
-	for (int i = 0; i < 4096; i++) {
-		itlb[(va + i) % ITLB_SIZE].tag = 0;
-	}
+	itlb[(va >> 12) % ITLB_SIZE].tag = 0;
 }
 
 void MMU::disable_writes()
@@ -347,20 +345,27 @@ bool MMU::is_device(gpa_t gpa)
 
 bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 {
-	access_info info;
-
-	info.type = ACCESS_FETCH;
-	info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+	uint32_t va_page = va >> 12;
+	uint32_t va_off = va & 0xfff;
+	uint32_t cache_idx = va_page % ITLB_SIZE;
 	
-	if (va != 0 && itlb[va % ITLB_SIZE].tag == va) {
-		pa = itlb[va % ITLB_SIZE].value;
+	if (va_page != 0 && itlb[cache_idx].tag == va_page) { // && itlb[cache_idx].mode == info.mode) {
+		pa = itlb[cache_idx].value | va_off;
 		return true;
 	} else {
+		access_info info;
+
+		info.type = ACCESS_FETCH;
+		info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+
 		if (!resolve_gpa(va, pa, info, fault, true))
 			return false;
 		
-		itlb[va % ITLB_SIZE].tag = va;
-		itlb[va % ITLB_SIZE].value = pa;
+		if (fault == NONE) {
+			itlb[cache_idx].tag = va_page;
+			itlb[cache_idx].value = pa & ~0xfff;
+		}
+		
 		return true;
 	}
 }

@@ -71,6 +71,7 @@ bool CPU::run_block_jit_safepoint()
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
 			if (interpreter().handle_irq(cpu_data().isr)) {
+				jit_state.exit_chain = 0;
 				cpu_data().interrupts_taken++;
 			}
 		}
@@ -89,7 +90,7 @@ bool CPU::run_block_jit_safepoint()
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
-			MMU::resolution_fault fault;
+			MMU::resolution_fault fault = MMU::NONE;
 			if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) abort();
 
 			// If there was a fault, then switch back to the safe-point.

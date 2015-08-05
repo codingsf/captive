@@ -4,10 +4,10 @@
 using namespace captive::arch::x86;
 
 namespace captive { namespace arch { namespace x86 {
-X86Register REG_RAX("rax", 8, 0), REG_EAX("eax", 4, 0), REG_AX("ax", 2, 0), REG_AL("al", 1, 0);
-X86Register REG_RCX("rcx", 8, 1), REG_ECX("ecx", 4, 1), REG_CX("cx", 2, 1), REG_CL("cl", 1, 1);
-X86Register REG_RDX("rdx", 8, 2), REG_EDX("edx", 4, 2), REG_DX("dx", 2, 2), REG_DL("dl", 1, 2);
-X86Register REG_RBX("rbx", 8, 3), REG_EBX("ebx", 4, 3), REG_BX("bx", 2, 3), REG_BL("bl", 1, 3);
+X86Register REG_RAX("rax", 8, 0), REG_EAX("eax", 4, 0), REG_AX("ax", 2, 0), REG_AL("al", 1, 0), REG_AH("ah", 1, 4);
+X86Register REG_RCX("rcx", 8, 1), REG_ECX("ecx", 4, 1), REG_CX("cx", 2, 1), REG_CL("cl", 1, 1), REG_CH("ch", 1, 5);
+X86Register REG_RDX("rdx", 8, 2), REG_EDX("edx", 4, 2), REG_DX("dx", 2, 2), REG_DL("dl", 1, 2), REG_DH("dh", 1, 6);
+X86Register REG_RBX("rbx", 8, 3), REG_EBX("ebx", 4, 3), REG_BX("bx", 2, 3), REG_BL("bl", 1, 3), REG_BH("bh", 1, 7);
 X86Register REG_RSP("rsp", 8, 4), REG_ESP("esp", 4, 4), REG_SP("sp", 2, 4), REG_SPL("spl", 1, 4, false, true);
 X86Register REG_RBP("rbp", 8, 5), REG_EBP("ebp", 4, 5), REG_BP("bp", 2, 5), REG_BPL("bpl", 1, 5, false, true);
 X86Register REG_RSI("rsi", 8, 6), REG_ESI("esi", 4, 6), REG_SI("si", 2, 6), REG_SIL("sil", 1, 6, false, true);
