@@ -28,10 +28,10 @@ namespace captive {
 				inline bool operator!=(const X86Register& other) const { return !(other.size == size && other.raw_index == raw_index && other.hireg == hireg && other.newreg == newreg); }
 			};
 
-			extern X86Register REG_RAX, REG_EAX, REG_AX, REG_AL;
-			extern X86Register REG_RCX, REG_ECX, REG_CX, REG_CL;
-			extern X86Register REG_RDX, REG_EDX, REG_DX, REG_DL;
-			extern X86Register REG_RBX, REG_EBX, REG_BX, REG_BL;
+			extern X86Register REG_RAX, REG_EAX, REG_AX, REG_AL, REG_AH;
+			extern X86Register REG_RCX, REG_ECX, REG_CX, REG_CL, REG_CH;
+			extern X86Register REG_RDX, REG_EDX, REG_DX, REG_DL, REG_DH;
+			extern X86Register REG_RBX, REG_EBX, REG_BX, REG_BL, REG_BH;
 			extern X86Register REG_RSP, REG_ESP, REG_SP, REG_SIL;
 			extern X86Register REG_RBP, REG_EBP, REG_BP, REG_BPL;
 			extern X86Register REG_RSI, REG_ESI, REG_SI, REG_SIL;
