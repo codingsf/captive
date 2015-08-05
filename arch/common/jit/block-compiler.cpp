@@ -2414,8 +2414,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			bool dest_is_rax = register_from_operand(&insn->operands[3], 8) == REG_RAX;
+			
 			if (!dest_is_rax) {
-				encoder.mov(REG_AX, get_temp(1, 2));
+				encoder.mov(REG_AX, register_from_operand(flags_out, 2));
 			}
 
 			// Read flags out into AX
@@ -2425,16 +2426,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			//Move AX into correct destination register
 			if (!dest_is_rax) {
 				if (flags_out->is_alloc_reg()) {
-					encoder.mov(REG_AX, register_from_operand(flags_out, 2));
+					encoder.xchg(REG_AX, register_from_operand(flags_out, 2));
 				} else {
 					assert(false);
 				}
-
-				encoder.mov(get_temp(1, 2), REG_AX);
 			}
 
 			encoder.seto(register_from_operand(flags_out, 1));
-
 			break;
 		}
 
