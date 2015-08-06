@@ -234,6 +234,23 @@ void X86Encoder::xchg(const X86Register& a, const X86Register& b)
 	}
 }
 
+void X86Encoder::cbtw()
+{
+	emit8(0x66);
+	emit8(0x98);
+}
+
+void X86Encoder::cwtl()
+{
+	emit8(0x98);
+}
+
+void X86Encoder::cltq()
+{
+	emit8(0x48);
+	emit8(0x98);
+}
+
 void X86Encoder::andd(uint32_t val, const X86Memory& dst)
 {
 	assert(false);
