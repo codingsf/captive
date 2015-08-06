@@ -223,6 +223,12 @@ void X86Encoder::movsx(const X86Register& src, const X86Register& dst)
 	}
 }
 
+void X86Encoder::movfs(uint32_t off, const X86Register& dst)
+{
+	emit8(0x64);
+	encode_opcode_mod_rm(0x8b, dst, X86Memory::get(REG_RIZ, off, REG_RIZ, 1));
+}
+
 void X86Encoder::xchg(const X86Register& a, const X86Register& b)
 {
 	assert(a.size == b.size);
@@ -870,7 +876,7 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 {
 	uint8_t mod, mrm;
 
-	if (rm.displacement == 0) {
+	if (rm.displacement == 0 || (rm.base == REG_RIZ && rm.index == REG_RIZ)) {
 		mod = 0;
 	} else if (rm.displacement < 128 && rm.displacement > -127) {
 		mod = 1;
@@ -921,8 +927,12 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 			} else {
 				i = rm.index.raw_index;
 			}
-
-			b = rm.base.raw_index;
+			
+			if (rm.base == REG_RIZ) {
+				b = 5;
+			} else {
+				b = rm.base.raw_index;
+			}
 		}
 
 		emit8((s & 3) << 6 | (i & 7) << 3 | (b & 7));
@@ -930,7 +940,7 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 
 	if (mod == 1) {
 		emit8(rm.displacement);
-	} else if (mod == 2) {
+	} else if (mod == 2 || (rm.base == REG_RIZ && rm.index == REG_RIZ)) {
 		emit32(rm.displacement);
 	}
 }
@@ -943,7 +953,7 @@ void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
 void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Memory& rm)
 {
 	assert(reg.size == 1 || reg.size == 2 || reg.size == 4 || reg.size == 8);
-	assert(rm.base.size == 4 || rm.base.size == 8);
+	assert(rm.base.size == 4 || rm.base.size == 8 || rm.base == REG_RIZ);
 
 	// Figure out what prefixes are needed (if any)
 

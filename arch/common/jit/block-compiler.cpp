@@ -1056,7 +1056,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	uint32_t prologue_offset = encoder.current_offset();
 	encoder.sub(max_stack, REG_RSP);
 
-	encoder.mov(REG_RDI, JITSTATE_REG);	// JIT state ptr
 	load_state_field(8, REGSTATE_REG);	// Register state ptr
 
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
@@ -1224,24 +1223,23 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::DISPATCH:
 		case IRInstruction::RET:
 		{
-			encoder.mov(JITSTATE_REG, REG_RDI);
-
 			// Function Epilogue
-			
 			if (emit_interrupt_check) {
 				assert(emit_chaining_logic);
-				encoder.cmp1(0, X86Memory::get(REG_RDI, 48));
-				encoder.jnz((int8_t)26);
+				encoder.movfs(48, REG_EAX);
+				encoder.test(REG_RAX, REG_RAX);
+				encoder.jnz((int8_t)36);
 			}
 
 			if (emit_chaining_logic) {
-				encoder.mov(X86Memory::get(REG_RDI, 8), REG_RAX);				
+				encoder.movfs(8, REG_RAX);				
 				encoder.mov(X86Memory::get(REG_RAX, 0x3c), REG_EAX);			// Load the PC
 				encoder.movzx(REG_AX, REG_EDX);									// Mask the PC
 				encoder.lea(X86Memory::get(REG_RDX, REG_RDX, 2), REG_RCX);		// Calculate block cache entry offset
-				encoder.mov(X86Memory::get(REG_RDI, 32), REG_RDX);
+				encoder.movfs(32, REG_RDX);
 				encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
 				encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
+				
 				encoder.je((int8_t)11);											// Tags match?
 
 				encoder.leave();
@@ -1252,7 +1250,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 				encoder.xorr(REG_EAX, REG_EAX);
 				encoder.ret(); // Nope, return.
-
+				
 				encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
 				encoder.add(prologue_offset, REG_RAX);
 				encoder.add(max_stack, REG_RSP);

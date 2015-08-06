@@ -145,7 +145,9 @@ namespace captive {
 
 				inline void load_state_field(uint8_t slot, const x86::X86Register& reg)
 				{
-					encoder.mov(x86::X86Memory::get(x86::JITSTATE_REG, slot), reg);
+					//encoder.mov(x86::X86Memory::get(x86::JITSTATE_REG, slot), reg);
+					
+					encoder.movfs(slot, reg);
 				}
 			};
 		}
