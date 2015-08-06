@@ -1985,7 +1985,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 							break;
 
 						case IRInstruction::SX:
-							encoder.movsx(register_from_operand(source), register_from_operand(dest));
+							if (register_from_operand(source) == REG_EAX && register_from_operand(dest) == REG_RAX) {
+								encoder.cltq();
+							} else if (register_from_operand(source) == REG_AX && register_from_operand(dest) == REG_EAX) {
+								encoder.cwtl();
+							} else if (register_from_operand(source) == REG_AL && register_from_operand(dest) == REG_AX) {
+								encoder.cbtw();
+							} else {
+								encoder.movsx(register_from_operand(source), register_from_operand(dest));
+							}
+							
 							break;
 						default:
 							assert(false);
