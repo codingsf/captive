@@ -25,19 +25,20 @@ using namespace captive::shared;
 /* Register Mapping
  *
  * RAX  Allocatable			0
- * RBX  Temporary
- * RCX  Temporary
- * RDX  Allocatable			1
- * RSI  Allocatable			2
- * RDI  Allocatable			3
+ * RBX  Not used			1
+ * RCX  Temporary			t0
+ * RDX  Allocatable			2
+ * RSI  Allocatable			3
+ * RDI  Register File
  * R8   Allocatable			4
  * R9   Allocatable			5
  * R10  Allocatable			6
- * R11  Not used
+ * R11  Allocatable			7
  * R12  Not used
- * R13  Not used
- * R14  State variable
+ * R13  Allocatable			8
+ * R14  Temporary			t1
  * R15  Register File
+ * FS	Base Pointer to JIT STATE structure
  */
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check, bool emit_chaining_logic) 
@@ -48,6 +49,7 @@ BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interr
 {
 	int i = 0;
 	assign(i++, REG_RAX, REG_EAX, REG_AX, REG_AL);
+	assign(i++, REG_RBX, REG_EBX, REG_BX, REG_BL);
 	assign(i++, REG_RDX, REG_EDX, REG_DX, REG_DL);
 	assign(i++, REG_RSI, REG_ESI, REG_SI, REG_SIL);
 	assign(i++, REG_R8, REG_R8D, REG_R8W, REG_R8B);
@@ -1527,8 +1529,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
-			encoder.mov(target->value, get_temp(0, 8));
-			encoder.call(get_temp(0, 8));
+			encoder.mov(target->value, get_temp(1, 8));
+			encoder.call(get_temp(1, 8));
 
 			if (next_insn) {
 				if (next_insn->type == IRInstruction::CALL && insn->count_operands() == next_insn->count_operands()) {
@@ -1705,8 +1707,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encode_operand_function_argument(val, REG_RCX);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
-			encoder.mov((uint64_t)&cpu_write_device, get_temp(0, 8));
-			encoder.call(get_temp(0, 8));
+			encoder.mov((uint64_t)&cpu_write_device, get_temp(1, 8));
+			encoder.call(get_temp(1, 8));
 
 			if (next_insn && next_insn->type == IRInstruction::WRITE_DEVICE) {
 				//
@@ -1737,8 +1739,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encode_operand_function_argument(reg, REG_RDX);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
-			encoder.mov((uint64_t)&cpu_read_device, get_temp(0, 8));
-			encoder.call(get_temp(0, 8));
+			encoder.mov((uint64_t)&cpu_read_device, get_temp(1, 8));
+			encoder.call(get_temp(1, 8));
 
 			emit_restore_reg_state(4);
 
@@ -2321,7 +2323,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::FLUSH_ITLB:
 		case IRInstruction::FLUSH_DTLB:
 		{
-			encoder.mov(1, REG_EBX);
+			encoder.mov(1, REG_ECX);
 			encoder.intt(0x85);
 			break;
 		}
@@ -2330,11 +2332,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::FLUSH_DTLB_ENTRY:
 		{
 			if (insn->operands[0].is_constant()) {
-				encoder.mov(insn->operands[0].value, REG_RCX);
+				encoder.mov(insn->operands[0].value, REG_R14);
 			} else if (insn->operands[0].is_vreg()) {
 				if (insn->operands[0].is_alloc_reg()) {
 					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
-					encoder.mov(addr, REG_ECX);
+					encoder.mov(addr, REG_R14D);
 				} else {
 					assert(false);
 				}
@@ -2342,7 +2344,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
-			encoder.mov(4, REG_EBX);
+			encoder.mov(4, REG_ECX);
 			encoder.intt(0x85);
 			break;
 		}
@@ -2488,7 +2490,6 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 	} else if (oper->is_vreg()) {
 		if (oper->is_alloc_reg()) {
 			encoder.mov(X86Memory::get(REG_RSP, oper->alloc_data * 8), target_reg);
-
 		} else {
 			encoder.mov(X86Memory::get(REG_RBP, (oper->alloc_data * -1) - 8), target_reg);
 		}

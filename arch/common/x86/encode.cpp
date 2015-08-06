@@ -694,6 +694,10 @@ void X86Encoder::test(const X86Register& op1, const X86Register& op2)
 
 void X86Encoder::call(const X86Register& reg)
 {
+	if (reg.hireg) {
+		emit8(0x41);
+	}
+	
 	emit8(0xff);
 	encode_mod_reg_rm(REG_RDX, reg);
 }
