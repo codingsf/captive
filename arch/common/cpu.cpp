@@ -51,6 +51,9 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.exit_chain = 0;
+	
+	// Populate the FS register with the address of the JIT state structure.
+	__wrmsr(0xc0000100, (uint64_t)&jit_state);
 
 	invalidate_virtual_mappings();
 }
@@ -271,9 +274,9 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 	if(block_txln_cache ) {
 		block_txln_cache->invalidate_entry(va);
 	}
-	
+
 	if(region_txln_cache) {
-		region_txln_cache->invalidate_entry(va);
+		region_txln_cache->invalidate_entry(va >> 12);
 	}
 }
 

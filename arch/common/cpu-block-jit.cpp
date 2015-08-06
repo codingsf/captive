@@ -121,7 +121,6 @@ bool CPU::run_block_jit_safepoint()
 
 		if (blk->exec_count > 10) {
 			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
-
 			mmu().disable_writes();
 
 			step_ok = blk->txln(&jit_state) == 0;

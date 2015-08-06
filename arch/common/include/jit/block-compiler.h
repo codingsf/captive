@@ -117,19 +117,19 @@ namespace captive {
 					switch (id) {
 					case 0:
 						switch (width) {
-						case 1:	return x86::REG_BL;
-						case 2:	return x86::REG_BX;
-						case 4:	return x86::REG_EBX;
-						case 8:	return x86::REG_RBX;
+						case 1:	return x86::REG_CL;
+						case 2:	return x86::REG_CX;
+						case 4:	return x86::REG_ECX;
+						case 8:	return x86::REG_RCX;
 						default: assert(false);
 						}
 
 					case 1:
 						switch (width) {
-						case 1:	return x86::REG_CL;
-						case 2:	return x86::REG_CX;
-						case 4:	return x86::REG_ECX;
-						case 8:	return x86::REG_RCX;
+						case 1:	return x86::REG_R14B;
+						case 2:	return x86::REG_R14W;
+						case 4:	return x86::REG_R14D;
+						case 8:	return x86::REG_R14;
 						default: assert(false);
 						}
 
@@ -146,7 +146,9 @@ namespace captive {
 
 				inline void load_state_field(uint8_t slot, const x86::X86Register& reg)
 				{
-					encoder.mov(x86::X86Memory::get(x86::JITSTATE_REG, slot), reg);
+					//encoder.mov(x86::X86Memory::get(x86::JITSTATE_REG, slot), reg);
+					
+					encoder.movfs(slot, reg);
 				}
 			};
 		}

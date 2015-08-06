@@ -112,11 +112,17 @@ namespace captive {
 				void mov(const X86Register& src, const X86Memory& dst);
 				void mov(uint64_t src, const X86Register& dst);
 
+				void movfs(uint32_t off, const X86Register& dst);
+				
 				void mov8(uint64_t imm, const X86Memory& dst);
 				void mov4(uint32_t imm, const X86Memory& dst);
 				void mov2(uint16_t imm, const X86Memory& dst);
 				void mov1(uint8_t imm, const X86Memory& dst);
 
+				void cbtw();
+				void cwtl();
+				void cltq();
+				
 				void xchg(const X86Register& a, const X86Register& b);
 				
 				void andd(uint32_t val, const X86Register& dst);

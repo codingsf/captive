@@ -13,22 +13,6 @@
 
 extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
 
-static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
-{
-	uint32_t low = msr_value & 0xffffffff;
-	uint32_t high = (msr_value >> 32);
-
-	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
-}
-
-static inline uint64_t rdmsr(uint32_t msr_id)
-{
-	uint32_t low, high;
-
-	asm volatile("rex.b rdmsr" : "=a"(low), "=d"(high) : "c" (msr_id));
-	return (uint64_t)low | ((uint64_t)high << 32);
-}
-
 extern void (*__init_array_start []) (void);
 extern void (*__init_array_end []) (void);
 
@@ -112,9 +96,6 @@ extern "C" {
 	{
 		printf("no time for that now...\n");
 
-		// Populate the FS register with the address of the global state structure.
-		wrmsr(0xc0000100, (uint64_t)cpu_data);
-
 		// Run the static constructors.
 		call_static_constructors();
 
@@ -129,7 +110,6 @@ extern "C" {
 
 		// Initialise the memory manager.
 		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
-
 
 		captive::arch::Environment *env = create_environment(cpu_data);
 

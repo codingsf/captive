@@ -84,4 +84,20 @@ static inline uint64_t __rdtsc()
 	return (uint64_t)l | ((uint64_t)h) << 32;
 }
 
+static inline void __wrmsr(uint32_t msr_id, uint64_t msr_value)
+{
+	uint32_t low = msr_value & 0xffffffff;
+	uint32_t high = (msr_value >> 32);
+
+	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
+}
+
+static inline uint64_t __rdmsr(uint32_t msr_id)
+{
+	uint32_t low, high;
+
+	asm volatile("rex.b rdmsr" : "=a"(low), "=d"(high) : "c" (msr_id));
+	return (uint64_t)low | ((uint64_t)high << 32);
+}
+
 #endif	/* DEFINE_H */

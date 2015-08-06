@@ -94,7 +94,7 @@ bool CPU::run_region_jit_safepoint()
 
 		// This will perform a FETCH with side effects, so that we can impose the
 		// correct permissions checking for the block we're about to execute.
-		MMU::resolution_fault fault;
+		MMU::resolution_fault fault = MMU::NONE;
 		if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) abort();
 
 		// If there was a fault, then switch back to the safe-point.
@@ -135,7 +135,10 @@ bool CPU::run_region_jit_safepoint()
 
 		if (rgn->txln) {
 			reset_trace = true;
-			((void **)jit_state.region_txln_cache)[virt_pc >> 12] = (void *)rgn->txln;
+			
+			//auto ptr = region_txln_cache->entry_ptr(virt_pc >> 12);
+			//ptr->fn = (void *)rgn->txln;
+			
 			rgn->txln(&jit_state);
 			if (virt_pc != read_pc()) continue;
 		}

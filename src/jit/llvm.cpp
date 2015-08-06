@@ -81,8 +81,9 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	jit_state_elements.push_back(rcc.types.pi8);					// Registers
 	jit_state_elements.push_back(rcc.types.i64);					// Register Size
 	jit_state_elements.push_back(rcc.types.pi8->getPointerTo(0));	// Region Chaining Table
+	jit_state_elements.push_back(rcc.types.pi8->getPointerTo(0));	// Block Chaining Table
 	jit_state_elements.push_back(rcc.types.pi64);					// Instruction Counter
-	jit_state_elements.push_back(rcc.types.pi32);					// ISR
+	jit_state_elements.push_back(rcc.types.i32);					// Exit Chain
 
 	rcc.types.jit_state_ty = StructType::get(rcc.ctx, jit_state_elements, false);
 	rcc.types.jit_state_ptr = rcc.types.jit_state_ty->getPointerTo(0);
@@ -110,9 +111,9 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	set_aa_metadata(rcc.pc_ptr, AA_MD_REGISTER, rcc.consti64(60));
 
 	rcc.entry_page = rcc.builder.CreateLShr(rcc.builder.CreateLoad(rcc.pc_ptr), 12);
-	rcc.insn_counter = rcc.builder.CreateExtractValue(rcc.jit_state, {4}, "insn_counter");
+	rcc.insn_counter = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "insn_counter");
 	set_aa_metadata(rcc.insn_counter, AA_MD_INSN_COUNTER);
-	rcc.isr = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "isr");
+	rcc.isr = rcc.builder.CreateConstGEP2_32(jit_state_ptr_val, 0, 6, "isr");
 	set_aa_metadata(rcc.isr, AA_MD_ISR);
 
 	rcc.builder.CreateBr(rcc.dispatch_block);
@@ -136,8 +137,9 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 
 	// --- CHAIN
 	rcc.builder.SetInsertPoint(chain_block);
+	rcc.builder.CreateRet(rcc.consti32(0));
 
-	std::vector<Value *> chain_slot_gep;
+	/*std::vector<Value *> chain_slot_gep;
 	chain_slot_gep.push_back(dispatch_pc_page_idx);
 
 	Value *chain_slot = rcc.builder.CreateGEP(rcc.region_table, chain_slot_gep, "chain_slot");
@@ -146,7 +148,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	CallInst *region_tail_call = rcc.builder.CreateCall(real_fn_ptr, jit_state_ptr_val);
 	region_tail_call->setTailCall(true);
 
-	rcc.builder.CreateRet(region_tail_call);
+	rcc.builder.CreateRet(region_tail_call);*/
 
 	// Create Blocks
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
@@ -572,16 +574,8 @@ bool LLVMJIT::lower_block(RegionCompilationContext& rcc, const shared::BlockWork
 	bcc.builder.SetInsertPoint(entry_block);
 
 	if (bwu->interrupt_check) {
-		std::vector<Type *> params;
-		params.push_back(rcc.types.pi8);
-		params.push_back(rcc.types.i32);
-
-		FunctionType *fntype = FunctionType::get(rcc.types.i32, params, false);
-
-		Constant *fn = rcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("jit_handle_interrupt", fntype);
-		Value *interrupt_handled = rcc.builder.CreateCall2(fn, rcc.cpu_obj, rcc.builder.CreateLoad(rcc.isr));
-
-		rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(interrupt_handled, rcc.consti32(0)), get_ir_block(bcc, (IRBlockId)0), rcc.exit_handle_block);
+		Value *continue_exec = rcc.builder.CreateICmpEQ(rcc.builder.CreateLoad(rcc.isr), rcc.consti32(0));
+		rcc.builder.CreateCondBr(continue_exec, get_ir_block(bcc, (IRBlockId)0), rcc.exit_normal_block);
 	} else {
 		rcc.builder.CreateBr(get_ir_block(bcc, (IRBlockId)0));
 	}

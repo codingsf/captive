@@ -60,8 +60,8 @@ int85_handler:
 	push $0
 	push_regs
 	mov %rsp, %rdi
-	mov %rbx, %rsi
-	mov %rcx, %rdx
+	mov %rcx, %rsi
+	mov %r14, %rdx
 	call do_syscall
 	pop_regs
 	add $8, %rsp
