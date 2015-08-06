@@ -271,7 +271,7 @@ void CPU::invalidate_virtual_mappings()
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
-	if(block_txln_cache ) {
+	if (block_txln_cache) {
 		block_txln_cache->invalidate_entry(va);
 	}
 
@@ -362,52 +362,4 @@ bool CPU::verify_check()
 	} else {
 		return true;
 	}
-}
-
-bool CPU::device_write(uint32_t address, uint8_t length, uint64_t value)
-{
-	cpu_data().device_address = address;
-
-	switch (length) {
-	case 4:
-		asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)value));
-		break;
-
-	case 2:
-		asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)value));
-		break;
-
-	case 1:
-		asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)value));
-		break;
-
-	default:
-		return false;
-	}
-
-	//printf("device write: addr=%x, value=%u\n", address, value);
-	return true;
-}
-
-bool CPU::device_read(uint32_t address, uint8_t length, uint64_t& value)
-{
-	cpu_data().device_address = address;
-
-	switch (length) {
-	case 4:
-		asm volatile("inl $0xf0, %0\n" : "=a"((uint32_t&)value));
-		break;
-	case 2:
-		asm volatile("inw $0xf0, %0\n" : "=a"((uint16_t&)value));
-		break;
-	case 1:
-		asm volatile("inb $0xf0, %0\n" : "=a"((uint8_t&)value));
-		break;
-
-	default:
-		return false;
-	}
-
-	//printf("device read: addr=%x, value=%u\n", address, value);
-	return true;
 }

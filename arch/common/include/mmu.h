@@ -16,6 +16,8 @@ namespace captive {
 	namespace arch {
 		class CPU;
 
+		extern bool fast_handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr);
+		
 		class MMU
 		{
 		public:

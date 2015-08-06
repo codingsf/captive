@@ -57,9 +57,6 @@ namespace captive {
 			virtual bool init() = 0;
 			bool run();
 
-			bool device_write(uint32_t address, uint8_t length, uint64_t value);
-			bool device_read(uint32_t address, uint8_t length, uint64_t& value);
-
 			virtual MMU& mmu() const = 0;
 			virtual Interpreter& interpreter() const = 0;
 			virtual JIT& jit() const = 0;

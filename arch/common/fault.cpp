@@ -9,6 +9,8 @@ using namespace captive::arch;
 
 static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr)
 {
+	if (fast_handle_device_fault(core, mctx, dev_addr)) return;
+	
 	/*printf("fault: device fault rip=%lx\n", mctx->rip);
 
 	printf("code: ");
@@ -18,10 +20,16 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 	printf("\n");*/
 	
 	//core->cpu_data().device_address = dev_addr;
-	asm volatile("" ::: "memory");
-
 	captive::arch::x86::MemoryInstruction inst;
 	decode_memory_instruction((const uint8_t *)mctx->rip, inst);
+	
+	/*printf(".byte ");
+	for (int i = 0; i < inst.length; i++) {
+		if (i > 0)
+			printf(", ");
+		printf("0x%02x", ((const uint8_t *)mctx->rip)[i]);
+	}
+	printf("\n");*/
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {

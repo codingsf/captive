@@ -9,7 +9,7 @@ static const char *mem_access_types[] = { "read", "write", "fetch" };
 static const char *mem_access_modes[] = { "user", "kernel" };
 static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
 
-#define ITLB_SIZE	4096
+#define ITLB_SIZE	8192
 
 static struct {
 	gva_t tag;
@@ -297,6 +297,8 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 				pt->present(false);
 
 				out_pa = pa;
+				
+				Memory::flush_page((va_t)(uint64_t)va);
 				goto handle_device;
 			}
 
@@ -321,7 +323,6 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	return true;
 
 handle_device:
-	Memory::flush_page((va_t)(uint64_t)va);
 	fault = DEVICE_FAULT;
 
 	return true;
@@ -346,11 +347,10 @@ bool MMU::is_device(gpa_t gpa)
 bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 {
 	uint32_t va_page = va >> 12;
-	uint32_t va_off = va & 0xfff;
 	uint32_t cache_idx = va_page % ITLB_SIZE;
 	
-	if (va_page != 0 && itlb[cache_idx].tag == va_page) { // && itlb[cache_idx].mode == info.mode) {
-		pa = itlb[cache_idx].value | va_off;
+	if (va_page != 0 && itlb[cache_idx].tag == va_page) {
+		pa = itlb[cache_idx].value | (va & 0xfff);
 		return true;
 	} else {
 		access_info info;
