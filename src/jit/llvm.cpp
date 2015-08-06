@@ -75,7 +75,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.types.pi16 = (rcc.types.i16 = Type::getInt16Ty(rcc.ctx))->getPointerTo(0);
 	rcc.types.pi32 = (rcc.types.i32 = Type::getInt32Ty(rcc.ctx))->getPointerTo(0);
 	rcc.types.pi64 = (rcc.types.i64 = Type::getInt64Ty(rcc.ctx))->getPointerTo(0);
-
+	
 	std::vector<Type *> jit_state_elements;
 	jit_state_elements.push_back(rcc.types.pi8);					// CPU
 	jit_state_elements.push_back(rcc.types.pi8);					// Registers
@@ -99,6 +99,7 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.dispatch_block = BasicBlock::Create(rcc.ctx, "dispatch", rcc.rgn_func);
 	rcc.exit_normal_block = BasicBlock::Create(rcc.ctx, "exit_normal", rcc.rgn_func);
 	rcc.exit_handle_block = BasicBlock::Create(rcc.ctx, "exit_handle_interrupt", rcc.rgn_func);
+	rcc.chain_block = BasicBlock::Create(rcc.ctx, "chain", rcc.rgn_func);
 	rcc.alloca_block = rcc.entry_block;
 
 	rcc.builder.SetInsertPoint(rcc.entry_block);
@@ -107,10 +108,10 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.reg_state = rcc.builder.CreateExtractValue(rcc.jit_state, {1}, "reg_state");
 	rcc.region_table = rcc.builder.CreateExtractValue(rcc.jit_state, {3}, "region_table");
 
-	rcc.pc_ptr = rcc.builder.CreateBitCast(rcc.builder.CreateGEP(rcc.reg_state, rcc.constu64(60)), rcc.types.pi32);
+	rcc.pc_ptr = rcc.builder.CreateBitCast(rcc.builder.CreateGEP(rcc.reg_state, rcc.constu64(60)), rcc.types.pi32, "pc");
 	set_aa_metadata(rcc.pc_ptr, AA_MD_REGISTER, rcc.consti64(60));
 
-	rcc.entry_page = rcc.builder.CreateLShr(rcc.builder.CreateLoad(rcc.pc_ptr), 12);
+	rcc.entry_page = rcc.builder.CreateLShr(rcc.builder.CreateLoad(rcc.pc_ptr, "entry_pc"), 12, "entry_page");
 	rcc.insn_counter = rcc.builder.CreateExtractValue(rcc.jit_state, {5}, "insn_counter");
 	set_aa_metadata(rcc.insn_counter, AA_MD_INSN_COUNTER);
 	rcc.isr = rcc.builder.CreateConstGEP2_32(jit_state_ptr_val, 0, 6, "isr");
@@ -126,29 +127,30 @@ void *LLVMJIT::compile_region(shared::RegionWorkUnit* rwu)
 	rcc.builder.SetInsertPoint(rcc.exit_handle_block);
 	rcc.builder.CreateRet(rcc.constu32(1));
 
-	BasicBlock *chain_block = BasicBlock::Create(rcc.ctx, "chain", rcc.rgn_func);
 	BasicBlock *do_dispatch_block = BasicBlock::Create(rcc.ctx, "do_dispatch", rcc.rgn_func);
 
 	// --- DISPATCH
 	rcc.builder.SetInsertPoint(rcc.dispatch_block);
-	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr);
-	Value *dispatch_pc_page_idx = rcc.builder.CreateLShr(dispatch_loaded_pc, 12);
-	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page), do_dispatch_block, chain_block);
+	Value *dispatch_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr, "pc_to_dispatch");
+	Value *dispatch_pc_page_idx = rcc.builder.CreateLShr(dispatch_loaded_pc, 12, "region_to_dispatch");
+	rcc.builder.CreateCondBr(rcc.builder.CreateICmpEQ(dispatch_pc_page_idx, rcc.entry_page, "same_region"), do_dispatch_block, rcc.chain_block);
 
 	// --- CHAIN
-	rcc.builder.SetInsertPoint(chain_block);
-	rcc.builder.CreateRet(rcc.consti32(0));
+	rcc.builder.SetInsertPoint(rcc.chain_block);
 
-	/*std::vector<Value *> chain_slot_gep;
-	chain_slot_gep.push_back(dispatch_pc_page_idx);
+	Value *chain_loaded_pc = rcc.builder.CreateLoad(rcc.pc_ptr, "pc_to_chain");
+	Value *chain_pc_page_idx = rcc.builder.CreateLShr(chain_loaded_pc, 12, "region_to_chain");
+
+	std::vector<Value *> chain_slot_gep;
+	chain_slot_gep.push_back(chain_pc_page_idx);
 
 	Value *chain_slot = rcc.builder.CreateGEP(rcc.region_table, chain_slot_gep, "chain_slot");
-	Value *region_fn_ptr = rcc.builder.CreateLoad(chain_slot);
-	Value *real_fn_ptr = rcc.builder.CreateBitCast(region_fn_ptr, rgn_func_ty->getPointerTo(0));
-	CallInst *region_tail_call = rcc.builder.CreateCall(real_fn_ptr, jit_state_ptr_val);
+	Value *region_fn_ptr = rcc.builder.CreateLoad(chain_slot, "chain_fn");
+	Value *real_fn_ptr = rcc.builder.CreatePointerCast(region_fn_ptr, rgn_func_ty->getPointerTo(0));
+	CallInst *region_tail_call = rcc.builder.CreateCall(real_fn_ptr, jit_state_ptr_val, "chained_result");
 	region_tail_call->setTailCall(true);
 
-	rcc.builder.CreateRet(region_tail_call);*/
+	rcc.builder.CreateRet(region_tail_call);
 
 	// Create Blocks
 	for (uint32_t i = 0; i < rwu->block_count; i++) {
@@ -479,6 +481,7 @@ bool LLVMJIT::add_pass(PassManagerBase *pm, Pass *pass)
 }
 
 //#define DISABLE_AA
+#define LOOP_OPTIMISATIONS
 
 bool LLVMJIT::initialise_pass_manager(PassManagerBase* pm)
 {
@@ -500,6 +503,8 @@ bool LLVMJIT::initialise_pass_manager(PassManagerBase* pm)
 
 	add_pass(pm, createInstructionCombiningPass());
 	add_pass(pm, createCFGSimplificationPass());
+	
+	add_pass(pm, createPromoteMemoryToRegisterPass());
 
 	add_pass(pm, createPruneEHPass());
 	add_pass(pm, createFunctionInliningPass(0));
@@ -521,15 +526,21 @@ bool LLVMJIT::initialise_pass_manager(PassManagerBase* pm)
 	add_pass(pm, createCFGSimplificationPass());
 
 	add_pass(pm, createReassociatePass());
-	//add_pass(pm, createLoopRotatePass());					//
 
+#ifdef LOOP_OPTIMISATIONS
+	add_pass(pm, createLoopRotatePass());					//
+#endif
+	
 	add_pass(pm, createInstructionCombiningPass());
 	add_pass(pm, createIndVarSimplifyPass());
-	//add_pass(pm, createLoopIdiomPass());					//
-	//add_pass(pm, createLoopDeletionPass());				//
 
-	//add_pass(pm, createLoopUnrollPass());					//
+#ifdef LOOP_OPTIMISATIONS
+	add_pass(pm, createLoopIdiomPass());					//
+	add_pass(pm, createLoopDeletionPass());				//
 
+	add_pass(pm, createLoopUnrollPass());					//
+#endif
+	
 	add_pass(pm, createGVNPass());
 	add_pass(pm, createMemCpyOptPass());
 	add_pass(pm, createSCCPPass());
@@ -1110,6 +1121,8 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 				bcc.rcc.direct_blocks.insert(target_address & 0xfff);
 				target_block = bcc.rcc.guest_basic_blocks[target_address & 0xfff];
 			}
+		} else {
+			target_block = bcc.rcc.chain_block;
 		}
 
 		if (fallthrough_address && (fallthrough_address >> 12 == bcc.rcc.phys_region_index)) {
@@ -1117,17 +1130,23 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 				bcc.rcc.direct_blocks.insert(fallthrough_address & 0xfff);
 				fallthrough_block = bcc.rcc.guest_basic_blocks[fallthrough_address & 0xfff];
 			}
+		} else if (fallthrough_address) {
+			fallthrough_block = bcc.rcc.chain_block;
 		}
-
-		if (fallthrough_address == 0) {
-			// Non-predicated Direct
+		
+		if (target_block == fallthrough_block) {
 			bcc.builder.CreateBr(target_block);
 		} else {
-			// Predicated Direct
-			Value *target_match = bcc.builder.CreateICmpEQ(bcc.builder.CreateAnd(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), 0xfff), bcc.rcc.constu32(target_address & 0xfff));
-			bcc.builder.CreateCondBr(target_match, target_block, fallthrough_block);
+			if (fallthrough_address == 0) {
+				// Non-predicated Direct
+				bcc.builder.CreateBr(target_block);
+			} else {
+				// Predicated Direct
+				Value *target_match = bcc.builder.CreateICmpEQ(bcc.builder.CreateAnd(bcc.builder.CreateLoad(bcc.rcc.pc_ptr), 0xfff), bcc.rcc.constu32(target_address & 0xfff));
+				bcc.builder.CreateCondBr(target_match, target_block, fallthrough_block);
+			}
 		}
-
+		
 		return true;
 	}
 
@@ -1173,15 +1192,29 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 
 	case IRInstruction::ADC_WITH_FLAGS:
 	{
+		/*std::vector<Type *> args;
+		args.push_back(bcc.rcc.types.i32);
+
+		FunctionType *iaty = FunctionType::get(bcc.rcc.types.voidty, args, false);
+		InlineAsm* ia = InlineAsm::get(iaty, "int $$0x85", "{bx},~{dirflag},~{fpsr},~{flags}", true);
+
+		CallInst* iac = bcc.builder.CreateCall(ia, bcc.rcc.consti32(1));
+		iac->setCallingConv(CallingConv::C);
+		iac->setTailCall(false);*/
+
+		std::vector<Type *> rets;
+		rets.push_back(bcc.rcc.types.i16);		
+		rets.push_back(bcc.rcc.types.i32);
+		
+		StructType *adc_with_flags_ret_type = StructType::get(bcc.rcc.ctx, rets, false);
+		
 		std::vector<Type *> params;
-		params.push_back(type_for_operand(bcc, op0, false));
-		params.push_back(type_for_operand(bcc, op1, false));
-		params.push_back(type_for_operand(bcc, op2, false));
+		params.push_back(bcc.rcc.types.i8);
+		params.push_back(bcc.rcc.types.i32);
+		params.push_back(bcc.rcc.types.i32);
 
-		FunctionType *fntype = FunctionType::get(type_for_operand(bcc, op3, false), params, false);
-		Constant *fn = bcc.builder.GetInsertBlock()->getParent()->getParent()->getOrInsertFunction("genc_adc_flags", fntype);
-
-		assert(fn);
+		FunctionType *adc_with_flags_type = FunctionType::get(adc_with_flags_ret_type, params, false);
+		InlineAsm *adc_with_flags = InlineAsm::get(adc_with_flags_type, "mov $$0xff, %al\nadd $2, %al\nadc $3, $1\nlahf\nseto %al", "={ax},=r,r,r,1,~{al},~{dirflag},~{fpsr},~{flags}", true);
 
 		Value *lhs = value_for_operand(bcc, op0);
 		Value *rhs = value_for_operand(bcc, op1);
@@ -1189,9 +1222,24 @@ bool LLVMJIT::lower_instruction(BlockCompilationContext& bcc, const shared::IRIn
 		Value *result = vreg_for_operand(bcc, op3);
 
 		assert(lhs && rhs && carry_in && result);
+		
+		if (lhs->getType() != bcc.rcc.types.i32) {
+			lhs = bcc.builder.CreateCast(Instruction::ZExt, lhs, bcc.rcc.types.i32);
+		}
 
-		Value *r = bcc.builder.CreateCall3(fn, lhs, rhs, carry_in);
-		bcc.builder.CreateStore(r, result);
+		if (rhs->getType() != bcc.rcc.types.i32) {
+			rhs = bcc.builder.CreateCast(Instruction::ZExt, rhs, bcc.rcc.types.i32);
+		}
+
+		if (carry_in->getType() != bcc.rcc.types.i8) {
+			rhs = bcc.builder.CreateCast(Instruction::Trunc, rhs, bcc.rcc.types.i8);
+		}
+
+		CallInst *adc_with_flags_result = bcc.builder.CreateCall3(adc_with_flags, carry_in, lhs, rhs);
+		adc_with_flags_result->setCallingConv(CallingConv::C);
+		adc_with_flags_result->setTailCall(false);
+		
+		bcc.builder.CreateStore(bcc.builder.CreateExtractValue(adc_with_flags_result, 0), result);
 		return true;
 	}
 

@@ -6,13 +6,11 @@
 // output: SZ0A0P1C0000000V
 .globl genc_adc_flags
 genc_adc_flags:
-	mov %edi, %r11d
-	// set carry flag and clear ecx
 	movb $0xff, %al
 	addb %dl, %al
 
 	// perform add with carry
-	adc %esi, %r11d
+	adc %esi, %edi
 
 	// read out flags into correct format
 	lahf

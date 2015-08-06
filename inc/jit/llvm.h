@@ -75,6 +75,7 @@ namespace captive {
 				llvm::BasicBlock *exit_handle_block;
 				llvm::BasicBlock *dispatch_block;
 				llvm::BasicBlock *alloca_block;
+				llvm::BasicBlock *chain_block;
 				
 				llvm::Value *jit_state;
 				llvm::Value *cpu_obj;

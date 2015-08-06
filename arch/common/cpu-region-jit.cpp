@@ -136,8 +136,8 @@ bool CPU::run_region_jit_safepoint()
 		if (rgn->txln) {
 			reset_trace = true;
 			
-			//auto ptr = region_txln_cache->entry_ptr(virt_pc >> 12);
-			//ptr->fn = (void *)rgn->txln;
+			auto ptr = region_txln_cache->entry_ptr(virt_pc >> 12);
+			ptr->fn = (void *)rgn->txln;
 			
 			rgn->txln(&jit_state);
 			if (virt_pc != read_pc()) continue;
@@ -146,7 +146,7 @@ bool CPU::run_region_jit_safepoint()
 		if (rgn->rwu == NULL) {
 			blk->exec_count++;
 
-			if (rgn->heat > 50)
+			if (rgn->heat > 20)
 				hot_regions.set(phys_pc >> 12, true);
 		}
 

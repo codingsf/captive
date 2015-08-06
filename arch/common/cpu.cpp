@@ -43,7 +43,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	
 	jit_state.block_txln_cache = block_txln_cache->ptr();
 	
-	if (_per_cpu_data->execution_mode == 3) { // if we're a region jit
+	if (_per_cpu_data->execution_mode == 2) { // If we're a region jit
 		jit_state.region_txln_cache = region_txln_cache->ptr();
 	} else {
 		jit_state.region_txln_cache = NULL;

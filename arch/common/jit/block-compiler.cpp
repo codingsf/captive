@@ -26,7 +26,7 @@ using namespace captive::shared;
  *
  * RAX  Allocatable			0
  * RBX  Not used			1
- * RCX  Temporary			t0
+ * RCX  Temporary				t0
  * RDX  Allocatable			2
  * RSI  Allocatable			3
  * RDI  Register File
@@ -36,8 +36,8 @@ using namespace captive::shared;
  * R11  Allocatable			7
  * R12  Not used
  * R13  Allocatable			8
- * R14  Temporary			t1
- * R15  Register File
+ * R14  Temporary				t1
+ * R15  Temporary				t2
  * FS	Base Pointer to JIT STATE structure
  */
 
