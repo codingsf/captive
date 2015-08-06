@@ -56,6 +56,7 @@ namespace captive {
 				bool peeplower(uint32_t max_stack);
 				bool lower_stack_to_reg();
 				bool constant_prop();
+				bool reorder_blocks();
 
 				void dump_ir();
 

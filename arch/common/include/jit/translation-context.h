@@ -73,6 +73,9 @@ namespace captive {
 				
 				inline void set_ir_buffer(shared::IRInstruction *new_buffer) { _ir_insns = new_buffer; }
 				
+				// TODO: if !NDEBUG, check that max block is actually the max block number
+				void recount_blocks(uint32_t max_block) { _ir_block_count = max_block; }
+				
 			private:
 				shared::IRBlockId _current_block_id;
 				

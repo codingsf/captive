@@ -1,9 +1,11 @@
 #include <jit/block-compiler.h>
 #include <jit/ir-sorter.h>
+
+#include <algorithm>
 #include <set>
 #include <list>
 #include <map>
-
+#include <queue>
 
 #include <small-set.h>
 #include <maybe-set.h>
@@ -68,6 +70,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	tick_timer timer(0);
 
 	timer.reset();
+	if (!reorder_blocks()) return false;
+	timer.tick("Reorder");
 	if (!thread_jumps()) return false;
 	timer.tick("JT");
 	if (!dbe()) return false;
@@ -100,11 +104,15 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	}
 	timer.tick("Lower");
 
-	timer.dump();
+	timer.dump("compile ");
 
+	size_t aligned_fn = (size_t)malloc(encoder.get_buffer_size()+16);
+	if(aligned_fn & 0xf) aligned_fn += 16;
+	aligned_fn &= ~0xf;
+	fn = (block_txln_fn)aligned_fn;
+	memcpy((void*)fn, (void*)encoder.get_buffer(), encoder.get_buffer_size());
+	encoder.destroy_buffer();
 	
-
-	fn = (block_txln_fn)encoder.get_buffer();
 	return true;
 }
 
@@ -267,8 +275,6 @@ bool BlockCompiler::peephole()
 			}
 			break;
 
-		case IRInstruction::JMP:
-		case IRInstruction::BRANCH:
 		case IRInstruction::RET:
 		case IRInstruction::DISPATCH:
 		case IRInstruction::READ_MEM:
@@ -623,7 +629,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			if (allocation[in] == -1 && global_allocation.count(in) == 0) {
 				int32_t next_reg = avail_regs.next_avail();
 
-				if (avail_regs.next_avail() == -1) {
+				if (next_reg == -1) {
 					global_allocation[in] = next_global;
 					next_global += 8;
 					if(max_stack < next_global) max_stack = next_global;
@@ -641,7 +647,6 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 		bool not_dead = false;
 		bool can_be_dead = !descr->has_side_effects;
 
-//		printf("About to fuck up %10s\n", insn_descriptors[insn->type].mnemonic);
 		// Loop over operands to update the allocation information on VREG operands.
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
@@ -659,8 +664,6 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 					// Otherwise, if the value has been locally allocated, fill in the local allocation
 					//auto alloc_reg = allocation.find((IRRegId)oper->value);
-
-	//				printf("Operand %u (%u) is %c and is live out:%u\n", op_idx, oper->value, descr->format[op_idx], live_outs.count(oper->value));
 
 					if (allocation[oper->value] != -1) {
 						oper->allocate(IROperand::ALLOCATED_REG, allocation[oper->value]);
@@ -1043,8 +1046,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	bool success = true;
 	X86Register& guest_regs_reg = REGSTATE_REG;
 
-	std::map<uint32_t, IRBlockId> block_relocations;
-	std::map<IRBlockId, uint32_t> native_block_offsets;
+	std::vector<std::pair<uint32_t, IRBlockId> > block_relocations;
+	block_relocations.reserve(ctx.block_count());
+	std::vector<uint32_t> native_block_offsets (ctx.block_count(), 0);
 	
 	// Function prologue
 	encoder.push(REG_R15);
@@ -1425,7 +1429,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				uint32_t reloc_offset;
 				encoder.jmp_reloc(reloc_offset);
 
-				block_relocations[reloc_offset] = target->value;
+				block_relocations.push_back({reloc_offset, target->value});
 
 				encoder.align_up(8);
 			}
@@ -1453,7 +1457,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					IRBlockId target = cond->value ? tt->value : ft->value;
 					uint32_t reloc_offset;
 					encoder.jmp_reloc(reloc_offset);
-					block_relocations[reloc_offset] = target;
+					block_relocations.push_back({reloc_offset, target});
 					
 					encoder.align_up(8);
 					break;
@@ -1468,27 +1472,27 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				{
 					uint32_t reloc_offset;
 					encoder.jz_reloc(reloc_offset);
-					block_relocations[reloc_offset] = ft->value;
+					block_relocations.push_back({reloc_offset, ft->value});
 				}
 			} else if (next_insn && next_insn->ir_block == (IRBlockId)ft->value) {
 				// Fallthrough is FALSE block
 				{
 					uint32_t reloc_offset;
 					encoder.jnz_reloc(reloc_offset);
-					block_relocations[reloc_offset] = tt->value;
+					block_relocations.push_back({reloc_offset, tt->value});
 				}
 			} else {
 				// Fallthrough is NEITHER
 				{
 					uint32_t reloc_offset;
 					encoder.jnz_reloc(reloc_offset);
-					block_relocations[reloc_offset] = tt->value;
+					block_relocations.push_back({reloc_offset, tt->value});
 				}
 
 				{
 					uint32_t reloc_offset;
 					encoder.jmp_reloc(reloc_offset);
-					block_relocations[reloc_offset] = ft->value;
+					block_relocations.push_back({reloc_offset, ft->value});
 				}
 
 				encoder.align_up(8);
@@ -2159,13 +2163,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					{
 						uint32_t reloc_offset;
 						encoder.je_reloc(reloc_offset);
-						block_relocations[reloc_offset] = tt->value;
+						block_relocations.push_back({reloc_offset, tt->value});
 					}
 
 					{
 						uint32_t reloc_offset;
 						encoder.jmp_reloc(reloc_offset);
-						block_relocations[reloc_offset] = ft->value;
+						block_relocations.push_back({reloc_offset, ft->value});
 					}
 				} else {
 					encoder.sete(register_from_operand(dest));
@@ -2461,7 +2465,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+//	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	
 	return success;
 }
@@ -2498,6 +2502,41 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 	}
 }
 
+static void dump_insn(IRInstruction *insn) {
+	assert(insn->type < ARRAY_SIZE(insn_descriptors));
+	const struct insn_descriptor *descr = &insn_descriptors[insn->type];
+
+	printf("  %12s", descr->mnemonic);
+
+	for (int op_idx = 0; op_idx < 6; op_idx++) {
+		IROperand *oper = &insn->operands[op_idx];
+
+		if (descr->format[op_idx] != 'X') {
+			if (descr->format[op_idx] == 'M' && !oper->is_valid()) continue;
+
+			if (op_idx > 0) printf(", ");
+
+			if (oper->is_vreg()) {
+				printf("i%d r%d(%c%d)",
+					oper->size,
+					oper->value,
+					oper->alloc_mode == IROperand::NOT_ALLOCATED ? 'N' : (oper->alloc_mode == IROperand::ALLOCATED_REG ? 'R' : (oper->alloc_mode == IROperand::ALLOCATED_STACK ? 'S' : '?')),
+					oper->alloc_data);
+			} else if (oper->is_constant()) {
+				printf("i%d $0x%lx", oper->size, oper->value);
+			} else if (oper->is_pc()) {
+				printf("i4 pc (%08x)", oper->value);
+			} else if (oper->is_block()) {
+				printf("b%d", oper->value);
+			} else if (oper->is_func()) {
+				printf("&%x", oper->value);
+			} else {
+				printf("<invalid>");
+			}
+		}
+	}
+}
+
 void BlockCompiler::dump_ir()
 {
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
@@ -2505,43 +2544,12 @@ void BlockCompiler::dump_ir()
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
 
-		assert(insn->type < ARRAY_SIZE(insn_descriptors));
-		const struct insn_descriptor *descr = &insn_descriptors[insn->type];
-
 		if (current_block_id != insn->ir_block) {
 			current_block_id = insn->ir_block;
 			printf("block %d:\n", current_block_id);
 		}
 
-		printf("  %12s", descr->mnemonic);
-
-		for (int op_idx = 0; op_idx < 6; op_idx++) {
-			IROperand *oper = &insn->operands[op_idx];
-
-			if (descr->format[op_idx] != 'X') {
-				if (descr->format[op_idx] == 'M' && !oper->is_valid()) continue;
-
-				if (op_idx > 0) printf(", ");
-
-				if (oper->is_vreg()) {
-					printf("i%d r%d(%c%d)",
-						oper->size,
-						oper->value,
-						oper->alloc_mode == IROperand::NOT_ALLOCATED ? 'N' : (oper->alloc_mode == IROperand::ALLOCATED_REG ? 'R' : (oper->alloc_mode == IROperand::ALLOCATED_STACK ? 'S' : '?')),
-						oper->alloc_data);
-				} else if (oper->is_constant()) {
-					printf("i%d $0x%lx", oper->size, oper->value);
-				} else if (oper->is_pc()) {
-					printf("i4 pc (%08x)", oper->value);
-				} else if (oper->is_block()) {
-					printf("b%d", oper->value);
-				} else if (oper->is_func()) {
-					printf("&%x", oper->value);
-				} else {
-					printf("<invalid>");
-				}
-			}
-		}
+		dump_insn(insn);
 
 		printf("\n");
 	}
@@ -2593,13 +2601,9 @@ bool BlockCompiler::lower_stack_to_reg()
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx)
 	{
 		IRInstruction *insn = ctx.at(ir_idx);
-		/*
-		if(insn->type == IRInstruction::BARRIER) {
-			lowered_entries.clear();
-			avail_phys_regs = used_phys_regs;
-			avail_phys_regs.invert();
-		}
-		*/
+		
+		// Don't need to do any clever allocation here since the stack entries should already be re-used
+		
 		for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
 			IROperand &op = insn->operands[op_idx];
 			if(!op.is_valid()) break;
@@ -2666,6 +2670,115 @@ bool BlockCompiler::constant_prop()
 			}
 		}
 	}
+	
+	return true;
+}
+
+bool BlockCompiler::reorder_blocks()
+{
+	tick_timer timer(0);
+	timer.reset();
+	
+	std::vector<IRBlockId> reordering (ctx.block_count(), NOP_BLOCK);
+	std::vector<std::pair<IRBlockId, IRBlockId> > block_targets (ctx.block_count(), { NOP_BLOCK, NOP_BLOCK} );
+	
+	timer.tick("Init");
+		
+	// build a simple cfg
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		
+		switch(insn->type) {
+			case IRInstruction::JMP:
+				block_targets[insn->ir_block] = { insn->operands[0].value, insn->operands[0].value };
+				break;
+			case IRInstruction::BRANCH:
+				block_targets[insn->ir_block] = { insn->operands[1].value, insn->operands[2].value };
+				break;
+			case IRInstruction::RET:
+			case IRInstruction::DISPATCH:
+				block_targets[insn->ir_block] = { NOP_BLOCK, NOP_BLOCK };
+				break;
+			default:
+				break;
+		}
+	}
+	
+	timer.tick("CFG");
+	
+	// For each block, figure out the maximum number of predecessors which it has
+	std::vector<uint32_t> max_depth (ctx.block_count(), 0);
+	std::vector<IRBlockId> work_list;
+	
+	work_list.reserve(10);
+	work_list.push_back(0);
+	while(work_list.size()) {
+		IRBlockId block = work_list.back();
+		work_list.pop_back();
+		
+		if(block == NOP_BLOCK) continue;
+		
+		uint32_t my_max_depth = max_depth[block];
+		IRBlockId first_target = block_targets[block].first;
+		IRBlockId second_target = block_targets[block].second;
+		
+		if(first_target != NOP_BLOCK) {
+			uint32_t prev_max_depth = max_depth[block_targets[block].first];
+			if(prev_max_depth < my_max_depth+1) {
+				max_depth[block_targets[block].first] = my_max_depth+1;
+				work_list.push_back(block_targets[block].first);
+			}
+		}
+		
+		if(second_target != NOP_BLOCK) {
+			uint32_t prev_max_depth = max_depth[block_targets[block].second];
+			if(prev_max_depth < my_max_depth+1) {
+				max_depth[block_targets[block].second] = my_max_depth+1;
+				work_list.push_back(block_targets[block].second);
+			}
+		}
+	}
+	
+	timer.tick("Analyse");
+	
+	// Oh god what have I done
+	auto comp = [&max_depth] (IRBlockId a, IRBlockId b) -> bool { return max_depth[a] < max_depth[b]; };
+	
+	std::vector<IRBlockId> queue;
+	queue.reserve(ctx.block_count());
+	for(unsigned int i = 0; i < ctx.block_count(); ++i) {
+		queue.push_back(i);
+	}
+	//queue.insert(queue.begin(), blocks.begin(), blocks.end());
+
+	std::sort(queue.begin(), queue.end(), comp);
+	
+	for(int i = 0; i < queue.size(); ++i) {
+		reordering[queue[i]] = i;
+	}
+	
+	timer.tick("Sort");
+	
+	// FINALLY actually assign the new block ordering
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
+		insn->ir_block = reordering[insn->ir_block];
+		
+		if(insn->type == IRInstruction::JMP) {
+			insn->operands[0].value = reordering[insn->operands[0].value];
+		}
+		if(insn->type == IRInstruction::BRANCH) {
+			insn->operands[1].value = reordering[insn->operands[1].value];
+			insn->operands[2].value = reordering[insn->operands[2].value];
+		}
+		
+	}
+	
+	ctx.recount_blocks(queue.size());
+	
+	timer.tick("Assign");
+	timer.dump("Reorder ");
 	
 	return true;
 }

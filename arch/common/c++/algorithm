@@ -830,12 +830,6 @@ namespace std{
 		sort(first, last, c );
 	}
 
-	template<class RandomAccessIterator, class Compare> _UCXXEXPORT
-		void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
-	{
-		stable_sort(first, last, comp);
-	}
-
 	template<class RandomAccessIterator> _UCXXEXPORT
 		void stable_sort(RandomAccessIterator first, RandomAccessIterator last)
 	{
@@ -859,6 +853,36 @@ namespace std{
 			}
 			++first;
 		}
+	}
+
+	template<class RandomAccessIterator, class Compare> _UCXXEXPORT
+		void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
+	{
+		// Quicksort using Hoare partition scheme
+		
+		if(last >= first) return;
+		
+		RandomAccessIterator pivot = last-1;
+		
+		RandomAccessIterator i = first-1, j=last-1;
+		
+		while(true) {
+			do {
+				i++;
+			} while(comp(*i, *pivot));
+			do {
+				j--;
+			} while(!comp(*j, *pivot));
+			
+			if(i < j) std::swap(*i, *j);
+			else {
+				std::swap(*i, *(last-1));
+				break;
+			}
+		}
+		
+		sort(first, i-1, comp);
+		sort(i+1, last, comp);
 	}
 
 	template<class RandomAccessIterator> _UCXXEXPORT

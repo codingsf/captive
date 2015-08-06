@@ -48,10 +48,10 @@ namespace captive {
 
 			struct X86Memory
 			{
-				uint8_t scale;
 				const X86Register& index;
 				const X86Register& base;
 				int32_t displacement;
+				uint8_t scale;
 
 				X86Memory(const X86Register& _base) : scale(0), index(REG_RIZ), base(_base), displacement(0) { }
 				X86Memory(const X86Register& _base, int32_t disp) : scale(0), index(REG_RIZ), base(_base), displacement(disp) { }
@@ -87,7 +87,7 @@ namespace captive {
 				inline uint8_t *get_buffer() { return _buffer; }
 				inline uint32_t get_buffer_size() { return _write_offset; }
 
-				inline void destroy_buffer() { if (_buffer) captive::arch::free(_buffer); }
+				inline void destroy_buffer() { if (_buffer) captive::arch::free(_buffer); _buffer = NULL; }
 
 				void call(const X86Register& reg);
 

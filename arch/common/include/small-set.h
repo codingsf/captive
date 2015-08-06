@@ -122,6 +122,10 @@ public:
 		}
 	}
 	
+	void erase(iterator it) {
+		_populated.clear(it._ptr);
+	}
+	
 	void clear() {
 		_populated.clear();
 	}
