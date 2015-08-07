@@ -259,7 +259,7 @@ void X86Encoder::cltq()
 
 void X86Encoder::andd(uint32_t val, uint8_t size, const X86Memory& dst)
 {
-	assert(false);
+	encode_arithmetic(4, val, size, dst);
 }
 
 void X86Encoder::andd(uint32_t val, const X86Register& dst)
@@ -337,7 +337,7 @@ void X86Encoder::orr(const X86Memory& src, const X86Register& dest)
 
 void X86Encoder::xorr(uint32_t val, uint8_t size, const X86Memory& dst)
 {
-	assert(false);
+	encode_arithmetic(6, val, size, dst);
 }
 
 void X86Encoder::xorr(uint32_t val, const X86Register& dst)
@@ -545,6 +545,26 @@ void X86Encoder::add(uint32_t val, const X86Register& dst)
 	encode_arithmetic(0, val, dst);
 }
 
+void X86Encoder::add(const X86Register& src, const X86Memory& dst)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x0, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x1, src, dst);
+	}
+}
+
+void X86Encoder::add(uint32_t val, uint8_t size, const X86Memory& dst)
+{
+	if (val < 127) {
+		encode_opcode_mod_rm(0x83, 0, size, dst);
+		emit8(val);
+	} else {
+		encode_opcode_mod_rm(0x81, 0, size, dst);
+		emit32(val);
+	}
+}
+
 void X86Encoder::add4(uint32_t val, const X86Memory& dst)
 {
 	if (val < 127) {
@@ -585,9 +605,29 @@ void X86Encoder::sub(const X86Memory& src, const X86Register& dst)
 	}
 }
 
+void X86Encoder::sub(const X86Register& src, const X86Memory& dst)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x28, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x29, src, dst);
+	}
+}
+
 void X86Encoder::sub(uint32_t val, const X86Register& dst)
 {
 	encode_arithmetic(5, val, dst);
+}
+
+void X86Encoder::sub(uint32_t val, uint8_t size, const X86Memory& dst)
+{
+	if (val < 127) {
+		encode_opcode_mod_rm(0x83, 5, size, dst);
+		emit8(val);
+	} else {
+		encode_opcode_mod_rm(0x81, 5, size, dst);
+		emit32(val);
+	}
 }
 
 void X86Encoder::mul(const X86Register& src, const X86Register& dst)

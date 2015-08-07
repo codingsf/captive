@@ -159,12 +159,16 @@ namespace captive {
 				void add(const X86Register& src, const X86Register& dst);
 				void add(const X86Memory& src, const X86Register& dst);
 				void add(uint32_t val, const X86Register& dst);
+				void add(uint32_t val, uint8_t size, const X86Memory& dst);
+				void add(const X86Register& src, const X86Memory& dst);
 				void add4(uint32_t val, const X86Memory& dst);
 				void add8(uint32_t val, const X86Memory& dst);
 
 				void sub(const X86Register& src, const X86Register& dst);
 				void sub(const X86Memory& src, const X86Register& dst);
+				void sub(const X86Register& src, const X86Memory& dst);
 				void sub(uint32_t val, const X86Register& dst);
+				void sub(uint32_t val, uint8_t size, const X86Memory& dst);
 
 				void mul(const X86Register& src, const X86Register& dst);
 				void div(const X86Register& divisor);
