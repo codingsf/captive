@@ -78,6 +78,7 @@ trap_macro unk,0
 trap_macro unk_arg,1
 trap_macro gpf,1
 trap_macro irq,0
+trap_macro illegal,0
 
 .global trap_pf
 .extern interrupt_restore_safepoint

@@ -91,6 +91,13 @@ static void init_irqs()
 	apic_write(TPR, 0);
 }
 
+extern void foo(void);
+
+namespace captive { namespace arch {
+extern int do_device_read(struct mcontext *);
+extern int do_device_write(struct mcontext *);
+} }
+
 extern "C" {
 	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{
@@ -107,7 +114,7 @@ extern "C" {
 
 		// Initialise the malloc() memory allocation system.
 		captive::arch::malloc_init(cpu_data->guest_data->heap);
-
+		
 		// Initialise the memory manager.
 		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
 
@@ -190,6 +197,15 @@ extern "C" {
 		case 0x200 ... 0x2ff:
 			cpu->handle_irq_rescinded(cpu->cpu_data().signal_code & 0xff);
 			break;
+		}
+	}
+	
+	int handle_trap_illegal(struct mcontext *mctx)
+	{
+		switch (*(uint8_t *)mctx->rip) {
+		case 0xc4: return captive::arch::do_device_read(mctx);
+		case 0xc5: return captive::arch::do_device_write(mctx);
+		default: fatal("illegal instruction\n");
 		}
 	}
 

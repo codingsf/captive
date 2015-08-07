@@ -139,6 +139,8 @@ static X86InstructionPrefixes read_prefixes(const uint8_t **code)
 		case 0x4e: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_R | REX_X); break;
 		case 0x4f: p = (X86InstructionPrefixes)(p | REX | REX_W | REX_R | REX_X | REX_B); break;
 		
+		case 0xc4: case 0xc5: p = (X86InstructionPrefixes)(p | ADDRESS_SIZE_OVERRIDE); break;
+		
 		default: prefixes_complete = true; continue;
 		}
 

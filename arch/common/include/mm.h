@@ -185,6 +185,10 @@ namespace captive {
 				write_cr4(cr4 & ~(1 << 7));
 				write_cr4(cr4);
 			}
+			
+			static inline void wbinvd() {
+				asm volatile("wbinvd" ::: "memory");
+			}
 
 			#define BITS(val, start, end) ((((uint64_t)val) >> start) & (((1 << (end - start + 1)) - 1)))
 

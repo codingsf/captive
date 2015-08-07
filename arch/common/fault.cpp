@@ -9,38 +9,173 @@ using namespace captive::arch;
 
 static inline void __out32(uint32_t address, uint32_t value)
 {
-	asm("outl %0, $0xf0\n" :: "a"(value), "d"(address));
+	asm volatile("outl %0, $0xf0\n" :: "a"(value), "d"(address));
 }
 
 static inline void __out16(uint32_t address, uint16_t value)
 {
-	asm("outw %0, $0xf0\n" :: "a"(value), "d"(address));
+	asm volatile("outw %0, $0xf0\n" :: "a"(value), "d"(address));
 }
 
 static inline void __out8(uint32_t address, uint8_t value)
 {
-	asm("outb %0, $0xf0\n" :: "a"(value), "d"(address));
+	asm volatile("outb %0, $0xf0\n" :: "a"(value), "d"(address));
 }
 
 static inline uint32_t __in32(uint32_t address)
 {
 	uint32_t value;
-	asm("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
+	asm volatile("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
 	return value;
 }
 
 static inline uint16_t __in16(uint32_t address)
 {
-	uint32_t value;
-	asm("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
-	return (uint16_t)value;
+	uint16_t value;
+	asm volatile("inw $0xf0, %0\n" : "=a"(value) : "d"(address));
+	return value;
 }
 
 static inline uint8_t __in8(uint32_t address)
 {
-	uint32_t value;
-	asm("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
-	return (uint8_t)value;
+	uint8_t value;
+	asm volatile("inb $0xf0, %0\n" : "=a"(value) : "d"(address));
+	return value;
+}
+
+namespace captive { namespace arch {
+int do_device_read(struct mcontext *mctx)
+{
+	captive::arch::x86::MemoryInstruction inst;
+	x86::decode_memory_instruction((const uint8_t *)mctx->rip, inst);
+	mctx->rip += inst.length;
+	
+	assert(inst.Source.type == x86::Operand::TYPE_MEMORY);
+
+	uint32_t va = inst.Source.mem.displacement;
+	switch (inst.Source.mem.base_reg_idx) {
+	case x86::Operand::R_EAX: va += (uint32_t)mctx->rax; break;
+	case x86::Operand::R_EBX: va += (uint32_t)mctx->rbx; break;
+	case x86::Operand::R_ECX: va += (uint32_t)mctx->rcx; break;
+	case x86::Operand::R_EDX: va += (uint32_t)mctx->rdx; break;
+	default: fatal("unhandled base register %s for device read\n", x86::x86_register_names[inst.Source.mem.base_reg_idx]);
+	}
+
+	gpa_t pa;
+	MMU::resolution_fault fault;
+	MMU::access_info info;
+
+	info.type = MMU::ACCESS_READ;
+	info.mode = CPU::get_active_cpu()->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+
+	CPU::get_active_cpu()->mmu().resolve_gpa(va, pa, info, fault, true);
+	if (fault) {
+		printf("read @ %p va=%x fault=%d\n", mctx->rip - 2, va, fault);
+		return (int)fault;
+	}
+
+	uint32_t value = __in32(pa);
+	//printf("F read  @ %016lx addr=%08x val=%08x\n", mctx->rip - 2, pa, value);
+
+	switch (inst.Dest.reg) {
+	case x86::Operand::R_EAX: mctx->rax = value; break;
+	case x86::Operand::R_EBX: mctx->rbx = value; break;
+	case x86::Operand::R_ECX: mctx->rcx = value; break;
+	case x86::Operand::R_EDX: mctx->rdx = value; break;
+	case x86::Operand::R_ESI: mctx->rsi = value; break;
+	case x86::Operand::R_EDI: mctx->rdi = value; break;
+
+	case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (value & 0xffff); break;
+	case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (value & 0xffff); break;
+	case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (value & 0xffff); break;
+	case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (value & 0xffff); break;
+	case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (value & 0xffff); break;
+	case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (value & 0xffff); break;
+
+	case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (value & 0xff); break;
+	case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (value & 0xff); break;
+	case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (value & 0xff); break;
+	case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (value & 0xff); break;
+
+	default: fatal("unhandled dest register %s for device read\n", x86::x86_register_names[inst.Dest.reg]);
+	}
+
+	return 0;
+}
+
+int do_device_write(struct mcontext *mctx)
+{
+	captive::arch::x86::MemoryInstruction inst;
+	x86::decode_memory_instruction((const uint8_t *)mctx->rip, inst);
+	mctx->rip += inst.length;
+
+	assert(inst.Dest.type == x86::Operand::TYPE_MEMORY);
+
+	uint32_t va = inst.Dest.mem.displacement;
+	switch (inst.Dest.mem.base_reg_idx) {
+	case x86::Operand::R_EAX: va += (uint32_t)mctx->rax; break;
+	case x86::Operand::R_EBX: va += (uint32_t)mctx->rbx; break;
+	case x86::Operand::R_ECX: va += (uint32_t)mctx->rcx; break;
+	case x86::Operand::R_EDX: va += (uint32_t)mctx->rdx; break;
+	default: fatal("unhandled base register %s for device write\n", x86::x86_register_names[inst.Dest.mem.base_reg_idx]);
+	}
+
+	gpa_t pa;
+	MMU::resolution_fault fault;
+	MMU::access_info info;
+
+	info.type = MMU::ACCESS_WRITE;
+	info.mode = CPU::get_active_cpu()->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+
+	CPU::get_active_cpu()->mmu().resolve_gpa(va, pa, info, fault, true);
+	if (fault) {
+		printf("write @ %p va=%x fault=%d\n", mctx->rip - 2, va, fault);
+		return (int)fault;
+	}
+
+	switch (inst.Source.reg) {
+	case x86::Operand::R_EAX: __out32(pa, mctx->rax); break;
+	case x86::Operand::R_EBX: __out32(pa, mctx->rbx); break;
+	case x86::Operand::R_ECX: __out32(pa, mctx->rcx); break;
+	case x86::Operand::R_EDX: __out32(pa, mctx->rdx); break;
+	case x86::Operand::R_ESI: __out32(pa, mctx->rsi); break;
+	case x86::Operand::R_EDI: __out32(pa, mctx->rdi); break;
+
+	case x86::Operand::R_AX: __out16(pa, mctx->rax); break;
+	case x86::Operand::R_BX: __out16(pa, mctx->rbx); break;
+	case x86::Operand::R_CX: __out16(pa, mctx->rcx); break;
+	case x86::Operand::R_DX: __out16(pa, mctx->rdx); break;
+	case x86::Operand::R_SI: __out16(pa, mctx->rsi); break;
+	case x86::Operand::R_DI: __out16(pa, mctx->rdi); break;
+
+	case x86::Operand::R_AL: __out8(pa, mctx->rax); break;
+	case x86::Operand::R_BL: __out8(pa, mctx->rbx); break;
+	case x86::Operand::R_CL: __out8(pa, mctx->rcx); break;
+	case x86::Operand::R_DL: __out8(pa, mctx->rdx); break;
+	case x86::Operand::R_SIL: __out8(pa, mctx->rsi); break;
+	case x86::Operand::R_DIL: __out8(pa, mctx->rdi); break;
+
+	default: fatal("unhandled source register %s for device write\n", x86::x86_register_names[inst.Source.reg]);
+	}
+
+	return 0;
+}
+} }
+
+static void rewrite_device_access(uint64_t rip, uint8_t *code, const captive::arch::x86::MemoryInstruction& inst)
+{
+	if (inst.length < 2) return;
+	
+	bool is_device_read = inst.Dest.type == x86::Operand::TYPE_REGISTER;
+	
+	if (code[0] == 0x67) {
+		code[0] = is_device_read ? 0xc4 : 0xc5;
+	} else if (code[1] == 0x67) {
+		code[1] = code[0];
+		code[0] = is_device_read ? 0xc4 : 0xc5;
+	} else {
+		return;
+	}
 }
 
 static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr)
@@ -111,6 +246,10 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		fatal("illegal combination of operands for memory instruction\n");
 	}
 
+	if ((int64_t)mctx->rip > 0) {
+		rewrite_device_access(mctx->rip, (uint8_t *)mctx->rip, inst);
+	}
+	
 	// Skip over the instruction
 	mctx->rip += inst.length;
 }

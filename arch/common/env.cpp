@@ -13,6 +13,7 @@ extern "C" void trap_unk_arg(struct mcontext *);
 extern "C" void trap_pf(struct mcontext *);
 extern "C" void trap_gpf(struct mcontext *);
 extern "C" void trap_signal(struct mcontext *);
+extern "C" void trap_illegal(struct mcontext *);
 
 extern "C" void int80_handler(struct mcontext *);
 extern "C" void int81_handler(struct mcontext *);
@@ -105,6 +106,7 @@ void Environment::install_idt()
 	set_idt(&idt[0x1e], trap_unk_arg);
 
 	// Fault Handlers
+	set_idt(&idt[0x06], trap_illegal);
 	set_idt(&idt[0x0d], trap_gpf);
 	set_idt(&idt[0x0e], trap_pf);
 
