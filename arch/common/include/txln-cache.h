@@ -41,18 +41,15 @@ namespace captive {
 						for (uint64_t entry = i * cache_entry_count; entry < (i+1) * cache_entry_count; ++entry) {
 							entry_ptr_clean(entry)->invalidate();
 						}
-
-						dirty_pages.reset(i);
 					}
 				}
-
-				assert(dirty_pages.count() == 0);
-				assert(dirty_pages.none());
+				
+				dirty_pages.reset();
 			}
 
 			void invalidate_entry(uint64_t entry_idx)
 			{
-				entry_ptr(entry_idx)->invalidate();
+				entry_ptr_clean(entry_idx)->invalidate();
 			}
 
 		private:
