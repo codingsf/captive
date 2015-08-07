@@ -190,7 +190,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		}
 
 #ifdef DEBUG_TRANSLATION
-		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, decode_data));
+		printf("jit: translating insn @ [%08x] %s\n", insn->pc, trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
 #endif
 
 		if (unlikely(cpu_data().verify_enabled)) {

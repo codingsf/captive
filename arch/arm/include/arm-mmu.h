@@ -40,6 +40,8 @@ namespace captive {
 			private:
 				devices::CoCo& _coco;
 				bool _enabled;
+				
+				inline ArmCPU& arm_cpu() const { return (ArmCPU&) cpu(); }
 
 				struct l1_descriptor {
 					uint32_t data;

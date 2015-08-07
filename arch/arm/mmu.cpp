@@ -143,8 +143,8 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 	//printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
 
 	if (likely(have_side_effects)) {
-		_coco.FSR(fsr);
-		_coco.FAR(va);
+		arm_cpu().state.regs.FSR = fsr;
+		arm_cpu().state.regs.FAR = va;
 	}
 
 	return true;
