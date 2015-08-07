@@ -14,6 +14,8 @@
 namespace captive {
 	namespace arch {
 		namespace x86 {
+			extern const char *x86_register_names[];
+			
 			struct MemoryInstruction
 			{
 				uint8_t length;

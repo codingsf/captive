@@ -43,6 +43,28 @@ MMU::~MMU()
 
 }
 
+void MMU::set_page_device(va_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+	pt->device(true);
+}
+
+bool MMU::is_page_device(va_t va)
+{
+	page_map_entry_t *pm;
+	page_dir_ptr_entry_t *pdp;
+	page_dir_entry_t *pd;
+	page_table_entry_t *pt;
+
+	Memory::get_va_table_entries(va, pm, pdp, pd, pt);
+	return pt->device();
+}
+
 void MMU::set_page_executed(va_t va)
 {
 	page_map_entry_t *pm;
@@ -252,6 +274,8 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pd->writable(true);
 	}
 
+	va_t va_for_gpa = (va_t)(0x100000000ULL | pt->base_address());
+
 	// If the fault happened because of a device access, catch this early
 	// before we go over the lookup rigmaroll.
 	if (pt->device()) {
@@ -267,12 +291,10 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pt->allow_user(true);
 		pt->writable(info.is_write());
 
-		if (is_device((gpa_t)va)) {
+		if (is_page_device(va_for_gpa)) {
 			pt->device(true);
 			pt->present(false);
-		}
 
-		if (pt->device()) {
 			out_pa = (gpa_t)va;
 			goto handle_device;
 		}
@@ -292,7 +314,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 			pt->allow_user(info.is_user());
 			pt->writable(info.is_write());
 
-			if (is_device(pa)) {
+			if (is_page_device(va_for_gpa)) {
 				pt->device(true);
 				pt->present(false);
 
@@ -312,8 +334,6 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	}
 
 	if (pt->present() && info.is_write()) {
-		va_t va_for_gpa = (va_t)(0x100000000ULL | pt->base_address());
-
 		if (clear_if_page_executed(va_for_gpa)) {
 			cpu().invalidate_translation((pa_t)pt->base_address(), (va_t)(uint64_t)va);
 		}
@@ -324,24 +344,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 
 handle_device:
 	fault = DEVICE_FAULT;
-
 	return true;
-}
-
-bool MMU::is_device(gpa_t gpa)
-{
-	if (gpa >= 0x101e0000 && gpa < 0x101e1000) return true;
-	if (gpa >= 0x101e2000 && gpa < 0x101e3000) return true;
-	if (gpa >= 0x101e3000 && gpa < 0x101e4000) return true;
-	if (gpa >= 0x10140000 && gpa < 0x10141000) return true;
-	if (gpa >= 0x10000000 && gpa < 0x10001000) return true;
-	if (gpa >= 0x10003000 && gpa < 0x10004000) return true;
-	if (gpa >= 0x10006000 && gpa < 0x10007000) return true;
-	if (gpa >= 0x10007000 && gpa < 0x10008000) return true;
-	if (gpa >= 0x101f1000 && gpa < 0x101f2000) return true;
-	if (gpa >= 0x11001000 && gpa < 0x11002000) return true;
-
-	return false;
 }
 
 bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)

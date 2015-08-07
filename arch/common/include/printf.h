@@ -18,6 +18,7 @@ namespace captive
 extern void printf_init(captive::MemoryVector&);
 
 extern int printf(const char *fmt, ...);
+extern int fatal(const char *fmt, ...) __attribute__((noreturn));
 extern int sprintf(char *buffer, const char *fmt, ...);
 extern int scatf(char *buffer, const char *fmt, ...);
 extern int snprintf(char *buffer, int size, const char *fmt, ...);

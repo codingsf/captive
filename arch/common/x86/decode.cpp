@@ -3,6 +3,87 @@
 
 using namespace captive::arch::x86;
 
+const char *captive::arch::x86::x86_register_names[] = {
+	"rax",		// 0
+	"rbx",
+	"rcx",
+	"rdx",
+	"rsp",
+	"rbp",
+	"rsi",
+	"rdi",
+
+	"eax",		// 8
+	"ebx",
+	"ecx",
+	"edx",
+	"esp",
+	"ebp",
+	"esi",
+	"edi",
+
+	"ax",		// 16
+	"bx",
+	"cx",
+	"dx",
+	"sp",
+	"bp",
+	"si",
+	"di",
+
+	"ah",		// 24
+	"bh",
+	"ch",
+	"dh",
+	"al",
+	"bl",
+	"cl",
+	"dl",
+
+	"spl",		// 32
+	"bpl",
+	"sil",
+	"dil",
+
+	"r8b",		// 36
+	"r9b",
+	"r10b",
+	"r11b",
+	"r12b",
+	"r13b",
+	"r14b",
+	"r15b",
+	
+	"r8w",		// 44
+	"r9w",
+	"r10w",
+	"r11w",
+	"r12w",
+	"r13w",
+	"r14w",
+	"r15w",
+
+	"r8d",		// 52
+	"r9d",
+	"r10d",
+	"r11d",
+	"r12d",
+	"r13d",
+	"r14d",
+	"r15d",
+
+	"r8",		// 60
+	"r9",
+	"r10",
+	"r11",
+	"r12",
+	"r13",
+	"r14",
+	"r15",
+
+	"riz"
+};
+
 enum X86InstructionPrefixes
 {
 	NONE = 0x00,

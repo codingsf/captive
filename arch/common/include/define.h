@@ -66,6 +66,8 @@ static inline __attribute__((noreturn)) void abort()
 	}
 }
 
+#define unreachable() __builtin_unreachable()
+
 static inline void __local_irq_enable()
 {
 	asm volatile("sti\n");

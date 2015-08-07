@@ -16,8 +16,6 @@ namespace captive {
 	namespace arch {
 		class CPU;
 
-		extern bool fast_handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr);
-		
 		class MMU
 		{
 		public:
@@ -70,6 +68,9 @@ namespace captive {
 			void clear_page_executed(va_t va);
 			bool is_page_executed(va_t va);
 			bool clear_if_page_executed(va_t va);
+			
+			void set_page_device(va_t va);
+			bool is_page_device(va_t va);
 
 			void set_page_dirty(va_t va, bool dirty);
 			bool is_page_dirty(va_t va);
@@ -95,8 +96,6 @@ namespace captive {
 			inline gpa_t hpa_to_gpa(pa_t gpa) const {
 				return (gpa_t)((uint64_t)gpa & 0xffffffffULL);
 			}
-
-			bool is_device(gpa_t gpa);
 		};
 	}
 }

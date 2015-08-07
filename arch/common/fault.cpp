@@ -7,74 +7,83 @@
 
 using namespace captive::arch;
 
+static inline void __out32(uint32_t address, uint32_t value)
+{
+	asm("outl %0, $0xf0\n" :: "a"(value), "d"(address));
+}
+
+static inline void __out16(uint32_t address, uint16_t value)
+{
+	asm("outw %0, $0xf0\n" :: "a"(value), "d"(address));
+}
+
+static inline void __out8(uint32_t address, uint8_t value)
+{
+	asm("outb %0, $0xf0\n" :: "a"(value), "d"(address));
+}
+
+static inline uint32_t __in32(uint32_t address)
+{
+	uint32_t value;
+	asm("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
+	return value;
+}
+
+static inline uint16_t __in16(uint32_t address)
+{
+	uint32_t value;
+	asm("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
+	return (uint16_t)value;
+}
+
+static inline uint8_t __in8(uint32_t address)
+{
+	uint32_t value;
+	asm("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
+	return (uint8_t)value;
+}
+
 static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr)
 {
-	if (fast_handle_device_fault(core, mctx, dev_addr)) return;
-	
-	/*printf("fault: device fault rip=%lx\n", mctx->rip);
+	//printf("fault: device fault rip=%lx\n", mctx->rip);
 
-	printf("code: ");
+	/*printf("code: ");
 	for (int i = 0; i < 8; i++) {
 		printf("%02x ", ((uint8_t *)mctx->rip)[i]);
 	}
 	printf("\n");*/
 	
-	//core->cpu_data().device_address = dev_addr;
 	captive::arch::x86::MemoryInstruction inst;
-	decode_memory_instruction((const uint8_t *)mctx->rip, inst);
-	
-	/*printf(".byte ");
-	for (int i = 0; i < inst.length; i++) {
-		if (i > 0)
-			printf(", ");
-		printf("0x%02x", ((const uint8_t *)mctx->rip)[i]);
-	}
-	printf("\n");*/
+	if (!decode_memory_instruction((const uint8_t *)mctx->rip, inst))
+		fatal("unable to decode memory instruction\n");
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {
-		case x86::Operand::R_EAX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rax), "d"(dev_addr)); break;
-		case x86::Operand::R_EBX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rbx), "d"(dev_addr)); break;
-		case x86::Operand::R_ECX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rcx), "d"(dev_addr)); break;
-		case x86::Operand::R_EDX: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdx), "d"(dev_addr)); break;
-		case x86::Operand::R_ESI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rsi), "d"(dev_addr)); break;
-		case x86::Operand::R_EDI: asm volatile("outl %0, $0xf0\n" :: "a"((uint32_t)mctx->rdi), "d"(dev_addr)); break;
+		case x86::Operand::R_EAX: __out32(dev_addr, mctx->rax); break;
+		case x86::Operand::R_EBX: __out32(dev_addr, mctx->rbx); break;
+		case x86::Operand::R_ECX: __out32(dev_addr, mctx->rcx); break;
+		case x86::Operand::R_EDX: __out32(dev_addr, mctx->rdx); break;
+		case x86::Operand::R_ESI: __out32(dev_addr, mctx->rsi); break;
+		case x86::Operand::R_EDI: __out32(dev_addr, mctx->rdi); break;
 
-		case x86::Operand::R_AX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rax), "d"(dev_addr)); break;
-		case x86::Operand::R_BX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rbx), "d"(dev_addr)); break;
-		case x86::Operand::R_CX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rcx), "d"(dev_addr)); break;
-		case x86::Operand::R_DX: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdx), "d"(dev_addr)); break;
-		case x86::Operand::R_SI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rsi), "d"(dev_addr)); break;
-		case x86::Operand::R_DI: asm volatile("outw %0, $0xf0\n" :: "a"((uint16_t)mctx->rdi), "d"(dev_addr)); break;
+		case x86::Operand::R_AX: __out16(dev_addr, mctx->rax); break;
+		case x86::Operand::R_BX: __out16(dev_addr, mctx->rbx); break;
+		case x86::Operand::R_CX: __out16(dev_addr, mctx->rcx); break;
+		case x86::Operand::R_DX: __out16(dev_addr, mctx->rdx); break;
+		case x86::Operand::R_SI: __out16(dev_addr, mctx->rsi); break;
+		case x86::Operand::R_DI: __out16(dev_addr, mctx->rdi); break;
 
-		case x86::Operand::R_AL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rax), "d"(dev_addr)); break;
-		case x86::Operand::R_BL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rbx), "d"(dev_addr)); break;
-		case x86::Operand::R_CL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rcx), "d"(dev_addr)); break;
-		case x86::Operand::R_DL: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->rdx), "d"(dev_addr)); break;
-		
-		case x86::Operand::R_R8: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r8), "d"(dev_addr)); break;
-		case x86::Operand::R_R9: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r9), "d"(dev_addr)); break;
-		case x86::Operand::R_R10: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r10), "d"(dev_addr)); break;
-		case x86::Operand::R_R11: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r11), "d"(dev_addr)); break;
-		case x86::Operand::R_R12: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r12), "d"(dev_addr)); break;
-		case x86::Operand::R_R13: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r13), "d"(dev_addr)); break;
-		case x86::Operand::R_R14: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r14), "d"(dev_addr)); break;
-		case x86::Operand::R_R15: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r15), "d"(dev_addr)); break;
-		
-		case x86::Operand::R_R8D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r8), "d"(dev_addr)); break;
-		case x86::Operand::R_R9D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r9), "d"(dev_addr)); break;
-		case x86::Operand::R_R10D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r10), "d"(dev_addr)); break;
-		case x86::Operand::R_R11D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r11), "d"(dev_addr)); break;
-		case x86::Operand::R_R12D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r12), "d"(dev_addr)); break;
-		case x86::Operand::R_R13D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r13), "d"(dev_addr)); break;
-		case x86::Operand::R_R14D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r14), "d"(dev_addr)); break;
-		case x86::Operand::R_R15D: asm volatile("outb %0, $0xf0\n" :: "a"((uint8_t)mctx->r15), "d"(dev_addr)); break;
+		case x86::Operand::R_AL: __out8(dev_addr, mctx->rax); break;
+		case x86::Operand::R_BL: __out8(dev_addr, mctx->rbx); break;
+		case x86::Operand::R_CL: __out8(dev_addr, mctx->rcx); break;
+		case x86::Operand::R_DL: __out8(dev_addr, mctx->rdx); break;
+		case x86::Operand::R_SIL: __out8(dev_addr, mctx->rsi); break;
+		case x86::Operand::R_DIL: __out8(dev_addr, mctx->rdi); break;
 
-		default: printf("fatal: unhandled source register %d\n", inst.Source.reg); abort();
+		default: fatal("unhandled source register %s\n", x86::x86_register_names[inst.Source.reg]);
 		}
 	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
-		uint32_t value;		
-		asm volatile("inl $0xf0, %0\n" : "=a"(value) : "d"(dev_addr));
+		uint32_t value = __in32(dev_addr);
 		
 		switch (inst.Dest.reg) {
 		case x86::Operand::R_EAX: mctx->rax = value; break;
@@ -84,31 +93,22 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		case x86::Operand::R_ESI: mctx->rsi = value; break;
 		case x86::Operand::R_EDI: mctx->rdi = value; break;
 		
-		case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (value & 0xffffULL); break;
-		case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (value & 0xffffULL); break;
-		case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (value & 0xffffULL); break;
-		case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (value & 0xffffULL); break;
-		case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (value & 0xffffULL); break;
-		case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (value & 0xffffULL); break;
+		case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (value & 0xffff); break;
+		case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (value & 0xffff); break;
+		case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (value & 0xffff); break;
+		case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (value & 0xffff); break;
+		case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (value & 0xffff); break;
+		case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (value & 0xffff); break;
 
-		case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (value & 0xffULL); break;
-		case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (value & 0xffULL); break;
-		case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (value & 0xffULL); break;
-		case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (value & 0xffULL); break;
+		case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (value & 0xff); break;
+		case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (value & 0xff); break;
+		case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (value & 0xff); break;
+		case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (value & 0xff); break;
 		
-		case x86::Operand::R_AH: mctx->rax = (mctx->rax & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
-		case x86::Operand::R_BH: mctx->rbx = (mctx->rbx & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
-		case x86::Operand::R_CH: mctx->rcx = (mctx->rcx & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
-		case x86::Operand::R_DH: mctx->rdx = (mctx->rdx & ~0xff00ULL) | ((value & 0xffULL) << 8); break;
-
-		case x86::Operand::R_SIL: mctx->rsi = (mctx->rsi & ~0xffULL) | (value & 0xffULL); break;
-		case x86::Operand::R_DIL: mctx->rdi = (mctx->rdi & ~0xffULL) | (value & 0xffULL); break;
-		
-		default: printf("fatal: unhandled dest register %d\n", inst.Dest.reg); abort();
+		default: fatal("unhandled dest register %s\n", x86::x86_register_names[inst.Dest.reg]);
 		}
 	} else {
-		printf("fatal: unhandled combination\n");
-		abort();
+		fatal("illegal combination of operands for memory instruction\n");
 	}
 
 	// Skip over the instruction
@@ -191,17 +191,15 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				return (int)fault;
 			} else {
 				// If the core couldn't handle the fault, then we've got a serious problem.
-				printf("panic: unhandled page-fault: va=%lx, code=%x, pc=%x\n", va, code, core->read_pc());
-				abort();
+				fatal("unhandled page-fault: va=%lx, code=%x, pc=%x\n", va, code, core->read_pc());
 			}
 		} else {
 			// We can't handle this page fault if we haven't got an active core.
-			printf("panic: unhandled page-fault: va=%lx, code=%x, (no cpu)\n", va, code);
-			abort();
+			fatal("unhandled page-fault: va=%lx, code=%x, (no cpu)\n", va, code);
 		}
 	} else {
 		// This page-fault happened elsewhere - we can't do anything about it.
-		printf("panic: internal page-fault: rip=%lx va=%lx, code=%x\n", rip, va, code);
+		printf("fatal: internal page-fault: rip=%lx va=%lx, code=%x\n", rip, va, code);
 
 		printf("  type:   %s\n", (code & PF_WRITE) ? "write" : "read");
 		printf("  mode:   %s\n", (code & PF_USER_MODE) ? "user" : "kernel");
@@ -210,6 +208,5 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		abort();
 	}
 
-	// We can't ever get here - all other paths have an abort in them.
-	return 0;
+	unreachable();
 }

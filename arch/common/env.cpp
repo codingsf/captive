@@ -138,7 +138,7 @@ bool Environment::init()
 	install_idt();
 	install_tss();
 	setup_interrupts();
-
+	
 	return true;
 }
 
@@ -156,6 +156,17 @@ bool Environment::run()
 		printf("error: unable to init core\n");
 		return false;
 	}
+		
+	core->mmu().set_page_device(VA_OF_GPA(0x101e0000));
+	core->mmu().set_page_device(VA_OF_GPA(0x101e2000));
+	core->mmu().set_page_device(VA_OF_GPA(0x101e3000));
+	core->mmu().set_page_device(VA_OF_GPA(0x10140000));
+	core->mmu().set_page_device(VA_OF_GPA(0x10000000));
+	core->mmu().set_page_device(VA_OF_GPA(0x10003000));
+	core->mmu().set_page_device(VA_OF_GPA(0x10006000));
+	core->mmu().set_page_device(VA_OF_GPA(0x10007000));
+	core->mmu().set_page_device(VA_OF_GPA(0x101f1000));
+	core->mmu().set_page_device(VA_OF_GPA(0x11001000));
 
 	bool result = core->run();
 	delete core;
