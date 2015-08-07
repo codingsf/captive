@@ -257,7 +257,7 @@ void X86Encoder::cltq()
 	emit8(0x98);
 }
 
-void X86Encoder::andd(uint32_t val, const X86Memory& dst)
+void X86Encoder::andd(uint32_t val, uint8_t size, const X86Memory& dst)
 {
 	assert(false);
 }
@@ -296,9 +296,9 @@ void X86Encoder::andd(const X86Memory& src, const X86Register& dest)
 	}
 }
 
-void X86Encoder::orr(uint32_t val, const X86Memory& dst)
+void X86Encoder::orr(uint32_t val, uint8_t size, const X86Memory& dst)
 {
-	assert(false);
+	encode_arithmetic(1, val, size, dst);
 }
 
 void X86Encoder::orr(uint32_t val, const X86Register& dst)
@@ -335,7 +335,7 @@ void X86Encoder::orr(const X86Memory& src, const X86Register& dest)
 	}
 }
 
-void X86Encoder::xorr(uint32_t val, const X86Memory& dst)
+void X86Encoder::xorr(uint32_t val, uint8_t size, const X86Memory& dst)
 {
 	assert(false);
 }
@@ -381,6 +381,39 @@ void X86Encoder::xorr(const X86Memory& src, const X86Register& dest)
 		encode_opcode_mod_rm(0x32, dest, src);
 	} else {
 		encode_opcode_mod_rm(0x33, dest, src);
+	}
+}
+
+void X86Encoder::shl(uint8_t amount, uint8_t dstsize, const X86Memory& dst)
+{
+	if (dstsize == 1) {
+		encode_opcode_mod_rm(0xc0, 4, dstsize, dst);
+		emit8(amount);
+	} else {
+		encode_opcode_mod_rm(0xc1, 4, dstsize, dst);
+		emit8(amount);
+	}
+}
+
+void X86Encoder::shr(uint8_t amount, uint8_t dstsize, const X86Memory& dst)
+{
+	if (dstsize == 1) {
+		encode_opcode_mod_rm(0xc0, 5, dstsize, dst);
+		emit8(amount);
+	} else {
+		encode_opcode_mod_rm(0xc1, 5, dstsize, dst);
+		emit8(amount);
+	}
+}
+
+void X86Encoder::sar(uint8_t amount, uint8_t dstsize, const X86Memory& dst)
+{
+	if (dstsize == 1) {
+		encode_opcode_mod_rm(0xc0, 7, dstsize, dst);
+		emit8(amount);
+	} else {
+		encode_opcode_mod_rm(0xc1, 7, dstsize, dst);
+		emit8(amount);
 	}
 }
 
@@ -837,9 +870,9 @@ void X86Encoder::nop(uint8_t bytes)
 
 void X86Encoder::align_up(uint8_t amount)
 {
-	if((_write_offset & (amount-1)) == 0) return;
-	uint32_t align_end = (_write_offset + amount) & ~(amount-1);
-	nop(align_end - _write_offset);
+//	if((_write_offset & (amount-1)) == 0) return;
+//	uint32_t align_end = (_write_offset + amount) & ~(amount-1);
+//	nop(align_end - _write_offset);
 }
 
 void X86Encoder::nop(const X86Memory& mem)

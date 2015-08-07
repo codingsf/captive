@@ -126,11 +126,11 @@ namespace captive {
 				void xchg(const X86Register& a, const X86Register& b);
 				
 				void andd(uint32_t val, const X86Register& dst);
-				void andd(uint32_t val, const X86Memory& dst);
+				void andd(uint32_t val, uint8_t size, const X86Memory& dst);
 				void orr(uint32_t val, const X86Register& dst);
-				void orr(uint32_t val, const X86Memory& dst);
+				void orr(uint32_t val, uint8_t size, const X86Memory& dst);
 				void xorr(uint32_t val, const X86Register& dst);
-				void xorr(uint32_t val, const X86Memory& dst);
+				void xorr(uint32_t val, uint8_t size, const X86Memory& dst);
 
 				void andd(const X86Register& src, const X86Register& dest);
 				void andd(const X86Register& src, const X86Memory& dest);
@@ -142,6 +142,9 @@ namespace captive {
 				void xorr(const X86Register& src, const X86Memory& dest);
 				void xorr(const X86Memory& src, const X86Register& dest);
 
+				void shl(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
+				void shr(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
+				void sar(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
 				void shl(uint8_t amount, const X86Register& dst);
 				void shr(uint8_t amount, const X86Register& dst);
 				void sar(uint8_t amount, const X86Register& dst);
