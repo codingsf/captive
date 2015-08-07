@@ -859,20 +859,20 @@ namespace std{
 		void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
 	{
 		// Quicksort using Hoare partition scheme
-		
-		if(last >= first) return;
-		
-		RandomAccessIterator pivot = last-1;
+
+		if(first >= last-1) return;
+
+		auto pivot = *(last-1);
 		
 		RandomAccessIterator i = first-1, j=last-1;
 		
 		while(true) {
 			do {
 				i++;
-			} while(comp(*i, *pivot));
+			} while(comp(*i, pivot));
 			do {
 				j--;
-			} while(!comp(*j, *pivot));
+			} while(!comp(*j, pivot));
 			
 			if(i < j) std::swap(*i, *j);
 			else {
@@ -881,8 +881,9 @@ namespace std{
 			}
 		}
 		
-		sort(first, i-1, comp);
+		sort(first, i, comp);
 		sort(i+1, last, comp);
+		
 	}
 
 	template<class RandomAccessIterator> _UCXXEXPORT
