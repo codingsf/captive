@@ -9,7 +9,7 @@ template<int size> class PopulatedSet {
 		void set(int i) { _populated[i] = true; }
 		bool get(int i) { return _populated[i]; }
 		
-		int count() { int c = 0; for(auto i : _populated) c++; return c; }
+		int count() { int c = 0; for(auto i : _populated) if(i) c++; return c; }
 		void clear() { for(auto &i : _populated) i = 0; }
 		void clear(int i) { _populated[i] = 0; }
 		
