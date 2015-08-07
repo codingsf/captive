@@ -20,11 +20,6 @@ namespace captive {
 					CoCo(Environment& env);
 					~CoCo();
 
-					inline uint32_t FSR() const { return _FSR; }
-					inline void FSR(uint32_t v) { _FSR = v; }
-					inline uint32_t FAR() const { return _FAR; }
-					inline void FAR(uint32_t v) { _FAR = v; }
-
 					inline bool R() const { return _R; }
 					inline bool S() const { return _S; }
 
@@ -54,8 +49,6 @@ namespace captive {
 					bool C;
 					bool A;
 					bool M;
-
-					uint32_t _FSR, _FAR;
 				};
 			}
 		}

@@ -17,7 +17,6 @@ CoCo::~CoCo()
 
 bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data)
 {
-	//printf("mcr %d %d %d %d %d\n", op1, op2, rn, rm, data);
 	switch (rn) {
 	case 1:
 	{
@@ -53,33 +52,6 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 	}
 	
-	case 2:
-		switch (op2) {
-		case 0:
-			((ArmCPU&)cpu).state.regs.TTBR0 = data;
-			break;
-		case 1:
-			((ArmCPU&)cpu).state.regs.TTBR1 = data;
-			break;
-		default:
-			assert(false);
-			return false;
-		}
-
-		cpu.mmu().invalidate_virtual_mappings();
-		break;
-
-	case 3:
-		((ArmCPU&)cpu).state.regs.DACR = data;
-		break;
-
-	case 5:
-		_FSR = data;
-		break;
-	case 6:
-		_FAR = data;
-		break;
-
 	case 7:
 		cpu.mmu().invalidate_virtual_mappings();
 		switch (rm) {
@@ -235,7 +207,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 		
 	default:
-		printf("**** unknown system control coprocessor: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
+		printf("**** unknown system control coprocessor write: rn=%d, rm=%d, op1=%d, op2=%d, data=%x\n", rn, rm, op1, op2, data);
 		break;
 	}
 
@@ -312,36 +284,12 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		data |= 0 << 26; //L2
 
 		break;
-
-	case 2:
-		switch (op2) {
-		case 0:
-			data = ((ArmCPU&)cpu).state.regs.TTBR0;
-			break;
-		case 1:
-			data = ((ArmCPU&)cpu).state.regs.TTBR1;
-			break;
-		default:
-			assert(false);
-			return false;
-		}
-		break;
-
-	case 3:
-		data = ((ArmCPU&)cpu).state.regs.DACR;
-		break;
 		
-	case 5:
-		data = _FSR;
-		break;
-	case 6:
-		data = _FAR;
-		break;
 	case 7:
 		if (rm == 14) data = 1 << 30;
 		break;
 	default:
-		printf("mrc %d %d %d %d\n", op1, op2, rn, rm);
+		printf("**** unknown system control coprocessor read: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
 		break;
 	}
 

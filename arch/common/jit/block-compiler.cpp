@@ -80,7 +80,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	timer.tick("DBE");
 	
 	if (!merge_blocks()) return false;
-	
+
 	timer.tick("MB");
 	if (!peephole()) return false;
 
@@ -89,9 +89,13 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!constant_prop()) return false;
 	timer.tick("Cprop");
 
+	//~ printf	("XXX %x\n", pa);
+	//~ sort_ir();
+	//~ dump_ir();
 	if(!reg_value_reuse()) return false;
 	timer.tick("RVR");
-	
+	//~ dump_ir();
+
 	if (!sort_ir()) return false;
 	timer.tick("Sort");
 
@@ -99,7 +103,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	timer.tick("Analyse");
 	if( !post_allocate_peephole()) return false;
 	timer.tick("PAP");
-	
+
 	if( !lower_stack_to_reg()) return false;
 	timer.tick("LSTR");
 
@@ -1050,7 +1054,7 @@ bool BlockCompiler::allocate()
 
 bool BlockCompiler::lower(uint32_t max_stack)
 {
-	bool success = true;
+	bool success = true, dump_this_shit = false;
 	X86Register& guest_regs_reg = REGSTATE_REG;
 
 	std::vector<std::pair<uint32_t, IRBlockId> > block_relocations;
@@ -2603,7 +2607,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	if (dump_this_shit)
+		asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	
 	return success;
 }
