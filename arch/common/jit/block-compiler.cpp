@@ -1324,7 +1324,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 								continue;
 							default: 
-								printf("OPPORTUNITY %s\n", insn_descriptors[mod_insn->type].mnemonic);
 								break;
 						}
 					}
