@@ -37,7 +37,7 @@ namespace captive {
 				bool emit_interrupt_check;
 				bool emit_chaining_logic;
 
-				PopulatedSet<8> used_phys_regs;
+				PopulatedSet<9> used_phys_regs;
 
 				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
 				typedef std::vector<shared::IRBlockId> block_list_t;
@@ -57,6 +57,7 @@ namespace captive {
 				bool lower_stack_to_reg();
 				bool constant_prop();
 				bool reorder_blocks();
+				bool reg_value_reuse();
 
 				void dump_ir();
 

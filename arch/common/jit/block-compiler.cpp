@@ -24,6 +24,8 @@ using namespace captive::arch::jit::algo;
 using namespace captive::arch::x86;
 using namespace captive::shared;
 
+static void dump_insn(IRInstruction *insn);
+
 /* Register Mapping
  *
  * RAX  Allocatable			0
@@ -65,7 +67,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
-	//printf("*** %x\n", pa);
+//	printf("*** %x\n", pa);
 
 	tick_timer timer(0);
 
@@ -83,10 +85,17 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!peephole()) return false;
 
 	timer.tick("Peep");
-	
+
 	if (!constant_prop()) return false;
 	timer.tick("Cprop");
-		
+
+	//~ printf	("XXX %x\n", pa);
+	//~ sort_ir();
+	//~ dump_ir();
+	if(!reg_value_reuse()) return false;
+	timer.tick("RVR");
+	//~ dump_ir();
+	
 	if (!sort_ir()) return false;
 	timer.tick("Sort");
 
@@ -98,6 +107,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if( !lower_stack_to_reg()) return false;
 	timer.tick("LSTR");
 
+	
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
@@ -524,7 +534,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 	live_set_t live_ins, live_outs;
 	std::vector<live_set_t::iterator> to_erase;
 
-	PopulatedSet<8> avail_regs; // Register indicies that are available for allocation.
+	PopulatedSet<9> avail_regs; // Register indicies that are available for allocation.
 	uint32_t next_global = 0;	// Next stack location for globally allocated register.
 
 	std::vector<int32_t> vreg_seen_block (ctx.reg_count(), -1);
@@ -577,7 +587,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			allocation.assign(ctx.reg_count(), -1);
 
 			// Reset the available register bitfield
-			avail_regs.fill(0xff);
+			avail_regs.fill(0x1ff);
 
 			// Update the latest block id.
 			latest_block_id = insn->ir_block;
@@ -1060,7 +1070,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	encoder.mov(REG_RSP, REG_RBP);
 
 	uint32_t prologue_offset = encoder.current_offset();
-	encoder.sub(max_stack, REG_RSP);
+	if(max_stack)
+		encoder.sub(max_stack, REG_RSP);
 
 	load_state_field(8, REGSTATE_REG);	// Register state ptr
 
@@ -1135,13 +1146,19 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						encoder.mov(source->value, register_from_operand(dest));
 					}
 				} else if (dest->is_alloc_stack()) {
-					// mov imm -> stack
-					switch (dest->size) {
-					case 1: encoder.mov1(source->value, stack_from_operand(dest)); break;
-					case 2: encoder.mov2(source->value, stack_from_operand(dest)); break;
-					case 4: encoder.mov4(source->value, stack_from_operand(dest)); break;
-					case 8: encoder.mov8(source->value, stack_from_operand(dest)); break;
-					default: assert(false);
+					if(source->value == 0) {
+						auto temp_reg = get_temp(0, dest->size);
+						encoder.xorr(temp_reg, temp_reg);
+						encoder.mov(temp_reg, stack_from_operand(dest));
+					} else {				
+						// mov imm -> stack
+						switch (dest->size) {
+						case 1: encoder.mov1(source->value, stack_from_operand(dest)); break;
+						case 2: encoder.mov2(source->value, stack_from_operand(dest)); break;
+						case 4: encoder.mov4(source->value, stack_from_operand(dest)); break;
+						case 8: encoder.mov8(source->value, stack_from_operand(dest)); break;
+						default: assert(false);
+						}
 					}
 
 				} else {
@@ -1259,7 +1276,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				
 				encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
 				encoder.add(prologue_offset, REG_RAX);
-				encoder.add(max_stack, REG_RSP);
+				if(max_stack)
+					encoder.add(max_stack, REG_RSP);
 				encoder.jmp(REG_RAX);											// Yep, tail call.
 			} else {
 				encoder.leave();
@@ -1590,7 +1608,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					// mov const(reg), reg
 					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
 				} else {
-					assert(false);
+					// Destination is sometimes not allocated, e.g. if an ldrd loads to a location, then only one
+					// of the loaded registers is used but the other is killed
+					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), get_temp(0, dest->size));
 				}
 			} else {
 				assert(false);
@@ -1899,13 +1919,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 					switch (insn->type) {
 					case IRInstruction::AND:
-						encoder.andd(source->value, stack_from_operand(dest));
+						encoder.andd(source->value, dest->size, stack_from_operand(dest));
 						break;
 					case IRInstruction::OR:
-						encoder.orr(source->value, stack_from_operand(dest));
+						encoder.orr(source->value, dest->size, stack_from_operand(dest));
 						break;
 					case IRInstruction::XOR:
-						encoder.xorr(source->value, stack_from_operand(dest));
+						encoder.xorr(source->value, dest->size, stack_from_operand(dest));
 						break;
 					default:
 						assert(false);
@@ -2260,7 +2280,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					}
 				} else {
-					assert(false);
+					auto operand = stack_from_operand(dest);
+
+					switch (insn->type) {
+					case IRInstruction::SHL:
+						encoder.shl(amount->value, dest->size, operand);
+						break;
+					case IRInstruction::SHR:
+						encoder.shr(amount->value, dest->size, operand);
+						break;
+					case IRInstruction::SAR:
+						encoder.sar(amount->value, dest->size, operand);
+						break;
+					default:
+						assert(false);
+						break;
+					}
 				}
 			} else if (amount->is_vreg()) {
 				if (amount->is_alloc_reg()) {
@@ -2465,7 +2500,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-//	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	//asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	
 	return success;
 }
@@ -2595,7 +2630,7 @@ void BlockCompiler::encode_operand_to_reg(shared::IROperand *operand, const x86:
 bool BlockCompiler::lower_stack_to_reg()
 {
 	std::map<uint32_t, uint32_t> lowered_entries;
-	PopulatedSet<8> avail_phys_regs = used_phys_regs;
+	PopulatedSet<9> avail_phys_regs = used_phys_regs;
 	avail_phys_regs.invert();
 		
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx)
@@ -2632,26 +2667,42 @@ bool BlockCompiler::lower_stack_to_reg()
 
 bool BlockCompiler::constant_prop()
 {
-	std::map<IRRegId, IROperand*> constant_operands;
+	std::map<IRRegId, IROperand> constant_operands;
 	
+	IRBlockId prev_block = 0;
+//	printf("********* %x\n", pa);
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx)
 	{
 		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
+		if(prev_block != insn->ir_block) {
+			constant_operands.clear();
+//			printf("ZAP!\n");
+		}
+		prev_block = insn->ir_block;
+		
+//		dump_insn(insn);
+//		printf("\n");
+		
 		if(insn->type == IRInstruction::MOV) {
 			assert(insn->operands[1].is_vreg());
 			if(insn->operands[0].type == IROperand::CONSTANT) {
-				constant_operands[insn->operands[1].value] = &insn->operands[0];
+				constant_operands[insn->operands[1].value] = insn->operands[0];
+//				printf("v%u <= %u\n", insn->operands[1].value, insn->operands[0].value);
 				continue;
 			}
 		} 
+		
 		if(insn->type == IRInstruction::ADD || insn->type == IRInstruction::SUB) {
 			assert(insn->operands[1].is_vreg());
 			if(insn->operands[0].type == IROperand::CONSTANT) {
 				if(constant_operands.count(insn->operands[1].value)) {
 					if(insn->type == IRInstruction::ADD) {
-						constant_operands[insn->operands[1].value] += insn->operands[0].value;
+//						printf("v%u += %u\n", insn->operands[1].value, insn->operands[0].value);
+						constant_operands[insn->operands[1].value].value += insn->operands[0].value;
 					} else {
-						constant_operands[insn->operands[1].value] -= insn->operands[0].value;
+//						printf("v%u -= %u\n", insn->operands[1].value, insn->operands[0].value);
+						constant_operands[insn->operands[1].value].value -= insn->operands[0].value;
 					}
 				}
 			}
@@ -2663,7 +2714,8 @@ bool BlockCompiler::constant_prop()
 			IROperand *operand = &(insn->operands[op_idx]);
 			if(descr.format[op_idx] == 'I') {
 				if(operand->is_vreg() && constant_operands.count(operand->value)) {
-					*operand = *constant_operands[operand->value];
+//					printf("v%u := %u\n", operand->value, constant_operands[operand->value].value);
+					*operand = constant_operands[operand->value];
 				}
 			} else {
 				if(operand->is_vreg()) constant_operands.erase(operand->value);
@@ -2681,19 +2733,24 @@ bool BlockCompiler::reorder_blocks()
 	
 	std::vector<IRBlockId> reordering (ctx.block_count(), NOP_BLOCK);
 	std::vector<std::pair<IRBlockId, IRBlockId> > block_targets (ctx.block_count(), { NOP_BLOCK, NOP_BLOCK} );
+	std::set<IRBlockId> blocks;
 	
 	timer.tick("Init");
 		
+	blocks.insert(0);
 	// build a simple cfg
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
 		
 		switch(insn->type) {
 			case IRInstruction::JMP:
-				block_targets[insn->ir_block] = { insn->operands[0].value, insn->operands[0].value };
+				block_targets[insn->ir_block] = { insn->operands[0].value, NOP_BLOCK };
+				blocks.insert(insn->operands[0].value);
 				break;
 			case IRInstruction::BRANCH:
 				block_targets[insn->ir_block] = { insn->operands[1].value, insn->operands[2].value };
+				blocks.insert(insn->operands[1].value);
+				blocks.insert(insn->operands[2].value);
 				break;
 			case IRInstruction::RET:
 			case IRInstruction::DISPATCH:
@@ -2745,13 +2802,9 @@ bool BlockCompiler::reorder_blocks()
 	auto comp = [&max_depth] (IRBlockId a, IRBlockId b) -> bool { return max_depth[a] < max_depth[b]; };
 	
 	std::vector<IRBlockId> queue;
-	queue.reserve(ctx.block_count());
-	for(unsigned int i = 0; i < ctx.block_count(); ++i) {
-		queue.push_back(i);
-	}
-	//queue.insert(queue.begin(), blocks.begin(), blocks.end());
-
+	queue.insert(queue.begin(), blocks.begin(), blocks.end());
 	std::sort(queue.begin(), queue.end(), comp);
+	
 	
 	for(int i = 0; i < queue.size(); ++i) {
 		reordering[queue[i]] = i;
@@ -2781,4 +2834,151 @@ bool BlockCompiler::reorder_blocks()
 	timer.dump("Reorder ");
 	
 	return true;
+
+#if 0
+	uh_oh:
+	
+	for(int i = 0; i < queue.size(); ++i) {
+		printf("%u = %u\n", i, max_depth[i]);
+	}
+	
+	printf("digraph {\n");
+	for(int i = 0; i < queue.size(); ++i) {
+		bool has_node = false;
+		if(block_targets[i].first != NOP_BLOCK) {
+			printf("%u -> %u\n", i, block_targets[i].first);
+			has_node = true;
+		}
+		if(block_targets[i].second != NOP_BLOCK) {
+			printf("%u -> %u\n", i, block_targets[i].second);
+			has_node = true;
+		}
+		
+		if(has_node) {
+			printf("%u [label=\"%u (%u, %u)\"]\n", i, i, reordering[i], max_depth[i]);
+		}
+	}
+	printf("}");
+	
+	assert(false);
+#endif
 }
+
+bool BlockCompiler::reg_value_reuse()
+{
+	std::map<uint32_t, IROperand> stored_regs;
+	std::map<uint32_t, IRInstruction*> last_write;
+	std::map<uint32_t, bool> used_entries;
+	
+//	printf("*********** %x\n", pa);
+	
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		if(insn->ir_block == NOP_BLOCK) continue;
+		
+		uint32_t reg_offset;
+		uint32_t max_num_cached_regs = 4;
+		
+		switch(insn->type) {
+			// If we make a read of a value which is cached, replace the read with a mov of the cached value
+			// If the register is not cached, then add it to the cache
+			case IRInstruction::READ_REG:
+				assert(insn->operands[1].is_vreg());
+				assert(insn->operands[0].is_constant());
+				
+				reg_offset = insn->operands[0].value;
+				
+				// HACK ARM PC offset
+				if(reg_offset == 0x3c) continue;
+				
+				if(stored_regs.count(reg_offset)) {
+					insn->type = IRInstruction::MOV;
+					insn->operands[0] = stored_regs[reg_offset];
+					used_entries[reg_offset] = true;
+					break;
+				} else {
+					stored_regs[reg_offset] = insn->operands[1];
+					if(stored_regs.size() > max_num_cached_regs) {
+						uint32_t eliminate_reg = (*stored_regs.begin()).first;
+						
+						for(auto i : used_entries) if(i.second == false) eliminate_reg = i.first;
+						
+						stored_regs.erase(eliminate_reg);
+						last_write.erase(eliminate_reg);
+						used_entries.erase(eliminate_reg);
+					}
+				}
+				break;
+
+			// If we store a value to a register, cache the value for next time we use the register
+			case IRInstruction::WRITE_REG:
+				reg_offset = insn->operands[1].value;
+				
+				// HACK ARM PC Offset
+				if(reg_offset == 0x3c) continue;
+				
+				// If we've previously written to this offset, zap out the old write since this one kills it
+				// We can only do this if the reg is in both caches since otherwise it might have been loaded since 
+				// its last real store
+				if(last_write.count(reg_offset) && stored_regs.count(reg_offset)) {
+					make_instruction_nop(last_write[reg_offset], true);
+				}
+				
+				last_write[reg_offset] = insn;
+				stored_regs[reg_offset] = insn->operands[0];
+				
+				// If we've got a lot of cached registers, clear some out to avoid host reg pressure getting too high
+				if(stored_regs.size() > max_num_cached_regs) {
+					uint32_t eliminate_reg = (*stored_regs.begin()).first;
+
+					for(auto i : used_entries) if(i.second == false) eliminate_reg = i.first;
+
+					last_write.erase(eliminate_reg);
+					used_entries.erase(eliminate_reg);
+					stored_regs.erase(eliminate_reg);
+				}
+				
+				break;
+				
+			// If we have any control flow, then ditch the whole cache
+			case IRInstruction::JMP:
+			case IRInstruction::BRANCH:
+			case IRInstruction::RET:
+			case IRInstruction::DISPATCH:
+			case IRInstruction::READ_MEM:
+			case IRInstruction::WRITE_MEM:
+			case IRInstruction::READ_MEM_USER:
+			case IRInstruction::WRITE_MEM_USER:
+			case IRInstruction::WRITE_DEVICE:
+			case IRInstruction::READ_DEVICE:
+			case IRInstruction::CALL:
+				stored_regs.clear();
+				last_write.clear();
+				used_entries.clear();
+//				printf("ZAP!\n");
+				break;
+			default:
+				/*
+				const struct insn_descriptor *desc = &insn_descriptors[insn->type];
+				
+				// If this instruction writes to a vreg containing a cached register value, then erase that cached 
+				// value
+				// TODO: this doesn't actually do that, but the IR seems to be structured such that it doesn't matter
+				for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
+					IROperand *op = &(insn->operands[op_idx]);
+					if(op->is_vreg() && desc->format[op_idx] != 'I') {
+//						if(stored_regs.count(op->value))printf("ZAP v%u\n", op->value);
+						stored_regs.erase(op->value);
+					}
+				}
+				* */
+				break;
+		}
+		
+//		dump_insn(insn);
+//		printf("\n");
+	}
+	
+	return true;
+}
+
