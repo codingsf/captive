@@ -78,9 +78,9 @@ trap_macro unk,0
 trap_macro unk_arg,1
 trap_macro gpf,1
 trap_macro irq,0
-trap_macro illegal,0
 
 .global trap_pf
+.global trap_illegal
 .extern interrupt_restore_safepoint
 .extern cpu_safepoint
 .extern handle_pagefault
@@ -90,6 +90,19 @@ trap_pf:
 
 	mov %cr2, %rsi
 	call handle_pagefault
+
+	test %rax, %rax
+	jnz 1f
+	exit_intr
+
+1:
+	leaq cpu_safepoint, %rdi
+	jmp interrupt_restore_safepoint
+
+trap_illegal:
+	enter_intr 0
+
+	call handle_trap_illegal
 
 	test %rax, %rax
 	jnz 1f
