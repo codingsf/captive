@@ -19,7 +19,6 @@
 #include <vector>
 
 #define REGSTATE_REG REG_RDI
-#define JITSTATE_REG REG_R14
 
 namespace captive {
 	namespace arch {
