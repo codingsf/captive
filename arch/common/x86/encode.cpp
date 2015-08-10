@@ -342,8 +342,8 @@ void X86Encoder::xorr(uint32_t val, uint8_t size, const X86Memory& dst)
 
 void X86Encoder::xorr(uint32_t val, const X86Register& dst)
 {
-	if(dst.raw_index == 0) {
-		if(dst.size == 1) {
+	if (dst.raw_index == 0 && !dst.hireg) {
+		if (dst.size == 1) {
 			emit8(0x34);
 			emit8(val);
 		} else {
