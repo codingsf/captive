@@ -2557,23 +2557,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			X86Register& tmp = get_temp(0, 4);
 
-			// Load up lhs
-			if (lhs->is_constant()) {
-				encoder.mov(lhs->value, tmp);
-			} else if (lhs->is_vreg()) {
-				if (lhs->is_alloc_reg()) {
-					encoder.mov(register_from_operand(lhs, 4), tmp);
-				} else if (lhs->is_alloc_stack()) {
-					encoder.mov(stack_from_operand(lhs), tmp);
-				} else {
-					assert(false);
-				}
-			} else {
-				assert(false);
-			}
-
 			bool just_do_an_add = false;
-			
+
 			// Set up carry bit for adc
 			if (carry_in->is_constant()) {
 				if (carry_in->value == 0) {
@@ -2583,8 +2568,23 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				}
 			} else if (carry_in->is_vreg()) {
 				if (carry_in->is_alloc_reg()) {
-					encoder.mov(0xff, get_temp(1, 1));
-					encoder.add(register_from_operand(carry_in, 1), get_temp(1, 1));
+					encoder.mov(0xff, get_temp(0, 1));
+					encoder.add(register_from_operand(carry_in, 1), get_temp(0, 1));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			// Load up lhs
+			if (lhs->is_constant()) {
+				encoder.mov(lhs->value, tmp);
+			} else if (lhs->is_vreg()) {
+				if (lhs->is_alloc_reg()) {
+					encoder.mov(register_from_operand(lhs, 4), tmp);
+				} else if (lhs->is_alloc_stack()) {
+					encoder.mov(stack_from_operand(lhs), tmp);
 				} else {
 					assert(false);
 				}
