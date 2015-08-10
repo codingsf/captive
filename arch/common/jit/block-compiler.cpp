@@ -190,7 +190,7 @@ bool peephole_shift(IRInstruction &insn)
 		switch(op2.size) {
 			case 1: zeros_out = op1.value == 8; break;
 			case 2: zeros_out = op1.value == 16; break;
-			case 4: zeros_out = op1.value == 32; break;
+			case 4: zeros_out = op1.value == 32; break; 	
 			case 8: zeros_out = op1.value == 64; break;
 		}
 
@@ -1227,9 +1227,24 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *offset = &insn->operands[0];
 			IROperand *target = &insn->operands[1];
 
-			IRInstruction *mod_insn, *store_insn;
+			IRInstruction *mod_insn, *store_insn, *potential_killer;
 			mod_insn = insn+1;
 			store_insn = insn+2;
+			
+			potential_killer = insn+3;
+			bool notfound = true;
+			while(notfound) {
+				switch(potential_killer->type) {
+					case IRInstruction::INCPC:
+					case IRInstruction::BARRIER:
+						potential_killer++;
+						break;
+					default:
+						notfound = false;
+						break;
+				}
+			}
+			
 			
 			// If these three instructions are a read-modify-write of the same register, then emit a modification of
 			// the register, and then the normal read (eliminate the store)
@@ -1241,6 +1256,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			//  \/
 			// add $0x10, $0x0(REGSTATE_REG) 
 			// mov $0x0(REGSTATE_REG), [v0]
+			//
+			// We also determine if the final mov can be eliminted. It is only eliminated if the following instruction
+			// kills the value read from the register, e.g.
+			//
+			// add $0x10, $0x0(REGSTATE_REG) 
+			// mov $0x0(REGSTATE_REG), [v0]
+			// mov $0x8(REGSTATE_REG), [v0]
+			//  ||
+			//  \/
+			// add $0x10, $0x0(REGSTATE_REG) 
+			// mov $0x8(REGSTATE_REG), [v0]
 			unsigned reg_offset = insn->operands[0].value;
 			if(mod_insn->ir_block == insn->ir_block && store_insn->ir_block == insn->ir_block && store_insn->type == IRInstruction::WRITE_REG && store_insn->operands[1].value == reg_offset) {
 				
@@ -1256,6 +1282,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					unsigned store_source_reg = store_source->alloc_data;
 					
 					// TODO: this is hideous
+					bool fused = false;
 					if(my_target_reg == modify_target_reg && modify_target_reg == store_source_reg) {
 						switch(mod_insn->type) {
 							case IRInstruction::ADD: 
@@ -1267,10 +1294,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 								} else {
 									assert(false);
 								}
-								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
-								ir_idx += 2;
-								
-								continue;
+								fused = true;
+								break;
 							case IRInstruction::SUB:
 								if(modify_source->is_constant()) {
 									encoder.sub(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
@@ -1280,10 +1305,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 								} else {
 									assert(false);
 								}
-								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
-								ir_idx += 2;
-								
-								continue;
+								fused = true;
+								break;
 							case IRInstruction::OR:
 								if(modify_source->is_constant()) {
 									encoder.orr(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
@@ -1293,10 +1316,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 								} else {
 									assert(false);
 								}
-								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
-								ir_idx += 2;
-
-								continue;
+								fused = true;
+								break;
 							case IRInstruction::AND:
 								if(modify_source->is_constant()) {
 									encoder.andd(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
@@ -1306,10 +1327,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 								} else {
 									assert(false);
 								}
-								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
-								ir_idx += 2;
-
-								continue;
+								fused = true;
+								break;
 							case IRInstruction::XOR:
 								if(modify_source->is_constant()) {
 									encoder.xorr(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
@@ -1319,12 +1338,45 @@ bool BlockCompiler::lower(uint32_t max_stack)
 								} else {
 									assert(false);
 								}
-								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
-								ir_idx += 2;
-
-								continue;
+								fused = true;
+								break;
 							default: 
 								break;
+						}
+						
+						if(fused) {
+							ir_idx += 2;
+							
+							// If the IR node after the fused instruction kills the register we would load into, then
+							// we don't need to load the register value
+							auto &descr = insn_descriptors[potential_killer->type];
+							//~ printf("Killer is %s %x\n", descr.mnemonic, pa);
+							bool kills_value = false;
+							for(int i = 0; i < 6; ++i) {
+								IROperand *kop = &potential_killer->operands[i];
+								// If the operand is an input of the register, we need the move
+								if(descr.format[i] == 'I' || descr.format[i] == 'B') {
+									if(kop->is_alloc_reg() && kop->alloc_data == store_source->alloc_data) {
+										kills_value = false;
+										//~ printf("doesn't kill\n");
+										break;
+									}
+								}
+								
+								if(descr.format[i] == 'O') {
+									if(kop->is_alloc_reg() && kop->alloc_data == store_source->alloc_data) {
+										kills_value = true;
+										//~ printf("kills\n");
+										break;
+									}
+								}
+							}
+							
+							// If the killer DOES kill the instruction, then we DO NOT need the move
+							if(!kills_value) {
+								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
+							}
+							continue;
 						}
 					}
 				}
@@ -2973,6 +3025,7 @@ bool BlockCompiler::reorder_blocks()
 
 bool BlockCompiler::reg_value_reuse()
 {
+	std::map<IRRegId, uint32_t> ir_regs_to_machine_regs;
 	std::map<uint32_t, IROperand> stored_regs;
 	std::map<uint32_t, IRInstruction*> last_write;
 	std::map<uint32_t, bool> used_entries;
@@ -3005,11 +3058,14 @@ bool BlockCompiler::reg_value_reuse()
 					break;
 				} else {
 					stored_regs[reg_offset] = insn->operands[1];
+					ir_regs_to_machine_regs[insn->operands[1].value] = reg_offset;
+					
 					if(stored_regs.size() > max_num_cached_regs) {
 						uint32_t eliminate_reg = (*stored_regs.begin()).first;
 						
 						for(auto i : used_entries) if(i.second == false) eliminate_reg = i.first;
 						
+						ir_regs_to_machine_regs.erase(stored_regs[eliminate_reg].value);
 						stored_regs.erase(eliminate_reg);
 						last_write.erase(eliminate_reg);
 						used_entries.erase(eliminate_reg);
@@ -3034,6 +3090,7 @@ bool BlockCompiler::reg_value_reuse()
 				
 				last_write[reg_offset] = insn;
 				stored_regs[reg_offset] = insn->operands[0];
+				if(insn->operands[0].is_vreg()) ir_regs_to_machine_regs[insn->operands[0].value] = reg_offset;
 				
 				// If we've got a lot of cached registers, clear some out to avoid host reg pressure getting too high
 				if(stored_regs.size() > max_num_cached_regs) {
@@ -3041,6 +3098,7 @@ bool BlockCompiler::reg_value_reuse()
 
 					for(auto i : used_entries) if(i.second == false) eliminate_reg = i.first;
 
+					ir_regs_to_machine_regs.erase(stored_regs[eliminate_reg].value);
 					last_write.erase(eliminate_reg);
 					used_entries.erase(eliminate_reg);
 					stored_regs.erase(eliminate_reg);
@@ -3063,23 +3121,29 @@ bool BlockCompiler::reg_value_reuse()
 				stored_regs.clear();
 				last_write.clear();
 				used_entries.clear();
+				ir_regs_to_machine_regs.clear();
 //				printf("ZAP!\n");
 				break;
 			default:
-				/*
+				
 				const struct insn_descriptor *desc = &insn_descriptors[insn->type];
 				
 				// If this instruction writes to a vreg containing a cached register value, then erase that cached 
 				// value
-				// TODO: this doesn't actually do that, but the IR seems to be structured such that it doesn't matter
 				for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
 					IROperand *op = &(insn->operands[op_idx]);
 					if(op->is_vreg() && desc->format[op_idx] != 'I') {
-//						if(stored_regs.count(op->value))printf("ZAP v%u\n", op->value);
-						stored_regs.erase(op->value);
+						IRRegId vreg = op->value;
+						if(ir_regs_to_machine_regs.count(vreg)) {
+							uint32_t offset = ir_regs_to_machine_regs[vreg];
+							stored_regs.erase(offset);
+							last_write.erase(offset);
+							used_entries.erase(offset);
+							ir_regs_to_machine_regs.erase(vreg);
+						}
 					}
 				}
-				* */
+				
 				break;
 		}
 		
