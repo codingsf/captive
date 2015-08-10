@@ -20,8 +20,8 @@ MMU::MMU(CPU& cpu) : _cpu(cpu)
 {
 	//printf("mmu: allocating guest pdps\n");
 
-	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
-	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
+	page_map_t *pm = (page_map_t *)PHYS_TO_VIRT(CR3);
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)pm->entries[0].base_address());
 
 	for (int i = 0; i < 4; i++) {
 		pdp->entries[i].base_address((uint64_t)Memory::alloc_page().pa);
@@ -148,8 +148,8 @@ uint32_t MMU::page_checksum(va_t va)
 
 void MMU::invalidate_virtual_mappings()
 {
-	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
-	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
+	page_map_t *pm = (page_map_t *)PHYS_TO_VIRT(CR3);
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)pm->entries[0].base_address());
 
 	// Clear the present map on the 4G mapping
 	for (int i = 0; i < 4; i++) {
@@ -188,8 +188,8 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 
 void MMU::disable_writes()
 {
-	page_map_t *pm = (page_map_t *)Memory::phys_to_virt(CR3);
-	page_dir_ptr_t *pdp = (page_dir_ptr_t *)Memory::phys_to_virt((pa_t)pm->entries[0].base_address());
+	page_map_t *pm = (page_map_t *)PHYS_TO_VIRT(CR3);
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)pm->entries[0].base_address());
 
 	// Clear the present map on the 4G mapping
 	for (int i = 0; i < 4; i++) {

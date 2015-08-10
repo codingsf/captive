@@ -191,16 +191,17 @@ namespace captive {
 			}
 
 			#define BITS(val, start, end) ((((uint64_t)val) >> start) & (((1 << (end - start + 1)) - 1)))
-
-			static inline va_t phys_to_virt(pa_t pa) __attribute__((pure)) {
-				if ((uint64_t)pa >= 0 && (uint64_t)pa < 0x10000000) {
+			#define PHYS_TO_VIRT(__pa) ((va_t)(0x200000000ULL + (uint64_t)__pa))
+			
+			/*constexpr static va_t phys_to_virt(pa_t pa) __attribute__((pure)) {
+				//if ((uint64_t)pa >= 0 && (uint64_t)pa < 0x10000000) {
 					return (va_t *)(0x200000000 + (uint64_t)pa);
-				} else {
-					return NULL;
-				}
-			}
+				//} else {
+				//	return NULL;
+				//}
+			}*/
 
-			static inline void va_table_indicies(va_t va, table_idx_t& pm, table_idx_t& pdp, table_idx_t& pd, table_idx_t& pt) {
+			static inline void va_table_indicies(va_t va, table_idx_t& pm, table_idx_t& pdp, table_idx_t& pd, table_idx_t& pt) __attribute__((pure)) {
 				pm = BITS(va, 39, 47);
 				pdp = BITS(va, 30, 38);
 				pd = BITS(va, 21, 29);
@@ -212,7 +213,7 @@ namespace captive {
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
 				// L4 read_cr3()
-				pm = &((page_map_t *)phys_to_virt(CR3))->entries[pm_idx];
+				pm = &((page_map_t *)PHYS_TO_VIRT(CR3))->entries[pm_idx];
 				if (pm->base_address() == 0) {
 					auto page = Memory::alloc_page();
 					pm->base_address((uint64_t)page.pa);
@@ -222,7 +223,7 @@ namespace captive {
 				}
 
 				// L3
-				pdp = &((page_dir_ptr_t *)phys_to_virt((pa_t)(uint64_t)pm->base_address()))->entries[pdp_idx];
+				pdp = &((page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)(uint64_t)pm->base_address()))->entries[pdp_idx];
 				if (pdp->base_address() == 0) {
 					auto page = Memory::alloc_page();
 					pdp->base_address((uint64_t)page.pa);
@@ -232,7 +233,7 @@ namespace captive {
 				}
 
 				// L2
-				pd = &((page_dir_t *)phys_to_virt((pa_t)(uint64_t)pdp->base_address()))->entries[pd_idx];
+				pd = &((page_dir_t *)PHYS_TO_VIRT((pa_t)(uint64_t)pdp->base_address()))->entries[pd_idx];
 				if (pd->base_address() == 0) {
 					auto page = Memory::alloc_page();
 					pd->base_address((uint64_t)page.pa);
@@ -241,7 +242,7 @@ namespace captive {
 					pd->allow_user(true);
 				}
 
-				pt = &((page_table_t *)phys_to_virt((pa_t)(uint64_t)pd->base_address()))->entries[pt_idx];
+				pt = &((page_table_t *)PHYS_TO_VIRT((pa_t)(uint64_t)pd->base_address()))->entries[pt_idx];
 			}
 
 			#undef BITS
