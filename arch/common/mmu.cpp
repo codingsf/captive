@@ -274,8 +274,6 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pd->writable(true);
 	}
 
-	va_t va_for_gpa = (va_t)(0x100000000ULL | pt->base_address());
-
 	// If the fault happened because of a device access, catch this early
 	// before we go over the lookup rigmaroll.
 	if (pt->device()) {
@@ -291,7 +289,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		pt->allow_user(true);
 		pt->writable(info.is_write());
 
-		if (is_page_device(va_for_gpa)) {
+		if (is_page_device(((va_t)(0x100000000ULL | pt->base_address())))) {
 			pt->device(true);
 			pt->present(false);
 
@@ -314,7 +312,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 			pt->allow_user(info.is_user());
 			pt->writable(info.is_write());
 
-			if (is_page_device(va_for_gpa)) {
+			if (is_page_device(((va_t)(0x100000000ULL | pt->base_address())))) {
 				pt->device(true);
 				pt->present(false);
 
@@ -334,7 +332,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	}
 
 	if (pt->present() && info.is_write()) {
-		if (clear_if_page_executed(va_for_gpa)) {
+		if (clear_if_page_executed(((va_t)(0x100000000ULL | pt->base_address())))) {
 			cpu().invalidate_translation((pa_t)pt->base_address(), (va_t)(uint64_t)va);
 		}
 	}
