@@ -29,14 +29,10 @@ void ThreadPool::start()
 {
 	terminate = false;
 
-	DEBUG << CONTEXT(ThreadPool) << " Launching " << _max_threads << " worker threads";
-	for (uint32_t i = 0; i < _max_threads; i++) {
-		ThreadPoolWorkerInfo *info = new ThreadPoolWorkerInfo();
-		info->owner = this;
-		info->id = i;
-		info->name = _name_pfx + std::to_string(i);
-
-		threads.push_back(new std::thread(thread_proc_tramp, info));
+	DEBUG << CONTEXT(ThreadPool) << " Launching " << _min_threads << " worker threads";
+	
+	for (int i = 0; i < _min_threads; i++) {
+		start_new_thread();
 	}
 }
 
@@ -58,6 +54,19 @@ void ThreadPool::stop()
 	}
 }
 
+void ThreadPool::start_new_thread() 
+{
+	// Refuse to start a new thread if the thread pool size is too large.
+	if (threads.size() >= _max_threads) return;
+	
+	ThreadPoolWorkerInfo *info = new ThreadPoolWorkerInfo();
+	info->owner = this;
+	info->id = threads.size();
+	info->name = _name_pfx + std::to_string(info->id);
+
+	threads.push_back(new std::thread(thread_proc_tramp, info));
+}
+
 void ThreadPool::queue_work(action_t action, completion_t completion, void* data)
 {
 	ThreadPoolWork work;
@@ -66,6 +75,11 @@ void ThreadPool::queue_work(action_t action, completion_t completion, void* data
 	work.data = data;
 
 	work_queue_mutex.lock();
+	
+	if (threads.size() < _max_threads && work_queue.size() > threads.size()) {
+		start_new_thread();
+	}
+	
 	work_queue.push(work);
 	work_queue_cond.notify_one();
 	work_queue_mutex.unlock();
