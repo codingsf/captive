@@ -81,6 +81,9 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	
 	if (!merge_blocks()) return false;
 	timer.tick("MB");
+
+	if (!constant_prop()) return false;
+	timer.tick("Cprop");
 	
 	if (!peephole()) return false;
 	timer.tick("Peep");
@@ -88,9 +91,6 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	sort_ir();
 	if (!value_merging()) return false;
 	timer.tick("VM");
-
-	if (!constant_prop()) return false;
-	timer.tick("Cprop");
 
 	//~ printf	("XXX %x\n", pa);
 	//~ sort_ir();
@@ -2337,8 +2337,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				if (should_branch) {
 					assert(dest->is_alloc_reg());
 					
-					encoder.sete(register_from_operand(dest));
-
 					// Skip the next instruction (which is the branch)
 					ir_idx++;
 
@@ -2363,8 +2361,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.setne(register_from_operand(dest));
 				if (should_branch) {
 					assert(dest->is_alloc_reg());
-					
-					encoder.sete(register_from_operand(dest));
 
 					// Skip the next instruction (which is the branch)
 					ir_idx++;
