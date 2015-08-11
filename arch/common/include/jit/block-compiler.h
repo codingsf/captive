@@ -57,6 +57,7 @@ namespace captive {
 				bool constant_prop();
 				bool reorder_blocks();
 				bool reg_value_reuse();
+				bool value_merging();
 
 				void dump_ir();
 

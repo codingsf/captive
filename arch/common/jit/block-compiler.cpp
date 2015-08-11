@@ -80,11 +80,14 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	timer.tick("DBE");
 	
 	if (!merge_blocks()) return false;
-
 	timer.tick("MB");
+	
 	if (!peephole()) return false;
-
 	timer.tick("Peep");
+
+	sort_ir();
+	if (!value_merging()) return false;
+	timer.tick("VM");
 
 	if (!constant_prop()) return false;
 	timer.tick("Cprop");
@@ -106,7 +109,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 
 	if( !lower_stack_to_reg()) return false;
 	timer.tick("LSTR");
-
+	
 	
 	sort_ir();
 	if (!lower(max_stack)) {
@@ -716,9 +719,9 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 			for(auto e : to_erase)live_ins.erase(e);
 		}
 
-//		printf("  [%03d] %10s\n", ir_idx, insn_descriptors[insn->type].mnemonic);
-
 #if 0
+
+		printf("  [%03d] %10s ", ir_idx, insn_descriptors[insn->type].mnemonic);
 		for (int op_idx = 0; op_idx < 6; op_idx++) {
 			IROperand *oper = &insn->operands[op_idx];
 
@@ -749,15 +752,15 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 		printf(" {");
 		for (auto in : live_ins) {
-			auto alloc = allocation.find(in);
-			int alloc_reg = alloc == allocation.end() ? -1 : alloc->second;
+			//auto alloc = allocation.find(in);
+			int alloc_reg = allocation[in]; //alloc == allocation.end() ? -1 : alloc->second;
 
 			printf(" r%d:%d", in, alloc_reg);
 		}
 		printf(" } {");
 		for (auto out : live_outs) {
-			auto alloc = allocation.find(out);
-			int alloc_reg = alloc == allocation.end() ? -1 : alloc->second;
+			//auto alloc = allocation.find(out);
+			int alloc_reg = allocation[out]; //alloc == allocation.end() ? -1 : alloc->second;
 
 			printf(" r%d:%d", out, alloc_reg);
 		}
@@ -3154,3 +3157,57 @@ bool BlockCompiler::reg_value_reuse()
 	return true;
 }
 
+bool BlockCompiler::value_merging() 
+{
+	// Merge vregs. If a vreg is defined by a mov and never modified, replace all uses of the vreg with the source of
+	// the mov. E.g.
+	// mov v0, v1
+	// mov v1, v2
+	// ||
+	// \/
+	// mov v0, v0
+	// mov v0, v2
+	
+	std::vector<IRRegId> merged_vregs (ctx.reg_count(), -1);
+	
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		
+		// If this is a move of one vreg to another, record this as a candidate for merging
+		if(insn->type == IRInstruction::MOV && insn->operands[0].is_vreg()) {
+			if(merged_vregs[insn->operands[0].value] != -1)
+				merged_vregs[insn->operands[1].value] = merged_vregs[insn->operands[0].value];
+			else
+				merged_vregs[insn->operands[1].value] = insn->operands[0].value;
+		}
+		// If this is not a move, remove any outputs of the instruction from the merge list
+		else {
+			auto &descr = insn_descriptors[insn->type];
+			for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
+				if(descr.format[op_idx] == 'O' || descr.format[op_idx] == 'B') {
+					if(insn->operands[op_idx].is_vreg()) {
+						merged_vregs[insn->operands[op_idx].value] = -1;
+					}
+				}
+			}
+		}
+	}
+	
+	// Apply current merges
+	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
+		IRInstruction *insn = ctx.at(ir_idx);
+		for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
+			IROperand &op = insn->operands[op_idx];
+			if(op.is_vreg() && merged_vregs[op.value] != -1) op.value = merged_vregs[op.value];
+		}
+		
+		if(insn->type == IRInstruction::MOV) {
+			IROperand &op0 = insn->operands[0], &op1 = insn->operands[1];
+			if(op0.is_vreg() && op1.is_vreg() && op0.value == op1.value) make_instruction_nop(insn, true);
+		}
+		//~ dump_insn(insn);
+		//~ printf("\n");
+	}	
+	
+	return true;
+}
