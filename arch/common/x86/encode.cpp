@@ -664,7 +664,15 @@ void X86Encoder::cmp(const X86Register& src, const X86Memory& dst)
 
 void X86Encoder::cmp(uint32_t val, const X86Register& dst)
 {
-	encode_arithmetic(7, val, dst);
+	if(val == 0) {
+		if(dst.size == 1) {
+			encode_opcode_mod_rm(0x84, dst, dst);
+		} else {
+			encode_opcode_mod_rm(0x85, dst, dst);
+		}
+	} else {
+		encode_arithmetic(7, val, dst);
+	}
 }
 
 void X86Encoder::cmp1(uint8_t val, const X86Memory& dst)
@@ -910,9 +918,9 @@ void X86Encoder::nop(uint8_t bytes)
 
 void X86Encoder::align_up(uint8_t amount)
 {
-//	if((_write_offset & (amount-1)) == 0) return;
-//	uint32_t align_end = (_write_offset + amount) & ~(amount-1);
-//	nop(align_end - _write_offset);
+	if((_write_offset & (amount-1)) == 0) return;
+	uint32_t align_end = (_write_offset + amount) & ~(amount-1);
+	nop(align_end - _write_offset);
 }
 
 void X86Encoder::nop(const X86Memory& mem)
