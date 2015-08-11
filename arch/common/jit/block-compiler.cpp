@@ -2313,30 +2313,34 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			default: assert(false);
 			}
 
-			bool should_branch_instead = false;
+			bool should_branch = false;
 
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
 			// TODO: Look at this optimisation
-			/*if (next_insn && next_insn->type == IRInstruction::BRANCH) {
+			if (next_insn && next_insn->type == IRInstruction::BRANCH) {
 				// If the next instruction is a branch, we need to check to see if it's branching on
 				// this condition, before we go ahead an emit an optimised form.
 
 				if (next_insn->operands[0].is_vreg() && next_insn->operands[0].value == dest->value) {
 					// Right here we go, we've got a compare-and-branch situation.
 
-					// Skip the next instruction (which is the branch)
-					i++;
-
 					// Set the do-a-branch-instead flag
-					should_branch_instead = true;
+					should_branch = true;
 				}
-			}*/
+			}
 
 			switch (insn->type) {
 			case IRInstruction::CMPEQ:
-				if (should_branch_instead) {
+				encoder.sete(register_from_operand(dest));
+				
+				if (should_branch) {
 					assert(dest->is_alloc_reg());
+					
+					encoder.sete(register_from_operand(dest));
+
+					// Skip the next instruction (which is the branch)
+					ir_idx++;
 
 					IROperand *tt = &next_insn->operands[1];
 					IROperand *ft = &next_insn->operands[2];
@@ -2352,13 +2356,35 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						encoder.jmp_reloc(reloc_offset);
 						block_relocations.push_back({reloc_offset, ft->value});
 					}
-				} else {
-					encoder.sete(register_from_operand(dest));
 				}
 				break;
 
 			case IRInstruction::CMPNE:
 				encoder.setne(register_from_operand(dest));
+				if (should_branch) {
+					assert(dest->is_alloc_reg());
+					
+					encoder.sete(register_from_operand(dest));
+
+					// Skip the next instruction (which is the branch)
+					ir_idx++;
+
+					IROperand *tt = &next_insn->operands[1];
+					IROperand *ft = &next_insn->operands[2];
+
+					{
+						uint32_t reloc_offset;
+						encoder.jne_reloc(reloc_offset);
+						block_relocations.push_back({reloc_offset, tt->value});
+					}
+
+					{
+						uint32_t reloc_offset;
+						encoder.jmp_reloc(reloc_offset);
+						block_relocations.push_back({reloc_offset, ft->value});
+					}
+				}
+
 				break;
 
 			case IRInstruction::CMPLT:
