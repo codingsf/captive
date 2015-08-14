@@ -187,6 +187,7 @@ namespace captive {
 
 				void jmp(const X86Register& tgt);
 				void jmp(const X86Memory& tgt);
+				void jmp_offset(int32_t off);
 				void jmp_reloc(uint32_t& reloc_offset);
 
 				void jcc_reloc(uint8_t v, uint32_t& reloc_offset);
@@ -248,6 +249,11 @@ namespace captive {
 				inline void jne(int32_t off) { jcc(5, off); }
 				inline void jne(int8_t off) { jcc(5, off); }
 
+				
+
+				void cmov(uint8_t code, const X86Register &src, const X86Register &dst);
+				inline void cmove(const X86Register &src, const X86Register &dst) { cmov(4, src, dst); }
+
 				void lahf();
 				void clc();
 				void stc();
@@ -300,6 +306,7 @@ namespace captive {
 
 				void bsr(const X86Register& src, const X86Register& dst);
 
+				void int3();
 				void intt(uint8_t irq);
 				void leave();
 				void ret();
@@ -312,6 +319,24 @@ namespace captive {
 
 				uint32_t current_offset() const { return _write_offset; }
 
+				inline void emit8(uint8_t b)
+				{
+					ensure_buffer(1);
+					_buffer[_write_offset++] = b;
+				}
+
+				inline void emit32(uint32_t v)
+				{
+					ensure_buffer(4);
+
+					*(uint32_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 4;
+				}
+				
+				inline void ensure_extra_buffer(int extra)
+				{
+					ensure_buffer(extra);
+				}
 			private:
 				uint8_t *_buffer;
 				uint32_t _buffer_size;
@@ -325,11 +350,6 @@ namespace captive {
 					}
 				}
 
-				inline void emit8(uint8_t b)
-				{
-					ensure_buffer(1);
-					_buffer[_write_offset++] = b;
-				}
 
 				inline void emit16(uint16_t v)
 				{
@@ -339,13 +359,7 @@ namespace captive {
 					_write_offset += 2;
 				}
 
-				inline void emit32(uint32_t v)
-				{
-					ensure_buffer(4);
 
-					*(uint32_t*)(&_buffer[_write_offset]) = v;
-					_write_offset += 4;
-				}
 
 				inline void emit64(uint64_t v)
 				{

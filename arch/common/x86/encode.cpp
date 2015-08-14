@@ -795,6 +795,12 @@ void X86Encoder::jmp(const X86Memory& tgt)
 	encode_mod_reg_rm(4, tgt);
 }
 
+void X86Encoder::jmp_offset(int32_t offset)
+{
+	emit8(0xe9);
+	emit32(offset);
+}
+
 void X86Encoder::jmp_reloc(uint32_t& reloc_offset)
 {
 	emit8(0xe9);
@@ -816,6 +822,13 @@ void X86Encoder::jcc(uint8_t v, int8_t off)
 	emit8(off);
 }
 
+void X86Encoder::jcc(uint8_t v, int32_t off)
+{
+	emit8(0x0f);
+	emit8(0x80 | (v & 0xf));
+	emit32(off);
+}
+
 void X86Encoder::setcc(uint8_t v, const X86Register& dst)
 {
 	assert(dst.size == 1);
@@ -825,6 +838,11 @@ void X86Encoder::setcc(uint8_t v, const X86Register& dst)
 	emit8(0x0f);
 	emit8(0x90 | (v & 0xf));
 	encode_mod_reg_rm(0, dst);
+}
+
+void X86Encoder::cmov(uint8_t code, const X86Register &src, const X86Register &dst)
+{
+	encode_opcode_mod_rm(0x140 | code, dst, src);
 }
 
 void X86Encoder::lahf()
@@ -860,6 +878,11 @@ void X86Encoder::movcs(const X86Register& dst)
 	emit8(0x66);
 	emit8(0x8c);
 	encode_mod_reg_rm(1, dst);
+}
+
+void X86Encoder::int3()
+{
+	emit8(0xcc);
 }
 
 void X86Encoder::intt(uint8_t irq)

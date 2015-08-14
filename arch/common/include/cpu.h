@@ -129,6 +129,7 @@ namespace captive {
 
 			struct block_chain_cache_entry {
 				uint32_t tag;
+				uint32_t padding;
 				void *fn;
 				
 				inline void invalidate() { tag = 1; }

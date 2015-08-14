@@ -110,7 +110,6 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if( !lower_stack_to_reg()) return false;
 	timer.tick("LSTR");
 	
-	
 	sort_ir();
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
@@ -119,15 +118,10 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	timer.tick("Lower");
 
 	timer.dump("compile ");
-
-	size_t aligned_fn = (size_t)malloc(encoder.get_buffer_size()+16);
-	if(aligned_fn & 0xf) aligned_fn += 16;
-	aligned_fn &= ~0xf;
-	fn = (block_txln_fn)aligned_fn;
-	memcpy((void*)fn, (void*)encoder.get_buffer(), encoder.get_buffer_size());
-	encoder.destroy_buffer();
 	
-	return true;
+	fn = (block_txln_fn)encoder.get_buffer();
+	
+	return encoder.get_buffer_size();
 }
 
 bool BlockCompiler::sort_ir()
@@ -505,7 +499,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "jmp",		.format = "NXXXXX", .has_side_effects = true },
 	{ .mnemonic = "branch",		.format = "INNXXX", .has_side_effects = true },
 	{ .mnemonic = "ret",		.format = "XXXXXX", .has_side_effects = true },
-	{ .mnemonic = "dispatch",	.format = "NNXXXX", .has_side_effects = true },
+	{ .mnemonic = "dispatch",	.format = "NNNNXX", .has_side_effects = true },
 
 	{ .mnemonic = "scm",		.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "stdev",		.format = "IIIXXX", .has_side_effects = true },
@@ -822,9 +816,9 @@ bool BlockCompiler::thread_jumps()
 				*source_instruction = *target_instruction;
 				source_instruction->ir_block = block_id;
 				goto do_branch_thread;
-			} else if (target_instruction->type == IRInstruction::DISPATCH) {
-				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block_id;
+			//} else if (target_instruction->type == IRInstruction::DISPATCH) {
+			//	*source_instruction = *target_instruction;
+			//	source_instruction->ir_block = block_id;
 			} else {
 				source_instruction->operands[0].value = target_instruction->ir_block;
 			}
@@ -1065,19 +1059,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	std::vector<uint32_t> native_block_offsets (ctx.block_count(), 0);
 	
 	// Function prologue
-	encoder.push(REG_R15);
-	encoder.push(REG_R14);
-	encoder.push(REG_R13);
-	encoder.push(REG_RBX);
-
-	encoder.push(REG_RBP);
-	encoder.mov(REG_RSP, REG_RBP);
 
 	uint32_t prologue_offset = encoder.current_offset();
-	if(max_stack)
-		encoder.sub(max_stack, REG_RSP);
+	if(max_stack > 0x40)
+		encoder.sub(max_stack-0x40, REG_RSP);
 
-	load_state_field(8, REGSTATE_REG);	// Register state ptr
 
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
@@ -1405,51 +1391,133 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		}
 
 		case IRInstruction::DISPATCH:
+		{
+			// If this dispatch hasn't got any compiled targets, do a return instead
+			bool has_fallthrough = insn->operands[1].value != 0;
+			
+			// If this dispatch has a fallthrough PC, but no fallthrough block, don't try to dispatch
+			if(insn->operands[1].value != 0 && insn->operands[3].value == 0) goto do_ret_instead;
+				
+			if(max_stack > 0x40) {
+				encoder.add(max_stack-0x40, REG_RSP);
+			}
+			
+			encoder.ensure_extra_buffer(64);
+			
+			uint8_t *jump_offset;
+			if (emit_interrupt_check) {
+				assert(emit_chaining_logic);
+				encoder.movfs(48, REG_EAX);
+				encoder.test(REG_EAX, REG_EAX);
+				jump_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset() + 1;
+				//printf("Jump offset is at %p (%u)\n", jump_offset, (encoder.current_offset()+1));
+				encoder.jne((int8_t)0);
+			}
+			
+			if(emit_chaining_logic) {
+				
+				size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+				size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+
+				bool jump_via_offsets = false;
+				if(target_offset < 0x80000000 && (!has_fallthrough || fallthrough_offset < 0x80000000)) jump_via_offsets = true;
+				
+				if(jump_via_offsets) {
+					if(has_fallthrough) {
+
+						//load PC into EAX
+						encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EBX);
+						
+						//mask page offset of PC (we already know that both targets land in this page)
+						encoder.andd(0xfff, REG_EBX);
+						
+						encoder.mov(insn->operands[2].value, REG_RCX);
+						encoder.mov(insn->operands[3].value, REG_RDX);
+					
+						//check both targets individually. we check both in case something messed up
+						encoder.cmp(insn->operands[0].value, REG_EBX);
+						encoder.jne((int8_t)2);
+						encoder.jmp(REG_RCX);
+						encoder.jmp(REG_RDX);
+						
+					} else {
+						encoder.mov(insn->operands[2].value, REG_RCX);
+						encoder.jmp(REG_RCX);
+					}
+					
+				} else {
+					if(has_fallthrough) {
+						//load PC into EAX
+						encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EBX);
+						
+						//mask page offset of PC (we already know that both targets land in this page)
+						encoder.andd(0xfff, REG_EBX);
+						encoder.cmp(insn->operands[0].value, REG_EBX);
+						
+						target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+						encoder.je((int32_t)target_offset-6);
+						
+						fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+						encoder.jmp_offset((int32_t)fallthrough_offset-5);
+					} else {
+						//~ dump_this_shit = true;
+						target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+						encoder.jmp_offset((int32_t)target_offset-5);
+					}
+				}
+				uint8_t *current_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset();
+				*jump_offset = (uint8_t)(uint64_t)(current_offset - jump_offset-1);
+				//printf("Jump offset set to %u\n", *jump_offset);
+				
+				//if something messed up, we fall through to the return
+			}
+				
+			// jnz above lands here
+			encoder.xorr(REG_EAX, REG_EAX);
+			encoder.ret();
+						
+			break;
+		}
 		case IRInstruction::RET:
 		{
+			do_ret_instead:
+			if(max_stack > 0x40)
+				encoder.add(max_stack-0x40, REG_RSP);
+			
 			// Function Epilogue
 			if (emit_interrupt_check) {
 				assert(emit_chaining_logic);
 				encoder.movfs(48, REG_EAX);
-				encoder.test(REG_RAX, REG_RAX);
-				encoder.jnz((int8_t)36);
+				encoder.test(REG_EAX, REG_EAX);
+				encoder.jnz((int8_t)34);
 			}
 
 			if (emit_chaining_logic) {
-				encoder.movfs(8, REG_RAX);				
-				encoder.mov(X86Memory::get(REG_RAX, 0x3c), REG_EAX);			// Load the PC
-				encoder.movzx(REG_AX, REG_EDX);									// Mask the PC
-				encoder.lea(X86Memory::get(REG_RDX, REG_RDX, 2), REG_RCX);		// Calculate block cache entry offset
-				encoder.movfs(32, REG_RDX);
-				encoder.lea(X86Memory::get(REG_RDX, REG_RCX, 4), REG_RDX);
-				encoder.cmp(REG_EAX, X86Memory::get(REG_RDX));					// Compre PC with cache entry tag
+				// Each chaining table entry is 16 bytes, arranged
+				// 0	tag (4 bytes)
+				// 8	pointer (8 bytes)
+								
+				// Used regs: EAX, EBX, ECX, EDX
+								
+				encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EAX);		// Load the PC
+				encoder.mov(REG_EAX, REG_EBX);
+				encoder.shr(0x2, REG_EAX);
+				encoder.movzx(REG_AX, REG_EDX);									// Shift/Mask the PC
+				encoder.shl(4, REG_RDX);										// Get cache entry offset (multiply by 16)
+				encoder.movfs(32, REG_RCX);
+				encoder.add(REG_RCX, REG_RDX);									// apply offset
+
+				encoder.cmp(REG_EBX, X86Memory::get(REG_RDX));					// Compare PC with cache entry tag
 				
-				encoder.je((int8_t)11);											// Tags match?
-
-				encoder.leave();
-				encoder.pop(REG_RBX);
-				encoder.pop(REG_R13);
-				encoder.pop(REG_R14);
-				encoder.pop(REG_R15);
-
-				encoder.xorr(REG_EAX, REG_EAX);
-				encoder.ret(); // Nope, return.
+				encoder.jne((int8_t)3);											// Tags match?
 				
-				encoder.mov(X86Memory::get(REG_RDX, 4), REG_RAX);
-				encoder.add(prologue_offset, REG_RAX);
-				if(max_stack)
-					encoder.add(max_stack, REG_RSP);
-				encoder.jmp(REG_RAX);											// Yep, tail call.
-			} else {
-				encoder.leave();
-				encoder.pop(REG_RBX);
-				encoder.pop(REG_R13);
-				encoder.pop(REG_R14);
-				encoder.pop(REG_R15);
-
-				encoder.xorr(REG_EAX, REG_EAX);
-				encoder.ret();
+				encoder.jmp(X86Memory::get(REG_RDX, 8));						// Yep, tail call.
+				
 			}
+
+			// (jnz above should jump to here)
+			encoder.xorr(REG_EAX, REG_EAX);
+			encoder.ret();
 			
 			break;
 		}
@@ -2336,6 +2404,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				
 				if (should_branch) {
 					assert(dest->is_alloc_reg());
+					IRBlockId next_block = (next_insn+1)->ir_block;
 					
 					// Skip the next instruction (which is the branch)
 					ir_idx++;
@@ -2350,9 +2419,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					}
 
 					{
-						uint32_t reloc_offset;
-						encoder.jmp_reloc(reloc_offset);
-						block_relocations.push_back({reloc_offset, ft->value});
+						if(ft->value != next_block) {
+							uint32_t reloc_offset;
+							encoder.jmp_reloc(reloc_offset);
+							block_relocations.push_back({reloc_offset, ft->value});
+						}
 					}
 				}
 				break;
@@ -2361,6 +2432,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.setne(register_from_operand(dest));
 				if (should_branch) {
 					assert(dest->is_alloc_reg());
+					IRBlockId next_block = (next_insn+1)->ir_block;
 
 					// Skip the next instruction (which is the branch)
 					ir_idx++;
@@ -2375,9 +2447,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					}
 
 					{
-						uint32_t reloc_offset;
-						encoder.jmp_reloc(reloc_offset);
-						block_relocations.push_back({reloc_offset, ft->value});
+						if(ft->value != next_block) {
+							uint32_t reloc_offset;
+							encoder.jmp_reloc(reloc_offset);
+							block_relocations.push_back({reloc_offset, ft->value});
+						}
 					}
 				}
 

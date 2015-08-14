@@ -59,12 +59,15 @@ bool CPU::run_block_jit()
 	return run_block_jit_safepoint();
 }
 
+extern "C" int block_trampoline(void *, void*);
+
 bool CPU::run_block_jit_safepoint()
 {
 	bool step_ok = true;
 
 	Region *rgn = NULL;
 	uint32_t region_virt_base = 1;
+	uint32_t region_phys_base = 1;
 
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
@@ -106,16 +109,17 @@ bool CPU::run_block_jit_safepoint()
 
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
+			region_phys_base = phys_pc & 0xfffff000;
 		}
 
+
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
-		
 		if (blk->txln) {
-			auto ptr = block_txln_cache->entry_ptr(virt_pc);
+			auto ptr = block_txln_cache->entry_ptr(virt_pc >> 2);
 			ptr->tag = virt_pc;
 			ptr->fn = (void *)blk->txln;
-						
-			step_ok = blk->txln(&jit_state) == 0;
+			
+			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 			continue;
 		}
 
@@ -123,7 +127,7 @@ bool CPU::run_block_jit_safepoint()
 			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 			mmu().disable_writes();
 
-			step_ok = blk->txln(&jit_state) == 0;
+			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
 		} else {
 			blk->exec_count++;
 			blk->loop_header = true;
@@ -142,7 +146,7 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 		return NULL;
 	}
 
-	bool emit_interrupt_check = mode == MODE_BLOCK && blk->loop_header;
+	bool emit_interrupt_check = mode == MODE_BLOCK;
 	bool emit_chaining_logic = mode == MODE_BLOCK;
 	
 	BlockCompiler compiler(ctx, pa, emit_interrupt_check, emit_chaining_logic);
@@ -174,7 +178,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 #endif
 
 	std::set<uint32_t> seen_pcs;
-
+	seen_pcs.insert(pa);
 	Decode *insn = get_decode(0);
 
 	int insn_count = 0;
@@ -222,14 +226,57 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 100);
 
 	// Branch optimisation log
+	bool can_dispatch = false;
+	uint32_t target_pc = 0, fallthrough_pc = 0;
+
 	if (insn->end_of_block) {
 		JumpInfo ji = get_instruction_jump_info(insn);
-		if (insn->is_predicated && ji.type == JumpInfo::DIRECT) {
-			// Direct Predicated
-			ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(ji.target), IROperand::const32(insn->pc + insn->length)));
-		} else if (get_instruction_jump_info(insn).type == JumpInfo::DIRECT) {
-			// Direct Non-predicated
-			ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(ji.target), IROperand::const32(0)));
+		
+		if (ji.type == JumpInfo::DIRECT) {
+			//~ if (insn->is_predicated) {
+				// Direct Predicated
+				
+				target_pc = ji.target;
+				fallthrough_pc = insn->pc + insn->length;
+			
+				uint32_t target_page = target_pc &  0xfffff000;
+				uint32_t ft_page = fallthrough_pc & 0xfffff000;
+			
+				// Can only dispatch if both jump targets land on the same page as the jump source.
+				if((target_page == page) && (ft_page == page)) {
+					can_dispatch = true;
+				}
+					
+				if(!insn->is_predicated) {
+					if((target_page == page)) can_dispatch = true;
+					fallthrough_pc = 0;
+				}
+					//~ printf("Dispatching via [%08x] %s to %x or %x ", insn->pc, trace().disasm().disassemble(insn->pc, (const uint8_t *)insn), target_pc, fallthrough_pc);
+				
+			//~ } else {
+				//~ target_pc = ji.target;
+				//~ uint32_t target_page = target_pc &  0xfffff000;
+				//~ if(target_page == page) {
+					//~ can_dispatch = true;
+				//~ }
+			//~ }
+		}
+	}
+	
+	if(can_dispatch) {
+		Region *rgn = image->get_region(page);
+		
+		void *target_block = NULL, *ft_block = NULL;
+		
+		if(target_pc) {
+			target_block = (void*)rgn->get_block(PAGE_OFFSET_OF(target_pc))->txln;
+		}
+		if(fallthrough_pc) {
+			ft_block = (void*)rgn->get_block(PAGE_OFFSET_OF(fallthrough_pc))->txln;
+		}
+		
+		if(target_block) {
+			ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
 		} else {
 			ctx.add_instruction(IRInstruction::ret());
 		}
