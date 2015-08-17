@@ -810,8 +810,8 @@ bool BlockCompiler::thread_jumps()
 			}
 
 			if (target_instruction->type == IRInstruction::RET) {
-				*source_instruction = *target_instruction;
-				source_instruction->ir_block = block_id;
+				//*source_instruction = *target_instruction;
+				//source_instruction->ir_block = block_id;
 			} else if (target_instruction->type == IRInstruction::BRANCH) {
 				*source_instruction = *target_instruction;
 				source_instruction->ir_block = block_id;

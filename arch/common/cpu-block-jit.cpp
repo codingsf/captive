@@ -223,7 +223,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 
 			break;
 		}
-	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 100);
+	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 200);
 
 	// Branch optimisation log
 	bool can_dispatch = false;
@@ -281,7 +281,8 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			ctx.add_instruction(IRInstruction::ret());
 		}
 	} else {
-		ctx.add_instruction(IRInstruction::ret());
+		ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(insn->pc + insn->length), IROperand::const32(0)));
+		//ctx.add_instruction(IRInstruction::ret());
 	}
 
 	return true;
