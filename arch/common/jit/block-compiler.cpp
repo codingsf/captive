@@ -511,7 +511,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = false },
+	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = true },
 
 	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
 };
@@ -1369,7 +1369,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						}
 					}
 				}
-				
 			}
 			
 
@@ -1394,7 +1393,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			// If this dispatch hasn't got any compiled targets, do a return instead
 			bool has_fallthrough = insn->operands[1].value != 0;
-			
+						
 			// If this dispatch has a fallthrough PC, but no fallthrough block, don't try to dispatch
 			if(insn->operands[1].value != 0 && insn->operands[3].value == 0) goto do_ret_instead;
 				
@@ -1410,7 +1409,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.movfs(48, REG_EAX);
 				encoder.test(REG_EAX, REG_EAX);
 				jump_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset() + 1;
-				//printf("Jump offset is at %p (%u)\n", jump_offset, (encoder.current_offset()+1));
+				
 				encoder.jne((int8_t)0);
 			}
 			
@@ -1434,7 +1433,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						encoder.mov(insn->operands[2].value, REG_RCX);
 						encoder.mov(insn->operands[3].value, REG_RDX);
 					
-						//check both targets individually. we check both in case something messed up
 						encoder.cmp(insn->operands[0].value, REG_EBX);
 						encoder.jne((int8_t)2);
 						encoder.jmp(REG_RCX);
@@ -1460,7 +1458,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 						encoder.jmp_offset((int32_t)fallthrough_offset-5);
 					} else {
-						//~ dump_this_shit = true;
 						target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 						encoder.jmp_offset((int32_t)target_offset-5);
 					}
@@ -1755,14 +1752,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
+			stack_map_t stack_map;
+
 			if (prev_insn) {
 				if (prev_insn->type == IRInstruction::CALL && insn->count_operands() == prev_insn->count_operands()) {
 					// Don't save the state, because the previous instruction was a call and it is already saved.
 				} else {
-					emit_save_reg_state(insn->count_operands());
+					emit_save_reg_state(insn->count_operands(), stack_map);
 				}
 			} else {
-				emit_save_reg_state(insn->count_operands());
+				emit_save_reg_state(insn->count_operands(), stack_map);
 			}
 
 			//emit_save_reg_state();
@@ -1775,7 +1774,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			for (int i = 1; i < 6; i++) {
 				if (insn->operands[i].type != IROperand::NONE) {
-					encode_operand_function_argument(&insn->operands[i], *sysv_abi[i]);
+					encode_operand_function_argument(&insn->operands[i], *sysv_abi[i], stack_map);
 				}
 			}
 
@@ -1787,10 +1786,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				if (next_insn->type == IRInstruction::CALL && insn->count_operands() == next_insn->count_operands()) {
 					// Don't restore the state, because the next instruction is a call and it will use it.
 				} else {
-					emit_restore_reg_state(insn->count_operands());
+					emit_restore_reg_state(insn->count_operands(), stack_map);
 				}
 			} else {
-				emit_restore_reg_state(insn->count_operands());
+				emit_restore_reg_state(insn->count_operands(), stack_map);
 			}
 
 			break;
@@ -1947,17 +1946,19 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
+			stack_map_t stack_map;
+
 			if (prev_insn && prev_insn->type == IRInstruction::WRITE_DEVICE) {
 				//
 			} else {
-				emit_save_reg_state(4);
+				emit_save_reg_state(4, stack_map);
 			}
 
 			load_state_field(0, REG_RDI);
 
-			encode_operand_function_argument(dev, REG_RSI);
-			encode_operand_function_argument(reg, REG_RDX);
-			encode_operand_function_argument(val, REG_RCX);
+			encode_operand_function_argument(dev, REG_RSI, stack_map);
+			encode_operand_function_argument(reg, REG_RDX, stack_map);
+			encode_operand_function_argument(val, REG_RCX, stack_map);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_write_device, get_temp(1, 8));
@@ -1966,7 +1967,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (next_insn && next_insn->type == IRInstruction::WRITE_DEVICE) {
 				//
 			} else {
-				emit_restore_reg_state(4);
+				emit_restore_reg_state(4, stack_map);
 			}
 
 			break;
@@ -1984,18 +1985,19 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// Load the address of the stack slot into RCX
 			encoder.mov(REG_RSP, REG_RCX);
 
-			emit_save_reg_state(4);
+			stack_map_t stack_map;
+			emit_save_reg_state(4, stack_map);
 
 			load_state_field(0, REG_RDI);
 
-			encode_operand_function_argument(dev, REG_RSI);
-			encode_operand_function_argument(reg, REG_RDX);
+			encode_operand_function_argument(dev, REG_RSI, stack_map);
+			encode_operand_function_argument(reg, REG_RDX, stack_map);
 
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&cpu_read_device, get_temp(1, 8));
 			encoder.call(get_temp(1, 8));
 
-			emit_restore_reg_state(4);
+			emit_restore_reg_state(4, stack_map);
 
 			// Pop the reference argument value into the destination register
 			if (val->is_alloc_reg()) {
@@ -2592,7 +2594,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			encoder.nop(X86Memory::get(REG_RAX, insn->operands[0].value));
 
-			emit_save_reg_state(1);
+			stack_map_t stack_map;
+			emit_save_reg_state(1, stack_map);
 
 			load_state_field(0, REG_RDI);
 
@@ -2600,7 +2603,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&jit_verify, get_temp(0, 8));
 			encoder.call(get_temp(0, 8));
 
-			emit_restore_reg_state(1);
+			emit_restore_reg_state(1, stack_map);
 
 			break;
 		}
@@ -2718,26 +2721,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
-			bool dest_is_rax = register_from_operand(&insn->operands[3], 8) == REG_RAX;
-			
-			if (!dest_is_rax) {
-				encoder.mov(REG_AX, register_from_operand(flags_out, 2));
-			}
+			encoder.setc(X86Memory::get(REG_RDI, 472));
+			encoder.seto(X86Memory::get(REG_RDI, 473));
+			encoder.setz(X86Memory::get(REG_RDI, 474));
+			encoder.sets(X86Memory::get(REG_RDI, 475));
 
-			// Read flags out into AX
-			// What are you lahfing at?
-			encoder.lahf();
-
-			//Move AX into correct destination register
-			if (!dest_is_rax) {
-				if (flags_out->is_alloc_reg()) {
-					encoder.xchg(REG_AX, register_from_operand(flags_out, 2));
-				} else {
-					assert(false);
-				}
-			}
-
-			encoder.seto(register_from_operand(flags_out, 1));
 			break;
 		}
 
@@ -2763,30 +2751,52 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	return success;
 }
 
-void BlockCompiler::emit_save_reg_state(int num_operands)
+void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map)
 {
-	encoder.mov(REGSTATE_REG, REG_R15);
+	uint32_t stack_offset = 0;
+	
+	//First, count required stack slots
 	for(int i = 6; i >= 0; i--) {
-		encoder.push(get_allocable_register(i, 8));
+		if(used_phys_regs.get(i)) {
+			stack_offset += 8;
+		}
+	}
+	
+	encoder.mov(REGSTATE_REG, REG_R15);
+	
+	for(int i = 6; i >= 0; i--) {
+		if(used_phys_regs.get(i)) {
+			const X86Register &reg = get_allocable_register(i, 8);
+			
+			stack_offset -= 8;
+			stack_map[&reg] = stack_offset;
+			encoder.push(reg);
+			
+		}
 	}
 }
 
-void BlockCompiler::emit_restore_reg_state(int num_operands)
+void BlockCompiler::emit_restore_reg_state(int num_operands, stack_map_t &stack_map)
 {
 	for(int i = 0; i < 7; ++i) {
-		encoder.pop(get_allocable_register(i, 8));
+		if(used_phys_regs.get(i)) {
+			encoder.pop(get_allocable_register(i, 8));
+		}
 	}
 	encoder.mov(REG_R15, REGSTATE_REG);
 }
 
-void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86Register& target_reg)
+void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86Register& target_reg, stack_map_t &stack_map)
 {
 	if (oper->is_constant() == IROperand::CONSTANT) {
 		if(oper->value == 0) encoder.xorr(target_reg, target_reg);
 		else encoder.mov(oper->value, target_reg);
 	} else if (oper->is_vreg()) {
-		if (oper->is_alloc_reg()) {
-			encoder.mov(X86Memory::get(REG_RSP, oper->alloc_data * 8), target_reg);
+		if(get_allocable_register(oper->alloc_data, 8) == REG_RBX) {
+			encoder.mov(REG_RBX, target_reg);
+		} else if (oper->is_alloc_reg()) {
+			const X86Register &reg = get_allocable_register(oper->alloc_data, 8);
+			encoder.mov(X86Memory::get(REG_RSP, stack_map[&reg]), target_reg);
 		} else {
 			encoder.mov(X86Memory::get(REG_RBP, (oper->alloc_data * -1) - 8), target_reg);
 		}
@@ -3148,7 +3158,7 @@ bool BlockCompiler::reg_value_reuse()
 				reg_offset = insn->operands[0].value;
 				
 				// HACK ARM PC offset
-				if(reg_offset == 0x3c) continue;
+				if(reg_offset >= 0x3c) continue;
 				
 				if(stored_regs.count(reg_offset)) {
 					insn->type = IRInstruction::MOV;
@@ -3177,7 +3187,7 @@ bool BlockCompiler::reg_value_reuse()
 				reg_offset = insn->operands[1].value;
 				
 				// HACK ARM PC Offset
-				if(reg_offset == 0x3c) continue;
+				if(reg_offset >= 0x3c) continue;
 				
 				// If we've previously written to this offset, zap out the old write since this one kills it
 				// We can only do this if the reg is in both caches since otherwise it might have been loaded since 

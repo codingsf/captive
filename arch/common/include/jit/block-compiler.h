@@ -61,9 +61,10 @@ namespace captive {
 
 				void dump_ir();
 
-				void emit_save_reg_state(int num_operands);
-				void emit_restore_reg_state(int num_operands);
-				void encode_operand_function_argument(shared::IROperand *oper, const x86::X86Register& reg);
+				typedef std::map<const x86::X86Register*, uint32_t> stack_map_t;
+				void emit_save_reg_state(int num_operands, stack_map_t&);
+				void emit_restore_reg_state(int num_operands, stack_map_t&);
+				void encode_operand_function_argument(shared::IROperand *oper, const x86::X86Register& reg, stack_map_t&);
 				void encode_operand_to_reg(shared::IROperand *operand, const x86::X86Register& reg);
 
 				std::map<uint64_t, const x86::X86Register *> register_assignments_1;

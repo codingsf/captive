@@ -251,15 +251,6 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 					if((target_page == page)) can_dispatch = true;
 					fallthrough_pc = 0;
 				}
-					//~ printf("Dispatching via [%08x] %s to %x or %x ", insn->pc, trace().disasm().disassemble(insn->pc, (const uint8_t *)insn), target_pc, fallthrough_pc);
-				
-			//~ } else {
-				//~ target_pc = ji.target;
-				//~ uint32_t target_page = target_pc &  0xfffff000;
-				//~ if(target_page == page) {
-					//~ can_dispatch = true;
-				//~ }
-			//~ }
 		}
 	}
 	
@@ -281,8 +272,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			ctx.add_instruction(IRInstruction::ret());
 		}
 	} else {
-		ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(insn->pc + insn->length), IROperand::const32(0)));
-		//ctx.add_instruction(IRInstruction::ret());
+		ctx.add_instruction(IRInstruction::ret());
 	}
 
 	return true;

@@ -24,6 +24,23 @@ X86Register REG_R15("r15", 8, 7, true), REG_R15D("r15d", 4, 7, true), REG_R15W("
 
 X86Register REG_RIZ("riz", 0, 8);
 X86Register REG_RIP("rip", 0, 9);
+
+X86VectorRegister REG_XMM0("xmm0", 16, 0, 0);
+X86VectorRegister REG_XMM1("xmm1", 16, 1, 0);
+X86VectorRegister REG_XMM2("xmm2", 16, 2, 0);
+X86VectorRegister REG_XMM3("xmm3", 16, 3, 0);
+X86VectorRegister REG_XMM4("xmm4", 16, 4, 0);
+X86VectorRegister REG_XMM5("xmm5", 16, 5, 0);
+X86VectorRegister REG_XMM6("xmm6", 16, 6, 0);
+X86VectorRegister REG_XMM7("xmm7", 16, 7, 0);
+X86VectorRegister REG_XMM8("xmm8", 16, 0, 1);
+X86VectorRegister REG_XMM9("xmm9", 16, 1, 1);
+X86VectorRegister REG_XMM10("xmm10", 16, 2, 1);
+X86VectorRegister REG_XMM11("xmm11", 16, 3, 1);
+X86VectorRegister REG_XMM12("xmm12", 16, 4, 1);
+X86VectorRegister REG_XMM13("xmm13", 16, 5, 1);
+X86VectorRegister REG_XMM14("xmm14", 16, 6, 1);
+X86VectorRegister REG_XMM15("xmm15", 16, 7, 1);
 } } }
 
 #define REX	0x40
@@ -147,15 +164,18 @@ void X86Encoder::mov(uint64_t src, const X86Register& dst)
 	} else {
 		uint8_t rex = 0;
 
+		uint8_t size = dst.size;
+		if(size == 8 && src < 0x80000000) size = 4;
+
 		if (dst.hireg) {
 			rex |= REX_B;
 		}
 
-		if (dst.size == 8) {
+		if (size == 8) {
 			rex |= REX_W;
 		}
 
-		if (dst.size == 2) {
+		if (size == 2) {
 			emit8(OPER_SIZE_OVERRIDE);
 		}
 
@@ -163,7 +183,8 @@ void X86Encoder::mov(uint64_t src, const X86Register& dst)
 
 		emit8(0xb8 + dst.raw_index);
 
-		switch(dst.size) {
+
+		switch(size) {
 		case 8: emit64(src); break;
 		case 4: emit32(src); break;
 		case 2: emit16(src); break;
@@ -221,6 +242,49 @@ void X86Encoder::movsx(const X86Register& src, const X86Register& dst)
 		assert(dst.size == 8);
 		encode_opcode_mod_rm(0x63, dst, src);
 	}
+}
+
+void X86Encoder::movq(const X86Register &src, const X86VectorRegister &dst)
+{
+	
+	//Only support moving quad to quad at the moment
+	assert(src.size == 8);
+	
+	if(dst.size == 16) {
+		emit8(0x66);
+	}
+	
+	uint8_t rex = 0x48;
+	// Emit REX byte ourselves here
+	if(src.hireg) rex |= 1;
+	if(dst.hireg) rex |= 4;
+	
+	emit8(rex);
+	emit8(0x0f);
+	emit8(0x6e);
+	
+	encode_mod_reg_rm(dst.raw_index, src);
+	
+}
+
+void X86Encoder::movq(const X86VectorRegister &src, const X86Register &dst)
+{
+	//Only support moving quad to quad at the moment
+	assert(dst.size == 8);
+	
+	if(src.size == 16) {
+		emit8(0x66);
+	}
+	
+	uint8_t rex = 0x48;
+	// Emit REX byte ourselves here
+	if(dst.hireg) rex |= 1;
+	if(src.hireg) rex |= 4;
+	
+	emit8(rex);
+	emit8(0x0f);
+	emit8(0x7e);
+	encode_mod_reg_rm(src.raw_index, dst);
 }
 
 void X86Encoder::movfs(uint32_t off, const X86Register& dst)
@@ -840,6 +904,13 @@ void X86Encoder::setcc(uint8_t v, const X86Register& dst)
 	encode_mod_reg_rm(0, dst);
 }
 
+void X86Encoder::setcc(uint8_t v, const X86Memory& dst)
+{
+	emit8(0x0f);
+	emit8(0x90 | (v & 0xf));
+	encode_mod_reg_rm(0, dst);
+}
+
 void X86Encoder::cmov(uint8_t code, const X86Register &src, const X86Register &dst)
 {
 	encode_opcode_mod_rm(0x140 | code, dst, src);
@@ -972,7 +1043,8 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Register& rm)
 	mod = 3;
 	mrm = rm.raw_index;
 
-	emit8((mod & 3) << 6 | (mreg & 7) << 3 | (mrm & 7));
+	uint8_t byte = (mod & 3) << 6 | (mreg & 7) << 3 | (mrm & 7);
+	emit8(byte);
 }
 
 void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Register& rm)

@@ -46,6 +46,18 @@ namespace captive {
 			extern X86Register REG_R15, REG_R15D, REG_R15W, REG_R15B;
 			extern X86Register REG_RIZ, REG_RIP;
 
+			struct X86VectorRegister
+			{
+				X86VectorRegister(const char *name, uint8_t size, uint8_t raw_index, bool hireg) : name(name), size(size), raw_index(raw_index), hireg(hireg) { }
+				const char *name;
+				uint8_t size;
+				uint8_t raw_index;
+				bool hireg;
+			};
+			
+			extern X86VectorRegister REG_XMM0, REG_XMM1, REG_XMM2, REG_XMM3, REG_XMM4, REG_XMM5, REG_XMM6, REG_XMM7;
+			extern X86VectorRegister REG_XMM8, REG_XMM9, REG_XMM10, REG_XMM11, REG_XMM12, REG_XMM13, REG_XMM14, REG_XMM15;
+
 			struct X86Memory
 			{
 				const X86Register& index;
@@ -102,6 +114,9 @@ namespace captive {
 
 				void movzx(const X86Register& src, const X86Register& dst);
 				void movsx(const X86Register& src, const X86Register& dst);
+
+				void movq(const X86Register &src, const X86VectorRegister &dst);
+				void movq(const X86VectorRegister &src, const X86Register &dst);
 
 				void incq(const X86Memory& loc);
 				void incl(const X86Memory& loc);
@@ -259,19 +274,23 @@ namespace captive {
 				void stc();
 
 				void setcc(uint8_t v, const X86Register& dst);
+				void setcc(uint8_t v, const X86Memory& dst);
 
 				inline void seto(const X86Register& dst) { setcc(0x00, dst); }
+				inline void seto(const X86Memory& dst) { setcc(0x00, dst); }
 				inline void setno(const X86Register& dst) { setcc(0x01, dst); }
 
 				inline void setb(const X86Register& dst) { setcc(0x02, dst); }
 				inline void setnae(const X86Register& dst) { setb(dst); }
 				inline void setc(const X86Register& dst) { setb(dst); }
+				inline void setc(const X86Memory& dst) { setcc(0x02, dst); }
 
 				inline void setnb(const X86Register& dst) { setcc(0x03, dst); }
 				inline void setae(const X86Register& dst) { setnb(dst); }
 				inline void setnc(const X86Register& dst) { setnb(dst); }
 
 				inline void setz(const X86Register& dst) { setcc(0x04, dst); }
+				inline void setz(const X86Memory& dst) { setcc(0x04, dst); }
 				inline void sete(const X86Register& dst) { setz(dst); }
 
 				inline void setnz(const X86Register& dst) { setcc(0x05, dst); }
@@ -284,6 +303,7 @@ namespace captive {
 				inline void seta(const X86Register& dst) { setnbe(dst); }
 
 				inline void sets(const X86Register& dst) { setcc(0x08, dst); }
+				inline void sets(const X86Memory& dst) { setcc(0x08, dst); }
 				inline void setns(const X86Register& dst) { setcc(0x09, dst); }
 
 				inline void setp(const X86Register& dst) { setcc(0x0a, dst); }
