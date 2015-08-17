@@ -18,8 +18,8 @@ entry16:
 	out %al, $0xa1
 	out %al, $0x21
 
-	// Enable PAE, PGE and PSE
-    mov $0xb0, %eax
+	// Enable PAE, PGE, PSE, OSFXSR and OSXMMEXCPT bits
+    mov $0x6b0, %eax
     mov %eax, %cr4
 
 	// Setup cr3 with the PML4
@@ -32,9 +32,9 @@ entry16:
     or $0x901, %eax
     wrmsr
 
-	// Enable paging and protected mode
+	// Enable paging and protected mode, and the EM and MP bits
     mov %cr0, %eax
-    or $0x80010001, %eax
+    or $0x80010007, %eax
     mov %eax, %cr0
 
 	// Load the GDT
