@@ -62,6 +62,9 @@ namespace captive {
 			std::queue<ThreadPoolWork> work_queue;
 
 			volatile bool terminate;
+			
+			void start_new_thread();
+			void stop_idle_thread();
 		};
 	}
 }
