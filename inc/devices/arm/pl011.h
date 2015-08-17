@@ -11,6 +11,7 @@
 #include <devices/arm/primecell.h>
 #include <deque>
 #include <atomic>
+#include <thread>
 
 #define IRQ_TXINTR (1 << 5)
 #define IRQ_RXINTR (1 << 4)
@@ -32,6 +33,9 @@ namespace captive {
 				PL011(irq::IRQLine& irq, io::UART& uart);
 				virtual ~PL011();
 
+				void start_reading();
+				void stop_reading();
+				
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
@@ -53,6 +57,9 @@ namespace captive {
 				uint32_t rsr, ifl;
 				
 				std::deque<uint32_t> fifo;
+				
+				bool terminate_read_thread;
+				std::thread *read_thread;
 
 				void update_irq();
 
@@ -66,7 +73,7 @@ namespace captive {
 					update_irq();
 				}
 				
-				static void read_thread(PL011 *obj);
+				static void read_thread_proc(PL011 *obj);
 			};
 		}
 	}
