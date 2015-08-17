@@ -4,6 +4,7 @@
 #include <cpu.h>
 #include <mmu.h>
 #include <x86/decode.h>
+#include <interp.h>
 
 using namespace captive::arch;
 
@@ -325,9 +326,15 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 					return 0;
 				}
 
-				// Return TRUE if we need to return to the safe-point, i.e. to do a side
-				// exit from the currently executing guest instruction.
-				return (int)fault;
+				// Invoke the target platform behaviour for the memory fault
+				if (fault) { 
+					// Return TRUE if we need to return to the safe-point, i.e. to do a side
+					// exit from the currently executing guest instruction.
+					core->interpreter().handle_memory_fault(fault);
+					return 1;
+				} else {
+					return 0;
+				}
 			} else {
 				// If the core couldn't handle the fault, then we've got a serious problem.
 				fatal("unhandled page-fault: va=%lx, code=%x, pc=%x\n", va, code, core->read_pc());

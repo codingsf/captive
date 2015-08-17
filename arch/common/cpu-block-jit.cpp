@@ -26,6 +26,8 @@ using namespace captive::arch;
 using namespace captive::arch::jit;
 using namespace captive::arch::profile;
 
+extern "C" int block_trampoline(void *, void*);
+
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
@@ -46,20 +48,12 @@ bool CPU::run_block_jit()
 			trace().end_record();
 		}
 
-		//printf("cpu: memory fault %d\n", rc);
-
-		// Instruct the interpreter to handle the memory fault, passing
-		// in the the type of fault.
-		interpreter().handle_memory_fault((MMU::resolution_fault)rc);
-
 		// Make sure interrupts are enabled.
 		__local_irq_enable();
 	}
 
 	return run_block_jit_safepoint();
 }
-
-extern "C" int block_trampoline(void *, void*);
 
 bool CPU::run_block_jit_safepoint()
 {
@@ -98,10 +92,8 @@ bool CPU::run_block_jit_safepoint()
 
 			// If there was a fault, then switch back to the safe-point.
 			if (unlikely(fault)) {
-				restore_safepoint(&cpu_safepoint, (int)fault);
-
-				// Since we've just destroyed the stack, we should never get here.
-				assert(false);
+				if (!interpreter().handle_memory_fault(fault)) return false;
+				continue;
 			}
 
 			// Mark the physical page corresponding to the PC as executed
@@ -281,8 +273,8 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			ctx.add_instruction(IRInstruction::ret());
 		}
 	} else {
-		ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(insn->pc + insn->length), IROperand::const32(0)));
-		//ctx.add_instruction(IRInstruction::ret());
+		//ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(insn->pc + insn->length), IROperand::const32(0)));
+		ctx.add_instruction(IRInstruction::ret());
 	}
 
 	return true;

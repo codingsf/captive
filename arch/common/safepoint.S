@@ -58,3 +58,33 @@ interrupt_restore_safepoint:
 	push 56(%rdi)	// RIP
 
 	iretq
+
+.globl interrupt_restore_trampoline
+.extern block_trampoline
+interrupt_restore_trampoline:
+	// RDI - safepoint address
+	// RSI - translated code address
+	// RAX - return value
+
+	movq (%rdi), %rbx
+	movq 8(%rdi), %rsp
+	movq 16(%rdi), %rbp
+	movq 24(%rdi), %r12
+	movq 32(%rdi), %r13
+	movq 40(%rdi), %r14
+	movq 48(%rdi), %r15
+
+	// Push the safepoint address on to the stack here
+	push 56(%rdi)	// RIP
+
+	// We should return into ring0
+	push $0x10		// SS
+	push 8(%rdi)	// RSP
+	push 64(%rdi)	// RFLAGS
+	push $0x08		// CS
+
+	// Now, push the block trampoline address here, so that we return directly
+	// into the trampoline
+	push block_trampoline
+
+	iretq
