@@ -511,7 +511,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "adc flags",	.format = "IIIOXX", .has_side_effects = true },
+	{ .mnemonic = "adc flags",	.format = "IIIXXX", .has_side_effects = true },
 
 	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
 };
@@ -2653,9 +2653,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *lhs = &insn->operands[0];
 			IROperand *rhs = &insn->operands[1];
 			IROperand *carry_in = &insn->operands[2];
-			IROperand *flags_out = &insn->operands[3];
 
-			assert(flags_out->is_vreg());
 
 			X86Register& tmp = get_temp(0, 4);
 
