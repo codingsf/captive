@@ -246,7 +246,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the worker thread pool
-	ThreadPool worker_threads("jit-worker-", 1, 3);
+	ThreadPool worker_threads("jit-worker-", 0, 1);
 	worker_threads.start();
 
 	// Create the JIT
@@ -336,9 +336,15 @@ int main(int argc, char **argv)
 	// Start the tick source
 	ts->start();
 
+	// Start reading from the UART
+	uart0->start_reading();
+
 	if (!cpu->run()) {
 		ERROR << "Unable to run CPU";
 	}
+
+	// Stop reading from the UART
+	uart0->stop_reading();
 
 	// Stop the tick source
 	ts->stop();

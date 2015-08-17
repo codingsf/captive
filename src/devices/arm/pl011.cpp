@@ -29,9 +29,11 @@ PL011::PL011(irq::IRQLine& irq, io::UART& uart)
 	irq_mask(0),
 	flag_register(0),
 	rsr(0),
-	ifl(0x12)
+	ifl(0x12),
+	terminate_read_thread(false),
+	read_thread(NULL)
 {
-	new std::thread(read_thread, this);
+	
 }
 
 PL011::~PL011()
@@ -39,10 +41,24 @@ PL011::~PL011()
 
 }
 
-void PL011::read_thread(PL011 *pl011)
+void PL011::start_reading()
 {
+	terminate_read_thread = false;
+	read_thread = new std::thread(read_thread_proc, this);
+}
+
+void PL011::stop_reading()
+{
+	terminate_read_thread = true;
+	read_thread = NULL;
+}
+
+void PL011::read_thread_proc(PL011 *pl011)
+{
+	pthread_setname_np(pthread_self(), "pl011-read");
+	
 	uint8_t ch;
-	while (pl011->_uart.read_char(ch)) {
+	while (!pl011->terminate_read_thread && pl011->_uart.read_char(ch)) {
 		pl011->enqueue(ch);
 	}
 }

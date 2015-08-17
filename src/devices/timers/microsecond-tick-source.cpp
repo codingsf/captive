@@ -37,7 +37,7 @@ void MicrosecondTickSource::tick_thread_proc_tramp(MicrosecondTickSource* o) {
 }
 
 void MicrosecondTickSource::tick_thread_proc() {
-	pthread_setname_np(pthread_self(), "millisecond-tick");
+	pthread_setname_np(pthread_self(), "microsecond-tick");
 	
 	while (!terminate) {
 		tick(1);
@@ -67,7 +67,9 @@ void MicrosecondTickSource::tick_thread_proc() {
 
 			calibrated_ticks = ticks - (total_overshoot / overshoot_samples);
 		} else {
-			usleep(calibrated_ticks);
+			if (usleep(calibrated_ticks) < 0) {
+				fprintf(stderr, "**** INTERRRRRRRUPTED SLEEP\n");
+			}
 		}
 	}
 }

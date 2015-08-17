@@ -16,8 +16,9 @@ namespace captive {
 			struct AsyncBlockRequest
 			{
 				uint64_t offset;
-				uint32_t count;
+				uint32_t block_count;
 				uint8_t *buffer;
+				bool is_read;
 				void *opaque;
 			};
 			

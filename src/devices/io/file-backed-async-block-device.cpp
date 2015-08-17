@@ -67,7 +67,7 @@ bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest& rq, block_req
 	aiorq.aio_fildes = _file_descr;
 	aiorq.aio_offset = rq.offset;
 	aiorq.aio_buf = (void *)rq.buffer;
-	aiorq.aio_nbytes = rq.count * block_size();
+	aiorq.aio_nbytes = rq.block_count * block_size();
 	aiorq.aio_reqprio = 0;
 	//aiorq.aio_sigevent.sigev_value = SIGEV_
 	aiorq.aio_lio_opcode = 0;

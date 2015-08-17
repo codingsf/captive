@@ -6,6 +6,7 @@
 
 #include <unistd.h>
 #include <thread>
+#include <pthread.h>
 
 USE_CONTEXT(VirtualScreen);
 DECLARE_CHILD_CONTEXT(SDLVirtualScreen, VirtualScreen);
@@ -106,6 +107,7 @@ SDLVirtualScreen::~SDLVirtualScreen()
 
 void SDLVirtualScreen::window_thread_proc_tramp(SDLVirtualScreen *o)
 {
+	pthread_setname_np(pthread_self(), "virt-screen");
 	o->window_thread_proc();
 }
 
