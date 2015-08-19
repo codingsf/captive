@@ -1,5 +1,5 @@
 #include <string.h>
-#include <malloc.h>
+#include <malloc/malloc.h>
 
 int strlen(const char *str)
 {
@@ -61,7 +61,7 @@ char *strncat(char *dest, const char *src, int n)
 
 char *strdup(const char *str)
 {
-	char *newstr = (char*)captive::arch::malloc(strlen(str)+1);
+	char *newstr = (char*)captive::arch::malloc::data_alloc.alloc(strlen(str)+1);
 	strcpy(newstr, str);
 	return newstr;
 }

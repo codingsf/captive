@@ -1,5 +1,4 @@
 #include <x86/encode.h>
-#include <local-memory.h>
 
 using namespace captive::arch::x86;
 
@@ -52,7 +51,7 @@ X86VectorRegister REG_XMM15("xmm15", 16, 7, 1);
 #define OPER_SIZE_OVERRIDE 0x66
 #define ADDR_SIZE_OVERRIDE 0x67
 
-X86Encoder::X86Encoder() : _buffer(NULL), _buffer_size(0), _write_offset(0)
+X86Encoder::X86Encoder(malloc::Allocator& allocator) : allocator(allocator), _buffer(NULL), _buffer_size(0), _write_offset(0)
 {
 }
 

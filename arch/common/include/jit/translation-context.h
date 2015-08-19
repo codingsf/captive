@@ -9,9 +9,8 @@
 #define	TRANSLATION_CONTEXT_H
 
 #include <define.h>
-#include <malloc.h>
+#include <malloc/malloc.h>
 #include <shared-jit.h>
-#include <shared-memory.h>
 
 #include <algorithm>
 
@@ -21,7 +20,7 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext();
+				TranslationContext(malloc::Allocator& allocator);
 				~TranslationContext();
 
 				inline void add_instruction(const shared::IRInstruction& instruction) {
@@ -76,7 +75,10 @@ namespace captive {
 				// TODO: if !NDEBUG, check that max block is actually the max block number
 				void recount_blocks(uint32_t max_block) { _ir_block_count = max_block; }
 				
+				inline malloc::Allocator& allocator() const { return _allocator; }
+				
 			private:
+				malloc::Allocator& _allocator;
 				shared::IRBlockId _current_block_id;
 				
 				uint32_t _ir_block_count;
@@ -93,7 +95,7 @@ namespace captive {
 
 					if (_ir_insn_buffer_size < required_size) {
 						_ir_insn_buffer_size = required_size + (sizeof(shared::IRInstruction) * 255);
-						_ir_insns = (shared::IRInstruction *)realloc(_ir_insns, _ir_insn_buffer_size);
+						_ir_insns = (shared::IRInstruction *)_allocator.realloc(_ir_insns, _ir_insn_buffer_size);
 						assert(_ir_insns);
 					}
 				}

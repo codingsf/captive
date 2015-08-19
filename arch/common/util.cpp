@@ -1,20 +1,20 @@
 #include <define.h>
 #include <printf.h>
-#include <malloc.h>
+#include <malloc/malloc.h>
 
 void *operator new(size_t size)
 {
-	return captive::arch::malloc(size);
+	return captive::arch::malloc::data_alloc.alloc(size);
 }
 
 void *operator new[](size_t size)
 {
-	return captive::arch::calloc(1, size);
+	return captive::arch::malloc::data_alloc.calloc(1, size);
 }
 
 void operator delete(void *p)
 {
-	captive::arch::free(p);
+	captive::arch::malloc::data_alloc.free(p);
 }
 
 extern "C" void __cxa_pure_virtual()

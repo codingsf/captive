@@ -47,6 +47,7 @@ static void dump_insn(IRInstruction *insn);
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check, bool emit_chaining_logic) 
 	: ctx(ctx),
+		encoder(malloc::code_alloc),
 		pa(pa),
 		emit_interrupt_check(emit_interrupt_check),
 		emit_chaining_logic(emit_chaining_logic)
@@ -139,12 +140,8 @@ bool BlockCompiler::sort_ir()
 	if(!not_sorted) return true;
 	
 	MergeSort sorter(ctx);
-	auto new_buffer = sorter.perform_sort();
-	if(new_buffer != ctx.get_ir_buffer()) {
-		auto old_buffer = ctx.get_ir_buffer();
-		ctx.set_ir_buffer(new_buffer);
-		free(old_buffer);
-	}
+	sorter.perform_sort();
+	
 	return true;
 }
 

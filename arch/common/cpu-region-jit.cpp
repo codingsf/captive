@@ -4,7 +4,6 @@
 #include <disasm.h>
 #include <jit.h>
 #include <safepoint.h>
-#include <local-memory.h>
 #include <jit/translation-context.h>
 #include <jit/block-compiler.h>
 #include <shared-jit.h>
@@ -191,7 +190,7 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 {
 	rgn->heat = 0;
 
-	rgn->rwu = (shared::RegionWorkUnit *) shalloc(sizeof(shared::RegionWorkUnit));
+	rgn->rwu = (shared::RegionWorkUnit *)malloc::shmem_alloc.alloc(sizeof(shared::RegionWorkUnit));
 	rgn->rwu->region_index = region_index;
 	rgn->rwu->valid = 1;
 	rgn->rwu->block_count = 0;
@@ -208,7 +207,7 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 		if (!blk->ir) continue;
 
 		rgn->rwu->block_count++;
-		rgn->rwu->blocks = (shared::BlockWorkUnit *) shrealloc(rgn->rwu->blocks, sizeof(shared::BlockWorkUnit) * rgn->rwu->block_count);
+		rgn->rwu->blocks = (shared::BlockWorkUnit *)malloc::shmem_alloc.realloc(rgn->rwu->blocks, sizeof(shared::BlockWorkUnit) * rgn->rwu->block_count);
 
 		shared::BlockWorkUnit *bwu = &rgn->rwu->blocks[rgn->rwu->block_count - 1];
 		bwu->offset = bi;
@@ -216,12 +215,12 @@ void CPU::compile_region(Region *rgn, uint32_t region_index)
 		bwu->entry_block = blk->entry;
 
 		bwu->ir_count = blk->ir_count;
-		bwu->ir = (const shared::IRInstruction *)shalloc(sizeof(shared::IRInstruction) * bwu->ir_count);
+		bwu->ir = (const shared::IRInstruction *)malloc::shmem_alloc.alloc(sizeof(shared::IRInstruction) * bwu->ir_count);
 		memcpy((void *)bwu->ir, (const void *)blk->ir, sizeof(shared::IRInstruction) * bwu->ir_count);
 	}
 
 	if (!rgn->rwu->block_count) {
-		shfree(rgn->rwu);
+		malloc::shmem_alloc.free(rgn->rwu);
 		rgn->rwu = NULL;
 		return;
 	}
@@ -238,19 +237,19 @@ void CPU::register_region(shared::RegionWorkUnit* rwu)
 	//printf("registering region %p %08x\n", rgn, rwu->region_index << 12);
 	if (rwu->valid) {
 		if (rgn->txln)
-			shfree((void *)rgn->txln);
+			malloc::shmem_alloc.free((void *)rgn->txln);
 
 		rgn->txln = (shared::region_txln_fn)rwu->fn_ptr;
 	} else {
-		shfree(rwu->fn_ptr);
+		malloc::shmem_alloc.free(rwu->fn_ptr);
 	}
 
 	for (int i = 0; i < rwu->block_count; i++) {
-		shfree((void *)rwu->blocks[i].ir);
+		malloc::shmem_alloc.free((void *)rwu->blocks[i].ir);
 	}
 
-	shfree(rwu->blocks);
-	shfree(rwu);
+	malloc::shmem_alloc.free(rwu->blocks);
+	malloc::shmem_alloc.free(rwu);
 
 	mmu().disable_writes();
 }

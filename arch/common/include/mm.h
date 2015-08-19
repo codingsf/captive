@@ -10,7 +10,6 @@
 
 #include <define.h>
 #include <printf.h>
-#include <shmem.h>
 
 #include <priv.h>
 
@@ -19,7 +18,6 @@
 namespace captive {
 	namespace arch {
 		class MMU;
-		class SharedMemory;
 
 		namespace arm {
 			class ArmMMU;

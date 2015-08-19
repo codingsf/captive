@@ -6,9 +6,8 @@
 #include <env.h>
 #include <cpu.h>
 #include <mmu.h>
-#include <malloc.h>
-#include <shared-memory.h>
-#include <shmem.h>
+#include <malloc/malloc.h>
+#include <malloc/page-allocator.h>
 #include <interp.h>
 
 extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
@@ -113,7 +112,7 @@ extern "C" {
 		printf_init(cpu_data->guest_data->printf_buffer);
 
 		// Initialise the malloc() memory allocation system.
-		captive::arch::malloc_init(cpu_data->guest_data->heap);
+		captive::arch::malloc::page_alloc.init(cpu_data->guest_data->heap.base_address, cpu_data->guest_data->heap.size);
 		
 		// Initialise the memory manager.
 		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
@@ -180,7 +179,7 @@ extern "C" {
 				if (!qi) break;
 
 				if (qi->data) cpu->register_region((captive::shared::RegionWorkUnit *)qi->data);
-				captive::arch::shfree(qi);
+				captive::arch::malloc::shmem_alloc.free(qi);
 
 				captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
 			} while(true);

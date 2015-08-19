@@ -4,27 +4,27 @@ using namespace captive::arch::jit;
 using namespace captive::arch::jit::algo;
 using namespace captive::shared;
 
-IRInstruction *IRSorter::perform_sort()
+void IRSorter::perform_sort()
 {
-	insn_idxs = (uint32_t*)malloc(count() * sizeof(uint32_t));
+	insn_idxs = (uint32_t *)ctx.allocator().alloc(count() * sizeof(uint32_t));
 	
-	for(uint32_t i = 0; i < ctx.count(); ++i) {
+	for (uint32_t i = 0; i < ctx.count(); ++i) {
 		insn_idxs[i] = i;
 	}
 	
 	do_sort();
 	
-	IRInstruction *new_buffer = (IRInstruction*)malloc(ctx.count() * sizeof(IRInstruction));
-	bzero(new_buffer, ctx.count() * sizeof(IRInstruction));
-	for(uint32_t i = 0; i < ctx.count(); ++i) {
-		new_buffer[i] = *ctx.at(insn_idxs[i]);
+	IRInstruction *old_buffer = ctx.get_ir_buffer();
+	IRInstruction *new_buffer = (IRInstruction *)ctx.allocator().calloc(ctx.count(), sizeof(IRInstruction));
+	for (uint32_t i = 0; i < ctx.count(); ++i) {
+		new_buffer[i] = old_buffer[insn_idxs[i]];
 	}
+
+	ctx.set_ir_buffer(new_buffer);
+	ctx.allocator().free(old_buffer);
 	
-	free(insn_idxs);
-	
+	ctx.allocator().free(insn_idxs);
 	insn_idxs = NULL;
-	
-	return new_buffer;
 }
 
 bool GnomeSort::do_sort()

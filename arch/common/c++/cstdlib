@@ -17,7 +17,7 @@
 */
 
 #include <basic_definitions>
-#include <malloc.h>
+#include <malloc/malloc.h>
 #include <string.h>
 
 #ifndef __HEADER_CSTDLIB
@@ -32,17 +32,17 @@ namespace std{
 //	using ::atof;
 //	using ::atoi;
 //	using ::bsearch;
-	using captive::arch::calloc;
+//	using captive::arch::calloc;
 //	using ::div;
 //	using ::exit;
-	using captive::arch::free;
+//	using captive::arch::free;
 //	using ::getenv;
 //	using ::labs;
 //	using ::ldiv;
-	using captive::arch::malloc;
+//	using captive::arch::malloc;
 //	using ::qsort;
 //	using ::rand;
-	using captive::arch::realloc;
+//	using captive::arch::realloc;
 //	using ::srand;
 //	using ::strtod;
 //	using ::strtol;

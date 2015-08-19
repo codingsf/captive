@@ -21,7 +21,7 @@ namespace captive {
 			{
 			public:
 				IRSorter(TranslationContext& _ctx) : ctx(_ctx) { }
-				shared::IRInstruction *perform_sort();
+				void perform_sort();
 				
 			protected:
 				virtual bool do_sort() = 0;

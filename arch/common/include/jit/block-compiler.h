@@ -11,8 +11,8 @@
 #include <define.h>
 #include <shared-jit.h>
 #include <x86/encode.h>
-#include <local-memory.h>
 #include <jit/translation-context.h>
+#include <malloc/malloc.h>
 
 #include <small-set.h>
 #include <map>

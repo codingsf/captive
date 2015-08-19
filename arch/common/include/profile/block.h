@@ -9,7 +9,7 @@
 #define	BLOCK_H
 
 #include <define.h>
-#include <malloc.h>
+#include <malloc/malloc.h>
 #include <shared-jit.h>
 
 #include <set>
@@ -34,12 +34,12 @@ namespace captive {
 					loop_header = false;
 					
 					if (txln) {
-						free((void *)txln);
+						malloc::data_alloc.free((void *)txln);
 						txln = NULL;
 					}
 					
 					if (ir) {
-						free((void *)ir);
+						malloc::data_alloc.free((void *)ir);
 						ir = NULL;
 					}
 				}

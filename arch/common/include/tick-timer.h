@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include <malloc.h>
+#include <malloc/malloc.h>
 #include <string.h>
 
 class tick_timer
@@ -12,7 +12,7 @@ class tick_timer
 		tick_timer(bool enabled = 1) : enabled(enabled) {}
 		~tick_timer() {
 			for(auto i : names) {
-				if(i) captive::arch::free(i);
+				if(i) captive::arch::malloc::data_alloc.free(i);
 			}
 		}
 	

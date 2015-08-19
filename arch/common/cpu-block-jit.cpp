@@ -4,7 +4,6 @@
 #include <disasm.h>
 #include <jit.h>
 #include <safepoint.h>
-#include <local-memory.h>
 #include <jit/translation-context.h>
 #include <jit/block-compiler.h>
 #include <shared-jit.h>
@@ -132,7 +131,7 @@ bool CPU::run_block_jit_safepoint()
 
 captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_compilation_mode mode)
 {
-	TranslationContext ctx;
+	TranslationContext ctx(malloc::data_alloc);
 	if (!translate_block(ctx, pa)) {
 		printf("jit: block translation failed\n");
 		return NULL;
@@ -149,7 +148,7 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 	}
 
 	if (mode == MODE_BLOCK) {
-		free((void *)ctx.get_ir_buffer());
+		malloc::data_alloc.free((void *)ctx.get_ir_buffer());
 	} else {
 		blk->ir_count = ctx.count();
 		blk->ir = ctx.get_ir_buffer();

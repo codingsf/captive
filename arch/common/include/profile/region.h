@@ -11,6 +11,7 @@
 #include <define.h>
 #include <string.h>
 #include <profile/block.h>
+#include <malloc/malloc.h>
 
 namespace captive {
 	namespace shared {
@@ -47,7 +48,7 @@ namespace captive {
 					}
 
 					if (txln) {
-						shfree((void *)txln);
+						malloc::shmem_alloc.free((void *)txln);
 						txln = NULL;
 					}
 

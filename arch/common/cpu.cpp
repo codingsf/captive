@@ -9,7 +9,6 @@
 #include <priv.h>
 #include <jit.h>
 #include <jit/translation-context.h>
-#include <shared-memory.h>
 #include <profile/image.h>
 #include <profile/region.h>
 #include <profile/block.h>
@@ -72,9 +71,9 @@ bool CPU::handle_pending_action(uint32_t action)
 	switch (action) {
 	case 2:
 	{
-		struct mallinfo mi = dlmallinfo();
-		printf("*** malloc info ***\n");
-		printf("used: %d\nfree: %d\n", mi.uordblks, mi.fordblks);
+		//struct mallinfo mi = dlmallinfo();
+		//printf("*** malloc info ***\n");
+		//printf("used: %d\nfree: %d\n", mi.uordblks, mi.fordblks);
 
 		dump_state();
 		return true;

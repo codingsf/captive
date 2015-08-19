@@ -1,6 +1,5 @@
 #include <mm.h>
 #include <printf.h>
-#include <shared-memory.h>
 
 using namespace captive::arch;
 
