@@ -20,7 +20,7 @@ namespace captive {
 				FileBackedAsyncBlockDevice();
 				~FileBackedAsyncBlockDevice();
 				
-				bool submit_request(AsyncBlockRequest& rq, block_request_cb_t cb) override;
+				bool submit_request(AsyncBlockRequest *rq, block_request_cb_t cb) override;
 
 				uint64_t blocks() const override { return _block_count; }
 				

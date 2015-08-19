@@ -520,7 +520,7 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 	if (fixed_addr) {
 		mmap_flags |= MAP_FIXED;
 	}
-
+	
 	int mmap_prot = PROT_READ | PROT_WRITE;
 
 	rgn->host_buffer = mmap(fixed_addr, size, mmap_prot, mmap_flags, -1, 0);

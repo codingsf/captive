@@ -13,27 +13,26 @@
 namespace captive {
 	namespace devices {
 		namespace io {
-			class BlockDevice;
+			class AsyncBlockDevice;
 
 			namespace virtio {
 				class VirtIOBlockDevice : public VirtIO
 				{
 				public:
-					VirtIOBlockDevice(irq::IRQLine& irq, BlockDevice& bdev);
+					VirtIOBlockDevice(irq::IRQLine& irq, AsyncBlockDevice& bdev);
 					virtual ~VirtIOBlockDevice();
+					
+					void signal_completion();
 
 				protected:
 					void reset() override;
 					const uint8_t* config_area() const override { return (const uint8_t *)&config; }
 					uint32_t config_area_size() const override { return sizeof(config); }
 
-					void process_event(VirtIOQueueEvent& evt) override;
+					void process_event(VirtIOQueueEvent *evt) override;
 
 				private:
-					BlockDevice& _bdev;
-
-					bool handle_read(uint64_t sector, uint8_t *buffer, uint32_t len);
-					bool handle_write(uint64_t sector, uint8_t *buffer, uint32_t len);
+					AsyncBlockDevice& _bdev;
 
 					struct virtio_blk_req {
 						uint32_t type;
@@ -41,6 +40,9 @@ namespace captive {
 						uint64_t sector;
 					} __packed;
 
+					void handle_read_request(VirtIOQueueEvent *evt, struct virtio_blk_req *req);
+					void handle_write_request(VirtIOQueueEvent *evt, struct virtio_blk_req *req);
+					
 					struct {
 						uint64_t capacity;
 						uint32_t size_max;

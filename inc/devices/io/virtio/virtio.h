@@ -20,6 +20,8 @@ namespace captive {
 
 		namespace io {
 			namespace virtio {
+				class VirtQueue;
+
 				struct VirtIOQueueEventBuffer
 				{
 				public:
@@ -32,7 +34,7 @@ namespace captive {
 				class VirtIOQueueEvent
 				{
 				public:
-					VirtIOQueueEvent() : response_size(0) { }
+					VirtIOQueueEvent(VirtQueue& queue, uint16_t head_idx) : queue(queue), head_idx(head_idx), response_size(0) { }
 
 					~VirtIOQueueEvent() {
 					}
@@ -45,19 +47,15 @@ namespace captive {
 						write_buffers.push_back(VirtIOQueueEventBuffer(data, size));
 					}
 
-					inline void clear() {
-						response_size = 0;
-						read_buffers.clear();
-						write_buffers.clear();
-					}
-
+					VirtQueue& queue;
+					uint16_t head_idx;
+					
 					std::vector<VirtIOQueueEventBuffer> read_buffers;
 					std::vector<VirtIOQueueEventBuffer> write_buffers;
 
 					uint32_t response_size;
 				};
 
-				class VirtQueue;
 				class VirtIO : public Device
 				{
 				public:
@@ -78,7 +76,7 @@ namespace captive {
 					inline VirtQueue *current_queue() const { return queue(_queue_sel); }
 					inline VirtQueue *queue(uint8_t index) const { if (index > queues.size()) return NULL; else return queues[index]; }
 
-					virtual void process_event(VirtIOQueueEvent& evt) = 0;
+					virtual void process_event(VirtIOQueueEvent *evt) = 0;
 
 					inline void assert_interrupt(int idx) {
 						_isr |= 1 << idx;
@@ -96,9 +94,10 @@ namespace captive {
 						_host_features &= ~(1 << idx);
 					}
 
+					void update_irq();
+					
 				private:
 					void process_queue(VirtQueue *queue);
-					void update_irq();
 
 					std::vector<VirtQueue *> queues;
 					irq::IRQLine& _irq;

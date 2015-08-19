@@ -197,18 +197,16 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 
 void VirtIO::process_queue(VirtQueue* queue)
 {
-	assert(_isr == 0);
-
 	// DEBUG << "[" << GetName() << "] Processing Queue";
 
 	uint16_t head_idx;
 	const VirtRing::VirtRingDesc *descr;
-	VirtIOQueueEvent evt;
 	while ((descr = queue->PopDescriptorChainHead(head_idx)) != NULL) {
 		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Popped a descriptor chain head " << std::dec << head_idx;
 
 		bool have_next = false;
-		evt.clear();
+
+		VirtIOQueueEvent *evt = new VirtIOQueueEvent(*queue, head_idx);
 
 		do {
 			void *descr_host_addr;
@@ -218,10 +216,10 @@ void VirtIO::process_queue(VirtQueue* queue)
 
 			if (descr->flags & 2) {
 				//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Adding WRITE buffer @ " << descr_host_addr << ", size = " << descr->len;
-				evt.add_write_buffer(descr_host_addr, descr->len);
+				evt->add_write_buffer(descr_host_addr, descr->len);
 			} else {
 				//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Adding READ buffer @ " << descr_host_addr << ", size = " << descr->len;
-				evt.add_read_buffer(descr_host_addr, descr->len);
+				evt->add_read_buffer(descr_host_addr, descr->len);
 			}
 
 			have_next = (descr->flags & 1) == 1;
@@ -234,7 +232,6 @@ void VirtIO::process_queue(VirtQueue* queue)
 		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Processing event";
 		process_event(evt);
 
-		queue->Push(head_idx, evt.response_size);
 		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Pushed a descriptor chain head " << std::dec << head_idx << ", length=" << evt.response_size;
 	}
 }

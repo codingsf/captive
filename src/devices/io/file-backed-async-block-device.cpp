@@ -60,19 +60,57 @@ void FileBackedAsyncBlockDevice::close_file()
 	_file_descr = -1;
 }
 
-bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest& rq, block_request_cb_t cb)
+struct AsyncContext
 {
 	struct aiocb64 aiorq;
+	AsyncBlockRequest *rq;
+	FileBackedAsyncBlockDevice::block_request_cb_t cb;
+};
+
+extern "C" void async_read_complete(sigval_t sigval)
+{
+	AsyncContext *ctx = (AsyncContext *)sigval.sival_ptr;
+	//DEBUG << "Asynchronous read operation has completed";
 	
-	aiorq.aio_fildes = _file_descr;
-	aiorq.aio_offset = rq.offset;
-	aiorq.aio_buf = (void *)rq.buffer;
-	aiorq.aio_nbytes = rq.block_count * block_size();
-	aiorq.aio_reqprio = 0;
-	//aiorq.aio_sigevent.sigev_value = SIGEV_
-	aiorq.aio_lio_opcode = 0;
+	ctx->rq->request_complete.complete(aio_error64(&ctx->aiorq) == 0);
+	if (ctx->cb) {
+		ctx->cb(ctx->rq);
+	}
 	
-	//aio_read64(&aiorq);
+	delete ctx;
+}
+
+bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest *rq, block_request_cb_t cb)
+{
+	AsyncContext *ctx = new AsyncContext();
+	ctx->rq = rq;
+	ctx->cb = cb;
 	
-	return false;
+	bzero(&ctx->aiorq, sizeof(ctx->aiorq));
+	ctx->aiorq.aio_fildes = _file_descr;
+	ctx->aiorq.aio_offset = rq->offset;
+	ctx->aiorq.aio_buf = (void *)rq->buffer;
+	ctx->aiorq.aio_nbytes = rq->block_count * block_size();
+	ctx->aiorq.aio_reqprio = 0;
+	ctx->aiorq.aio_sigevent.sigev_notify = SIGEV_THREAD;
+	ctx->aiorq.aio_sigevent.sigev_value.sival_ptr = ctx;
+	ctx->aiorq.aio_sigevent._sigev_un._sigev_thread._function = async_read_complete;
+	ctx->aiorq.aio_lio_opcode = 0;
+	
+	if (rq->is_read) {
+		//DEBUG << "Enqueing asynchronous block read request";
+		
+		if (aio_read64(&ctx->aiorq)) {
+			//ERROR << "AIO failure: " << strerror(errno);
+			return false;
+		}
+	} else {
+		if (aio_write64(&ctx->aiorq)) {
+			//ERROR << "AIO failure: " << strerror(errno);
+			return false;
+		}
+	}
+	
+	//DEBUG << "Asynchronous block request was queued up";
+	return true;
 }
