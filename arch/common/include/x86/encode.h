@@ -57,18 +57,33 @@ namespace captive {
 			
 			extern X86VectorRegister REG_XMM0, REG_XMM1, REG_XMM2, REG_XMM3, REG_XMM4, REG_XMM5, REG_XMM6, REG_XMM7;
 			extern X86VectorRegister REG_XMM8, REG_XMM9, REG_XMM10, REG_XMM11, REG_XMM12, REG_XMM13, REG_XMM14, REG_XMM15;
+			
+			struct X86SegmentRegister
+			{
+				X86SegmentRegister(const char *name, uint8_t raw_index) : name(name), raw_index(raw_index) { }
+				const char *name;
+				uint8_t raw_index;
+
+				inline bool operator==(const X86SegmentRegister& other) const { return other.raw_index == raw_index; }
+				inline bool operator!=(const X86SegmentRegister& other) const { return other.raw_index != raw_index; }
+			};
+			
+			extern X86SegmentRegister REG_CS, REG_DS, REG_ES, REG_FS, REG_GS, REG_SS;
 
 			struct X86Memory
 			{
+				const X86SegmentRegister& segment;
 				const X86Register& index;
 				const X86Register& base;
 				int32_t displacement;
 				uint8_t scale;
 
-				X86Memory(const X86Register& _base) : scale(0), index(REG_RIZ), base(_base), displacement(0) { }
-				X86Memory(const X86Register& _base, int32_t disp) : scale(0), index(REG_RIZ), base(_base), displacement(disp) { }
-				X86Memory(const X86Register& _base, const X86Register& _index, uint8_t _scale) : scale(_scale), index(_index), base(_base), displacement(0) { }
-				X86Memory(const X86Register& _base, int32_t _disp, const X86Register& _index, uint8_t _scale) : scale(_scale), index(_index), base(_base), displacement(_disp) { }
+				X86Memory(const X86Register& _base) : segment(REG_DS), scale(0), index(REG_RIZ), base(_base), displacement(0) { }
+				X86Memory(const X86Register& _base, int32_t disp) : segment(REG_DS), scale(0), index(REG_RIZ), base(_base), displacement(disp) { }
+				X86Memory(const X86Register& _base, const X86Register& _index, uint8_t _scale) : segment(REG_DS), scale(_scale), index(_index), base(_base), displacement(0) { }
+				X86Memory(const X86Register& _base, int32_t _disp, const X86Register& _index, uint8_t _scale) : segment(REG_DS), scale(_scale), index(_index), base(_base), displacement(_disp) { }
+				X86Memory(const X86SegmentRegister& _segment, const X86Register& _base) : segment(_segment), scale(0), index(REG_RIZ), base(_base), displacement(0) { }
+				X86Memory(const X86SegmentRegister& _segment, int32_t _disp) : segment(_segment), scale(0), index(REG_RIZ), base(REG_RIZ), displacement(_disp) { }
 
 				static X86Memory get(const X86Register& base)
 				{
@@ -88,6 +103,16 @@ namespace captive {
 				static X86Memory get(const X86Register& base, int32_t disp)
 				{
 					return X86Memory(base, disp);
+				}
+				
+				static X86Memory get(const X86SegmentRegister& segment, const X86Register& base)
+				{
+					return X86Memory(segment, base);
+				}
+
+				static X86Memory get(const X86SegmentRegister& segment, int32_t disp)
+				{
+					return X86Memory(segment, disp);
 				}
 			};
 
@@ -127,8 +152,6 @@ namespace captive {
 				void mov(const X86Register& src, const X86Memory& dst);
 				void mov(uint64_t src, const X86Register& dst);
 
-				void movfs(uint32_t off, const X86Register& dst);
-				
 				void mov8(uint64_t imm, const X86Memory& dst);
 				void mov4(uint32_t imm, const X86Memory& dst);
 				void mov2(uint16_t imm, const X86Memory& dst);

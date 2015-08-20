@@ -76,7 +76,7 @@ namespace captive {
 			bool is_page_dirty(va_t va);
 			uint32_t page_checksum(va_t va);
 
-			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault);
+			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault, bool emulate_user);
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
 
 			bool virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault);

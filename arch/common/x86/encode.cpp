@@ -40,6 +40,8 @@ X86VectorRegister REG_XMM12("xmm12", 16, 4, 1);
 X86VectorRegister REG_XMM13("xmm13", 16, 5, 1);
 X86VectorRegister REG_XMM14("xmm14", 16, 6, 1);
 X86VectorRegister REG_XMM15("xmm15", 16, 7, 1);
+
+X86SegmentRegister REG_CS("cs", 0), REG_DS("ds", 1), REG_ES("es", 2), REG_FS("fs", 3), REG_GS("gs", 4), REG_SS("ss", 5);
 } } }
 
 #define REX	0x40
@@ -48,8 +50,10 @@ X86VectorRegister REG_XMM15("xmm15", 16, 7, 1);
 #define REX_R	0x44
 #define REX_W	0x48
 
-#define OPER_SIZE_OVERRIDE 0x66
-#define ADDR_SIZE_OVERRIDE 0x67
+#define SEG_OVERRIDE_FS		0x64
+#define SEG_OVERRIDE_GS		0x65
+#define OPER_SIZE_OVERRIDE	0x66
+#define ADDR_SIZE_OVERRIDE	0x67
 
 X86Encoder::X86Encoder(malloc::Allocator& allocator) : allocator(allocator), _buffer(NULL), _buffer_size(0), _write_offset(0)
 {
@@ -284,12 +288,6 @@ void X86Encoder::movq(const X86VectorRegister &src, const X86Register &dst)
 	emit8(0x0f);
 	emit8(0x7e);
 	encode_mod_reg_rm(src.raw_index, dst);
-}
-
-void X86Encoder::movfs(uint32_t off, const X86Register& dst)
-{
-	emit8(0x64);
-	encode_opcode_mod_rm(0x8b, dst, X86Memory::get(REG_RIZ, off, REG_RIZ, 1));
 }
 
 void X86Encoder::xchg(const X86Register& a, const X86Register& b)
@@ -1069,6 +1067,8 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 		mrm = 4; // Need a SIB byte
 	} else if (rm.base == REG_RIP) {
 		assert(false); // Need to think about this]
+	} else if (rm.base == REG_RIZ) {
+		mrm = 4; // Need a SIB byte
 	} else if (rm.scale != 0) {
 		mrm = 4; // Need a SIB byte
 	} else {
@@ -1089,9 +1089,16 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 		uint8_t s, i, b;
 
 		if (rm.scale == 0) {
-			s = 0;
-			i = 4;
-			b = rm.base.raw_index;
+			if (rm.base == REG_RIZ) {
+				s = 0;
+				i = 4;
+				b = 5;
+			} else {
+				assert(rm.base.raw_index != 5);
+				s = 0;
+				i = 4;
+				b = rm.base.raw_index;
+			}
 		} else {
 			switch (rm.scale) {
 				case 1:	s = 0; break;
@@ -1135,6 +1142,13 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, c
 	assert(rm.base.size == 4 || rm.base.size == 8 || rm.base == REG_RIZ);
 
 	// Figure out what prefixes are needed (if any)
+	
+	// Determine if there are any segment override prefixes
+	if (rm.segment == REG_FS) {
+		emit8(SEG_OVERRIDE_FS);
+	} else if (rm.segment == REG_GS) {
+		emit8(SEG_OVERRIDE_GS);
+	}
 
 	// Emit an operand-size override if the reg operand is 16-bits
 	if (reg.size == 2) {
@@ -1166,6 +1180,11 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, c
 	// If the base operand is a high register, emit a REX_B
 	if (rm.base.hireg) {
 		rex |= REX_B;
+	}
+	
+	// If the index operand is a high register, emit a REX_X
+	if (rm.index.hireg) {
+		rex |= REX_X;
 	}
 
 	// If we are to emit a REX prefix, do that now.

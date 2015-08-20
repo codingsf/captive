@@ -19,20 +19,44 @@
 namespace captive {
 	namespace arch {
 		namespace malloc {
+
+#define MAX_ORDER 17
+			
 			class PageAllocator
 			{
 			public:
 				PageAllocator();
 				
-				void init(void *heap, size_t heap_size);
+				void init(void *zone, size_t zone_size);
+				
+				inline void *alloc_page() { alloc_pages(1); }
 				void *alloc_pages(int nr_pages);
-				void free_pages(void *p);
+				void free_pages(void *p, int nr_pages);
 				
 			private:
-				void *_heap;
-				size_t _heap_size;
+				void *_zone;
+				size_t _zone_size;
+				uint32_t _zone_pages;
 				
-				void *_next_page;
+				struct FreeArea {
+					FreeArea *next;
+					
+					inline void push(FreeArea *area) {
+						area->next = next;
+						next = area;
+					}
+					
+					inline FreeArea *pop() {
+						FreeArea *tmp = next;
+						next = tmp->next;
+						return tmp;
+					}
+				};
+				
+				FreeArea _free_areas[MAX_ORDER];
+				
+				void split_order(int order);
+				void dump();
 			};
 			
 			extern PageAllocator page_alloc;

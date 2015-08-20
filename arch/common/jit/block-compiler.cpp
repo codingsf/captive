@@ -26,6 +26,11 @@ using namespace captive::shared;
 
 static void dump_insn(IRInstruction *insn);
 
+static void you_pleb()
+{
+	printf("stm user\n");
+}
+
 /* Register Mapping
  *
  * RAX  Allocatable			0
@@ -1403,7 +1408,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			uint8_t *jump_offset;
 			if (emit_interrupt_check) {
 				assert(emit_chaining_logic);
-				encoder.movfs(48, REG_EAX);
+				encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
 				encoder.test(REG_EAX, REG_EAX);
 				jump_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset() + 1;
 				
@@ -1481,7 +1486,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// Function Epilogue
 			if (emit_interrupt_check) {
 				assert(emit_chaining_logic);
-				encoder.movfs(48, REG_EAX);
+				encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
 				encoder.test(REG_EAX, REG_EAX);
 				encoder.jnz((int8_t)34);
 			}
@@ -1498,7 +1503,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.shr(0x2, REG_EAX);
 				encoder.movzx(REG_AX, REG_EDX);									// Shift/Mask the PC
 				encoder.shl(4, REG_RDX);										// Get cache entry offset (multiply by 16)
-				encoder.movfs(32, REG_RCX);
+				encoder.mov(X86Memory::get(REG_FS, 32), REG_RCX);
 				encoder.add(REG_RCX, REG_RDX);									// apply offset
 
 				encoder.cmp(REG_EBX, X86Memory::get(REG_RDX));					// Compare PC with cache entry tag
@@ -1876,26 +1881,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *offset = &insn->operands[0];
 			IROperand *dest = &insn->operands[1];
 
-			encoder.movcs(REG_CX);
-			encoder.test(3, REG_CL);
-			encoder.jnz((int8_t)2);
-			encoder.intt(0x81);
-
 			if (offset->is_vreg()) {
 				if (offset->is_alloc_reg() && dest->is_alloc_reg()) {
-					// mov (reg), reg
-					encoder.mov(X86Memory::get(register_from_operand(offset)), register_from_operand(dest));
+					// mov %gs:(reg), reg
+					encoder.mov(X86Memory::get(REG_GS, register_from_operand(offset)), register_from_operand(dest));
 				} else {
 					assert(false);
 				}
 			} else {
 				assert(false);
 			}
-
-			encoder.test(3, REG_CL);
-			encoder.jnz((int8_t)2);
-			encoder.intt(0x80);
-			encoder.nop();				// JIC
 
 			break;
 		}
@@ -1904,18 +1899,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			IROperand *value = &insn->operands[0];
 			IROperand *offset = &insn->operands[1];
-
-			encoder.movcs(REG_CX);
-			encoder.test(3, REG_CL);
-			encoder.jnz((int8_t)2);
-			encoder.intt(0x81);
-
+			
 			if (offset->is_vreg()) {
 				if (value->is_vreg()) {
 					if (offset->is_alloc_reg() && value->is_alloc_reg()) {
-						// mov reg, (reg)
-
-						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset)));
+						// mov reg, %gs:(reg)
+						encoder.mov(register_from_operand(value), X86Memory::get(REG_GS, register_from_operand(offset)));
 					} else {
 						assert(false);
 					}
@@ -1925,11 +1914,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				assert(false);
 			}
-
-			encoder.test(3, REG_CL);
-			encoder.jnz((int8_t)2);
-			encoder.intt(0x80);
-			encoder.nop();				// JIC
 
 			break;
 		}

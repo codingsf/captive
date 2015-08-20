@@ -30,6 +30,14 @@ MMU::MMU(CPU& cpu) : _cpu(cpu)
 		pdp->entries[i].writable(true);
 		pdp->entries[i].allow_user(true);
 	}
+	
+	for (int i = 12; i < 16; i++) {
+		pdp->entries[i].base_address((uint64_t)Memory::alloc_page().pa);
+		pdp->entries[i].flags(0);
+		pdp->entries[i].present(false);
+		pdp->entries[i].writable(true);
+		pdp->entries[i].allow_user(true);
+	}
 
 	Memory::flush_tlb();
 	
@@ -151,8 +159,14 @@ void MMU::invalidate_virtual_mappings()
 	page_map_t *pm = (page_map_t *)PHYS_TO_VIRT(CR3);
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)pm->entries[0].base_address());
 
-	// Clear the present map on the 4G mapping
+	// Clear the present map on the 4G mapping, and re-enable writing.
 	for (int i = 0; i < 4; i++) {
+		pdp->entries[i].present(false);
+		pdp->entries[i].writable(true);
+	}
+	
+	// Clear the present map on the emulated 4G mapping, and re-enable writing.
+	for (int i = 16; i < 20; i++) {
 		pdp->entries[i].present(false);
 		pdp->entries[i].writable(true);
 	}
@@ -180,6 +194,11 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 
 	Memory::flush_page((va_t)(uint64_t)va);
 	
+	Memory::get_va_table_entries((va_t)(uint64_t)(0x400000000ULL | va), pm, pdp, pd, pt);
+	pt->present(false);
+
+	Memory::flush_page((va_t)(uint64_t)(0x400000000ULL | va));
+	
 	// Notify the CPU to invalidate this virtual mapping
 	_cpu.invalidate_virtual_mapping(va);
 	
@@ -191,8 +210,13 @@ void MMU::disable_writes()
 	page_map_t *pm = (page_map_t *)PHYS_TO_VIRT(CR3);
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)pm->entries[0].base_address());
 
-	// Clear the present map on the 4G mapping
+	// Clear the writable flag on the 4G mapping
 	for (int i = 0; i < 4; i++) {
+		pdp->entries[i].writable(false);
+	}
+	
+	// Clear the writable flag on the emulated 4G mapping
+	for (int i = 16; i < 20; i++) {
 		pdp->entries[i].writable(false);
 	}
 
@@ -204,14 +228,21 @@ void MMU::disable_writes()
 	}
 }
 
-bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault)
+bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault, bool emulate_user)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
 	page_dir_entry_t *pd;
 	page_table_entry_t *pt;
 
-	Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
+	va_t host_va;
+	if (emulate_user) {
+		host_va = (va_t)(0x400000000ULL | va);
+	} else {
+		host_va = (va_t)(va);
+	}
+	
+	Memory::get_va_table_entries(host_va, pm, pdp, pd, pt);
 
 	//printf("mmu: handle fault: %x %p (%x) %p (%x) %p (%x) %p (%x)\n", va, pm, pm->data, pdp, pdp->data, pd, pd->data, pt, pt->data);
 
@@ -298,6 +329,7 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		}
 	} else {
 		gpa_t pa;
+	
 		if (!resolve_gpa(va, pa, info, fault)) {
 			return false;
 		}
@@ -312,13 +344,13 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 			pt->allow_user(info.is_user());
 			pt->writable(info.is_write());
 
-			if (is_page_device(((va_t)(0x100000000ULL | pt->base_address())))) {
+			if (is_page_device(((va_t)(0x100000000ULL | pa)))) {
 				pt->device(true);
 				pt->present(false);
 
 				out_pa = pa;
 				
-				Memory::flush_page((va_t)(uint64_t)va);
+				Memory::flush_page(host_va);
 				goto handle_device;
 			}
 
@@ -332,12 +364,12 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	}
 
 	if (pt->present() && info.is_write()) {
-		if (clear_if_page_executed(((va_t)(0x100000000ULL | pt->base_address())))) {
+		if (clear_if_page_executed(((va_t)(0x100000000ULL | (pt->base_address() & 0xffffffff))))) {
 			cpu().invalidate_translation((pa_t)pt->base_address(), (va_t)(uint64_t)va);
 		}
 	}
 
-	Memory::flush_page((va_t)(uint64_t)va);
+	Memory::flush_page(host_va);
 	return true;
 
 handle_device:

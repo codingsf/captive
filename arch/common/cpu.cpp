@@ -53,6 +53,10 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	
 	// Populate the FS register with the address of the JIT state structure.
 	__wrmsr(0xc0000100, (uint64_t)&jit_state);
+	
+	// Populate the GS register with the address of the emulated user page table.
+	__wrmsr(0xc0000101, (uint64_t)0x400000000ULL);	// GS Base
+	__wrmsr(0xc0000102, (uint64_t)0x400000000ULL);	// Kernel GS Base
 
 	invalidate_virtual_mappings();
 }

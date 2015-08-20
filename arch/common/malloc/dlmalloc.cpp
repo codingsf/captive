@@ -536,6 +536,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 
 #define HAVE_MMAP 1
 #define HAVE_MORECORE 0
+#define HAVE_MREMAP 0
 
 #define PROT_READ	1
 #define PROT_WRITE	2
@@ -558,7 +559,7 @@ static inline void *mremap(void *addr, size_t old_size, size_t new_size, int fla
 
 static inline int munmap(void *addr, size_t size)
 {
-	captive::arch::malloc::page_alloc.free_pages(addr);
+	captive::arch::malloc::page_alloc.free_pages(addr, size >> 12);
 	return 0;
 }
 

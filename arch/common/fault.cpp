@@ -282,7 +282,12 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
-	if (va < 0x100000000) {
+	if (va < 0x100000000 || (va >= 0x400000000 && va < 0x500000000)) {
+		bool emulate_user = false;
+		if (va >= 0x400000000 && va < 0x500000000) {
+			emulate_user = true;
+		}
+		
 		// Obtain the core that is currently active.
 		captive::arch::CPU *core = captive::arch::CPU::get_active_cpu();
 
@@ -292,8 +297,12 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 
 			// Prepare an access_info structure to describe the memory access
 			// to the MMU.
-			info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
-			//info.mode = (core->kernel_mode() && !core->emulating_user_mode()) ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+			if (emulate_user) {
+				// If we're emulating a user-mode instruction, mark this access as a USER access.
+				info.mode = MMU::ACCESS_USER;
+			} else {
+				info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
+			}
 
 			if (code & PF_PRESENT) {
 				// Detect the fault as being because a permissions check failed
@@ -303,7 +312,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				info.reason = MMU::REASON_PAGE_INVALID;
 			}
 
-			if (va == core->read_pc() && !(code & PF_WRITE)) {
+			if ((uint32_t)va == core->read_pc() && !(code & PF_WRITE)) {
 				// Detect a fetch
 				info.type = MMU::ACCESS_FETCH;
 			} else {
@@ -317,7 +326,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 
 			// Get the core's MMU to handle the fault.
 			gpa_t out_pa;
-			if (core->mmu().handle_fault((gva_t)va, out_pa, info, fault)) {
+			if (core->mmu().handle_fault((gva_t)va, out_pa, info, fault, emulate_user)) {
 				// If we got this far, then the fault was handled by the core's logic.
 				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%s, type=%s, reason=%s\n", va, code, core->read_pc(), fault, info_modes[info.mode], info_types[info.type], info_reasons[info.reason]);
 
