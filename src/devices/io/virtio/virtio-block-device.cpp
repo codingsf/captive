@@ -1,5 +1,5 @@
 #include <devices/io/virtio/virtio-block-device.h>
-#include <devices/io/block-device.h>
+#include <devices/io/async-block-device.h>
 #include <captive.h>
 
 #include <string.h>
@@ -9,7 +9,7 @@ DECLARE_CHILD_CONTEXT(VirtIOBlockDevice, VirtIO);
 
 using namespace captive::devices::io::virtio;
 
-VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, BlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
+VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, AsyncBlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
 {
 	bzero(&config, sizeof(config));
 	config.capacity = bdev.blocks();
@@ -93,12 +93,35 @@ void VirtIOBlockDevice::reset()
 
 bool VirtIOBlockDevice::handle_read(uint64_t sector, uint8_t* buffer, uint32_t len)
 {
-	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Read: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;	
-	return _bdev.read_blocks(sector, len / _bdev.block_size(), buffer);
+	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Read: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;
+	
+	AsyncBlockRequest *rq = new AsyncBlockRequest();
+	rq->block_count = len / _bdev.block_size();
+	rq->block_offset = sector;
+	rq->buffer = buffer;
+	rq->is_read = true;
+	
+	if (!_bdev.submit_request(rq, NULL)) return false;
+	
+	bool result = rq->complete.wait();
+	delete rq;
+	
+	return result;
 }
 
 bool VirtIOBlockDevice::handle_write(uint64_t sector, uint8_t* buffer, uint32_t len)
 {
 	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;
-	return _bdev.write_blocks(sector, len / _bdev.block_size(), buffer);
+	AsyncBlockRequest *rq = new AsyncBlockRequest();
+	rq->block_count = len / _bdev.block_size();
+	rq->block_offset = sector;
+	rq->buffer = buffer;
+	rq->is_read = false;
+	
+	if (!_bdev.submit_request(rq, NULL)) return false;
+	
+	bool result = rq->complete.wait();
+	delete rq;
+	
+	return result;
 }

@@ -9,13 +9,16 @@
 #define	ASYNC_BLOCK_DEVICE_H
 
 #include <define.h>
+#include <util/completion.h>
 
 namespace captive {
 	namespace devices {
 		namespace io {
 			struct AsyncBlockRequest
 			{
-				uint64_t offset;
+				util::Completion<bool> complete;
+				
+				uint64_t block_offset;
 				uint32_t block_count;
 				uint8_t *buffer;
 				bool is_read;
@@ -30,7 +33,7 @@ namespace captive {
 				AsyncBlockDevice(uint32_t block_size = 4096);
 				virtual ~AsyncBlockDevice();
 				
-				virtual bool submit_request(AsyncBlockRequest& rq, block_request_cb_t cb) = 0;
+				virtual bool submit_request(AsyncBlockRequest *rq, block_request_cb_t cb) = 0;
 
 				inline uint32_t block_size() const { return _block_size; }
 

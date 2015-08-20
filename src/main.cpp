@@ -30,7 +30,7 @@
 #include <devices/io/ps2.h>
 #include <devices/io/null-uart.h>
 #include <devices/io/console-uart.h>
-#include <devices/io/file-backed-block-device.h>
+#include <devices/io/file-backed-async-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
 
 #include <devices/gfx/sdl-virtual-screen.h>
@@ -226,7 +226,7 @@ int main(int argc, char **argv)
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e6000, *gpio2));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101e7000, *gpio3));
 
-	devices::io::FileBackedBlockDevice *bdev = new devices::io::FileBackedBlockDevice();
+	devices::io::FileBackedAsyncBlockDevice *bdev = new devices::io::FileBackedAsyncBlockDevice();
 
 	if (!bdev->open_file(argv[4])) {
 		ERROR << "Unable to open block device file '" << argv[4] << "'";
@@ -345,6 +345,9 @@ int main(int argc, char **argv)
 
 	// Stop reading from the UART
 	uart0->stop_reading();
+	
+	// Close the block device file
+	bdev->close_file();
 
 	// Stop the tick source
 	ts->stop();

@@ -10,6 +10,8 @@
 
 #include <define.h>
 #include <devices/io/async-block-device.h>
+#include <thread>
+#include <linux/aio_abi.h>
 
 namespace captive {
 	namespace devices {
@@ -20,7 +22,7 @@ namespace captive {
 				FileBackedAsyncBlockDevice();
 				~FileBackedAsyncBlockDevice();
 				
-				bool submit_request(AsyncBlockRequest& rq, block_request_cb_t cb) override;
+				bool submit_request(AsyncBlockRequest *rq, block_request_cb_t cb) override;
 
 				uint64_t blocks() const override { return _block_count; }
 				
@@ -34,6 +36,12 @@ namespace captive {
 				uint64_t _file_size;
 				uint64_t _block_count;
 				bool _read_only;
+				
+				aio_context_t _aio;
+				std::thread *_aio_thread;
+				bool _terminate;
+				
+				static void aio_thread_proc(FileBackedAsyncBlockDevice *bdev);
 			};
 		}
 	}

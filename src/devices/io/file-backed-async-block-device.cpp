@@ -5,15 +5,35 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <aio.h>
+#include <sys/syscall.h>
+
+inline int io_setup(unsigned nr, aio_context_t *ctxp)
+{
+	return syscall(__NR_io_setup, nr, ctxp);
+}
+
+inline int io_destroy(aio_context_t ctx) 
+{
+	return syscall(__NR_io_destroy, ctx);
+}
+
+inline int io_submit(aio_context_t ctx, long nr,  struct iocb **iocbpp) 
+{
+	return syscall(__NR_io_submit, ctx, nr, iocbpp);
+}
+
+inline int io_getevents(aio_context_t ctx, long min_nr, long max_nr, struct io_event *events, struct timespec *timeout)
+{
+	return syscall(__NR_io_getevents, ctx, min_nr, max_nr, events, timeout);
+}
 
 USE_CONTEXT(BlockDevice);
+DECLARE_CHILD_CONTEXT(FileBackedAsyncBlockDevice, BlockDevice);
 
 using namespace captive::devices::io;
 
-FileBackedAsyncBlockDevice::FileBackedAsyncBlockDevice() : AsyncBlockDevice(512), _file_descr(-1), _file_size(0), _block_count(0), _read_only(false)
+FileBackedAsyncBlockDevice::FileBackedAsyncBlockDevice() : AsyncBlockDevice(512), _file_descr(-1), _file_size(0), _block_count(0), _read_only(false), _aio_thread(NULL), _terminate(false)
 {
-
 }
 
 FileBackedAsyncBlockDevice::~FileBackedAsyncBlockDevice()
@@ -25,17 +45,19 @@ FileBackedAsyncBlockDevice::~FileBackedAsyncBlockDevice()
 
 bool FileBackedAsyncBlockDevice::open_file(std::string filename, bool read_only)
 {
+	if (_file_descr >= 0) return false;
+	
 	_read_only = read_only;
 
-	_file_descr = open(filename.c_str(), read_only ? O_RDONLY : O_RDWR);
+	_file_descr = open(filename.c_str(), (read_only ? O_RDONLY : O_RDWR));
 	if (_file_descr < 0) {
-		ERROR << "Failed to open file";
+		ERROR << CONTEXT(BlockDevice) << "Failed to open file";
 		return false;
 	}
 
 	struct stat st;
 	if (fstat(_file_descr, &st)) {
-		ERROR << "Failed to stat file";
+		ERROR << CONTEXT(BlockDevice) << "Failed to stat file";
 		close(_file_descr);
 		_file_descr = -1;
 		
@@ -50,29 +72,76 @@ bool FileBackedAsyncBlockDevice::open_file(std::string filename, bool read_only)
 	if (_file_size % block_size() != 0) {
 		_block_count++;
 	}
-
+	
+	if (io_setup(128, &_aio)) {
+		ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "Unable to setup AIO";
+		close(_file_descr);
+		_file_descr = -1;
+		
+		return false;
+	}
+	
+	_terminate = false;
+	_aio_thread = new std::thread(aio_thread_proc, this);
+	
 	return true;
 }
 
 void FileBackedAsyncBlockDevice::close_file()
 {
+	if (_file_descr == -1) return;
+	
+	_terminate = true;
+	io_destroy(_aio);
+
+	if (_aio_thread->joinable()) _aio_thread->join();	
+	
 	close(_file_descr);
 	_file_descr = -1;
 }
 
-bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest& rq, block_request_cb_t cb)
+bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest *rq, block_request_cb_t callback)
 {
-	struct aiocb64 aiorq;
+	struct iocb cb;
+	struct iocb *cbs[] = { &cb };
 	
-	aiorq.aio_fildes = _file_descr;
-	aiorq.aio_offset = rq.offset;
-	aiorq.aio_buf = (void *)rq.buffer;
-	aiorq.aio_nbytes = rq.block_count * block_size();
-	aiorq.aio_reqprio = 0;
-	//aiorq.aio_sigevent.sigev_value = SIGEV_
-	aiorq.aio_lio_opcode = 0;
+	bzero(&cb, sizeof(cb));
+	cb.aio_fildes = _file_descr;
 	
-	//aio_read64(&aiorq);
+	if (rq->is_read)
+		cb.aio_lio_opcode = IOCB_CMD_PREAD;
+	else
+		cb.aio_lio_opcode = IOCB_CMD_PWRITE;
 	
-	return false;
+	cb.aio_buf = (uint64_t)rq->buffer;
+	cb.aio_offset = rq->block_offset * block_size();
+	cb.aio_nbytes = rq->block_count * block_size();
+	cb.aio_data = (uint64_t)rq;
+	
+	DEBUG << CONTEXT(FileBackedAsyncBlockDevice) << "Submitting IO request";
+	int rc = io_submit(_aio, 1, cbs);
+	if (rc < 0) {
+		ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "IO submission error";
+		return false;
+	} else if (rc != 1) {
+		ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "IO submission rejection";
+		return false;
+	}
+	
+	return true;
+}
+
+void FileBackedAsyncBlockDevice::aio_thread_proc(FileBackedAsyncBlockDevice* bdev)
+{
+	struct io_event events[1];
+	while (!bdev->_terminate) {		
+		int rc = io_getevents(bdev->_aio, 1, 1, events, NULL);
+		if (rc < 0) {
+			ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "IO event error";
+			break;
+		}
+
+		AsyncBlockRequest *rq = (AsyncBlockRequest *)events[0].data;
+		rq->complete.signal(events[0].res == (rq->block_count * bdev->block_size()));
+	}
 }
