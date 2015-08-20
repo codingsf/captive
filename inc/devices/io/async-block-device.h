@@ -16,8 +16,6 @@ namespace captive {
 		namespace io {
 			struct AsyncBlockRequest
 			{
-				util::Completion<bool> complete;
-				
 				uint64_t block_offset;
 				uint32_t block_count;
 				uint8_t *buffer;
@@ -28,7 +26,7 @@ namespace captive {
 			class AsyncBlockDevice
 			{
 			public:
-				typedef void (*block_request_cb_t)(AsyncBlockRequest *rq);
+				typedef void (*block_request_cb_t)(AsyncBlockRequest *rq, bool success);
 				
 				AsyncBlockDevice(uint32_t block_size = 4096);
 				virtual ~AsyncBlockDevice();
@@ -46,7 +44,7 @@ namespace captive {
 				}
 
 			private:
-				uint32_t _block_size;
+				uint32_t _block_size;				
 			};
 		}
 	}

@@ -23,105 +23,147 @@ VirtIOBlockDevice::~VirtIOBlockDevice()
 
 }
 
-void VirtIOBlockDevice::process_event(VirtIOQueueEvent& evt)
+static void read_event_callback(captive::devices::io::AsyncBlockRequest *rq, bool success)
+{
+	VirtIOQueueEvent *evt = (VirtIOQueueEvent *)rq->opaque;
+
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Read request callback, success=" << std::boolalpha << success;
+	
+	*((uint8_t *)evt->write_buffers.back().data) = success ? 0 : 1;
+	evt->response_size = 1 + success ? evt->write_buffers.front().size : 0;
+	evt->submit();
+	
+#ifdef SYNCHRONOUS
+	evt->complete.signal(true);
+#endif
+	
+	delete rq;
+}
+
+static void write_event_callback(captive::devices::io::AsyncBlockRequest *rq, bool success)
+{
+	VirtIOQueueEvent *evt = (VirtIOQueueEvent *)rq->opaque;
+
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Write request callback, success=" << std::boolalpha << success;
+	
+	*((uint8_t *)evt->write_buffers.back().data) = success ? 0 : 1;
+	evt->response_size = 1;
+	evt->submit();
+
+#ifdef SYNCHRONOUS
+	evt->complete.signal(true);
+#endif
+	
+	delete rq;
+}
+
+void VirtIOBlockDevice::handle_read_event(uint64_t sector, VirtIOQueueEvent* evt)
+{
+	assert(evt->write_buffers.size() == 2);
+	
+	AsyncBlockRequest *rq = new AsyncBlockRequest();
+	rq->block_count = evt->write_buffers.front().size / _bdev.block_size();
+	rq->block_offset = sector;
+	rq->buffer = (uint8_t *)evt->write_buffers.front().data;
+	rq->is_read = true;
+	rq->opaque = evt;
+
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Submitting read request, offset=" << rq->block_offset << ", count=" << rq->block_count << ", buffer=" << std::hex << (uint64_t)rq->buffer;
+	
+	if (!_bdev.submit_request(rq, read_event_callback)) {
+		*(uint8_t *)evt->write_buffers.back().data = 1;
+		evt->response_size = 1;
+		submit_event(evt);
+#ifdef SYNCHRONOUS
+		evt->complete.signal(false);
+#endif
+	}
+}
+
+void VirtIOBlockDevice::handle_write_event(uint64_t sector, VirtIOQueueEvent* evt)
+{
+	assert(evt->read_buffers.size() == 2);
+	
+	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write Event";
+	
+	AsyncBlockRequest *rq = new AsyncBlockRequest();
+	rq->block_count = evt->read_buffers.back().size / _bdev.block_size();
+	rq->block_offset = sector;
+	rq->buffer = (uint8_t *)evt->read_buffers.back().data;
+	rq->is_read = false;
+	rq->opaque = evt;
+	
+	if (!_bdev.submit_request(rq, write_event_callback)) {
+		*(uint8_t *)evt->write_buffers.back().data = 1;
+		evt->response_size = 1;
+		submit_event(evt);
+#ifdef SYNCHRONOUS
+		evt->complete.signal(false);
+#endif
+	}
+}
+
+void VirtIOBlockDevice::process_event(VirtIOQueueEvent *evt)
 {
 	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Processing Event";
 
-	if (evt.read_buffers.size() == 0 && evt.write_buffers.size() == 0) {
+	if (evt->read_buffers.size() == 0 && evt->write_buffers.size() == 0) {
 		return;
 	}
 
-	if (evt.read_buffers.front().size < sizeof(struct virtio_blk_req)) {
+	if (evt->read_buffers.front().size < sizeof(struct virtio_blk_req)) {
 		WARNING << CONTEXT(VirtIOBlockDevice) << "Discarding event with invalid header";
 		return;
 	}
 
-	struct virtio_blk_req *req = (struct virtio_blk_req *)evt.read_buffers.front().data;
+	const struct virtio_blk_req *req = (const struct virtio_blk_req *)evt->read_buffers.front().data;
 
-	uint8_t *status = (uint8_t *)evt.write_buffers.back().data;
 	switch (req->type) {
-	case 0: // Read
-		assert(evt.write_buffers.size() == 2);
-
-		if (handle_read(req->sector, (uint8_t *)evt.write_buffers.front().data, evt.write_buffers.front().size)) {
-			*status = 0;
-		} else {
-			*status = 1;
-		}
-
-		evt.response_size = evt.write_buffers.front().size + 1;
+	case 0: 
+		handle_read_event(req->sector, evt);
 		break;
 
-	case 1: // Write
-		assert(evt.read_buffers.size() == 2);
-
-		if (handle_write(req->sector, (uint8_t *)evt.read_buffers.back().data, evt.read_buffers.back().size)) {
-			*status = 0;
-		} else {
-			*status = 1;
-		}
-
-		evt.response_size = 1;
+	case 1:
+		handle_write_event(req->sector, evt);
 		break;
+		
 	case 8: // Get ID
 	{
-		assert(evt.write_buffers.size() == 2);
+		assert(evt->write_buffers.size() == 2);
 
-		char *serial_number = (char *)evt.write_buffers.front().data;
-		strncpy(serial_number, "virtio", evt.write_buffers.front().size);
+		DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Get ID Event";
+		
+		char *serial_number = (char *)evt->write_buffers.front().data;
+		strncpy(serial_number, "virtio", evt->write_buffers.front().size);
 
-		evt.response_size = 1 + 7;
-		*status = 0;
+		// Size is the size of the status flag, plus the length of the null-terminated string.
+		evt->response_size = 8;
 
+		// Write the status flag
+		*(uint8_t *)evt->write_buffers.back().data = 0;
+
+		submit_event(evt);
+#ifdef SYNCHRONOUS
+		evt->complete.signal(true);
+#endif
 		break;
 	}
+	
 	default:
 		WARNING << CONTEXT(VirtIOBlockDevice) << "Rejecting event with unsupported type " << (uint32_t)req->type;
 
-		*status = 2;
-		evt.response_size = 1;
+		evt->response_size = 1;
+		*(uint8_t *)evt->write_buffers.back().data = 2;
+	
+		submit_event(evt);
+#ifdef SYNCHRONOUS
+		evt->complete.signal(false);
+#endif
 		break;
 	}
-
-	assert_interrupt(0);
 }
 
 void VirtIOBlockDevice::reset()
 {
 
-}
-
-bool VirtIOBlockDevice::handle_read(uint64_t sector, uint8_t* buffer, uint32_t len)
-{
-	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Read: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;
-	
-	AsyncBlockRequest *rq = new AsyncBlockRequest();
-	rq->block_count = len / _bdev.block_size();
-	rq->block_offset = sector;
-	rq->buffer = buffer;
-	rq->is_read = true;
-	
-	if (!_bdev.submit_request(rq, NULL)) return false;
-	
-	bool result = rq->complete.wait();
-	delete rq;
-	
-	return result;
-}
-
-bool VirtIOBlockDevice::handle_write(uint64_t sector, uint8_t* buffer, uint32_t len)
-{
-	//DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write: sector=" << std::hex << sector << ", len=" << len << ", buffer=" << std::hex << (uint64_t)buffer;
-	AsyncBlockRequest *rq = new AsyncBlockRequest();
-	rq->block_count = len / _bdev.block_size();
-	rq->block_offset = sector;
-	rq->buffer = buffer;
-	rq->is_read = false;
-	
-	if (!_bdev.submit_request(rq, NULL)) return false;
-	
-	bool result = rq->complete.wait();
-	delete rq;
-	
-	return result;
 }

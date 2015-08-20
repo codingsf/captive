@@ -27,13 +27,16 @@ namespace captive {
 					const uint8_t* config_area() const override { return (const uint8_t *)&config; }
 					uint32_t config_area_size() const override { return sizeof(config); }
 
-					void process_event(VirtIOQueueEvent& evt) override;
+					void process_event(VirtIOQueueEvent *evt) override;
 
 				private:
 					AsyncBlockDevice& _bdev;
+					
+					void handle_read_event(uint64_t sector, VirtIOQueueEvent *evt);
+					void handle_write_event(uint64_t sector, VirtIOQueueEvent *evt);
 
-					bool handle_read(uint64_t sector, uint8_t *buffer, uint32_t len);
-					bool handle_write(uint64_t sector, uint8_t *buffer, uint32_t len);
+					//bool handle_read(uint64_t sector, uint8_t *buffer, uint32_t len);
+					//bool handle_write(uint64_t sector, uint8_t *buffer, uint32_t len);
 
 					struct virtio_blk_req {
 						uint32_t type;

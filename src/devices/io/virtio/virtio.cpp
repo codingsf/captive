@@ -46,7 +46,7 @@ VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t 
 	_status(0)
 {
 	for (uint8_t i = 0; i < nr_queues; i++) {
-		queues.push_back(new VirtQueue());
+		queues.push_back(new VirtQueue(*this));
 	}
 }
 
@@ -57,6 +57,11 @@ VirtIO::~VirtIO()
 	}
 
 	queues.clear();
+}
+
+void VirtIOQueueEvent::submit()
+{
+	queue->owner().submit_event(this);
 }
 
 bool VirtIO::read(uint64_t off, uint8_t len, uint64_t& data)
@@ -93,11 +98,11 @@ bool VirtIO::read(uint64_t off, uint8_t len, uint64_t& data)
 			break;
 
 		case VIRTIO_REG_QUEUE_NUM_MAX:
-			data = (current_queue()->GetPhysAddr() == 0) ? 0x1000 : 0;
+			data = (current_queue()->guest_phys_addr() == 0) ? 0x1000 : 0;
 			break;
 
 		case VIRTIO_REG_QUEUE_PFN:
-			data = current_queue()->GetPhysAddr() >> _guest_page_shift;
+			data = current_queue()->guest_phys_addr() >> _guest_page_shift;
 			break;
 
 		case VIRTIO_REG_INTERRUPT_STATUS:
@@ -139,11 +144,11 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 		break;
 
 	case VIRTIO_REG_QUEUE_NUM:
-		current_queue()->SetSize(data);
+		current_queue()->num(data);
 		break;
 
 	case VIRTIO_REG_QUEUE_ALIGN:
-		current_queue()->SetAlign(data);
+		current_queue()->align(data);
 		break;
 
 	case VIRTIO_REG_QUEUE_PFN:
@@ -163,7 +168,8 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 			}
 
 			DEBUG << CONTEXT(VirtIO) << "Resolved PFN from " << std::hex << queue_phys_addr << " to " << queue_host_addr;
-			cq->SetBaseAddress(queue_phys_addr, queue_host_addr);
+			cq->guest_phys_addr(queue_phys_addr);
+			cq->queue_host_addr(queue_host_addr);
 		}
 		break;
 
@@ -197,46 +203,58 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 
 void VirtIO::process_queue(VirtQueue* queue)
 {
-	assert(_isr == 0);
-
-	// DEBUG << "[" << GetName() << "] Processing Queue";
-
-	uint16_t head_idx;
-	const VirtRing::VirtRingDesc *descr;
-	VirtIOQueueEvent evt;
-	while ((descr = queue->PopDescriptorChainHead(head_idx)) != NULL) {
-		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Popped a descriptor chain head " << std::dec << head_idx;
-
-		bool have_next = false;
-		evt.clear();
-
+	DEBUG << CONTEXT(VirtIO) << "Processing queue";
+	
+	uint32_t idx = -1;
+	const VirtRingDescr *descr;
+	while ((descr = queue->pop(idx)) != NULL) {
+		DEBUG << CONTEXT(VirtIO) << "Popped a descriptor chain head, idx=" << std::dec << idx;
+		
+		VirtIOQueueEvent *evt = new VirtIOQueueEvent(queue, idx);
 		do {
 			void *descr_host_addr;
-			if (!guest().resolve_gpa((gpa_t)descr->paddr, descr_host_addr)) {
-				assert(false);
+			if (!guest().resolve_gpa((gpa_t)descr->addr, descr_host_addr)) {
+				ERROR << "Unable to resolve VirtIO descriptor physical address to host address";
+				abort();
 			}
-
-			if (descr->flags & 2) {
-				//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Adding WRITE buffer @ " << descr_host_addr << ", size = " << descr->len;
-				evt.add_write_buffer(descr_host_addr, descr->len);
+			
+			assert(!descr->is_indirect());
+			
+			if (descr->is_write()) {
+				DEBUG << CONTEXT(VirtIO) << "Has a write buffer";
+				evt->add_write_buffer(descr_host_addr, descr->length);
 			} else {
-				//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Adding READ buffer @ " << descr_host_addr << ", size = " << descr->len;
-				evt.add_read_buffer(descr_host_addr, descr->len);
+				DEBUG << CONTEXT(VirtIO) << "Has a read buffer";
+				evt->add_read_buffer(descr_host_addr, descr->length);
 			}
-
-			have_next = (descr->flags & 1) == 1;
-			if (have_next) {
-				//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Following descriptor chain to " << (uint32_t)descr->next;
-				descr = queue->GetDescriptor(descr->next);
+			
+			if (descr->has_next()) {
+				descr = queue->get_descr(descr->next);
+			} else {
+				descr = NULL;
 			}
-		} while (have_next);
-
-		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Processing event";
+		} while(descr);
+		
 		process_event(evt);
-
-		queue->Push(head_idx, evt.response_size);
-		//LC_DEBUG1(LogVirtIO) << "[" << GetName() << "] Pushed a descriptor chain head " << std::dec << head_idx << ", length=" << evt.response_size;
+		
+#ifdef SYNCHRONOUS
+		evt->complete.wait();
+		delete evt;
+#endif
 	}
+}
+
+void VirtIO::submit_event(VirtIOQueueEvent *evt)
+{
+	assert(evt && evt->queue);
+	
+	evt->queue->push(evt->descr_idx, evt->response_size);
+	assert_interrupt(0);
+	update_irq();
+	
+#ifndef SYNCHRONOUS
+	delete evt;
+#endif
 }
 
 void VirtIO::update_irq()

@@ -116,7 +116,7 @@ bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest *rq, block_req
 	cb.aio_buf = (uint64_t)rq->buffer;
 	cb.aio_offset = rq->block_offset * block_size();
 	cb.aio_nbytes = rq->block_count * block_size();
-	cb.aio_data = (uint64_t)rq;
+	cb.aio_data = (uint64_t)new AsyncBlockRequestContext(rq, callback);
 	
 	DEBUG << CONTEXT(FileBackedAsyncBlockDevice) << "Submitting IO request";
 	int rc = io_submit(_aio, 1, cbs);
@@ -133,15 +133,25 @@ bool FileBackedAsyncBlockDevice::submit_request(AsyncBlockRequest *rq, block_req
 
 void FileBackedAsyncBlockDevice::aio_thread_proc(FileBackedAsyncBlockDevice* bdev)
 {
-	struct io_event events[1];
+	struct io_event events[8];
 	while (!bdev->_terminate) {		
-		int rc = io_getevents(bdev->_aio, 1, 1, events, NULL);
+		int rc = io_getevents(bdev->_aio, 1, 8, events, NULL);
 		if (rc < 0) {
+			if (errno == EINTR) continue;
+			
 			ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "IO event error";
 			break;
 		}
+		
+		for (int i = 0; i < rc; i++) {
+			AsyncBlockRequestContext *ctx = (AsyncBlockRequestContext *)events[i].data;
+			bool success = events[i].res == (ctx->rq->block_count * bdev->block_size());
 
-		AsyncBlockRequest *rq = (AsyncBlockRequest *)events[0].data;
-		rq->complete.signal(events[0].res == (rq->block_count * bdev->block_size()));
+			if (ctx->cb) {
+				ctx->cb(ctx->rq, success);
+			}
+		
+			delete ctx;
+		}
 	}
 }

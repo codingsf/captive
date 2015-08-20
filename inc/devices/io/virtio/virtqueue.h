@@ -9,6 +9,7 @@
 #define	VIRTQUEUE_H
 
 #include <define.h>
+#include <mutex>
 
 namespace captive
 {
@@ -18,125 +19,136 @@ namespace captive
 		{
 			namespace virtio
 			{
-				class VirtQueue;
-				class VirtRing
+				struct VirtRingDescr
 				{
-				public:
-					struct VirtRingDesc {
-						uint64_t paddr;
-						uint32_t len;
-						uint16_t flags;
-						uint16_t next;
-					} __packed;
-
-					struct VirtRingAvail {
-						uint16_t flags;
-						uint16_t idx;
-						uint16_t ring[];
-					} __packed;
-
-					struct VirtRingUsedElem {
-						uint32_t id;
-						uint32_t len;
-					} __packed;
-
-					struct VirtRingUsed {
-						uint16_t flags;
-						uint16_t idx;
-						VirtRingUsedElem ring[];
-					} __packed;
-
-					inline struct VirtRingDesc *GetDescriptor(uint8_t index) const {
-						return &descriptors[index];
-					}
-
-					inline struct VirtRingAvail *GetAvailable() const {
-						return avail;
-					}
-
-					inline struct VirtRingUsed *GetUsed() const {
-						return used;
-					}
-
-					inline void SetHostBaseAddress(void *base_address, uint32_t size) {
-						assert(size);
-
-						descriptors = (VirtRingDesc *)base_address;
-						avail = (VirtRingAvail *)((unsigned long)base_address + size * sizeof(VirtRingDesc));
-
-						uint32_t avail_size = (size * sizeof(uint16_t)) + 4;
-						uint32_t padding = 4096 - (avail_size % 4096);
-
-						used = (VirtRingUsed *)((unsigned long)avail + avail_size + padding);
-
-					}
-
-				private:
-					VirtRingDesc *descriptors;
-					VirtRingAvail *avail;
-					VirtRingUsed *used;
-				};
-
+					uint64_t addr;
+					uint32_t length;
+					
+#define VRING_DESC_F_NEXT		1
+#define VRING_DESC_F_WRITE		2
+#define VRING_DESC_F_INDIRECT	4
+					
+					uint16_t flags;
+					uint16_t next;
+					
+					inline bool has_next() const { return !!(flags & VRING_DESC_F_NEXT); }
+					inline bool is_write() const { return !!(flags & VRING_DESC_F_WRITE); }
+					inline bool is_indirect() const { return !!(flags & VRING_DESC_F_INDIRECT); }
+				} __packed;
+				
+				struct VirtRingAvail
+				{
+#define VRING_AVAIL_F_NO_INTERRUPT	1
+					
+					uint16_t flags;
+					uint16_t index;
+					uint16_t ring[];
+				} __packed;
+				
+				struct VirtRingUsedElem
+				{
+					uint32_t id;
+					uint32_t len;
+				} __packed;
+				
+				struct VirtRingUsed
+				{
+					uint16_t flags;
+					uint16_t idx;
+					VirtRingUsedElem ring[];
+				} __packed;
+				
+				class VirtIO;
 				class VirtQueue
 				{
 				public:
-					VirtQueue() : guest_base_address(0), host_base_address(NULL), align(0), size(0), last_avail_idx(0) { }
+					VirtQueue(VirtIO& owner) : _owner(owner), _queue_num(0), _queue_align(0), _guest_phys_addr(0), _queue_host_addr(NULL) { }
+					
+					inline uint32_t guest_phys_addr() const { return _guest_phys_addr; }
+					inline void guest_phys_addr(uint32_t gpa) { _guest_phys_addr = gpa; }
+					
+					inline uint32_t num() const { return _queue_num; }
+					inline void num(uint32_t num) { _queue_num = num; }
+					
+					inline uint32_t align() const { return _queue_align; }
+					inline void align(uint32_t align) { _queue_align = align; }
+					
+					inline void *queue_host_addr() const { return _queue_host_addr; }
+					inline void queue_host_addr(void *addr) { _queue_host_addr = addr; init_vring(); }
+					
+					inline VirtRingDescr *pop(uint32_t& idx)
+					{
+						//std::unique_lock<std::mutex> lock(_mtx);
+						
+						__barrier();
 
-					inline void SetBaseAddress(gpa_t guest_base_address, void *host_base_address) {
-						assert(size);
-
-						this->guest_base_address = guest_base_address;
-						this->host_base_address = host_base_address;
-
-						ring.SetHostBaseAddress(host_base_address, size);
-					}
-
-					inline gpa_t GetPhysAddr() const { return guest_base_address; }
-
-					inline void SetAlign(uint32_t align) { this->align = align; }
-
-					inline void SetSize(uint32_t size) { this->size = size; }
-
-					inline const VirtRing::VirtRingDesc *PopDescriptorChainHead(uint16_t& out_idx) {
-						uint16_t num_heads = ring.GetAvailable()->idx - last_avail_idx;
-						assert(num_heads < size);
-
-						if (num_heads == 0)
+						uint16_t num_heads = _avail_descrs->index - prev_idx;
+						assert(num_heads < _queue_num);
+						
+						if (num_heads == 0) {
 							return NULL;
-
-						uint16_t head = ring.GetAvailable()->ring[last_avail_idx % size];
-						assert(head < size);
-
-						out_idx = head;
-
-						last_avail_idx++;
-						return ring.GetDescriptor(head);
+						}
+						
+						uint16_t head = _avail_descrs->ring[prev_idx % _queue_num];
+						assert(head < _queue_num);
+						
+						idx = head;
+						
+						prev_idx++;
+						return get_descr(head);
 					}
+					
+					inline void push(uint32_t elem_idx, uint32_t size)
+					{
+						//std::unique_lock<std::mutex> lock(_mtx);
+						
+						assert(elem_idx < _queue_num);
+						
+						__barrier();
 
-					inline const VirtRing::VirtRingDesc *GetDescriptor(uint8_t index) {
-						return ring.GetDescriptor(index);
+						uint16_t idx = _used_descrs->idx % _queue_num;
+						_used_descrs->ring[idx].id = elem_idx;
+						_used_descrs->ring[idx].len = size;
+						
+						_used_descrs->idx++;
 					}
+					
+					inline VirtRingDescr *get_descr(uint32_t idx) { 
+						assert(idx < _queue_num);
+						
+						if (!_queue_host_addr) return NULL;
+						
+						return &_vring_descrs[idx];
+					};
 
-					inline void Push(uint16_t elem_idx, uint32_t len) {
-						uint16_t idx = ring.GetUsed()->idx % size;
-
-						ring.GetUsed()->ring[idx].id = elem_idx;
-						ring.GetUsed()->ring[idx].len = len;
-
-						uint16_t old = ring.GetUsed()->idx;
-						ring.GetUsed()->idx = old + 1;
-					}
-
+					inline VirtIO& owner() const { return _owner; }
+					
 				private:
-					VirtRing ring;
-
-					gpa_t guest_base_address;
-					void *host_base_address;
-
-					uint32_t align;
-					uint32_t size;
-
-					uint16_t last_avail_idx;
+					VirtIO& _owner;
+					uint32_t _queue_num;
+					uint32_t _queue_align;
+					uint32_t _guest_phys_addr;
+					void *_queue_host_addr;
+					
+					VirtRingDescr *_vring_descrs;
+					VirtRingAvail *_avail_descrs;
+					VirtRingUsed *_used_descrs;
+					uint16_t prev_idx;
+					
+					std::mutex _mtx;
+					
+					inline void init_vring()
+					{
+						_vring_descrs = (VirtRingDescr *)_queue_host_addr;
+						_avail_descrs = (VirtRingAvail *)((uint64_t)_vring_descrs + (sizeof(VirtRingDescr) * _queue_num));
+						
+						uint64_t avail_size = (_queue_num * sizeof(uint16_t)) + 4;
+						uint64_t padding = 4096 - (avail_size % 4096);
+						
+						_used_descrs = (VirtRingUsed *)((uint64_t)_avail_descrs + avail_size + padding);
+						
+						prev_idx = 0;
+					}
 				};
 			}
 		}

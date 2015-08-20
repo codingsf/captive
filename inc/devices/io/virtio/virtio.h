@@ -11,6 +11,9 @@
 #include <devices/device.h>
 #include <vector>
 #include <atomic>
+#include <util/completion.h>
+
+//#define SYNCHRONOUS
 
 namespace captive {
 	namespace devices {
@@ -29,13 +32,11 @@ namespace captive {
 					uint32_t size;
 				};
 
+				class VirtQueue;
 				class VirtIOQueueEvent
 				{
 				public:
-					VirtIOQueueEvent() : response_size(0) { }
-
-					~VirtIOQueueEvent() {
-					}
+					VirtIOQueueEvent(VirtQueue *queue, uint32_t descr_idx) : response_size(0), queue(queue), descr_idx(descr_idx) { }
 
 					inline void add_read_buffer(void *data, uint32_t size) {
 						read_buffers.push_back(VirtIOQueueEventBuffer(data, size));
@@ -50,16 +51,24 @@ namespace captive {
 						read_buffers.clear();
 						write_buffers.clear();
 					}
-
+					
 					std::vector<VirtIOQueueEventBuffer> read_buffers;
 					std::vector<VirtIOQueueEventBuffer> write_buffers;
 
 					uint32_t response_size;
+					VirtQueue *queue;
+					uint32_t descr_idx;
+					
+					util::Completion<bool> complete;
+					
+					void submit();
 				};
 
-				class VirtQueue;
 				class VirtIO : public Device
 				{
+					friend class VirtIOQueueEvent;
+					friend class VirtQueue;
+					
 				public:
 					VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues);
 					virtual ~VirtIO();
@@ -78,7 +87,8 @@ namespace captive {
 					inline VirtQueue *current_queue() const { return queue(_queue_sel); }
 					inline VirtQueue *queue(uint8_t index) const { if (index > queues.size()) return NULL; else return queues[index]; }
 
-					virtual void process_event(VirtIOQueueEvent& evt) = 0;
+					virtual void process_event(VirtIOQueueEvent *evt) = 0;
+					virtual void submit_event(VirtIOQueueEvent *evt);
 
 					inline void assert_interrupt(int idx) {
 						_isr |= 1 << idx;

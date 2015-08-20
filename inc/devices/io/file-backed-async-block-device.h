@@ -42,6 +42,14 @@ namespace captive {
 				bool _terminate;
 				
 				static void aio_thread_proc(FileBackedAsyncBlockDevice *bdev);
+				
+				struct AsyncBlockRequestContext
+				{
+					AsyncBlockRequestContext(AsyncBlockRequest *rq, block_request_cb_t cb) : rq(rq), cb(cb) { }
+					
+					AsyncBlockRequest *rq;
+					block_request_cb_t cb;
+				};
 			};
 		}
 	}

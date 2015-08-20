@@ -20,5 +20,7 @@ typedef uint32_t gva_t;
 
 #define __packed __attribute__((packed))
 
+#define __barrier() asm volatile("": : :"memory")
+
 #endif	/* DEFINE_H */
 
