@@ -29,7 +29,7 @@ namespace captive {
 				
 				void init(void *zone, size_t zone_size);
 				
-				inline void *alloc_page() { alloc_pages(1); }
+				inline void *alloc_page() { return alloc_pages(1); }
 				void *alloc_pages(int nr_pages);
 				void free_pages(void *p, int nr_pages);
 				

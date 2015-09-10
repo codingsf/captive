@@ -125,71 +125,72 @@ namespace captive {
 		struct IRInstruction
 		{
 			enum IRInstructionType : uint8_t {
-				INVALID,
+				INVALID,				// 0
 
-				VERIFY,
+				VERIFY,					// 1
 				COUNT,
 
-				NOP,
+				NOP,					// 3
 				TRAP,
 
-				MOV,
+				MOV,					// 5
 				CMOV,
 				LDPC,
 				INCPC,
 
-				ADD,
+				ADD,					// 9
 				SUB,
 				MUL,
 				DIV,
 				MOD,
 
-				SHL,
+				SHL,					// 14
 				SHR,
 				SAR,
 				CLZ,
 
-				AND,
+				AND,					// 18
 				OR,
 				XOR,
 
-				CMPEQ,
+				CMPEQ,					// 21
 				CMPNE,
 				CMPGT,
 				CMPGTE,
 				CMPLT,
 				CMPLTE,
 
-				SX,
+				SX,						// 27
 				ZX,
 				TRUNC,
 
-				READ_REG,
+				READ_REG,				// 30
 				WRITE_REG,
 				READ_MEM,
 				WRITE_MEM,
 				READ_MEM_USER,
 				WRITE_MEM_USER,
 
-				CALL,
+				CALL,					// 36
 				JMP,
 				BRANCH,
 				RET,
 				DISPATCH,
 
-				SET_CPU_MODE,
+				SET_CPU_MODE,			// 41
 				WRITE_DEVICE,
 				READ_DEVICE,
 				
-				FLUSH,
+				FLUSH,					// 44
 				FLUSH_ITLB,
 				FLUSH_DTLB,
 				FLUSH_ITLB_ENTRY,
 				FLUSH_DTLB_ENTRY,
 				
-				ADC_WITH_FLAGS,
+				ADC_WITH_FLAGS,			// 49
 				
-				BARRIER,
+				BARRIER,				// 50
+				TRACE
 			};
 
 			IRBlockId ir_block;
@@ -200,7 +201,7 @@ namespace captive {
 				: type(type),
 				operands { IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
 
-			IRInstruction(IRInstructionType type, IROperand& op1)
+			IRInstruction(IRInstructionType type, const IROperand& op1)
 				: type(type),
 				operands { op1, IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none(), IROperand::none() } { }
 
@@ -228,23 +229,33 @@ namespace captive {
 
 			static IRInstruction nop() { return IRInstruction(NOP); }
 			static IRInstruction ret() { return IRInstruction(RET); }
-			static IRInstruction dispatch(IROperand target, IROperand fallthrough, IROperand target_block, IROperand fallthrough_block) { assert(target.is_constant() && fallthrough.is_constant()); return IRInstruction(DISPATCH, target, fallthrough, target_block, fallthrough_block); }
+			static IRInstruction dispatch(const IROperand& target, const IROperand& fallthrough, const IROperand& target_block, const IROperand& fallthrough_block) { assert(target.is_constant() && fallthrough.is_constant()); return IRInstruction(DISPATCH, target, fallthrough, target_block, fallthrough_block); }
 			static IRInstruction trap() { return IRInstruction(TRAP); }
-			static IRInstruction verify(IROperand pc) { return IRInstruction(VERIFY, pc); }
-			static IRInstruction count(IROperand pc, IROperand ir) { return IRInstruction(COUNT, pc, ir); }
+			static IRInstruction verify(const IROperand& pc) { return IRInstruction(VERIFY, pc); }
+			static IRInstruction count(const IROperand& pc, const IROperand& ir) { return IRInstruction(COUNT, pc, ir); }
 
-			static IRInstruction ldpc(IROperand dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
-			static IRInstruction incpc(IROperand amt) { assert(amt.is_constant()); return IRInstruction(INCPC, amt); }
+			static IRInstruction ldpc(const IROperand& dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
+			static IRInstruction incpc(const IROperand& amt) { assert(amt.is_constant()); return IRInstruction(INCPC, amt); }
 
 			static IRInstruction flush() { return IRInstruction(FLUSH); }
 			static IRInstruction flush_itlb() { return IRInstruction(FLUSH_ITLB); }
 			static IRInstruction flush_dtlb() { return IRInstruction(FLUSH_DTLB); }
-			static IRInstruction flush_itlb_entry(IROperand addr) { return IRInstruction(FLUSH_ITLB_ENTRY, addr); }
-			static IRInstruction flush_dtlb_entry(IROperand addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
+			static IRInstruction flush_itlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_ITLB_ENTRY, addr); }
+			static IRInstruction flush_dtlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
 			
-			static IRInstruction adc_with_flags(IROperand lhs_in, IROperand rhs_in, IROperand carry_in) { return IRInstruction(ADC_WITH_FLAGS, lhs_in, rhs_in, carry_in); }
+			static IRInstruction adc_with_flags(const IROperand& lhs_in, const IROperand& rhs_in, const IROperand& carry_in) { return IRInstruction(ADC_WITH_FLAGS, lhs_in, rhs_in, carry_in); }
 			
 			static IRInstruction barrier() { return IRInstruction(BARRIER); }
+			
+			static IRInstruction trace_start() { return IRInstruction(TRACE, IROperand::const8(0)); }
+			static IRInstruction trace_end() { return IRInstruction(TRACE, IROperand::const8(1)); }
+			static IRInstruction trace_mem_read(const IROperand& addr, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(2), addr, val); }
+			static IRInstruction trace_mem_write(const IROperand& addr, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(3), addr, val); }
+			static IRInstruction trace_reg_read(const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(4), reg, val); }
+			static IRInstruction trace_reg_write(const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(5), reg, val); }
+			static IRInstruction trace_dev_read(const IROperand& dev, const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(6), dev, reg, val); }
+			static IRInstruction trace_dev_write(const IROperand& dev, const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(7), dev, reg, val); }
+			
 			//
 			// Data Motion
 			//

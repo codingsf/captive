@@ -4,7 +4,6 @@
 #include <cpu.h>
 #include <mmu.h>
 #include <x86/decode.h>
-#include <interp.h>
 
 using namespace captive::arch;
 
@@ -215,6 +214,15 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		case x86::Operand::R_DL: __out8(dev_addr, mctx->rdx); break;
 		case x86::Operand::R_SIL: __out8(dev_addr, mctx->rsi); break;
 		case x86::Operand::R_DIL: __out8(dev_addr, mctx->rdi); break;
+		
+		case x86::Operand::R_R8B: __out8(dev_addr, mctx->r8); break;
+		case x86::Operand::R_R9B: __out8(dev_addr, mctx->r9); break;
+		case x86::Operand::R_R10B: __out8(dev_addr, mctx->r10); break;
+		case x86::Operand::R_R11B: __out8(dev_addr, mctx->r11); break;
+		case x86::Operand::R_R12B: __out8(dev_addr, mctx->r12); break;
+		case x86::Operand::R_R13B: __out8(dev_addr, mctx->r13); break;
+		case x86::Operand::R_R14B: __out8(dev_addr, mctx->r14); break;
+		case x86::Operand::R_R15B: __out8(dev_addr, mctx->r15); break;
 
 		default: fatal("unhandled source register %s\n", x86::x86_register_names[inst.Source.reg]);
 		}
@@ -292,7 +300,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		captive::arch::CPU *core = captive::arch::CPU::get_active_cpu();
 
 		if (core) {
-			MMU::resolution_fault fault;
+			MMU::resolution_fault fault = (MMU::resolution_fault)0;
 			MMU::access_info info;
 
 			// Prepare an access_info structure to describe the memory access
@@ -339,7 +347,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				if (fault) { 
 					// Return TRUE if we need to return to the safe-point, i.e. to do a side
 					// exit from the currently executing guest instruction.
-					core->interpreter().handle_memory_fault(fault);
+					core->handle_mem_fault(fault);
 					return 1;
 				} else {
 					return 0;

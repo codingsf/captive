@@ -82,7 +82,7 @@ namespace captive {
 
 	struct PerCPUData {
 		PerGuestData *guest_data;
-		VerificationData *verify_data;
+		volatile VerificationData *verify_data;
 
 		bool halt;
 

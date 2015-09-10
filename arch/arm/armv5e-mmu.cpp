@@ -1,11 +1,11 @@
-#include <arm-mmu.h>
-#include <arm-cpu.h>
-#include <arm-env.h>
+#include <armv5e-mmu.h>
+#include <armv5e-cpu.h>
+#include <armv5e-env.h>
 #include <mm.h>
 #include <printf.h>
 
 using namespace captive::arch;
-using namespace captive::arch::arm;
+using namespace captive::arch::armv5e;
 
 static const char *arm_faults[] = {
 	"none",
@@ -23,28 +23,28 @@ static const char *arm_faults[] = {
 static const char *mem_access_types[] = { "read", "write", "fetch", "read-user", "write-user" };
 static const char *mem_access_modes[] = { "user", "kernel" };
 
-ArmMMU::ArmMMU(ArmCPU& cpu) : MMU(cpu), _coco((devices::CoCo&)*cpu.env().lookup_core_device(15))
+armv5e_mmu::armv5e_mmu(armv5e_cpu& cpu) : MMU(cpu), _coco((devices::CoCo&)*cpu.env().lookup_core_device(15))
 {
 
 }
 
-ArmMMU::~ArmMMU()
+armv5e_mmu::~armv5e_mmu()
 {
 
 }
 
-bool ArmMMU::enable()
+bool armv5e_mmu::enable()
 {
 	if (_enabled) return true;
 
 	invalidate_virtual_mappings();
 	cpu().invalidate_translations();
-
+	
 	_enabled = true;
 	return true;
 }
 
-bool ArmMMU::disable()
+bool armv5e_mmu::disable()
 {
 	if (!_enabled) return true;
 
@@ -55,20 +55,20 @@ bool ArmMMU::disable()
 	return true;
 }
 
-bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects)
+bool armv5e_mmu::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects)
 {
 	arm_resolution_fault arm_fault = NONE;
 	fault = arch::MMU::NONE;
 	pa = 0xf0f0f0f0;
-
+	
 	if (!_enabled) {
 		pa = va;
 		return true;
 	}
 
-	//printf("mmu: resolve va=%08x, type=%d, ttbr0=%x\n", va, type, _coco.TTBR0());
+	//printf("mmu: resolve va=%08x, type=%d, ttbr0=%x\n", va, info.type, *(arm_cpu().reg_offsets.TTBR0));
 
-	l1_descriptor *ttbr = (l1_descriptor *)resolve_guest_phys((gpa_t)((ArmCPU&)cpu()).state.regs.TTBR0);
+	l1_descriptor *ttbr = (l1_descriptor *)resolve_guest_phys((gpa_t)*(arm_cpu().reg_offsets.TTBR0));
 	l1_descriptor *l1 = &ttbr[va >> 20];
 
 	//printf("l1: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, l1->type(), l1->base_addr(), l1->ap(), l1->domain());
@@ -111,27 +111,27 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 
 	uint32_t fsr = (uint32_t)l1->domain() << 4;
 	switch (arm_fault) {
-	case ArmMMU::SECTION_FAULT:
+	case armv5e_mmu::SECTION_FAULT:
 		fsr |= 0x5;
 		break;
 
-	case ArmMMU::COARSE_FAULT:
+	case armv5e_mmu::COARSE_FAULT:
 		fsr |= 0x7;
 		break;
 
-	case ArmMMU::SECTION_DOMAIN:
+	case armv5e_mmu::SECTION_DOMAIN:
 		fsr |= 0x9;
 		break;
 
-	case ArmMMU::COARSE_DOMAIN:
+	case armv5e_mmu::COARSE_DOMAIN:
 		fsr |= 0xb;
 		break;
 
-	case ArmMMU::SECTION_PERMISSION:
+	case armv5e_mmu::SECTION_PERMISSION:
 		fsr |= 0xd;
 		break;
 
-	case ArmMMU::COARSE_PERMISSION:
+	case armv5e_mmu::COARSE_PERMISSION:
 		fsr |= 0xf;
 		break;
 
@@ -143,14 +143,14 @@ bool ArmMMU::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolutio
 	//printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
 
 	if (likely(have_side_effects)) {
-		arm_cpu().state.regs.FSR = fsr;
-		arm_cpu().state.regs.FAR = va;
+		*(arm_cpu().reg_offsets.FSR) = fsr;
+		*(arm_cpu().reg_offsets.FAR) = va;
 	}
 
 	return true;
 }
 
-bool ArmMMU::check_access_perms(uint32_t ap, bool kernel_mode, bool is_write)
+bool armv5e_mmu::check_access_perms(uint32_t ap, bool kernel_mode, bool is_write)
 {
 	switch(ap) {
 	case 0:
@@ -173,7 +173,7 @@ bool ArmMMU::check_access_perms(uint32_t ap, bool kernel_mode, bool is_write)
 	}
 }
 
-bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
+bool armv5e_mmu::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
 	l2_descriptor *coarse_table = (l2_descriptor *)resolve_guest_phys(l1->base_addr());
 	l2_descriptor *l2 = &coarse_table[((uint32_t)va >> 12) & 0xff];
@@ -185,7 +185,7 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, a
 
 	//printf("resolving coarse descriptor: l1-base=%x l2-idx=%d va=%x, type=%d, base=%x, data=%x\n", l1->base_addr(), l2_idx, va, l2->type(), l2->base_addr(), l2->data);
 
-	uint32_t dacr = ((ArmCPU&)cpu()).state.regs.DACR;
+	uint32_t dacr = *(arm_cpu().reg_offsets.DACR);
 	dacr >>= l1->domain() * 2;
 	dacr &= 0x3;
 
@@ -224,15 +224,15 @@ bool ArmMMU::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, a
 	return false;
 }
 
-bool ArmMMU::resolve_fine_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
+bool armv5e_mmu::resolve_fine_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
 	printf("mmu: unsupported fine page table\n");
 	return false;
 }
 
-bool ArmMMU::resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
+bool armv5e_mmu::resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
-	uint32_t dacr = ((ArmCPU&)cpu()).state.regs.DACR;
+	uint32_t dacr = *(arm_cpu().reg_offsets.DACR);
 	dacr >>= l1->domain() * 2;
 	dacr &= 0x3;
 

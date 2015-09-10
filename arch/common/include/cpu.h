@@ -47,29 +47,34 @@ namespace captive {
 		class Decode;
 		class JumpInfo;
 		class JIT;
-
+		
 		class CPU
 		{
 		public:
+			struct TaggedRegisters {
+				void *base;
+				uint32_t *PC, *SP;
+				uint8_t *C, *Z, *N, *V;
+			};
+			
 			CPU(Environment& env, PerCPUData *per_cpu_data);
 			virtual ~CPU();
 
 			virtual bool init() = 0;
 			bool run();
 
-			virtual MMU& mmu() const = 0;
-			virtual Interpreter& interpreter() const = 0;
-			virtual JIT& jit() const = 0;
+			virtual MMU& mmu() const { return *_mmu; }
+			virtual JIT& jit() const { return *_jit; }
 
 			inline Environment& env() const { return _env; }
 			inline Trace& trace() const { return *_trace; }
 			inline PerCPUData& cpu_data() const { return *_per_cpu_data; }
 
-			inline uint32_t read_pc() const { return *_pc_reg_ptr; }
-			inline uint32_t write_pc(uint32_t new_pc_val) { uint32_t tmp = *_pc_reg_ptr; *_pc_reg_ptr = new_pc_val; return tmp; }
-			inline uint32_t inc_pc(uint32_t delta) { uint32_t tmp = *_pc_reg_ptr; *_pc_reg_ptr += delta; return tmp; }
+			inline uint32_t read_pc() const { return *tagged_reg_offsets.PC; }
+			inline uint32_t write_pc(uint32_t new_pc_val) { uint32_t tmp = *tagged_reg_offsets.PC; *tagged_reg_offsets.PC = new_pc_val; return tmp; }
+			inline uint32_t inc_pc(uint32_t delta) { uint32_t tmp = *tagged_reg_offsets.PC; *tagged_reg_offsets.PC += delta; return tmp; }
 
-			virtual void dump_state() const = 0;
+			virtual void dump_state(bool dump_hidden = false) const = 0;
 
 			inline uint64_t get_insns_executed() const { return cpu_data().insns_executed; }
 
@@ -95,7 +100,9 @@ namespace captive {
 			bool verify_check();
 
 			virtual void *reg_state() = 0;
-			virtual uint32_t reg_state_size() = 0;
+			virtual size_t reg_state_size() = 0;
+			
+			inline TaggedRegisters& tagged_registers() { return tagged_reg_offsets; }
 
 			void invalidate_virtual_mappings();
 			void invalidate_virtual_mapping(gva_t va);
@@ -106,10 +113,15 @@ namespace captive {
 
 			void handle_irq_raised(uint8_t irq_line);
 			void handle_irq_rescinded(uint8_t irq_line);
-
+			
+			// Behaviours
+			virtual bool handle_irq(uint32_t isr) = 0;
+			virtual bool handle_mem_fault(MMU::resolution_fault fault) = 0;
+			
 		protected:
-			volatile uint32_t *_pc_reg_ptr;
-
+			MMU *_mmu;
+			JIT *_jit;
+			
 			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
 			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
@@ -121,7 +133,8 @@ namespace captive {
 			}
 
 			Trace *_trace;
-
+			TaggedRegisters tagged_reg_offsets;
+			
 			struct {
 				volatile bool _kernel_mode;
 				uint32_t last_exception_action;
@@ -150,6 +163,14 @@ namespace captive {
 				uint64_t *insn_counter;									// 40
 				uint8_t exit_chain;										// 48
 			} packed jit_state;
+			
+			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }
+			inline void enter_kernel_mode() { kernel_mode(true); }
+			inline void enter_user_mode() { kernel_mode(false); }
+			inline void pend_interrupt() { }
+			
+			inline uint8_t get_cpu_mode() const { return 0; }
+			inline void set_cpu_mode(uint8_t mode) { }
 
 		private:
 			inline void assert_privilege_mode()
@@ -189,8 +210,6 @@ namespace captive {
 
 			profile::Image *image;
 
-			bool run_interp();
-			bool run_interp_safepoint();
 			bool run_block_jit();
 			bool run_block_jit_safepoint();
 			bool run_region_jit();
@@ -198,7 +217,6 @@ namespace captive {
 			bool run_test();
 
 			bool handle_pending_action(uint32_t action);
-			bool interpret_block();
 
 			void analyse_blocks();
 			void compile_region(profile::Region *rgn, uint32_t region_index);

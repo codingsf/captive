@@ -14,6 +14,7 @@ all: $(arch-out)
 clean:
 	$(rm) -f $(arch-out)
 	$(rm) -f $(obj)
+	$(rm) -f $(dep)
 
 $(arch-out): $(obj) $(cmn-out)
 	@echo "  LD      $(notdir $@)"

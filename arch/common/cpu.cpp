@@ -2,7 +2,6 @@
 #include <barrier.h>
 #include <mmu.h>
 #include <decode.h>
-#include <interp.h>
 #include <disasm.h>
 #include <string.h>
 #include <safepoint.h>
@@ -22,8 +21,7 @@ safepoint_t cpu_safepoint;
 CPU *CPU::current_cpu;
 
 CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
-	: _pc_reg_ptr(NULL),
-	_env(env),
+	: _env(env),
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false),
 	region_txln_cache(new region_txln_cache_t()),
@@ -31,6 +29,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
+	bzero(&tagged_reg_offsets, sizeof(tagged_reg_offsets));
 
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
@@ -100,7 +99,7 @@ bool CPU::run()
 {
 	switch (_per_cpu_data->execution_mode) {
 	case 0:
-		return run_interp();
+		return false;
 	case 1:
 		return run_block_jit();
 	case 2:
@@ -125,121 +124,6 @@ bool CPU::run_test()
 
 
 	return true;
-}
-
-bool CPU::run_interp()
-{
-	printf("cpu: starting interpretive cpu execution\n");
-
-	// Create a safepoint for returning from a memory access fault
-	int rc = record_safepoint(&cpu_safepoint);
-	if (rc > 0) {
-		// Reset the executing translation flag.
-		_exec_txl = false;
-
-		// If the return code is greater than zero, then we returned
-		// from a fault.
-
-		// If we're tracing, add a descriptive message, and close the
-		// trace packet.
-		if (unlikely(trace().enabled())) {
-			trace().add_str("memory exception taken");
-			trace().end_record();
-		}
-
-		// Instruct the interpreter to handle the memory fault, passing
-		// in the the type of fault.
-		interpreter().handle_memory_fault((MMU::resolution_fault)rc);
-
-		// Make sure interrupts are enabled.
-		__local_irq_enable();
-	}
-
-	// Make sure we're operating in the correct mode
-	ensure_privilege_mode();
-
-	return run_interp_safepoint();
-}
-
-bool CPU::run_interp_safepoint()
-{
-	bool step_ok = true;
-
-	do {
-		/*if (cpu_data().insns_executed > 392000000)
-			trace().enable();*/
-
-		// Check the ISR to determine if there is an interrupt pending,
-		// and if there is, instruct the interpreter to handle it.
-		if (unlikely(cpu_data().isr)) {
-			interpreter().handle_irq(cpu_data().isr);
-		}
-
-		// Check to see if there are any pending actions coming in from
-		// the hypervisor.
-		if (unlikely(cpu_data().async_action)) {
-			if (handle_pending_action(cpu_data().async_action)) {
-				cpu_data().async_action = 0;
-			}
-		}
-
-		step_ok = interpret_block();
-	} while(step_ok);
-
-	return true;
-}
-
-bool CPU::interpret_block()
-{
-	bool step_ok = false;
-
-	// Make sure we're in the correct privilege mode to execute this block
-	// of code.
-	ensure_privilege_mode();
-
-	uint32_t page = read_pc() & ~0xfffULL;
-
-	// Now, execute one basic-block of instructions.
-	Decode *insn;
-	do {
-		// Get the address of the next instruction to execute
-		uint32_t pc = read_pc();
-		if ((pc & ~0xfff) != page) return true;
-
-		// Obtain a decode object for this PC, and perform the decode.
-		insn = get_decode(pc);
-		if (1) { //insn->pc != pc) {
-			if (unlikely(!decode_instruction_virt(pc, insn))) {
-				printf("cpu: unhandled decode fault @ %08x\n", pc);
-				return false;
-			}
-		}
-
-		// Perhaps trace this instruction
-		if (unlikely(trace().enabled())) {
-			trace().start_record(get_insns_executed(), pc, insn);
-		}
-
-		// Perhaps verify this instruction
-		if (unlikely(cpu_data().verify_enabled) && !verify_check()) {
-			return false;
-		}
-
-		// Execute the instruction, with interrupts disabled.
-		//__local_irq_disable();
-		step_ok = interpreter().step_single(insn);
-		//__local_irq_enable();
-
-		// Increment the instruction counter.
-		if (unlikely(cpu_data().verbose_enabled)) {
-			inc_insns_executed();
-		}
-
-		// Perhaps finish tracing this instruction.
-		if (unlikely(trace().enabled())) {
-			trace().end_record();
-		}
-	} while(!insn->end_of_block && step_ok);
 }
 
 void CPU::invalidate_translations()
@@ -313,7 +197,7 @@ bool CPU::verify_check()
 
 	// Tick!
 	asm volatile("out %0, $0xff" :: "a"(9));
-
+	
 	pc_ring_buffer[pc_ring_buffer_ptr] = read_pc();
 	pc_ring_buffer_ptr = (pc_ring_buffer_ptr + 1) % 256;
 

@@ -13,6 +13,7 @@
 #include <x86/encode.h>
 #include <jit/translation-context.h>
 #include <malloc/malloc.h>
+#include <cpu.h>
 
 #include <small-set.h>
 #include <map>
@@ -26,13 +27,14 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check = false, bool emit_chaining_logic = false);
+				BlockCompiler(TranslationContext& ctx, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check = false, bool emit_chaining_logic = false);
 				bool compile(shared::block_txln_fn& fn);
 
 			private:
 				TranslationContext& ctx;
 				x86::X86Encoder encoder;
 				gpa_t pa;
+				const CPU::TaggedRegisters& tagged_regs;
 				bool emit_interrupt_check;
 				bool emit_chaining_logic;
 
@@ -41,6 +43,7 @@ namespace captive {
 				typedef std::map<shared::IRBlockId, std::vector<shared::IRBlockId>> cfg_t;
 				typedef std::vector<shared::IRBlockId> block_list_t;
 
+				bool verify();
 				bool sort_ir();
 				bool peephole();
 				bool analyse(uint32_t& max_stack);
@@ -52,6 +55,7 @@ namespace captive {
 				bool allocate();
 				bool post_allocate_peephole();
 				bool lower(uint32_t max_stack);
+				bool lower_to_interpreter();
 				bool peeplower(uint32_t max_stack);
 				bool lower_stack_to_reg();
 				bool constant_prop();

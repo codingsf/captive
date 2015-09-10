@@ -18,6 +18,9 @@ extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
 extern "C" void jit_verify(void *cpu);
 extern "C" void jit_rum(void *cpu);
+extern "C" void jit_trace(void *cpu, uint8_t opcode, uint64_t a1, uint64_t a2, uint64_t a3);
+
+extern uint32_t interpret_ir(void *, void *, uint32_t);
 
 using namespace captive::arch::jit;
 using namespace captive::arch::jit::algo;
@@ -26,10 +29,7 @@ using namespace captive::shared;
 
 static void dump_insn(IRInstruction *insn);
 
-static void you_pleb()
-{
-	printf("stm user\n");
-}
+#define REG_OFFSET_OF(__reg_name) ((uint64_t)tagged_regs.__reg_name - (uint64_t)tagged_regs.base)
 
 /* Register Mapping
  *
@@ -50,10 +50,11 @@ static void you_pleb()
  * FS	Base Pointer to JIT STATE structure
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interrupt_check, bool emit_chaining_logic) 
+BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check, bool emit_chaining_logic) 
 	: ctx(ctx),
 		encoder(malloc::code_alloc),
 		pa(pa),
+		tagged_regs(tagged_regs),
 		emit_interrupt_check(emit_interrupt_check),
 		emit_chaining_logic(emit_chaining_logic)
 {
@@ -69,59 +70,100 @@ BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, bool emit_interr
 	assign(i++, REG_R13, REG_R13D, REG_R13W, REG_R13B);
 }
 
+//#define VERIFY_IR
+
 bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
 	//~ printf("*** %x\n", pa);
 
+	//printf("*** before:\n");
+	//dump_ir();
+	
 	tick_timer timer(0);
 
 	timer.reset();
+	
+#ifdef VERIFY_IR
+	if (!verify()) {
+		printf("**** FAILED IR BEFORE OPTIMISATION\n");
+		dump_ir();
+		return false;
+	}
+#endif
+	
 	if (!reorder_blocks()) return false;
-	timer.tick("Reorder");
+	timer.tick("block-reorder");
+	
 	if (!thread_jumps()) return false;
-	timer.tick("JT");
+	timer.tick("jump-threading");
+	
 	if (!dbe()) return false;
-	timer.tick("DBE");
+	timer.tick("dead-block-elimination");
+	
+	sort_ir();
 	
 	if (!merge_blocks()) return false;
-	timer.tick("MB");
+	timer.tick("block-merging");
 
 	if (!constant_prop()) return false;
-	timer.tick("Cprop");
+	timer.tick("constant-propagation");
 	
 	if (!peephole()) return false;
-	timer.tick("Peep");
+	timer.tick("peepholer");
 
 	sort_ir();
-	if (!value_merging()) return false;
-	timer.tick("VM");
+	//if (!value_merging()) return false;
+	timer.tick("value-merging");
 
-	//~ printf	("XXX %x\n", pa);
-	//~ sort_ir();
-	//~ dump_ir();
-	if(!reg_value_reuse()) return false;
-	timer.tick("RVR");
-	//~ dump_ir();
+	//if(!reg_value_reuse()) return false;
+	timer.tick("reg-val-reuse");
 
 	if (!sort_ir()) return false;
-	timer.tick("Sort");
+	timer.tick("sort");
 
+#ifdef VERIFY_IR
+	if (!verify()) {
+		printf("**** FAILED IR BEFORE ALLOCATION\n");
+		dump_ir();
+		return false;
+	}
+#endif
+	
 	if (!analyse(max_stack)) return false;
-	timer.tick("Analyse");
-	if( !post_allocate_peephole()) return false;
-	timer.tick("PAP");
+	timer.tick("reg-allocation");
+	
+	//if( !post_allocate_peephole()) return false;
+	timer.tick("post-alloc-peepholer");
 
 	if( !lower_stack_to_reg()) return false;
-	timer.tick("LSTR");
+	timer.tick("mem-2-reg");
 	
 	sort_ir();
+	
+	//printf("*** after:\n");
+	//dump_ir();
+	
+#ifdef VERIFY_IR
+	if (!verify()) {
+		printf("**** FAILED IR BEFORE LOWERING\n");
+		dump_ir();
+		return false;
+	}
+#endif
+		
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
 	}
-	timer.tick("Lower");
+	
+	/*if (!lower_to_interpreter()) {
+		encoder.destroy_buffer();
+		return false;
+	}*/
+	
+	timer.tick("lower");
 
 	timer.dump("compile ");
 	
@@ -270,7 +312,7 @@ bool BlockCompiler::peephole()
 
 
 		case IRInstruction::INCPC:
-			if(prev_pc_inc) {
+			if(0) { //prev_pc_inc) {
 				insn->operands[0].value += prev_pc_inc->operands[0].value;
 				prev_pc_inc->type = IRInstruction::NOP;
 			}
@@ -279,8 +321,7 @@ bool BlockCompiler::peephole()
 			break;
 
 		case IRInstruction::READ_REG:
-			// HACK HACK HACK (pc offset)
-			if(insn->operands[0].value == 0x3c) {
+			if(insn->operands[0].value == REG_OFFSET_OF(PC)) {
 				prev_pc_inc = NULL;
 			}
 			break;
@@ -516,6 +557,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "adc flags",	.format = "IIIXXX", .has_side_effects = true },
 
 	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "trace",		.format = "NIIIII", .has_side_effects = true },
 };
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
@@ -851,7 +893,7 @@ bool BlockCompiler::thread_jumps()
 		case IRInstruction::RET:
 			break;
 		default:
-			assert(false);
+			fatal("last instruction was not control flow (it was a %s)\n", insn_descriptors[source_instruction->type].mnemonic);
 		}
 	}
 	
@@ -952,9 +994,9 @@ bool BlockCompiler::merge_blocks()
 		succs[block] = succs[block_successor];
 		
 		// If, post merging, the block has one successor, then put it on the work list
-		if(succs[block] == 1) work_list.push_back(block);
+		if(succs[block] != (IRBlockId)-1) work_list.push_back(block);
 	}
-	
+		
 	timer.tick("Merge");
 	timer.dump("MB");
 	return true;
@@ -985,6 +1027,7 @@ bool BlockCompiler::merge_block(IRBlockId merge_from, IRBlockId merge_into)
 		if(insn->ir_block == merge_from) insn->ir_block = merge_into;
 		if(insn->ir_block > merge_from) break;
 	}
+	
 	return true;
 }
 
@@ -1049,6 +1092,18 @@ bool BlockCompiler::build_cfg(block_list_t& blocks, cfg_t& succs, cfg_t& preds, 
 bool BlockCompiler::allocate()
 {
 	return true;
+}
+
+bool BlockCompiler::lower_to_interpreter()
+{
+	encoder.mov((uint64_t)&interpret_ir, REG_RAX);
+	load_state_field(0, REG_RDI);
+	encoder.mov((uint64_t)ctx.get_ir_buffer(), REG_RSI);
+	encoder.mov((uint64_t)ctx.count(), REG_RDX);
+	encoder.jmp(REG_RAX);
+	
+	asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	return true;	
 }
 
 bool BlockCompiler::lower(uint32_t max_stack)
@@ -1405,7 +1460,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			encoder.ensure_extra_buffer(64);
 			
-			uint8_t *jump_offset;
+			uint8_t *jump_offset = NULL;
 			if (emit_interrupt_check) {
 				assert(emit_chaining_logic);
 				encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
@@ -1416,6 +1471,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 			
 			if(emit_chaining_logic) {
+				assert(emit_interrupt_check);
 				
 				size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 				size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
@@ -1427,7 +1483,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					if(has_fallthrough) {
 
 						//load PC into EAX
-						encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EBX);
+						encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_EBX);
 						
 						//mask page offset of PC (we already know that both targets land in this page)
 						encoder.andd(0xfff, REG_EBX);
@@ -1448,7 +1504,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				} else {
 					if(has_fallthrough) {
 						//load PC into EAX
-						encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EBX);
+						encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_EBX);
 						
 						//mask page offset of PC (we already know that both targets land in this page)
 						encoder.andd(0xfff, REG_EBX);
@@ -1498,7 +1554,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 								
 				// Used regs: EAX, EBX, ECX, EDX
 								
-				encoder.mov(X86Memory::get(REGSTATE_REG, 0x3c), REG_EAX);		// Load the PC
+				encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_EAX);		// Load the PC
 				encoder.mov(REG_EAX, REG_EBX);
 				encoder.shr(0x2, REG_EAX);
 				encoder.movzx(REG_AX, REG_EDX);									// Shift/Mask the PC
@@ -1561,13 +1617,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				}
 			} else if (source->type == IROperand::PC) {
 				if (dest->is_alloc_reg()) {
-					// TODO: FIXME: HACK HACK HACK XXX
 					switch (insn->type) {
 					case IRInstruction::ADD:
-						encoder.add(X86Memory::get(REGSTATE_REG, 60), register_from_operand(dest));
+						encoder.add(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
 						break;
 					case IRInstruction::SUB:
-						encoder.sub(X86Memory::get(REGSTATE_REG, 60), register_from_operand(dest));
+						encoder.sub(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
 						break;
 					default:
 						assert(false);
@@ -1802,8 +1857,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *target = &insn->operands[0];
 
 			if (target->is_alloc_reg()) {
-				// TODO: FIXME: XXX: HACK HACK HACK
-				encoder.mov(X86Memory::get(REGSTATE_REG, 60), register_from_operand(target));
+				encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(target));
 			} else {
 				assert(false);
 			}
@@ -1817,7 +1871,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			if (amount->is_constant()) {
 				// TODO: FIXME: XXX: HACK HACK HACK
-				encoder.add4(amount->value, X86Memory::get(REGSTATE_REG, 60));
+				encoder.add4(amount->value, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
 			} else {
 				assert(false);
 			}
@@ -1927,13 +1981,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
+			// TODO: CHAIN WRITE DEVICE
 			stack_map_t stack_map;
-
-			if (prev_insn && prev_insn->type == IRInstruction::WRITE_DEVICE) {
-				//
-			} else {
-				emit_save_reg_state(4, stack_map);
-			}
+			emit_save_reg_state(4, stack_map);
 
 			load_state_field(0, REG_RDI);
 
@@ -1945,11 +1995,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&cpu_write_device, get_temp(1, 8));
 			encoder.call(get_temp(1, 8));
 
-			if (next_insn && next_insn->type == IRInstruction::WRITE_DEVICE) {
-				//
-			} else {
-				emit_restore_reg_state(4, stack_map);
-			}
+			emit_restore_reg_state(4, stack_map);
 
 			break;
 		}
@@ -2700,11 +2746,43 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				assert(false);
 			}
 
-			encoder.setc(X86Memory::get(REG_RDI, 472));
-			encoder.seto(X86Memory::get(REG_RDI, 473));
-			encoder.setz(X86Memory::get(REG_RDI, 474));
-			encoder.sets(X86Memory::get(REG_RDI, 475));
+			encoder.setc(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(C)));		// Carry
+			encoder.seto(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(V)));		// Overflow
+			encoder.setz(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(Z)));		// Zero
+			encoder.sets(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(N)));		// Negative
 
+			break;
+		}
+		
+		case IRInstruction::TRACE:
+		{
+			const IROperand& opcode = insn->operands[0];
+			assert(opcode.is_constant());
+			
+			stack_map_t stack_map;
+			emit_save_reg_state(5, stack_map);
+
+			load_state_field(0, REG_RDI);
+			encoder.mov((uint8_t)opcode.value, REG_RSI);
+			
+			if (insn->operands[1].is_valid()) {
+				encode_operand_function_argument(&insn->operands[1], REG_RDX, stack_map);
+			}
+
+			if (insn->operands[2].is_valid()) {
+				encode_operand_function_argument(&insn->operands[2], REG_RCX, stack_map);
+			}
+			
+			if (insn->operands[3].is_valid()) {
+				encode_operand_function_argument(&insn->operands[3], REG_R8, stack_map);
+			}
+			
+			// Load the address of the target function into a temporary, and perform an indirect call.
+			encoder.mov((uint64_t)&jit_trace, get_temp(1, 8));
+			encoder.call(get_temp(1, 8));
+
+			emit_restore_reg_state(5, stack_map);
+			
 			break;
 		}
 
@@ -2735,7 +2813,7 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 	uint32_t stack_offset = 0;
 	
 	//First, count required stack slots
-	for(int i = 6; i >= 0; i--) {
+	for(int i = register_assignments_8.size()-1; i >= 0; i--) {
 		if(used_phys_regs.get(i)) {
 			stack_offset += 8;
 		}
@@ -2743,7 +2821,7 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 	
 	encoder.mov(REGSTATE_REG, REG_R15);
 	
-	for(int i = 6; i >= 0; i--) {
+	for(int i = register_assignments_8.size()-1; i >= 0; i--) {
 		if(used_phys_regs.get(i)) {
 			const X86Register &reg = get_allocable_register(i, 8);
 			
@@ -2757,7 +2835,7 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 
 void BlockCompiler::emit_restore_reg_state(int num_operands, stack_map_t &stack_map)
 {
-	for(int i = 0; i < 7; ++i) {
+	for(int i = 0; i < register_assignments_8.size(); ++i) {
 		if(used_phys_regs.get(i)) {
 			encoder.pop(get_allocable_register(i, 8));
 		}
@@ -2775,6 +2853,7 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 			encoder.mov(REG_RBX, target_reg);
 		} else if (oper->is_alloc_reg()) {
 			const X86Register &reg = get_allocable_register(oper->alloc_data, 8);
+			assert(stack_map.count(&reg));
 			encoder.mov(X86Memory::get(REG_RSP, stack_map[&reg]), target_reg);
 		} else {
 			encoder.mov(X86Memory::get(REG_RBP, (oper->alloc_data * -1) - 8), target_reg);
@@ -2811,7 +2890,7 @@ static void dump_insn(IRInstruction *insn) {
 			} else if (oper->is_block()) {
 				printf("b%d", oper->value);
 			} else if (oper->is_func()) {
-				printf("&%x", oper->value);
+				printf("%%%p", (const char *)oper->value);
 			} else {
 				printf("<invalid>");
 			}
@@ -2827,6 +2906,7 @@ void BlockCompiler::dump_ir()
 		IRInstruction *insn = ctx.at(ir_idx);
 
 		if (current_block_id != insn->ir_block) {
+			if (insn->ir_block == NOP_BLOCK) continue;
 			current_block_id = insn->ir_block;
 			printf("block %d:\n", current_block_id);
 		}
@@ -3136,8 +3216,8 @@ bool BlockCompiler::reg_value_reuse()
 				
 				reg_offset = insn->operands[0].value;
 				
-				// HACK ARM PC offset
-				if(reg_offset >= 0x3c) continue;
+				// PC offset
+				if(reg_offset == REG_OFFSET_OF(PC)) continue;
 				
 				if(stored_regs.count(reg_offset)) {
 					insn->type = IRInstruction::MOV;
@@ -3165,8 +3245,8 @@ bool BlockCompiler::reg_value_reuse()
 			case IRInstruction::WRITE_REG:
 				reg_offset = insn->operands[1].value;
 				
-				// HACK ARM PC Offset
-				if(reg_offset >= 0x3c) continue;
+				// PC Offset
+				if(reg_offset == REG_OFFSET_OF(PC)) continue;
 				
 				// If we've previously written to this offset, zap out the old write since this one kills it
 				// We can only do this if the reg is in both caches since otherwise it might have been loaded since 
@@ -3294,5 +3374,7 @@ bool BlockCompiler::value_merging()
 		//~ printf("\n");
 	}	
 	
+	//printf("*** after merge:\n");
+	//dump_ir();
 	return true;
 }

@@ -147,6 +147,7 @@ namespace captive {
 				void incl(const X86Memory& loc);
 
 				void movcs(const X86Register& dst);
+				void mov(const X86SegmentRegister& src, const X86Register& dst);
 				void mov(const X86Register& src, const X86Register& dst);
 				void mov(const X86Memory& src, const X86Register& dst);
 				void mov(const X86Register& src, const X86Memory& dst);

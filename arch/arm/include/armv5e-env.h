@@ -12,12 +12,12 @@
 
 namespace captive {
 	namespace arch {
-		namespace arm {
-			class ArmEnvironment : public Environment
+		namespace armv5e {
+			class armv5e_environment : public Environment
 			{
 			public:
-				ArmEnvironment(captive::PerCPUData *per_cpu_data);
-				virtual ~ArmEnvironment();
+				armv5e_environment(captive::PerCPUData *per_cpu_data);
+				virtual ~armv5e_environment();
 
 				CPU *create_cpu() override;
 			};

@@ -14,18 +14,18 @@
 
 namespace captive {
 	namespace arch {
-		namespace arm {
+		namespace armv5e {
 			namespace devices {
 				class CoCo;
 			}
 
-			class ArmCPU;
+			class armv5e_cpu;
 
-			class ArmMMU : public MMU
+			class armv5e_mmu : public MMU
 			{
 			public:
-				ArmMMU(ArmCPU& cpu);
-				~ArmMMU();
+				armv5e_mmu(armv5e_cpu& cpu);
+				~armv5e_mmu();
 
 				bool enable() override;
 				bool disable() override;
@@ -41,7 +41,7 @@ namespace captive {
 				devices::CoCo& _coco;
 				bool _enabled;
 				
-				inline ArmCPU& arm_cpu() const { return (ArmCPU&) cpu(); }
+				inline armv5e_cpu& arm_cpu() const { return (armv5e_cpu&) cpu(); }
 
 				struct l1_descriptor {
 					uint32_t data;
@@ -111,6 +111,8 @@ namespace captive {
 							return data & ~0xfffUL;
 						case TE_TINY:
 							return data & ~0x3ffUL;
+						default:
+							return 0;
 						}
 					}
 

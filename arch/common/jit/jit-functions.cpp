@@ -2,7 +2,6 @@
 #include <printf.h>
 #include <cpu.h>
 #include <env.h>
-#include <interp.h>
 #include <priv.h>
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode)
@@ -25,22 +24,50 @@ extern "C" void cpu_read_device(captive::arch::CPU *cpu, uint32_t devid, uint32_
 	cpu->env().read_core_device(*cpu, devid, reg, val);
 }
 
-extern "C" void trace_reg_write(captive::arch::CPU *cpu, uint64_t off, uint32_t val)
+extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, uint64_t a2, uint64_t a3)
 {
-	printf("TRACE: REG-WRITE: off=%u, val=0x%x\n", (uint32_t)off, val);
+	switch (opcode) {
+	case 0:	// START
+		printf("[%08x] ", cpu->read_pc());
+		break;
+	case 1:	// STOP
+		printf("\n");
+		break;
+		
+	case 2: // READ MEM
+		printf("M[%08x] => %08x ", a1, a2);
+		break;
+	case 3: // WRITE MEM
+		printf("M[%08x] <= %08x ", a1, a2);
+		break;
+
+	case 4: // READ REG
+		printf("R[%03d] => %08x ", a1, a2);
+		break;
+	case 5: // WRITE REG
+		printf("R[%03d] <= %08x ", a1, a2);
+		break;
+		
+	case 6: // READ DEV
+		printf("D[%02d @ %02d] => %08x ", a1, a2, a3);
+		break;
+	case 7: // WRITE DEV
+		printf("D[%02d @ %02d] <= %08x ", a1, a2, a3);
+		break;
+	}
 }
 
 extern "C" void jit_verify(captive::arch::CPU *cpu)
 {
 	if (!cpu->verify_check()) {
-		abort();
+		fatal("verification failed\n");
 	}
 }
 
 extern "C" void cpu_check_interrupts(captive::arch::CPU *cpu)
 {
 	if (unlikely(cpu->cpu_data().isr)) {
-		cpu->interpreter().handle_irq(cpu->cpu_data().isr);
+		cpu->handle_irq(cpu->cpu_data().isr);
 	}
 }
 
@@ -55,7 +82,7 @@ extern "C" void jit_rum(captive::arch::CPU *cpu)
 
 extern "C" uint32_t jit_handle_interrupt(captive::arch::CPU *cpu, uint32_t isr)
 {
-	return cpu->interpreter().handle_irq(isr);
+	return cpu->handle_irq(isr);
 }
 
 extern "C" void jit_debug1(uint32_t pc)

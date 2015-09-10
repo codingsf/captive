@@ -8,8 +8,15 @@
 #ifndef DECODE_H
 #define	DECODE_H
 
+#include <define.h>
+
 namespace captive {
 	namespace arch {
+		#define UNSIGNED_BITS(v, u, l)	(((uint32_t)(v) << (31 - u)) >> (31 - u + l))
+		#define SIGNED_BITS(v, u, l)	(((int32_t)(v) << (31 - u)) >> (31 - u + l))
+		#define BITSEL(v, b)			(((v) >> b) & 1UL)
+		#define BIT_LSB(i)				(1 << (i))
+		
 		class Decode
 		{
 		public:

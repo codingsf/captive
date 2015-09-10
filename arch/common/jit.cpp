@@ -2,7 +2,7 @@
 
 using namespace captive::arch;
 
-JIT::JIT()
+JIT::JIT() : _trace(false)
 {
 
 }

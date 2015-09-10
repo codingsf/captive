@@ -41,7 +41,7 @@ X86VectorRegister REG_XMM13("xmm13", 16, 5, 1);
 X86VectorRegister REG_XMM14("xmm14", 16, 6, 1);
 X86VectorRegister REG_XMM15("xmm15", 16, 7, 1);
 
-X86SegmentRegister REG_CS("cs", 0), REG_DS("ds", 1), REG_ES("es", 2), REG_FS("fs", 3), REG_GS("gs", 4), REG_SS("ss", 5);
+X86SegmentRegister REG_CS("cs", 1), REG_DS("ds", 3), REG_ES("es", 0), REG_FS("fs", 4), REG_GS("gs", 5), REG_SS("ss", 2);
 } } }
 
 #define REX	0x40
@@ -118,6 +118,11 @@ void X86Encoder::invlpg(const X86Memory& addr)
 void X86Encoder::lea(const X86Memory& addr, const X86Register& dst)
 {
 	encode_opcode_mod_rm(0x8d, dst, addr);
+}
+
+void X86Encoder::mov(const X86SegmentRegister& src, const X86Register& dst)
+{
+	encode_opcode_mod_rm(0x8c, src.raw_index, dst);
 }
 
 void X86Encoder::mov(const X86Register& src, const X86Register& dst)

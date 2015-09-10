@@ -12,7 +12,7 @@
 
 namespace captive {
 	namespace arch {
-		namespace arm {
+		namespace armv5e {
 			namespace devices {
 				class CoCo : public Coprocessor
 				{

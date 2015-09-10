@@ -1,11 +1,12 @@
 #include <devices/coco.h>
-#include <arm-cpu.h>
+#include <armv5e-cpu.h>
 #include <mmu.h>
 #include <printf.h>
 
-using namespace captive::arch::arm::devices;
+using namespace captive::arch::armv5e;
+using namespace captive::arch::armv5e::devices;
 
-CoCo::CoCo(Environment& env) : Coprocessor(env), _S(false), _R(false), M(false)
+CoCo::CoCo(Environment& env) : Coprocessor(env), _R(false), _S(false), M(false)
 {
 
 }
@@ -28,7 +29,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		FI = (data & (1 << 21)) != 0;
 		L4 = (data & (1 << 15)) != 0;
 		RR = (data & (1 << 14)) != 0;
-		((ArmCPU&)cpu).state.regs.cpV = !!(data & (1 << 13));
+		*(((armv5e_cpu&)cpu).reg_offsets.cpV) = !!(data & (1 << 13));
 		I = (data & (1 << 12)) != 0;
 		Z = (data & (1 << 11)) != 0;
 		F = (data & (1 << 10)) != 0;
@@ -261,7 +262,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		//NIBBLE 3
 		data |= 1 << 12; //I L1 I$
 
-		data |= !!(((ArmCPU&)cpu).state.regs.cpV) << 13; //V, exception vectors
+		data |= !!((*(((armv5e_cpu&)cpu).reg_offsets.cpV)) << 13); //V, exception vectors
 
 		data |= 0 << 14; //RR
 		data |= 0 << 15; //L4

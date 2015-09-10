@@ -18,7 +18,7 @@ static int _verify_tid;
 
 int verify_prepare(int id)
 {
-	int shmfd = open("./captive.shm", O_RDWR);
+	int shmfd = open("/tmp/captive.shm", O_RDWR);
 	if (shmfd < 0) {
 		return -1;
 	}

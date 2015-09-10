@@ -1,5 +1,4 @@
 #include <cpu.h>
-#include <interp.h>
 #include <decode.h>
 #include <disasm.h>
 #include <jit.h>
@@ -50,7 +49,7 @@ bool CPU::run_region_jit()
 
 		// Instruct the interpreter to handle the memory fault, passing
 		// in the the type of fault.
-		interpreter().handle_memory_fault((MMU::resolution_fault)rc);
+		handle_mem_fault((MMU::resolution_fault)rc);
 
 		// Make sure interrupts are enabled.
 		__local_irq_enable();
@@ -75,7 +74,7 @@ bool CPU::run_region_jit_safepoint()
 		// and if there is, instruct the interpreter to handle it.
 
 		if (unlikely(cpu_data().isr)) {
-			if (interpreter().handle_irq(cpu_data().isr)) {
+			if (handle_irq(cpu_data().isr)) {
 				cpu_data().interrupts_taken++;
 			}
 		}
@@ -164,7 +163,7 @@ bool CPU::run_region_jit_safepoint()
 
 			step_ok = blk->txln(&jit_state) == 0;
 		} else {
-			interpret_block();
+			abort();
 		}
 	} while(step_ok);
 

@@ -24,7 +24,13 @@ namespace captive {
 			JIT();
 			virtual ~JIT();
 
+			void trace(bool enable) { _trace = enable; }
+			bool trace() const { return _trace; }
+			
 			virtual bool translate(const Decode *decode_obj, jit::TranslationContext& ctx) = 0;
+			
+		protected:
+			bool _trace;
 		};
 	}
 }

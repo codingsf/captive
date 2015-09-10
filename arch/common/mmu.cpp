@@ -188,7 +188,7 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 	page_dir_ptr_entry_t *pdp;
 	page_dir_entry_t *pd;
 	page_table_entry_t *pt;
-
+	
 	Memory::get_va_table_entries((va_t)(uint64_t)va, pm, pdp, pd, pt);
 	pt->present(false);
 

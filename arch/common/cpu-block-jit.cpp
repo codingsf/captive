@@ -1,5 +1,4 @@
 #include <cpu.h>
-#include <interp.h>
 #include <decode.h>
 #include <disasm.h>
 #include <jit.h>
@@ -30,6 +29,9 @@ extern "C" int block_trampoline(void *, void*);
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
+	
+	//trace().enable();
+	//jit().trace(true);
 
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
@@ -66,7 +68,7 @@ bool CPU::run_block_jit_safepoint()
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
-			if (interpreter().handle_irq(cpu_data().isr)) {
+			if (handle_irq(cpu_data().isr)) {
 				jit_state.exit_chain = 0;
 				cpu_data().interrupts_taken++;
 			}
@@ -82,16 +84,16 @@ bool CPU::run_block_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-
+				
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
 			MMU::resolution_fault fault = MMU::NONE;
-			if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) abort();
+			if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) fatal("mmu: failed to translate for fetch\n");
 
 			// If there was a fault, then switch back to the safe-point.
 			if (unlikely(fault)) {
-				if (!interpreter().handle_memory_fault(fault)) return false;
+				if (!handle_mem_fault(fault)) return false;
 				continue;
 			}
 
@@ -103,7 +105,6 @@ bool CPU::run_block_jit_safepoint()
 			region_phys_base = phys_pc & 0xfffff000;
 		}
 
-
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		if (blk->txln) {
 			auto ptr = block_txln_cache->entry_ptr(virt_pc >> 2);
@@ -112,17 +113,12 @@ bool CPU::run_block_jit_safepoint()
 			
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 			continue;
-		}
-
-		if (blk->exec_count > 10) {
+		} else {
+			blk->loop_header = true;
 			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 			mmu().disable_writes();
 
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
-		} else {
-			blk->exec_count++;
-			blk->loop_header = true;
-			interpret_block();
 		}
 	} while(step_ok);
 
@@ -140,7 +136,7 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 	bool emit_interrupt_check = mode == MODE_BLOCK;
 	bool emit_chaining_logic = mode == MODE_BLOCK;
 	
-	BlockCompiler compiler(ctx, pa, emit_interrupt_check, emit_chaining_logic);
+	BlockCompiler compiler(ctx, pa, tagged_registers(), emit_interrupt_check, emit_chaining_logic);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		printf("jit: block compilation failed\n");
@@ -156,6 +152,8 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 
 	return fn;
 }
+
+//#define DEBUG_TRANSLATION
 
 bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 {
@@ -197,8 +195,16 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		}
 
 		// Translate this instruction into the context.
+		if (unlikely(trace().enabled())) {
+			ctx.add_instruction(IRInstruction::trace_start());
+		}
+		
 		if (!jit().translate(insn, ctx)) {
 			return false;
+		}
+		
+		if (unlikely(trace().enabled())) {
+			ctx.add_instruction(IRInstruction::trace_end());
 		}
 
 		pc += insn->length;

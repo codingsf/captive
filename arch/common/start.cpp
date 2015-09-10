@@ -8,7 +8,6 @@
 #include <mmu.h>
 #include <malloc/malloc.h>
 #include <malloc/page-allocator.h>
-#include <interp.h>
 
 extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
 
@@ -19,7 +18,7 @@ static void call_static_constructors()
 {
 	size_t size = __init_array_end - __init_array_start;
 
-	for (int i = 0; i < size; i++) {
+	for (unsigned int i = 0; i < size; i++) {
 		(*__init_array_start[i])();
 	}
 }
@@ -191,9 +190,11 @@ extern "C" {
 			break;
 
 		case 0x100 ... 0x1ff:
+			//printf("IRQ RAISED: %d\n", cpu->cpu_data().signal_code & 0xff);
 			cpu->handle_irq_raised(cpu->cpu_data().signal_code & 0xff);
 			break;
 		case 0x200 ... 0x2ff:
+			//printf("IRQ RESCINDED: %d\n", cpu->cpu_data().signal_code & 0xff);
 			cpu->handle_irq_rescinded(cpu->cpu_data().signal_code & 0xff);
 			break;
 		}
