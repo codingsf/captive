@@ -228,6 +228,7 @@ int main(int argc, char **argv)
 
 	devices::io::FileBackedAsyncBlockDevice *bdev = new devices::io::FileBackedAsyncBlockDevice();
 
+	DEBUG << "Opening file " << std::string(argv[4]) << " for block device";
 	if (!bdev->open_file(argv[4])) {
 		ERROR << "Unable to open block device file '" << argv[4] << "'";
 		return 1;

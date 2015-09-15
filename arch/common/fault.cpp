@@ -74,7 +74,14 @@ int do_device_read(struct mcontext *mctx)
 		return (int)fault;
 	}
 
-	uint32_t value = __in32(pa);
+	uint64_t value;
+	switch (inst.data_size) {
+	case 1: value = __in8(pa); break;
+	case 2: value = __in16(pa); break;
+	case 4: value = __in32(pa); break;
+	default: fatal("invalid data size for rewritten device read\n");
+	}
+	
 	//printf("F read  @ %016lx addr=%08x val=%08x\n", mctx->rip - 2, pa, value);
 
 	switch (inst.Dest.reg) {
@@ -227,27 +234,33 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		default: fatal("unhandled source register %s\n", x86::x86_register_names[inst.Source.reg]);
 		}
 	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
-		uint32_t value = __in32(dev_addr);
+		uint64_t value;
+		switch (inst.data_size) {
+		case 1: value = __in8(dev_addr); break;
+		case 2: value = __in16(dev_addr); break;
+		case 4: value = __in32(dev_addr); break;
+		default: fatal("unhandled data size %d\n", inst.data_size);
+		}
 		
 		switch (inst.Dest.reg) {
-		case x86::Operand::R_EAX: mctx->rax = value; break;
-		case x86::Operand::R_EBX: mctx->rbx = value; break;
-		case x86::Operand::R_ECX: mctx->rcx = value; break;
-		case x86::Operand::R_EDX: mctx->rdx = value; break;
-		case x86::Operand::R_ESI: mctx->rsi = value; break;
-		case x86::Operand::R_EDI: mctx->rdi = value; break;
+		case x86::Operand::R_EAX: mctx->rax = (uint32_t)value; break;
+		case x86::Operand::R_EBX: mctx->rbx = (uint32_t)value; break;
+		case x86::Operand::R_ECX: mctx->rcx = (uint32_t)value; break;
+		case x86::Operand::R_EDX: mctx->rdx = (uint32_t)value; break;
+		case x86::Operand::R_ESI: mctx->rsi = (uint32_t)value; break;
+		case x86::Operand::R_EDI: mctx->rdi = (uint32_t)value; break;
 		
-		case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (value & 0xffff); break;
-		case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (value & 0xffff); break;
-		case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (value & 0xffff); break;
-		case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (value & 0xffff); break;
-		case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (value & 0xffff); break;
-		case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (value & 0xffff); break;
+		case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (uint16_t)value; break;
+		case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (uint16_t)value; break;
+		case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (uint16_t)value; break;
+		case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (uint16_t)value; break;
+		case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (uint16_t)value; break;
+		case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (uint16_t)value; break;
 
-		case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (value & 0xff); break;
-		case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (value & 0xff); break;
-		case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (value & 0xff); break;
-		case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (value & 0xff); break;
+		case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (uint8_t)value; break;
+		case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (uint8_t)value; break;
+		case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (uint8_t)value; break;
+		case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (uint8_t)value; break;
 		
 		default: fatal("unhandled dest register %s\n", x86::x86_register_names[inst.Dest.reg]);
 		}

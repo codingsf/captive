@@ -69,6 +69,7 @@ bool CPU::run_block_jit_safepoint()
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
 			if (handle_irq(cpu_data().isr)) {
+				//printf("IRQ\n");
 				jit_state.exit_chain = 0;
 				cpu_data().interrupts_taken++;
 			}
@@ -84,7 +85,7 @@ bool CPU::run_block_jit_safepoint()
 
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-				
+		
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.

@@ -18,7 +18,7 @@ extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
 extern "C" void jit_verify(void *cpu);
 extern "C" void jit_rum(void *cpu);
-extern "C" void jit_trace(void *cpu, uint8_t opcode, uint64_t a1, uint64_t a2, uint64_t a3);
+extern "C" void jit_trace(void *cpu, uint8_t opcode, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
 
 extern uint32_t interpret_ir(void *, void *, uint32_t);
 
@@ -2044,6 +2044,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (source->is_vreg()) {
 				if (dest->is_vreg()) {
 					if (source->is_alloc_reg() && dest->is_alloc_reg()) {
+						encoder.xorr(register_from_operand(dest), register_from_operand(dest));
 						encoder.bsr(register_from_operand(source), register_from_operand(dest));
 						encoder.xorr(0x1f, register_from_operand(dest));
 					} else if (source->is_alloc_reg() && dest->is_alloc_stack()) {
@@ -2760,7 +2761,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			assert(opcode.is_constant());
 			
 			stack_map_t stack_map;
-			emit_save_reg_state(5, stack_map);
+			emit_save_reg_state(6, stack_map);
 
 			load_state_field(0, REG_RDI);
 			encoder.mov((uint8_t)opcode.value, REG_RSI);
@@ -2777,11 +2778,15 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encode_operand_function_argument(&insn->operands[3], REG_R8, stack_map);
 			}
 			
+			if (insn->operands[4].is_valid()) {
+				encode_operand_function_argument(&insn->operands[4], REG_R9, stack_map);
+			}
+			
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov((uint64_t)&jit_trace, get_temp(1, 8));
 			encoder.call(get_temp(1, 8));
 
-			emit_restore_reg_state(5, stack_map);
+			emit_restore_reg_state(6, stack_map);
 			
 			break;
 		}

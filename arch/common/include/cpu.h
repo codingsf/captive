@@ -13,6 +13,7 @@
 #include <mmu.h>
 #include <shmem.h>
 #include <priv.h>
+#include <disasm.h>
 #include <shared-jit.h>
 #include <txln-cache.h>
 
@@ -43,7 +44,6 @@ namespace captive {
 
 		class Environment;
 		class MMU;
-		class Interpreter;
 		class Decode;
 		class JumpInfo;
 		class JIT;
@@ -69,6 +69,13 @@ namespace captive {
 			inline Environment& env() const { return _env; }
 			inline Trace& trace() const { return *_trace; }
 			inline PerCPUData& cpu_data() const { return *_per_cpu_data; }
+			
+			inline const char *disassemble_address(gva_t va)
+			{
+				char decode_data[128];
+				decode_instruction_virt(va, (Decode *)decode_data);
+				return trace().disasm().disassemble(va, (const uint8_t *)decode_data);
+			}
 
 			inline uint32_t read_pc() const { return *tagged_reg_offsets.PC; }
 			inline uint32_t write_pc(uint32_t new_pc_val) { uint32_t tmp = *tagged_reg_offsets.PC; *tagged_reg_offsets.PC = new_pc_val; return tmp; }

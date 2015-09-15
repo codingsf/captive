@@ -249,12 +249,13 @@ namespace captive {
 			
 			static IRInstruction trace_start() { return IRInstruction(TRACE, IROperand::const8(0)); }
 			static IRInstruction trace_end() { return IRInstruction(TRACE, IROperand::const8(1)); }
-			static IRInstruction trace_mem_read(const IROperand& addr, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(2), addr, val); }
-			static IRInstruction trace_mem_write(const IROperand& addr, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(3), addr, val); }
+			static IRInstruction trace_mem_read(const IROperand& addr, const IROperand& val, int width) { return IRInstruction(TRACE, IROperand::const8(2), addr, val, IROperand::const8(width)); }
+			static IRInstruction trace_mem_write(const IROperand& addr, const IROperand& val, int width) { return IRInstruction(TRACE, IROperand::const8(3), addr, val, IROperand::const8(width)); }
 			static IRInstruction trace_reg_read(const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(4), reg, val); }
 			static IRInstruction trace_reg_write(const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(5), reg, val); }
 			static IRInstruction trace_dev_read(const IROperand& dev, const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(6), dev, reg, val); }
 			static IRInstruction trace_dev_write(const IROperand& dev, const IROperand& reg, const IROperand& val) { return IRInstruction(TRACE, IROperand::const8(7), dev, reg, val); }
+			static IRInstruction trace_not_taken() { return IRInstruction(TRACE, IROperand::const8(8)); }
 			
 			//
 			// Data Motion
