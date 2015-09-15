@@ -113,7 +113,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!peephole()) return false;
 	timer.tick("peepholer");
 
-	sort_ir();
+	//sort_ir();
 	//if (!value_merging()) return false;
 	timer.tick("value-merging");
 
@@ -134,7 +134,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!analyse(max_stack)) return false;
 	timer.tick("reg-allocation");
 	
-	//if( !post_allocate_peephole()) return false;
+	if( !post_allocate_peephole()) return false;
 	timer.tick("post-alloc-peepholer");
 
 	if( !lower_stack_to_reg()) return false;
@@ -312,7 +312,7 @@ bool BlockCompiler::peephole()
 
 
 		case IRInstruction::INCPC:
-			if(0) { //prev_pc_inc) {
+			if (prev_pc_inc) {
 				insn->operands[0].value += prev_pc_inc->operands[0].value;
 				prev_pc_inc->type = IRInstruction::NOP;
 			}
