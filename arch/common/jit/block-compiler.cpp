@@ -303,6 +303,7 @@ bool BlockCompiler::peephole()
 
 		case IRInstruction::SUB:
 		case IRInstruction::SAR:
+		case IRInstruction::ROR:
 		case IRInstruction::OR:
 		case IRInstruction::XOR:
 			if (insn->operands[0].is_constant() && insn->operands[0].value == 0) {
@@ -506,6 +507,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "inc-pc",		.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "add",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "adc",		.format = "IBIXXX", .has_side_effects = false },
 	{ .mnemonic = "sub",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "mul",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "div",		.format = "IBXXXX", .has_side_effects = false },
@@ -514,10 +516,11 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "shl",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "shr",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "sar",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "ror",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "clz",		.format = "IOXXXX", .has_side_effects = false },
 
 	{ .mnemonic = "and",		.format = "IBXXXX", .has_side_effects = false },
-	{ .mnemonic = "or",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "or",			.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "xor",		.format = "IBXXXX", .has_side_effects = false },
 
 	{ .mnemonic = "cmp eq",		.format = "IIOXXX", .has_side_effects = false },
@@ -554,7 +557,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "adc flags",	.format = "IIIXXX", .has_side_effects = true },
+	{ .mnemonic = "adc flags",	.format = "IBIXXX", .has_side_effects = true },
+	{ .mnemonic = "set flags zn",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
 	{ .mnemonic = "trace",		.format = "NIIIII", .has_side_effects = true },
@@ -1110,7 +1114,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 {
 	bool success = true, dump_this_shit = false;
 	X86Register& guest_regs_reg = REGSTATE_REG;
-
+	
 	std::vector<std::pair<uint32_t, IRBlockId> > block_relocations;
 	block_relocations.reserve(ctx.block_count());
 	std::vector<uint32_t> native_block_offsets (ctx.block_count(), 0);
@@ -2544,6 +2548,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::SHL:
 		case IRInstruction::SHR:
 		case IRInstruction::SAR:
+		case IRInstruction::ROR:
 		{
 			IROperand *amount = &insn->operands[0];
 			IROperand *dest = &insn->operands[1];
@@ -2562,6 +2567,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					case IRInstruction::SAR:
 						encoder.sar(amount->value, operand);
 						break;
+					case IRInstruction::ROR:
+						encoder.ror(amount->value, operand);
+						break;
 					default:
 						assert(false);
 						break;
@@ -2578,6 +2586,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					case IRInstruction::SAR:
 						encoder.sar(amount->value, dest->size, operand);
+						break;
+					case IRInstruction::ROR:
+						encoder.ror(amount->value, dest->size, operand);
 						break;
 					default:
 						assert(false);
@@ -2600,6 +2611,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 							break;
 						case IRInstruction::SAR:
 							encoder.sar(REG_CL, operand);
+							break;
+						case IRInstruction::ROR:
+							encoder.ror(REG_CL, operand);
 							break;
 						default:
 							assert(false);
@@ -2675,83 +2689,94 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.intt(0x85);
 			break;
 		}
-
+		
+		case IRInstruction::SET_ZN_FLAGS:
+		{
+			IROperand *val = &insn->operands[0];
+			
+			if (val->is_alloc_reg()) {
+				encoder.test(register_from_operand(val), register_from_operand(val));
+			} else {
+				assert(false);
+			}
+			
+			encoder.setz(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(Z)));		// Zero
+			encoder.sets(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(N)));		// Negative
+			
+			break;
+		}
+		
+		case IRInstruction::ADC:
 		case IRInstruction::ADC_WITH_FLAGS:
 		{
-			IROperand *lhs = &insn->operands[0];
-			IROperand *rhs = &insn->operands[1];
-			IROperand *carry_in = &insn->operands[2];
-
-
-			X86Register& tmp = get_temp(0, 4);
+			IROperand *src = &insn->operands[0];
+			IROperand *dst = &insn->operands[1];
+			IROperand *carry = &insn->operands[2];
 
 			bool just_do_an_add = false;
 
 			// Set up carry bit for adc
-			if (carry_in->is_constant()) {
-				if (carry_in->value == 0) {
+			if (carry->is_constant()) {
+				if (carry->value == 0) {
 					just_do_an_add = true;
 				} else {
 					encoder.stc();
 				}
-			} else if (carry_in->is_vreg()) {
-				if (carry_in->is_alloc_reg()) {
-					encoder.mov(0xff, get_temp(0, 1));
-					encoder.add(register_from_operand(carry_in, 1), get_temp(0, 1));
+			} else if (carry->is_vreg()) {
+				encoder.mov(0xff, get_temp(0, 1));
+				if (carry->is_alloc_reg()) {
+					encoder.add(register_from_operand(carry, 1), get_temp(0, 1));
+				} else if (carry->is_alloc_stack()) {
+					encoder.add(stack_from_operand(carry), get_temp(0, 1));
 				} else {
 					assert(false);
 				}
 			} else {
 				assert(false);
 			}
-
-			// Load up lhs
-			if (lhs->is_constant()) {
-				encoder.mov(lhs->value, tmp);
-			} else if (lhs->is_vreg()) {
-				if (lhs->is_alloc_reg()) {
-					encoder.mov(register_from_operand(lhs, 4), tmp);
-				} else if (lhs->is_alloc_stack()) {
-					encoder.mov(stack_from_operand(lhs), tmp);
+			
+			if (just_do_an_add) {
+				if (src->is_constant() && dst->is_alloc_reg()) {
+					encoder.add(src->value, register_from_operand(dst));
+				} else if (src->is_alloc_reg() && dst->is_alloc_reg()) {
+					encoder.add(register_from_operand(src), register_from_operand(dst));
+				} else if (src->is_alloc_reg() && dst->is_alloc_stack()) {
+					encoder.add(register_from_operand(src), stack_from_operand(dst));
+				} else if (src->is_alloc_stack() && dst->is_alloc_reg()) {
+					encoder.add(stack_from_operand(src), register_from_operand(dst));
+				} else if (src->is_alloc_stack() && dst->is_alloc_stack()) {
+					X86Register& tmp = get_temp(0, src->size);
+					encoder.mov(stack_from_operand(src), tmp);
+					encoder.add(tmp, stack_from_operand(dst));
 				} else {
 					assert(false);
 				}
 			} else {
-				assert(false);
-			}
-
-			// Perform add with carry to set the flags
-			if (rhs->is_constant()) {
-				if (just_do_an_add) {
-					encoder.add((uint32_t)rhs->value, tmp);
-				} else {
-					encoder.adc((uint32_t)rhs->value, tmp);
-				}
-			} else if (rhs->is_vreg()) {
-				if (rhs->is_alloc_reg()) {
-					if (just_do_an_add) {
-						encoder.add(register_from_operand(rhs, 4), tmp);
-					} else {
-						encoder.adc(register_from_operand(rhs, 4), tmp);
-					}
-				} else if (rhs->is_alloc_stack()) {
-					if (just_do_an_add) {
-						encoder.add(stack_from_operand(rhs), tmp);
-					} else {
-						encoder.adc(stack_from_operand(rhs), tmp);
-					}
+				if (src->is_constant() && dst->is_alloc_reg()) {
+					encoder.adc(src->value, register_from_operand(dst));
+				} else if (src->is_alloc_reg() && dst->is_alloc_reg()) {
+					encoder.adc(register_from_operand(src), register_from_operand(dst));
+				} else if (src->is_alloc_reg() && dst->is_alloc_stack()) {
+					encoder.adc(register_from_operand(src), stack_from_operand(dst));
+				} else if (src->is_alloc_stack() && dst->is_alloc_reg()) {
+					encoder.adc(stack_from_operand(src), register_from_operand(dst));
+				} else if (src->is_alloc_stack() && dst->is_alloc_stack()) {
+					X86Register& tmp = get_temp(0, src->size);
+					encoder.mov(stack_from_operand(src), tmp);
+					encoder.adc(tmp, stack_from_operand(dst));
 				} else {
 					assert(false);
 				}
-			} else {
-				assert(false);
 			}
 
-			encoder.setc(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(C)));		// Carry
-			encoder.seto(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(V)));		// Overflow
-			encoder.setz(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(Z)));		// Zero
-			encoder.sets(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(N)));		// Negative
-
+			// If it's the flag setting instruction, set the flags.
+			if (insn->type == IRInstruction::ADC_WITH_FLAGS) {
+				encoder.setc(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(C)));		// Carry
+				encoder.seto(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(V)));		// Overflow
+				encoder.setz(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(Z)));		// Zero
+				encoder.sets(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(N)));		// Negative
+			}
+			
 			break;
 		}
 		

@@ -32,6 +32,10 @@ namespace captive {
 		protected:
 			bool _trace;
 		};
+		
+		static inline uint32_t __ror(uint32_t value, uint8_t amt) {
+			return (value >> amt) | (value << (32 - amt));
+		}
 	}
 }
 

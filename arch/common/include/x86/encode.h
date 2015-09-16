@@ -78,12 +78,12 @@ namespace captive {
 				int32_t displacement;
 				uint8_t scale;
 
-				X86Memory(const X86Register& _base) : segment(REG_DS), scale(0), index(REG_RIZ), base(_base), displacement(0) { }
-				X86Memory(const X86Register& _base, int32_t disp) : segment(REG_DS), scale(0), index(REG_RIZ), base(_base), displacement(disp) { }
-				X86Memory(const X86Register& _base, const X86Register& _index, uint8_t _scale) : segment(REG_DS), scale(_scale), index(_index), base(_base), displacement(0) { }
-				X86Memory(const X86Register& _base, int32_t _disp, const X86Register& _index, uint8_t _scale) : segment(REG_DS), scale(_scale), index(_index), base(_base), displacement(_disp) { }
-				X86Memory(const X86SegmentRegister& _segment, const X86Register& _base) : segment(_segment), scale(0), index(REG_RIZ), base(_base), displacement(0) { }
-				X86Memory(const X86SegmentRegister& _segment, int32_t _disp) : segment(_segment), scale(0), index(REG_RIZ), base(REG_RIZ), displacement(_disp) { }
+				X86Memory(const X86Register& _base) : segment(REG_DS), index(REG_RIZ), base(_base), displacement(0), scale(0) { }
+				X86Memory(const X86Register& _base, int32_t disp) : segment(REG_DS), index(REG_RIZ), base(_base), displacement(disp), scale(0) { }
+				X86Memory(const X86Register& _base, const X86Register& _index, uint8_t _scale) : segment(REG_DS), index(_index), base(_base), displacement(0), scale(_scale) { }
+				X86Memory(const X86Register& _base, int32_t _disp, const X86Register& _index, uint8_t _scale) : segment(REG_DS), index(_index), base(_base), displacement(_disp), scale(_scale) { }
+				X86Memory(const X86SegmentRegister& _segment, const X86Register& _base) : segment(_segment), index(REG_RIZ), base(_base), displacement(0), scale(0) { }
+				X86Memory(const X86SegmentRegister& _segment, int32_t _disp) : segment(_segment), index(REG_RIZ), base(REG_RIZ), displacement(_disp), scale(0) { }
 
 				static X86Memory get(const X86Register& base)
 				{
@@ -184,15 +184,19 @@ namespace captive {
 				void shl(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
 				void shr(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
 				void sar(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
+				void ror(uint8_t amount, uint8_t dstsize, const X86Memory& dst);
 				void shl(uint8_t amount, const X86Register& dst);
 				void shr(uint8_t amount, const X86Register& dst);
 				void sar(uint8_t amount, const X86Register& dst);
+				void ror(uint8_t amount, const X86Register& dst);
 				void shl(const X86Register& amount, const X86Register& dst);
 				void shr(const X86Register& amount, const X86Register& dst);
 				void sar(const X86Register& amount, const X86Register& dst);
+				void ror(const X86Register& amount, const X86Register& dst);
 
 				void adc(uint32_t src, const X86Register& dst);
 				void adc(const X86Memory& src, const X86Register& dst);
+				void adc(const X86Register& src, const X86Memory& dst);
 				void adc(const X86Register& src, const X86Register& dst);
 
 				void add(const X86Register& src, const X86Register& dst);

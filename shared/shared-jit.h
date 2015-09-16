@@ -139,57 +139,60 @@ namespace captive {
 				INCPC,
 
 				ADD,					// 9
+				ADC,
 				SUB,
 				MUL,
 				DIV,
 				MOD,
 
-				SHL,					// 14
+				SHL,					// 15
 				SHR,
 				SAR,
+				ROR,
 				CLZ,
 
-				AND,					// 18
+				AND,					// 20
 				OR,
 				XOR,
 
-				CMPEQ,					// 21
+				CMPEQ,					// 23
 				CMPNE,
 				CMPGT,
 				CMPGTE,
 				CMPLT,
 				CMPLTE,
 
-				SX,						// 27
+				SX,						// 29
 				ZX,
 				TRUNC,
 
-				READ_REG,				// 30
+				READ_REG,				// 32
 				WRITE_REG,
 				READ_MEM,
 				WRITE_MEM,
 				READ_MEM_USER,
 				WRITE_MEM_USER,
 
-				CALL,					// 36
+				CALL,					// 38
 				JMP,
 				BRANCH,
 				RET,
 				DISPATCH,
 
-				SET_CPU_MODE,			// 41
+				SET_CPU_MODE,			// 43
 				WRITE_DEVICE,
 				READ_DEVICE,
 				
-				FLUSH,					// 44
+				FLUSH,					// 46
 				FLUSH_ITLB,
 				FLUSH_DTLB,
 				FLUSH_ITLB_ENTRY,
 				FLUSH_DTLB_ENTRY,
 				
-				ADC_WITH_FLAGS,			// 49
+				ADC_WITH_FLAGS,			// 51
+				SET_ZN_FLAGS,
 				
-				BARRIER,				// 50
+				BARRIER,				// 53
 				TRACE
 			};
 
@@ -243,8 +246,6 @@ namespace captive {
 			static IRInstruction flush_itlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_ITLB_ENTRY, addr); }
 			static IRInstruction flush_dtlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
 			
-			static IRInstruction adc_with_flags(const IROperand& lhs_in, const IROperand& rhs_in, const IROperand& carry_in) { return IRInstruction(ADC_WITH_FLAGS, lhs_in, rhs_in, carry_in); }
-			
 			static IRInstruction barrier() { return IRInstruction(BARRIER); }
 			
 			static IRInstruction trace_start() { return IRInstruction(TRACE, IROperand::const8(0)); }
@@ -258,9 +259,14 @@ namespace captive {
 			static IRInstruction trace_not_taken() { return IRInstruction(TRACE, IROperand::const8(8)); }
 			
 			//
+			// Flag Manipulation
+			//
+			static IRInstruction set_zn_flags(const IROperand& val) { return IRInstruction(SET_ZN_FLAGS, val); }
+			
+			//
 			// Data Motion
 			//
-			static IRInstruction mov(IROperand src, IROperand dst) {
+			static IRInstruction mov(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -268,7 +274,7 @@ namespace captive {
 				return IRInstruction(MOV, src, dst);
 			}
 
-			static IRInstruction cmov(IROperand cond, IROperand src, IROperand dst) {
+			static IRInstruction cmov(const IROperand& cond, const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -276,7 +282,7 @@ namespace captive {
 				return IRInstruction(CMOV, cond, src, dst);
 			}
 
-			static IRInstruction sx(IROperand src, IROperand dst) {
+			static IRInstruction sx(const IROperand& src, const IROperand& dst) {
 				assert(src.size < dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -284,7 +290,7 @@ namespace captive {
 				return IRInstruction(SX, src, dst);
 			}
 
-			static IRInstruction zx(IROperand src, IROperand dst) {
+			static IRInstruction zx(const IROperand& src, const IROperand& dst) {
 				assert(src.size < dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -292,7 +298,7 @@ namespace captive {
 				return IRInstruction(ZX, src, dst);
 			}
 
-			static IRInstruction trunc(IROperand src, IROperand dst) {
+			static IRInstruction trunc(const IROperand& src, const IROperand& dst) {
 				assert(src.size > dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -303,7 +309,7 @@ namespace captive {
 			//
 			// Arithmetic Operations
 			//
-			static IRInstruction add(IROperand src, IROperand dst) {
+			static IRInstruction add(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg() || src.is_pc());
 				assert(dst.is_vreg());
@@ -311,7 +317,7 @@ namespace captive {
 				return IRInstruction(ADD, src, dst);
 			}
 
-			static IRInstruction sub(IROperand src, IROperand dst) {
+			static IRInstruction sub(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -319,7 +325,7 @@ namespace captive {
 				return IRInstruction(SUB, src, dst);
 			}
 
-			static IRInstruction mul(IROperand src, IROperand dst) {
+			static IRInstruction mul(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -327,7 +333,7 @@ namespace captive {
 				return IRInstruction(MUL, src, dst);
 			}
 
-			static IRInstruction div(IROperand src, IROperand dst) {
+			static IRInstruction div(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -335,45 +341,70 @@ namespace captive {
 				return IRInstruction(DIV, src, dst);
 			}
 
-			static IRInstruction mod(IROperand src, IROperand dst) {
+			static IRInstruction mod(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
 
 				return IRInstruction(MOD, src, dst);
 			}
-
+			
+			static IRInstruction adc(const IROperand& src, const IROperand& dst, const IROperand& carry) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+				assert(carry.is_constant() || carry.is_vreg());
+				
+				return IRInstruction(ADC, src, dst, carry);
+			}
+			
+			static IRInstruction adc_with_flags(const IROperand& src, const IROperand& dst, const IROperand& carry) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+				assert(carry.is_constant() || carry.is_vreg());
+				
+				return IRInstruction(ADC_WITH_FLAGS, src, dst, carry);
+			}
+			
 			// Bit-shifting
-			static IRInstruction shl(IROperand amt, IROperand dst) {
+			static IRInstruction shl(const IROperand& amt, const IROperand& dst) {
 				assert(amt.is_constant() || amt.is_vreg());
 				assert(dst.is_vreg());
 
 				return IRInstruction(SHL, amt, dst);
 			}
 
-			static IRInstruction shr(IROperand amt, IROperand dst) {
+			static IRInstruction shr(const IROperand& amt, const IROperand& dst) {
 				assert(amt.is_constant() || amt.is_vreg());
 				assert(dst.is_vreg());
 
 				return IRInstruction(SHR, amt, dst);
 			}
 
-			static IRInstruction sar(IROperand amt, IROperand dst) {
+			static IRInstruction sar(const IROperand& amt, const IROperand& dst) {
 				assert(amt.is_constant() || amt.is_vreg());
 				assert(dst.is_vreg());
 
 				return IRInstruction(SAR, amt, dst);
 			}
+			
+			static IRInstruction ror(const IROperand& amt, const IROperand& dst) {
+				assert(amt.is_constant() || amt.is_vreg());
+				assert(dst.is_vreg());
+
+				return IRInstruction(ROR, amt, dst);
+			}
 
 			// Bit manipulation
-			static IRInstruction clz(IROperand src, IROperand dst) {
+			static IRInstruction clz(const IROperand& src, const IROperand& dst) {
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
 
 				return IRInstruction(CLZ, src, dst);
 			}
 
-			static IRInstruction bitwise_and(IROperand src, IROperand dst) {
+			static IRInstruction bitwise_and(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -381,7 +412,7 @@ namespace captive {
 				return IRInstruction(AND, src, dst);
 			}
 
-			static IRInstruction bitwise_or(IROperand src, IROperand dst) {
+			static IRInstruction bitwise_or(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -389,7 +420,7 @@ namespace captive {
 				return IRInstruction(OR, src, dst);
 			}
 
-			static IRInstruction bitwise_xor(IROperand src, IROperand dst) {
+			static IRInstruction bitwise_xor(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
 				assert(dst.is_vreg());
@@ -400,7 +431,7 @@ namespace captive {
 			//
 			// Comparison
 			//
-			static IRInstruction cmpeq(IROperand lh, IROperand rh, IROperand dst)
+			static IRInstruction cmpeq(const IROperand& lh, const IROperand& rh, const IROperand& dst)
 			{
 				assert(lh.size == rh.size);
 				assert(lh.is_vreg() || lh.is_constant());
@@ -410,7 +441,7 @@ namespace captive {
 				return IRInstruction(CMPEQ, lh, rh, dst);
 			}
 
-			static IRInstruction cmpne(IROperand lh, IROperand rh, IROperand dst)
+			static IRInstruction cmpne(const IROperand& lh, const IROperand& rh, const IROperand& dst)
 			{
 				assert(lh.size == rh.size);
 				assert(lh.is_vreg() || lh.is_constant());
@@ -420,7 +451,7 @@ namespace captive {
 				return IRInstruction(CMPNE, lh, rh, dst);
 			}
 
-			static IRInstruction cmplt(IROperand lh, IROperand rh, IROperand dst)
+			static IRInstruction cmplt(const IROperand& lh, const IROperand& rh, const IROperand& dst)
 			{
 				assert(lh.size == rh.size);
 				assert(lh.is_vreg() || lh.is_constant());
@@ -430,7 +461,7 @@ namespace captive {
 				return IRInstruction(CMPLT, lh, rh, dst);
 			}
 
-			static IRInstruction cmplte(IROperand lh, IROperand rh, IROperand dst)
+			static IRInstruction cmplte(const IROperand& lh, const IROperand& rh, const IROperand& dst)
 			{
 				assert(lh.size == rh.size);
 				assert(lh.is_vreg() || lh.is_constant());
@@ -440,7 +471,7 @@ namespace captive {
 				return IRInstruction(CMPLTE, lh, rh, dst);
 			}
 
-			static IRInstruction cmpgt(IROperand lh, IROperand rh, IROperand dst)
+			static IRInstruction cmpgt(const IROperand& lh, const IROperand& rh, const IROperand& dst)
 			{
 				assert(lh.size == rh.size);
 				assert(lh.is_vreg() || lh.is_constant());
@@ -450,7 +481,7 @@ namespace captive {
 				return IRInstruction(CMPGT, lh, rh, dst);
 			}
 
-			static IRInstruction cmpgte(IROperand lh, IROperand rh, IROperand dst)
+			static IRInstruction cmpgte(const IROperand& lh, const IROperand& rh, const IROperand& dst)
 			{
 				assert(lh.size == rh.size);
 				assert(lh.is_vreg() || lh.is_constant());
@@ -463,7 +494,7 @@ namespace captive {
 			//
 			// Domain-specific operations
 			//
-			static IRInstruction ldreg(IROperand offset, IROperand dst)
+			static IRInstruction ldreg(const IROperand& offset, const IROperand& dst)
 			{
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(dst.is_vreg());
@@ -471,7 +502,7 @@ namespace captive {
 				return IRInstruction(READ_REG, offset, dst);
 			}
 
-			static IRInstruction streg(IROperand src, IROperand offset)
+			static IRInstruction streg(const IROperand& src, const IROperand& offset)
 			{
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(src.is_constant() || src.is_vreg());
@@ -479,7 +510,7 @@ namespace captive {
 				return IRInstruction(WRITE_REG, src, offset);
 			}
 
-			static IRInstruction ldmem(IROperand offset, IROperand dst)
+			static IRInstruction ldmem(const IROperand& offset, const IROperand& dst)
 			{
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(dst.is_vreg());
@@ -487,7 +518,7 @@ namespace captive {
 				return IRInstruction(READ_MEM, offset, IROperand::const32(0), dst);
 			}
 
-			static IRInstruction stmem(IROperand src, IROperand offset)
+			static IRInstruction stmem(const IROperand& src, const IROperand& offset)
 			{
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(src.is_constant() || src.is_vreg());
@@ -495,7 +526,7 @@ namespace captive {
 				return IRInstruction(WRITE_MEM, src, IROperand::const32(0), offset);
 			}
 
-			static IRInstruction ldmem_user(IROperand offset, IROperand dst)
+			static IRInstruction ldmem_user(const IROperand& offset, const IROperand& dst)
 			{
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(dst.is_vreg());
@@ -503,7 +534,7 @@ namespace captive {
 				return IRInstruction(READ_MEM_USER, offset, dst);
 			}
 
-			static IRInstruction stmem_user(IROperand src, IROperand offset)
+			static IRInstruction stmem_user(const IROperand& src, const IROperand& offset)
 			{
 				assert(offset.is_constant() || offset.is_vreg());
 				assert(src.is_constant() || src.is_vreg());
@@ -511,7 +542,7 @@ namespace captive {
 				return IRInstruction(WRITE_MEM_USER, src, offset);
 			}
 
-			static IRInstruction write_device(IROperand dev, IROperand reg, IROperand val)
+			static IRInstruction write_device(const IROperand& dev, const IROperand& reg, const IROperand& val)
 			{
 				assert(dev.is_constant() || dev.is_vreg());
 				assert(reg.is_constant() || reg.is_vreg());
@@ -520,7 +551,7 @@ namespace captive {
 				return IRInstruction(WRITE_DEVICE, dev, reg, val);
 			}
 
-			static IRInstruction read_device(IROperand dev, IROperand reg, IROperand dst)
+			static IRInstruction read_device(const IROperand& dev, const IROperand& reg, const IROperand& dst)
 			{
 				assert(dev.is_constant() || dev.is_vreg());
 				assert(reg.is_constant() || reg.is_vreg());
@@ -529,7 +560,7 @@ namespace captive {
 				return IRInstruction(READ_DEVICE, dev, reg, dst);
 			}
 
-			static IRInstruction set_cpu_mode(IROperand mode)
+			static IRInstruction set_cpu_mode(const IROperand& mode)
 			{
 				assert(mode.is_constant() || mode.is_vreg());
 
@@ -539,13 +570,13 @@ namespace captive {
 			//
 			// Control Flow
 			//
-			static IRInstruction jump(IROperand target)
+			static IRInstruction jump(const IROperand& target)
 			{
 				assert(target.is_block());
 				return IRInstruction(JMP, target);
 			}
 
-			static IRInstruction branch(IROperand cond, IROperand tt, IROperand ft)
+			static IRInstruction branch(const IROperand& cond, const IROperand& tt, const IROperand& ft)
 			{
 				assert(cond.is_constant() || cond.is_vreg());
 				assert(tt.is_block());
@@ -554,14 +585,14 @@ namespace captive {
 				return IRInstruction(BRANCH, cond, tt, ft);
 			}
 
-			static IRInstruction call(IROperand fn)
+			static IRInstruction call(const IROperand& fn)
 			{
 				assert(fn.is_func());
 
 				return IRInstruction(CALL, fn);
 			}
 
-			static IRInstruction call(IROperand fn, IROperand arg0)
+			static IRInstruction call(const IROperand& fn, const IROperand& arg0)
 			{
 				assert(fn.is_func());
 				assert(arg0.is_constant() || arg0.is_vreg());
@@ -569,7 +600,7 @@ namespace captive {
 				return IRInstruction(CALL, fn, arg0);
 			}
 
-			static IRInstruction call(IROperand fn, IROperand arg0, IROperand arg1)
+			static IRInstruction call(const IROperand& fn, const IROperand& arg0, const IROperand& arg1)
 			{
 				assert(fn.is_func());
 				assert(arg0.is_constant() || arg0.is_vreg());
@@ -578,7 +609,7 @@ namespace captive {
 				return IRInstruction(CALL, fn, arg0, arg1);
 			}
 
-			static IRInstruction call(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2)
+			static IRInstruction call(const IROperand& fn, const IROperand& arg0, const IROperand& arg1, const IROperand& arg2)
 			{
 				assert(fn.is_func());
 				assert(arg0.is_constant() || arg0.is_vreg());
@@ -588,7 +619,7 @@ namespace captive {
 				return IRInstruction(CALL, fn, arg0, arg1, arg2);
 			}
 
-			static IRInstruction call(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2, IROperand arg3)
+			static IRInstruction call(const IROperand& fn, const IROperand& arg0, const IROperand& arg1, const IROperand& arg2, const IROperand& arg3)
 			{
 				assert(fn.is_func());
 				assert(arg0.is_constant() || arg0.is_vreg());
@@ -599,7 +630,7 @@ namespace captive {
 				return IRInstruction(CALL, fn, arg0, arg1, arg2, arg3);
 			}
 
-			static IRInstruction call(IROperand fn, IROperand arg0, IROperand arg1, IROperand arg2, IROperand arg3, IROperand arg4)
+			static IRInstruction call(const IROperand& fn, const IROperand& arg0, const IROperand& arg1, const IROperand& arg2, const IROperand& arg3, const IROperand& arg4)
 			{
 				assert(fn.is_func());
 				assert(arg0.is_constant() || arg0.is_vreg());
