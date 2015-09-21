@@ -32,24 +32,28 @@ typedef struct _verify_context {
 	inline void add_def(IRBlockId block, const IROperand& op) { assert(op.is_vreg()); usedefs[block].push_back(use_def_t(DEF, op.value)); }
 } verify_context_t;
 
-static void compute_path_walk(verify_context_t& vctx, int& counter, IRBlockId b)
+static bool compute_path_walk(verify_context_t& vctx, int& counter, IRBlockId b)
 {
 	auto& succs = vctx.block_succesors[b];
 	if (succs.size() == 0) {
 		counter++;
+		if (counter > 100) {
+			return false;
+		}
 	} else {
 		for (auto succ : succs) {
-			compute_path_walk(vctx, counter, succ);
+			if (!compute_path_walk(vctx, counter, succ))
+				return false;
 		}
 	}
+	
+	return true;
 }
 
-static int compute_paths(verify_context_t& vctx)
+static bool too_many_paths(verify_context_t& vctx)
 {
 	int counter = 0;
-	compute_path_walk(vctx, counter, 0);
-	
-	return counter;
+	return !compute_path_walk(vctx, counter, 0);
 }
 
 static bool has_operands(const IRInstruction& insn, int count)
@@ -232,15 +236,25 @@ bool BlockCompiler::verify()
 
 			break;
 			
+		case IRInstruction::ADC:
+		case IRInstruction::SBC:
 		case IRInstruction::ADC_WITH_FLAGS:
+		case IRInstruction::SBC_WITH_FLAGS:
 			CHECK_OPERANDS(3);
 			assert(op0.is_constant() || op0.is_vreg());
-			assert(op1.is_constant() || op1.is_vreg());
+			assert(op1.is_vreg());
 			assert(op2.is_constant() || op2.is_vreg());
 			
 			ADD_USE(op0);
-			ADD_USE(op1);
+			ADD_DEF(op1);
 			ADD_USE(op2);
+			break;
+			
+		case IRInstruction::SET_ZN_FLAGS:
+			CHECK_OPERANDS(1);
+			assert(op0.is_constant() || op0.is_vreg());
+			
+			ADD_USE(op0);
 			break;
 
 		case IRInstruction::SHR:
@@ -459,7 +473,7 @@ bool BlockCompiler::verify()
 		}
 	}
 	
-	if (compute_paths(vctx) > 1000) return true;
+	if (too_many_paths(vctx)) return true;
 	
 	// Check use-def chains are valid
 	std::set<IRBlockId> path;

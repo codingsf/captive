@@ -134,9 +134,11 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!analyse(max_stack)) return false;
 	timer.tick("reg-allocation");
 	
+#ifndef VERIFY_IR
 	if( !post_allocate_peephole()) return false;
 	timer.tick("post-alloc-peepholer");
-
+#endif
+	
 	if( !lower_stack_to_reg()) return false;
 	timer.tick("mem-2-reg");
 	
@@ -313,7 +315,7 @@ bool BlockCompiler::peephole()
 
 
 		case IRInstruction::INCPC:
-			if (prev_pc_inc) {
+			if (0) {//prev_pc_inc) {
 				insn->operands[0].value += prev_pc_inc->operands[0].value;
 				prev_pc_inc->type = IRInstruction::NOP;
 			}
@@ -509,6 +511,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "add",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "adc",		.format = "IBIXXX", .has_side_effects = false },
 	{ .mnemonic = "sub",		.format = "IBXXXX", .has_side_effects = false },
+	{ .mnemonic = "sbc",		.format = "IBIXXX", .has_side_effects = false },
 	{ .mnemonic = "mul",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "div",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "mod",		.format = "IBXXXX", .has_side_effects = false },
@@ -558,6 +561,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "adc flags",	.format = "IBIXXX", .has_side_effects = true },
+	{ .mnemonic = "sbc flags",	.format = "IBIXXX", .has_side_effects = true },
+	
 	{ .mnemonic = "set flags zn",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
@@ -1114,10 +1119,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 {
 	bool success = true, dump_this_shit = false;
 	X86Register& guest_regs_reg = REGSTATE_REG;
-	
+		
 	std::vector<std::pair<uint32_t, IRBlockId> > block_relocations;
 	block_relocations.reserve(ctx.block_count());
 	std::vector<uint32_t> native_block_offsets (ctx.block_count(), 0);
+
+	stack_map_t stack_map;
 	
 	// Function prologue
 
@@ -1813,8 +1820,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
-			stack_map_t stack_map;
-
 			if (prev_insn) {
 				if (prev_insn->type == IRInstruction::CALL && insn->count_operands() == prev_insn->count_operands()) {
 					// Don't save the state, because the previous instruction was a call and it is already saved.
@@ -1986,7 +1991,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
 			// TODO: CHAIN WRITE DEVICE
-			stack_map_t stack_map;
 			emit_save_reg_state(4, stack_map);
 
 			load_state_field(0, REG_RDI);
@@ -2016,7 +2020,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// Load the address of the stack slot into RCX
 			encoder.mov(REG_RSP, REG_RCX);
 
-			stack_map_t stack_map;
 			emit_save_reg_state(4, stack_map);
 
 			load_state_field(0, REG_RDI);
@@ -2636,7 +2639,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			encoder.nop(X86Memory::get(REG_RAX, insn->operands[0].value));
 
-			stack_map_t stack_map;
 			emit_save_reg_state(1, stack_map);
 
 			load_state_field(0, REG_RDI);
@@ -2706,72 +2708,132 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			break;
 		}
 		
+		
 		case IRInstruction::ADC:
+		case IRInstruction::SBC:
 		case IRInstruction::ADC_WITH_FLAGS:
+		case IRInstruction::SBC_WITH_FLAGS:
 		{
 			IROperand *src = &insn->operands[0];
 			IROperand *dst = &insn->operands[1];
 			IROperand *carry = &insn->operands[2];
-
-			bool just_do_an_add = false;
-
-			// Set up carry bit for adc
+			
+			bool just_do_a_normal_operation = false;
+			bool is_an_add = insn->type == IRInstruction::ADC || insn->type == IRInstruction::ADC_WITH_FLAGS;
+			
+			// Set up carry bit for adc/sbc
 			if (carry->is_constant()) {
-				if (carry->value == 0) {
-					just_do_an_add = true;
+				if (is_an_add) {
+					if (carry->value == 0) {
+						just_do_a_normal_operation = true;
+					} else {
+						encoder.stc();
+					}
 				} else {
-					encoder.stc();
+					if (carry->value == 1) {
+						just_do_a_normal_operation = true;
+					} else {
+						encoder.stc();
+					}
 				}
 			} else if (carry->is_vreg()) {
-				encoder.mov(0xff, get_temp(0, 1));
-				if (carry->is_alloc_reg()) {
-					encoder.add(register_from_operand(carry, 1), get_temp(0, 1));
-				} else if (carry->is_alloc_stack()) {
-					encoder.add(stack_from_operand(carry), get_temp(0, 1));
+				if (is_an_add) {
+					encoder.mov(0xff, get_temp(0, 1));
+					if (carry->is_alloc_reg()) {
+						encoder.add(register_from_operand(carry, 1), get_temp(0, 1));
+					} else if (carry->is_alloc_stack()) {
+						encoder.add(stack_from_operand(carry), get_temp(0, 1));
+					} else {
+						assert(false);
+					}
 				} else {
-					assert(false);
-				}
+					encoder.xorr(get_temp(0, 1), get_temp(0, 1));
+					if (carry->is_alloc_reg()) {
+						encoder.sub(register_from_operand(carry, 1), get_temp(0, 1));
+					} else if (carry->is_alloc_stack()) {
+						encoder.sub(stack_from_operand(carry), get_temp(0, 1));
+					} else {
+						assert(false);
+					}
+					
+					encoder.cmc();
+				}				
 			} else {
 				assert(false);
 			}
 			
-			if (just_do_an_add) {
+			if (just_do_a_normal_operation) {
 				if (src->is_constant() && dst->is_alloc_reg()) {
-					encoder.add(src->value, register_from_operand(dst));
+					if (is_an_add)
+						encoder.add(src->value, register_from_operand(dst));
+					else
+						encoder.sub(src->value, register_from_operand(dst));
 				} else if (src->is_alloc_reg() && dst->is_alloc_reg()) {
-					encoder.add(register_from_operand(src), register_from_operand(dst));
+					if (is_an_add)
+						encoder.add(register_from_operand(src), register_from_operand(dst));
+					else
+						encoder.sub(register_from_operand(src), register_from_operand(dst));
 				} else if (src->is_alloc_reg() && dst->is_alloc_stack()) {
-					encoder.add(register_from_operand(src), stack_from_operand(dst));
+					if (is_an_add)
+						encoder.add(register_from_operand(src), stack_from_operand(dst));
+					else
+						encoder.sub(register_from_operand(src), stack_from_operand(dst));
 				} else if (src->is_alloc_stack() && dst->is_alloc_reg()) {
-					encoder.add(stack_from_operand(src), register_from_operand(dst));
+					if (is_an_add)
+						encoder.add(stack_from_operand(src), register_from_operand(dst));
+					else
+						encoder.sub(stack_from_operand(src), register_from_operand(dst));
 				} else if (src->is_alloc_stack() && dst->is_alloc_stack()) {
 					X86Register& tmp = get_temp(0, src->size);
 					encoder.mov(stack_from_operand(src), tmp);
-					encoder.add(tmp, stack_from_operand(dst));
+					
+					if (is_an_add)
+						encoder.add(tmp, stack_from_operand(dst));
+					else
+						encoder.sub(tmp, stack_from_operand(dst));
 				} else {
 					assert(false);
 				}
 			} else {
 				if (src->is_constant() && dst->is_alloc_reg()) {
-					encoder.adc(src->value, register_from_operand(dst));
+					if (is_an_add)
+						encoder.adc(src->value, register_from_operand(dst));
+					else
+						encoder.sbb(src->value, register_from_operand(dst));
 				} else if (src->is_alloc_reg() && dst->is_alloc_reg()) {
-					encoder.adc(register_from_operand(src), register_from_operand(dst));
+					if (is_an_add)
+						encoder.adc(register_from_operand(src), register_from_operand(dst));
+					else
+						encoder.sbb(register_from_operand(src), register_from_operand(dst));
 				} else if (src->is_alloc_reg() && dst->is_alloc_stack()) {
-					encoder.adc(register_from_operand(src), stack_from_operand(dst));
+					if (is_an_add)
+						encoder.adc(register_from_operand(src), stack_from_operand(dst));
+					else
+						encoder.sbb(register_from_operand(src), stack_from_operand(dst));
 				} else if (src->is_alloc_stack() && dst->is_alloc_reg()) {
-					encoder.adc(stack_from_operand(src), register_from_operand(dst));
+					if (is_an_add)
+						encoder.adc(stack_from_operand(src), register_from_operand(dst));
+					else
+						encoder.sbb(stack_from_operand(src), register_from_operand(dst));
 				} else if (src->is_alloc_stack() && dst->is_alloc_stack()) {
 					X86Register& tmp = get_temp(0, src->size);
 					encoder.mov(stack_from_operand(src), tmp);
-					encoder.adc(tmp, stack_from_operand(dst));
+					
+					if (is_an_add)
+						encoder.adc(tmp, stack_from_operand(dst));
+					else
+						encoder.sbb(tmp, stack_from_operand(dst));
 				} else {
 					assert(false);
 				}
 			}
 
 			// If it's the flag setting instruction, set the flags.
-			if (insn->type == IRInstruction::ADC_WITH_FLAGS) {
-				encoder.setc(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(C)));		// Carry
+			if (insn->type == IRInstruction::ADC_WITH_FLAGS || insn->type == IRInstruction::SBC_WITH_FLAGS) {
+				if (insn->type == IRInstruction::SBC_WITH_FLAGS)
+					encoder.setnc(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(C)));		// Carry
+				else
+					encoder.setc(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(C)));		// Carry
 				encoder.seto(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(V)));		// Overflow
 				encoder.setz(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(Z)));		// Zero
 				encoder.sets(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(N)));		// Negative
@@ -2785,7 +2847,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			const IROperand& opcode = insn->operands[0];
 			assert(opcode.is_constant());
 			
-			stack_map_t stack_map;
 			emit_save_reg_state(6, stack_map);
 
 			load_state_field(0, REG_RDI);
@@ -2834,13 +2895,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 	if (dump_this_shit)
 		asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
-	
+
 	return success;
 }
 
 void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map)
 {
 	uint32_t stack_offset = 0;
+	stack_map.clear();
 	
 	//First, count required stack slots
 	for(int i = register_assignments_8.size()-1; i >= 0; i--) {

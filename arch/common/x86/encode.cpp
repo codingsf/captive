@@ -630,6 +630,38 @@ void X86Encoder::adc(const X86Register& src, const X86Register& dst)
 	 }
 }
 
+void X86Encoder::sbb(uint32_t src, const X86Register& dst)
+{
+	encode_arithmetic(3, src, dst);
+}
+
+void X86Encoder::sbb(const X86Memory &src, const X86Register &dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0x1a, dst, src);
+	} else {
+		encode_opcode_mod_rm(0x1b, dst, src);
+	}
+}
+
+void X86Encoder::sbb(const X86Register &src, const X86Memory &dst)
+{
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x18, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x19, src, dst);
+	}
+}
+
+void X86Encoder::sbb(const X86Register& src, const X86Register& dst)
+{
+	if(dst.size == 1) {
+		encode_opcode_mod_rm(0x18, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x19, src, dst);
+	 }
+}
+
 void X86Encoder::add(const X86Register& src, const X86Register& dst)
 {
 	if (src.size == 1) {
@@ -973,6 +1005,11 @@ void X86Encoder::stc()
 void X86Encoder::clc()
 {
 	emit8(0xf8);
+}
+
+void X86Encoder::cmc()
+{
+	emit8(0xf5);
 }
 
 void X86Encoder::bsr(const X86Register& src, const X86Register& dst)

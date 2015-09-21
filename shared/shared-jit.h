@@ -141,58 +141,60 @@ namespace captive {
 				ADD,					// 9
 				ADC,
 				SUB,
+				SBC,
 				MUL,
 				DIV,
 				MOD,
 
-				SHL,					// 15
+				SHL,					// 16
 				SHR,
 				SAR,
 				ROR,
 				CLZ,
 
-				AND,					// 20
+				AND,					// 21
 				OR,
 				XOR,
 
-				CMPEQ,					// 23
+				CMPEQ,					// 24
 				CMPNE,
 				CMPGT,
 				CMPGTE,
 				CMPLT,
 				CMPLTE,
 
-				SX,						// 29
+				SX,						// 30
 				ZX,
 				TRUNC,
 
-				READ_REG,				// 32
+				READ_REG,				// 33
 				WRITE_REG,
 				READ_MEM,
 				WRITE_MEM,
 				READ_MEM_USER,
 				WRITE_MEM_USER,
 
-				CALL,					// 38
+				CALL,					// 39
 				JMP,
 				BRANCH,
 				RET,
 				DISPATCH,
 
-				SET_CPU_MODE,			// 43
+				SET_CPU_MODE,			// 44
 				WRITE_DEVICE,
 				READ_DEVICE,
 				
-				FLUSH,					// 46
+				FLUSH,					// 47
 				FLUSH_ITLB,
 				FLUSH_DTLB,
 				FLUSH_ITLB_ENTRY,
 				FLUSH_DTLB_ENTRY,
 				
-				ADC_WITH_FLAGS,			// 51
+				ADC_WITH_FLAGS,			// 52
+				SBC_WITH_FLAGS,
 				SET_ZN_FLAGS,
 				
-				BARRIER,				// 53
+				BARRIER,				// 55
 				TRACE
 			};
 
@@ -365,6 +367,24 @@ namespace captive {
 				assert(carry.is_constant() || carry.is_vreg());
 				
 				return IRInstruction(ADC_WITH_FLAGS, src, dst, carry);
+			}
+			
+			static IRInstruction sbc(const IROperand& src, const IROperand& dst, const IROperand& carry) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+				assert(carry.is_constant() || carry.is_vreg());
+				
+				return IRInstruction(SBC, src, dst, carry);
+			}
+			
+			static IRInstruction sbc_with_flags(const IROperand& src, const IROperand& dst, const IROperand& carry) {
+				assert(src.size == dst.size);
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+				assert(carry.is_constant() || carry.is_vreg());
+				
+				return IRInstruction(SBC_WITH_FLAGS, src, dst, carry);
 			}
 			
 			// Bit-shifting

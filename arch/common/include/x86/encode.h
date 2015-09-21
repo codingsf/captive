@@ -198,6 +198,10 @@ namespace captive {
 				void adc(const X86Memory& src, const X86Register& dst);
 				void adc(const X86Register& src, const X86Memory& dst);
 				void adc(const X86Register& src, const X86Register& dst);
+				void sbb(uint32_t src, const X86Register& dst);
+				void sbb(const X86Memory& src, const X86Register& dst);
+				void sbb(const X86Register& src, const X86Memory& dst);
+				void sbb(const X86Register& src, const X86Register& dst);
 
 				void add(const X86Register& src, const X86Register& dst);
 				void add(const X86Memory& src, const X86Register& dst);
@@ -300,6 +304,7 @@ namespace captive {
 				void lahf();
 				void clc();
 				void stc();
+				void cmc();
 
 				void setcc(uint8_t v, const X86Register& dst);
 				void setcc(uint8_t v, const X86Memory& dst);
@@ -316,6 +321,7 @@ namespace captive {
 				inline void setnb(const X86Register& dst) { setcc(0x03, dst); }
 				inline void setae(const X86Register& dst) { setnb(dst); }
 				inline void setnc(const X86Register& dst) { setnb(dst); }
+				inline void setnc(const X86Memory& dst) { setcc(0x03, dst); }
 
 				inline void setz(const X86Register& dst) { setcc(0x04, dst); }
 				inline void setz(const X86Memory& dst) { setcc(0x04, dst); }
