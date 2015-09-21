@@ -306,6 +306,15 @@ void X86Encoder::xchg(const X86Register& a, const X86Register& b)
 	}
 }
 
+void X86Encoder::xchg(const X86Memory& a, const X86Register& b)
+{
+	if (b.size == 1) {
+		encode_opcode_mod_rm(0x86, b, a);
+	} else {
+		encode_opcode_mod_rm(0x87, b, a);
+	}
+}
+
 void X86Encoder::cbtw()
 {
 	emit8(0x66);

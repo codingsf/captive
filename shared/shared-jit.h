@@ -173,28 +173,30 @@ namespace captive {
 				WRITE_MEM,
 				READ_MEM_USER,
 				WRITE_MEM_USER,
+				
+				ATOMIC_WRITE,
 
-				CALL,					// 39
+				CALL,					// 40
 				JMP,
 				BRANCH,
 				RET,
 				DISPATCH,
 
-				SET_CPU_MODE,			// 44
+				SET_CPU_MODE,			// 45
 				WRITE_DEVICE,
 				READ_DEVICE,
 				
-				FLUSH,					// 47
+				FLUSH,					// 48
 				FLUSH_ITLB,
 				FLUSH_DTLB,
 				FLUSH_ITLB_ENTRY,
 				FLUSH_DTLB_ENTRY,
 				
-				ADC_WITH_FLAGS,			// 52
+				ADC_WITH_FLAGS,			// 53
 				SBC_WITH_FLAGS,
 				SET_ZN_FLAGS,
 				
-				BARRIER,				// 55
+				BARRIER,				// 56
 				TRACE
 			};
 
@@ -560,6 +562,14 @@ namespace captive {
 				assert(src.is_constant() || src.is_vreg());
 
 				return IRInstruction(WRITE_MEM_USER, src, offset);
+			}
+			
+			static IRInstruction atomic_write(const IROperand& addr, const IROperand& val)
+			{
+				assert(addr.is_constant() || addr.is_vreg());
+				assert(val.is_vreg());
+
+				return IRInstruction(ATOMIC_WRITE, addr, val);
 			}
 
 			static IRInstruction write_device(const IROperand& dev, const IROperand& reg, const IROperand& val)

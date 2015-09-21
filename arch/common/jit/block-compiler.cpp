@@ -543,6 +543,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "stmem",		.format = "IIIXXX", .has_side_effects = true },
 	{ .mnemonic = "ldumem",		.format = "IOXXXX", .has_side_effects = true },
 	{ .mnemonic = "stumem",		.format = "IIXXXX", .has_side_effects = true },
+	
+	{ .mnemonic = "atomic-write",	.format = "IBXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "call",		.format = "NIIIII", .has_side_effects = true },
 	{ .mnemonic = "jmp",		.format = "NXXXXX", .has_side_effects = true },
@@ -1980,6 +1982,24 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			break;
 		}
+		
+		case IRInstruction::ATOMIC_WRITE:
+		{
+			IROperand *addr = &insn->operands[0];
+			IROperand *value = &insn->operands[1];
+			
+			if (addr->is_vreg()) {
+				if (addr->is_alloc_reg() && value->is_alloc_reg()) {
+					encoder.xchg(X86Memory::get(register_from_operand(addr)), register_from_operand(value));
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
 
 		case IRInstruction::WRITE_DEVICE:
 		{
@@ -1990,8 +2010,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IRInstruction *prev_insn = (ir_idx) > 0 ? ctx.at(ir_idx - 1) : NULL;
 			IRInstruction *next_insn = (ir_idx + 1) < ctx.count() ? ctx.at(ir_idx + 1) : NULL;
 
-			// TODO: CHAIN WRITE DEVICE
-			emit_save_reg_state(4, stack_map);
+			if (prev_insn && prev_insn->type == IRInstruction::WRITE_DEVICE) {
+				//
+			} else {
+				emit_save_reg_state(4, stack_map);
+			}
 
 			load_state_field(0, REG_RDI);
 
@@ -2003,7 +2026,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov((uint64_t)&cpu_write_device, get_temp(1, 8));
 			encoder.call(get_temp(1, 8));
 
-			emit_restore_reg_state(4, stack_map);
+			if (next_insn && next_insn->type == IRInstruction::WRITE_DEVICE) {
+				//
+			} else {
+				emit_restore_reg_state(4, stack_map);
+			}
 
 			break;
 		}

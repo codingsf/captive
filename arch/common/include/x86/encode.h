@@ -158,12 +158,13 @@ namespace captive {
 				void mov2(uint16_t imm, const X86Memory& dst);
 				void mov1(uint8_t imm, const X86Memory& dst);
 
+				void xchg(const X86Register& a, const X86Register& b);
+				void xchg(const X86Memory& a, const X86Register& b);
+				
 				void cbtw();
 				void cwtl();
 				void cltq();
-				
-				void xchg(const X86Register& a, const X86Register& b);
-				
+								
 				void andd(uint32_t val, const X86Register& dst);
 				void andd(uint32_t val, uint8_t size, const X86Memory& dst);
 				void orr(uint32_t val, const X86Register& dst);
@@ -295,8 +296,6 @@ namespace captive {
 				inline void jnz(int8_t off) { jcc(5, off); }
 				inline void jne(int32_t off) { jcc(5, off); }
 				inline void jne(int8_t off) { jcc(5, off); }
-
-				
 
 				void cmov(uint8_t code, const X86Register &src, const X86Register &dst);
 				inline void cmove(const X86Register &src, const X86Register &dst) { cmov(4, src, dst); }
