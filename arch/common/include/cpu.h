@@ -123,7 +123,15 @@ namespace captive {
 			
 			// Behaviours
 			virtual bool handle_irq(uint32_t isr) = 0;
-			virtual bool handle_mem_fault(MMU::resolution_fault fault) = 0;
+			
+			inline bool handle_mmu_fault(MMU::resolution_fault fault)
+			{
+				if (fault == MMU::FETCH_FAULT) return handle_fetch_fault(fault);
+				else return handle_data_fault(fault);
+			}
+			
+			virtual bool handle_data_fault(MMU::resolution_fault fault) = 0;
+			virtual bool handle_fetch_fault(MMU::resolution_fault fault) = 0;
 			
 		protected:
 			MMU *_mmu;

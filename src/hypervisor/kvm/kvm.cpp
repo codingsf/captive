@@ -2,6 +2,7 @@
 #include <hypervisor/config.h>
 #include <hypervisor/kvm/kvm.h>
 #include <hypervisor/kvm/guest.h>
+#include <platform/platform.h>
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -59,7 +60,7 @@ bool KVM::init()
 	return true;
 }
 
-Guest* KVM::create_guest(engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config)
+Guest* KVM::create_guest(engine::Engine& engine, jit::JIT& jit, const platform::Platform& pfm)
 {
 	// Ensure we've been initialised.
 	if (!initialised()) {
@@ -68,7 +69,7 @@ Guest* KVM::create_guest(engine::Engine& engine, jit::JIT& jit, const GuestConfi
 	}
 
 	// Validate the incoming guest configuration.
-	if (!validate_configuration(config)) {
+	if (!validate_configuration(pfm.config())) {
 		ERROR << CONTEXT(Hypervisor) << "Invalid configuration";
 		return NULL;
 	}
@@ -83,7 +84,7 @@ Guest* KVM::create_guest(engine::Engine& engine, jit::JIT& jit, const GuestConfi
 
 	// Create (and register) the representative guest object.
 	DEBUG << CONTEXT(Hypervisor) << "Creating guest object";
-	KVMGuest *guest = new KVMGuest(*this, engine, jit, config, guest_fd);
+	KVMGuest *guest = new KVMGuest(*this, engine, jit, pfm.config(), guest_fd);
 	known_guests.push_back(guest);
 
 	return guest;

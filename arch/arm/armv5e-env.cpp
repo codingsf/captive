@@ -8,7 +8,7 @@ using namespace captive;
 using namespace captive::arch;
 using namespace captive::arch::armv5e;
 
-Environment *create_environment(PerCPUData *per_cpu_data)
+Environment *create_environment_armv5e(PerCPUData *per_cpu_data)
 {
 	return new armv5e_environment(per_cpu_data);
 }

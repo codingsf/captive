@@ -36,6 +36,12 @@ namespace captive {
 		static inline uint32_t __ror(uint32_t value, uint8_t amt) {
 			return (value >> amt) | (value << (32 - amt));
 		}
+		
+		template<typename t, int e>
+		class vector
+		{
+			
+		};
 	}
 }
 

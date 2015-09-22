@@ -84,7 +84,12 @@ namespace captive {
 				ALLOCATED_STACK
 			};
 
-			uint64_t value;
+			union {
+				uint64_t value;
+				float fvalue;
+				double dvalue;
+			};
+			
 			uint16_t alloc_data : 14;
 			IRAllocationMode alloc_mode : 2;
 			IROperandType type : 4;
@@ -93,6 +98,8 @@ namespace captive {
 			IROperand() : value(0), alloc_data(0), alloc_mode(NOT_ALLOCATED), type(NONE), size(0) { }
 
 			IROperand(IROperandType type, uint64_t value, uint8_t size) : value(value), alloc_data(0), alloc_mode(NOT_ALLOCATED), type(type), size(size) { }
+			IROperand(IROperandType type, float value) : fvalue(value), alloc_data(0), alloc_mode(NOT_ALLOCATED), type(type), size(sizeof(float)) { }
+			IROperand(IROperandType type, double value) : dvalue(value), alloc_data(0), alloc_mode(NOT_ALLOCATED), type(type), size(sizeof(double)) { }
 
 			inline bool is_allocated() const { return alloc_mode != NOT_ALLOCATED; }
 			inline bool is_alloc_reg() const { return alloc_mode == ALLOCATED_REG; }
@@ -113,6 +120,8 @@ namespace captive {
 			static IROperand const16(uint16_t value) { return IROperand(CONSTANT, value, 2); }
 			static IROperand const32(uint32_t value) { return IROperand(CONSTANT, value, 4); }
 			static IROperand const64(uint64_t value) { return IROperand(CONSTANT, value, 8); }
+			static IROperand constFloat(float value) { return IROperand(CONSTANT, value); }
+			static IROperand constDouble(double value) { return IROperand(CONSTANT, value); }
 
 			static IROperand vreg(IRRegId id, uint8_t size) { return IROperand(VREG, (uint64_t)id, size); }
 
@@ -137,6 +146,9 @@ namespace captive {
 				CMOV,
 				LDPC,
 				INCPC,
+				
+				VECTOR_INSERT,
+				VECTOR_EXTRACT,
 
 				ADD,					// 9
 				ADC,
@@ -145,6 +157,12 @@ namespace captive {
 				MUL,
 				DIV,
 				MOD,
+				
+				ABS,
+				NEG,
+				SQRT,
+				IS_QNAN,
+				IS_SNAN,
 
 				SHL,					// 16
 				SHR,
@@ -309,6 +327,22 @@ namespace captive {
 
 				return IRInstruction(TRUNC, src, dst);
 			}
+			
+			static IRInstruction vector_insert(const IROperand& vector, const IROperand& index, const IROperand& src) {
+				assert(vector.is_constant() || vector.is_vreg());
+				assert(index.is_constant() || index.is_vreg());
+				assert(src.is_constant() || src.is_vreg());
+				
+				return IRInstruction(VECTOR_INSERT, vector, index, src);
+			}
+			
+			static IRInstruction vector_extract(const IROperand& vector, const IROperand& index, const IROperand& dst) {
+				assert(vector.is_constant() || vector.is_vreg());
+				assert(index.is_constant() || index.is_vreg());
+				assert(dst.is_vreg());
+				
+				return IRInstruction(VECTOR_EXTRACT, vector, index, dst);
+			}
 
 			//
 			// Arithmetic Operations
@@ -387,6 +421,38 @@ namespace captive {
 				assert(carry.is_constant() || carry.is_vreg());
 				
 				return IRInstruction(SBC_WITH_FLAGS, src, dst, carry);
+			}
+			
+			static IRInstruction abs(const IROperand& val)
+			{
+				assert(val.is_vreg());
+				return IRInstruction(ABS, val);
+			}
+			
+			static IRInstruction neg(const IROperand& val)
+			{
+				assert(val.is_vreg());
+				return IRInstruction(NEG, val);
+			}
+			
+			static IRInstruction sqrt(const IROperand& val)
+			{
+				assert(val.is_vreg());
+				return IRInstruction(SQRT, val);
+			}
+			
+			static IRInstruction is_qnan(const IROperand& src, const IROperand& dst)
+			{
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+				return IRInstruction(IS_QNAN, src, dst);
+			}
+			
+			static IRInstruction is_snan(const IROperand& src, const IROperand& dst)
+			{
+				assert(src.is_constant() || src.is_vreg());
+				assert(dst.is_vreg());
+				return IRInstruction(IS_SNAN, src, dst);
 			}
 			
 			// Bit-shifting

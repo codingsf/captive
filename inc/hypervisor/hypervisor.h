@@ -18,6 +18,10 @@ namespace captive {
 	namespace jit {
 		class JIT;
 	}
+	
+	namespace platform {
+		class Platform;
+	}
 
 	namespace hypervisor {
 		class Guest;
@@ -28,7 +32,7 @@ namespace captive {
 			virtual ~Hypervisor();
 
 			virtual bool init();
-			virtual Guest *create_guest(engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config) = 0;
+			virtual Guest *create_guest(engine::Engine& engine, jit::JIT& jit, const platform::Platform& platform) = 0;
 		};
 	}
 }

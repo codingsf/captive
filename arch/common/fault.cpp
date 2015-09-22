@@ -360,7 +360,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				if (fault) { 
 					// Return TRUE if we need to return to the safe-point, i.e. to do a side
 					// exit from the currently executing guest instruction.
-					core->handle_mem_fault(fault);
+					core->handle_mmu_fault(fault);
 					return 1;
 				} else {
 					return 0;

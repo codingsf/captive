@@ -94,7 +94,7 @@ bool CPU::run_block_jit_safepoint()
 
 			// If there was a fault, then switch back to the safe-point.
 			if (unlikely(fault)) {
-				if (!handle_mem_fault(fault)) return false;
+				if (!handle_mmu_fault(fault)) return false;
 				continue;
 			}
 

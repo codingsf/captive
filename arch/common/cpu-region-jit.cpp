@@ -49,7 +49,7 @@ bool CPU::run_region_jit()
 
 		// Instruct the interpreter to handle the memory fault, passing
 		// in the the type of fault.
-		handle_mem_fault((MMU::resolution_fault)rc);
+		//handle_mem_fault((MMU::resolution_fault)rc);
 
 		// Make sure interrupts are enabled.
 		__local_irq_enable();

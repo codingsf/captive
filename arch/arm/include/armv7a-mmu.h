@@ -5,8 +5,8 @@
  * Created on 13 February 2015, 18:13
  */
 
-#ifndef ARM5_MMU_H
-#define	ARM5_MMU_H
+#ifndef ARM7_MMU_H
+#define	ARM7_MMU_H
 
 #include <define.h>
 #include <mmu.h>
@@ -18,14 +18,17 @@ namespace captive {
 			namespace devices {
 				class CoCo;
 			}
+		}
+		
+		namespace armv7a {
 
-			class armv5e_cpu;
+			class armv7a_cpu;
 
-			class armv5e_mmu : public MMU
+			class armv7a_mmu : public MMU
 			{
 			public:
-				armv5e_mmu(armv5e_cpu& cpu);
-				~armv5e_mmu();
+				armv7a_mmu(armv7a_cpu& cpu);
+				~armv7a_mmu();
 
 				bool enable() override;
 				bool disable() override;
@@ -38,10 +41,10 @@ namespace captive {
 				bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects) override;
 
 			private:
-				devices::CoCo& _coco;
+				armv5e::devices::CoCo& _coco;
 				bool _enabled;
 				
-				inline armv5e_cpu& arm_cpu() const { return (armv5e_cpu&) cpu(); }
+				inline armv7a_cpu& arm_cpu() const { return (armv7a_cpu&) cpu(); }
 
 				struct l1_descriptor {
 					uint32_t data;

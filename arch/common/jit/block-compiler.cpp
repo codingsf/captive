@@ -507,6 +507,9 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "cmov",		.format = "XXXXXX", .has_side_effects = false },
 	{ .mnemonic = "ldpc",		.format = "OXXXXX", .has_side_effects = false },
 	{ .mnemonic = "inc-pc",		.format = "IXXXXX", .has_side_effects = true },
+	
+	{ .mnemonic = "vector insert",	.format = "IIIXXX", .has_side_effects = false },
+	{ .mnemonic = "vector extract",	.format = "IIOXXX", .has_side_effects = false },
 
 	{ .mnemonic = "add",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "adc",		.format = "IBIXXX", .has_side_effects = false },
@@ -515,6 +518,12 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "mul",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "div",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "mod",		.format = "IBXXXX", .has_side_effects = false },
+	
+	{ .mnemonic = "abs",		.format = "BXXXXX", .has_side_effects = false },
+	{ .mnemonic = "neg",		.format = "BXXXXX", .has_side_effects = false },
+	{ .mnemonic = "sqrt",		.format = "BXXXXX", .has_side_effects = false },
+	{ .mnemonic = "is qnan",	.format = "IOXXXX", .has_side_effects = false },
+	{ .mnemonic = "is snan",	.format = "IOXXXX", .has_side_effects = false },
 
 	{ .mnemonic = "shl",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "shr",		.format = "IBXXXX", .has_side_effects = false },

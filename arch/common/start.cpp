@@ -9,7 +9,8 @@
 #include <malloc/malloc.h>
 #include <malloc/page-allocator.h>
 
-extern captive::arch::Environment *create_environment(captive::PerCPUData *per_cpu_data);
+extern captive::arch::Environment *create_environment_armv5e(captive::PerCPUData *per_cpu_data);
+extern captive::arch::Environment *create_environment_armv7a(captive::PerCPUData *per_cpu_data);
 
 extern void (*__init_array_start []) (void);
 extern void (*__init_array_end []) (void);
@@ -116,7 +117,7 @@ extern "C" {
 		// Initialise the memory manager.
 		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
 
-		captive::arch::Environment *env = create_environment(cpu_data);
+		captive::arch::Environment *env = create_environment_armv7a(cpu_data);
 
 		if (!env) {
 			printf("error: unable to create environment\n");
