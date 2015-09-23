@@ -196,6 +196,7 @@ namespace captive {
 							uint32_t BASE:22;
 							
 							inline uint32_t base_address() const { return BASE << 10; }
+							inline uint32_t domain() const { return DOM; }
 						} coarse_page_table packed;
 						
 						struct {
@@ -215,6 +216,7 @@ namespace captive {
 							uint32_t BASE:12;
 							
 							inline uint32_t base_address() const { return BASE << 20; }
+							inline uint32_t domain() const { return DOM; }
 						} section packed;
 						
 						struct {
@@ -316,16 +318,22 @@ namespace captive {
 				} packed;
 				
 				enum arm_resolution_fault {
-					NONE,
-					OTHER,
-
-					SECTION_FAULT,
-					SECTION_DOMAIN,
-					SECTION_PERMISSION,
-
-					COARSE_FAULT,
-					COARSE_DOMAIN,
-					COARSE_PERMISSION,
+					NONE				= 0,
+					ALIGNMENT			= 1,
+					INSTRUCTION_DEBUG	= 2,
+					SECTION_ACCESS_BIT	= 3,
+					INSTRUCTION_CACHE_MAINTENANCE = 4,
+					SECTION_TRANSLATION	= 5,
+					PAGE_ACCESS_BIT		= 6,
+					PAGE_TRANSLATION	= 7,
+					PRECISE_EXTERNAL_ABORT = 8,
+					SECTION_DOMAIN		= 9,
+					RESERVED			= 10,
+					PAGE_DOMAIN			= 11,
+					EXTERNAL_ABORT_L1	= 12,
+					SECTION_PERMISSION	= 13,
+					EXTERNAL_ABORT_L2	= 14,
+					PAGE_PERMISSION		= 15,
 				};
 
 				bool resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, const l1_descriptor *l1);

@@ -158,7 +158,8 @@ bool arm_mmu_v5::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	//printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
 
 	if (likely(have_side_effects)) {
-		*(armcpu().reg_offsets.FSR) = fsr;
+		*(armcpu().reg_offsets.DFSR) = fsr;
+		*(armcpu().reg_offsets.IFSR) = fsr;
 		*(armcpu().reg_offsets.FAR) = va;
 	}
 
@@ -306,20 +307,24 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	printf("mmu-v6: resolved L1 @ %p data=%08x type=%d\n", l1, l1->data, l1->type());
 #endif
 	
+	uint32_t domain = 0;
 	switch (l1->type()) {
 	case l1_descriptor::SECTION:
+		domain = l1->section.domain();
 		if (!resolve_section(va, pa, info, arm_fault, l1)) return false;
 		break;
 		
 	case l1_descriptor::SUPERSECTION:
-		fatal("nope\n");
+		fatal("mmu-v6: we do not support supersections\n");
 		
 	case l1_descriptor::COARSE_PAGE_TABLE:
+		domain = l1->coarse_page_table.domain();
 		if (!resolve_coarse(va, pa, info, arm_fault, l1)) return false;
 		break;
 		
 	case l1_descriptor::FAULT:
-		fatal("nope\n");
+		arm_fault = SECTION_TRANSLATION;
+		break;
 	}
 
 	if (arm_fault == NONE) {
@@ -343,45 +348,20 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 		break;
 	}
 
-	fatal("not yet supported\n");
-	
-	/*uint32_t fsr = (uint32_t)l1->domain() << 4;
-	switch (arm_fault) {
-	case arm_mmu_v6::SECTION_FAULT:
-		fsr |= 0x5;
-		break;
-
-	case arm_mmu_v6::COARSE_FAULT:
-		fsr |= 0x7;
-		break;
-
-	case arm_mmu_v6::SECTION_DOMAIN:
-		fsr |= 0x9;
-		break;
-
-	case arm_mmu_v6::COARSE_DOMAIN:
-		fsr |= 0xb;
-		break;
-
-	case arm_mmu_v6::SECTION_PERMISSION:
-		fsr |= 0xd;
-		break;
-
-	case arm_mmu_v6::COARSE_PERMISSION:
-		fsr |= 0xf;
-		break;
-
-	default:
-		printf("mmu: unhandled resolution fault = %d\n", arm_fault);
-		return false;
-	}
-
-	//printf("mmu: fault: l1=%08x fsr=%x far=%x arm-fault=%s type=%s:%s\n", l1->data, fsr, va, arm_faults[arm_fault], mem_access_modes[info.mode], mem_access_types[info.type]);
-
 	if (likely(have_side_effects)) {
-		*(armcpu().reg_offsets.FSR) = fsr;
 		*(armcpu().reg_offsets.FAR) = va;
-	}*/
+
+		if (fault == MMU::FETCH_FAULT) {
+			*(armcpu().reg_offsets.IFSR) = (uint32_t)arm_fault;
+		} else {
+			uint32_t fsr = (domain << 4) | ((uint32_t)arm_fault);
+			if (fault == MMU::WRITE_FAULT) {
+				fsr |= (1 << 11);
+			}
+			
+			*(armcpu().reg_offsets.DFSR) = fsr;
+		}
+	}
 
 	return true;
 }
@@ -391,6 +371,25 @@ bool arm_mmu_v6::resolve_section(gva_t va, gpa_t& pa, const access_info& info, a
 #ifdef DEBUG_MMU
 	printf("mmu-v6: resolving section for %08x\n", va);
 #endif
+	
+	uint32_t dacr = *(armcpu().reg_offsets.DACR);
+	dacr >>= l1->section.domain() * 2;
+	dacr &= 0x3;
+	
+#ifdef DEBUG_MMU
+	printf("mmu-v6: section domain access permissions: %x\n", dacr);
+#endif
+	
+	switch (dacr) {
+	case 0:
+	case 2:
+		fault = SECTION_DOMAIN;
+		return true;
+
+	case 1:
+		// TODO
+		break;
+	}
 	
 	pa = l1->section.base_address() | (va & 0xfffff);
 	return true;
@@ -407,13 +406,32 @@ bool arm_mmu_v6::resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, ar
 #ifdef DEBUG_MMU
 	printf("mmu-v6: resolved L2 @ %p data=%08x type=%d\n", l2, l2->data, l2->type());
 #endif
+
+	uint32_t dacr = *(armcpu().reg_offsets.DACR);
+	dacr >>= l1->coarse_page_table.domain() * 2;
+	dacr &= 0x3;
+	
+#ifdef DEBUG_MMU
+	printf("mmu-v6: coarse domain access permissions: %x\n", dacr);
+#endif
+
+	switch (dacr) {
+	case 0:
+	case 2:
+		fault = PAGE_DOMAIN;
+		return true;
+
+	case 1:
+		// TODO
+		break;
+	}
 	
 	switch (l2->type()) {
 	case l2_descriptor::SMALL_PAGE:
 		pa = l2->small.base_address() | (va & 0xfff);
 		break;
 	default:
-		return false;
+		fatal("unsupported coarse page size\n");
 	}
 	
 	return true;
