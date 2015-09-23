@@ -54,7 +54,7 @@ namespace captive {
 			struct TaggedRegisters {
 				void *base;
 				uint32_t *PC, *SP;
-				uint8_t *C, *Z, *N, *V;
+				uint8_t *C, *Z, *N, *V, *ISA;
 			};
 			
 			CPU(Environment& env, PerCPUData *per_cpu_data);
@@ -70,10 +70,10 @@ namespace captive {
 			inline Trace& trace() const { return *_trace; }
 			inline PerCPUData& cpu_data() const { return *_per_cpu_data; }
 			
-			inline const char *disassemble_address(gva_t va)
+			inline const char *disassemble_address(uint8_t isa, gva_t va)
 			{
 				char decode_data[128];
-				decode_instruction_virt(va, (Decode *)decode_data);
+				decode_instruction_virt(isa, va, (Decode *)decode_data);
 				return trace().disasm().disassemble(va, (const uint8_t *)decode_data);
 			}
 
@@ -137,8 +137,8 @@ namespace captive {
 			MMU *_mmu;
 			JIT *_jit;
 			
-			virtual bool decode_instruction_virt(gva_t addr, Decode *insn) = 0;
-			virtual bool decode_instruction_phys(gpa_t addr, Decode *insn) = 0;
+			virtual bool decode_instruction_virt(uint8_t isa, gva_t addr, Decode *insn) = 0;
+			virtual bool decode_instruction_phys(uint8_t isa, gpa_t addr, Decode *insn) = 0;
 			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
 
 			virtual bool interrupts_enabled(uint8_t irq_line) const = 0;
@@ -184,9 +184,6 @@ namespace captive {
 			inline void enter_user_mode() { kernel_mode(false); }
 			inline void pend_interrupt() { }
 			
-			inline uint8_t get_cpu_mode() const { return 0; }
-			inline void set_cpu_mode(uint8_t mode) { }
-
 		private:
 			inline void assert_privilege_mode()
 			{

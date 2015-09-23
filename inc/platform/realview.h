@@ -16,13 +16,17 @@ namespace captive {
 		namespace arm {
 			class PL011;
 		}
+		
+		namespace timers {
+			class TickSource;
+		}
 	}
 	
 	namespace platform {
 		class Realview : public Platform
 		{
 		public:
-			Realview();
+			Realview(devices::timers::TickSource& ts);
 			virtual ~Realview();
 			
 			const hypervisor::GuestConfiguration& config() const override;

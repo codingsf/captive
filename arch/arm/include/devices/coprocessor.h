@@ -12,7 +12,7 @@
 
 namespace captive {
 	namespace arch {
-		namespace armv5e {
+		namespace arm {
 			namespace devices {
 				class Coprocessor : public CoreDevice
 				{

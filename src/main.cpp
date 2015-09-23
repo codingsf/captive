@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the guest platform.
-	Platform *pfm = new Realview();
+	Platform *pfm = new Realview(*ts);
 
 	// Create the engine.
 	Engine engine(argv[1]);

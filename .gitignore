@@ -9,3 +9,4 @@ bin/
 bios.bin
 bios.elf
 
+/dist/

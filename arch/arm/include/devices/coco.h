@@ -12,7 +12,7 @@
 
 namespace captive {
 	namespace arch {
-		namespace armv5e {
+		namespace arm {
 			namespace devices {
 				class CoCo : public Coprocessor
 				{
@@ -49,6 +49,9 @@ namespace captive {
 					bool C;
 					bool A;
 					bool M;
+					
+					uint32_t DATA_TCM_REGION;
+					uint32_t INSN_TCM_REGION;
 				};
 			}
 		}

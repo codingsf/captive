@@ -1,7 +1,7 @@
 #include <devices/coprocessor.h>
 #include <printf.h>
 
-using namespace captive::arch::armv5e::devices;
+using namespace captive::arch::arm::devices;
 
 Coprocessor::Coprocessor(Environment& env) : CoreDevice(env), op1(0), op2(0), rn(0), rm(0)
 {
