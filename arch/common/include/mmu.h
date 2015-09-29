@@ -24,7 +24,8 @@ namespace captive {
 				READ_FAULT,
 				WRITE_FAULT,
 				FETCH_FAULT,
-				DEVICE_FAULT
+				DEVICE_FAULT,
+				SMC_FAULT
 			};
 
 			enum access_type {

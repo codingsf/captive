@@ -7,6 +7,7 @@
 #include <loader/zimage-loader.h>
 #include <loader/elf-loader.h>
 #include <loader/devtree-loader.h>
+#include <loader/atags-loader.h>
 
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
@@ -165,7 +166,7 @@ int main(int argc, char **argv)
 
 	// Load the device-tree
 	if (kernel->requires_device_tree()) {
-		DeviceTreeLoader device_tree(argv[3], 0x1000);
+		/*DeviceTreeLoader device_tree(argv[3], 0x1000);
 		if (!guest->load(device_tree)) {
 			delete guest;
 			delete pfm;
@@ -173,8 +174,20 @@ int main(int argc, char **argv)
 
 			ERROR << "Unable to load device tree";
 			return 1;
+		}*/
+		
+		ATAGsLoader atags;
+		if (!guest->load(atags)) {
+			delete guest;
+			delete pfm;
+			delete hv;
+
+			ERROR << "Unable to load ATAGs";
+			return 1;
 		}
 	}
+	
+	// Load atags
 
 	CPU *cpu = NULL;
 	if (verify_enabled()) {

@@ -35,10 +35,22 @@ arm_mmu::~arm_mmu()
 
 }
 
+MMU *arm_mmu::create(arm_cpu& cpu)
+{
+	if (((arm_environment &)cpu.env()).variant() == arm_environment::ARMv5)
+		return new arm_mmu_v5(cpu);
+	else
+		return new arm_mmu_v6(cpu);
+}
+
 bool arm_mmu::enable()
 {
 	if (_enabled) return true;
 
+#ifdef DEBUG_MMU
+	printf("mmu: enable\n");
+#endif
+	
 	invalidate_virtual_mappings();
 	cpu().invalidate_translations();
 	
@@ -50,6 +62,10 @@ bool arm_mmu::disable()
 {
 	if (!_enabled) return true;
 	
+#ifdef DEBUG_MMU
+	printf("mmu: disable %x\n", cpu().read_pc());
+#endif
+
 	invalidate_virtual_mappings();
 	cpu().invalidate_translations();
 
@@ -295,6 +311,7 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	}
 
 #ifdef DEBUG_MMU
+	printf("---\n");
 	printf("mmu-v6: resolving %08x\n", va);
 #endif
 	
@@ -334,6 +351,10 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 		return true;
 	}
 
+#ifdef DEBUG_MMU
+		printf("mmu-v6: fault va=%08x type=%d\n", va, arm_fault);
+#endif
+
 	switch (info.type) {
 	case MMU::ACCESS_READ:
 		fault = MMU::READ_FAULT;
@@ -361,6 +382,10 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 			
 			*(armcpu().reg_offsets.DFSR) = fsr;
 		}
+		
+		#ifdef DEBUG_MMU
+			printf("mmu-v6: fault va=%08x far=%08x dfsr=%08x ifsr=%08x\n", va, *(armcpu().reg_offsets.FAR), *(armcpu().reg_offsets.DFSR), *(armcpu().reg_offsets.IFSR));
+		#endif
 	}
 
 	return true;
@@ -387,7 +412,9 @@ bool arm_mmu_v6::resolve_section(gva_t va, gpa_t& pa, const access_info& info, a
 		return true;
 
 	case 1:
-		// TODO
+#ifdef DEBUG_MMU
+		printf("mmu-v6: AP=%d\n", l1->section.ap());
+#endif
 		break;
 	}
 	
@@ -427,9 +454,18 @@ bool arm_mmu_v6::resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, ar
 	}
 	
 	switch (l2->type()) {
+	case l2_descriptor::FAULT:
+		fault = PAGE_TRANSLATION;
+		return true;
+		
 	case l2_descriptor::SMALL_PAGE:
 		pa = l2->small.base_address() | (va & 0xfff);
 		break;
+		
+	case l2_descriptor::LARGE_PAGE:
+		pa = l2->large.base_address() | (va & 0xffff);
+		break;
+		
 	default:
 		fatal("unsupported coarse page size\n");
 	}

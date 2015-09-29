@@ -110,6 +110,8 @@ namespace captive {
 						int32_t displacement;
 					} mem;
 				};
+				
+				void dump();
 			};
 		}
 	}

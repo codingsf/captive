@@ -34,6 +34,8 @@ namespace captive {
 					return _enabled;
 				}
 				
+				static MMU *create(arm_cpu& cpu);
+				
 			protected:
 				devices::CoCo& _coco;
 				bool _enabled;
@@ -217,6 +219,7 @@ namespace captive {
 							
 							inline uint32_t base_address() const { return BASE << 20; }
 							inline uint32_t domain() const { return DOM; }
+							inline uint32_t ap() const { return (AP | (APX << 2)); }
 						} section packed;
 						
 						struct {
@@ -285,6 +288,8 @@ namespace captive {
 							uint32_t TEX:3;
 							uint32_t XN:1;
 							uint32_t BASE:16;
+							
+							inline uint32_t base_address() const { return BASE << 16; }
 						} large packed;
 						
 						struct {

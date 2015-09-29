@@ -363,9 +363,14 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		}
 	}
 
-	if (pt->present() && info.is_write()) {
+	if (pt->present() && info.is_write() && fault == NONE) {
 		if (clear_if_page_executed(((va_t)(0x100000000ULL | (pt->base_address() & 0xffffffff))))) {
 			cpu().invalidate_translation((pa_t)pt->base_address(), (va_t)(uint64_t)va);
+
+			//printf("PC: %08x, VA: %08x\n", _cpu.read_pc(), (uint32_t)va);
+			if ((_cpu.read_pc() & ~0xfff) == (uint32_t)(va & ~0xfff)) {
+				fault = SMC_FAULT;
+			}
 		}
 	}
 

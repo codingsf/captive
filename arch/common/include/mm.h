@@ -190,14 +190,6 @@ namespace captive {
 
 			#define BITS(val, start, end) ((((uint64_t)val) >> start) & (((1 << (end - start + 1)) - 1)))
 			#define PHYS_TO_VIRT(__pa) ((va_t)(0x200000000ULL + (uint64_t)__pa))
-			
-			/*constexpr static va_t phys_to_virt(pa_t pa) __attribute__((pure)) {
-				//if ((uint64_t)pa >= 0 && (uint64_t)pa < 0x10000000) {
-					return (va_t *)(0x200000000 + (uint64_t)pa);
-				//} else {
-				//	return NULL;
-				//}
-			}*/
 
 			static inline void va_table_indicies(va_t va, table_idx_t& pm, table_idx_t& pdp, table_idx_t& pd, table_idx_t& pt) __attribute__((pure)) {
 				pm = BITS(va, 39, 47);
@@ -267,6 +259,18 @@ namespace captive {
 				pt->flags(flags);
 
 				flush_page(va);
+			}
+
+			static inline void prevent_writes(va_t addr) {
+				page_map_entry_t* pm;
+				page_dir_ptr_entry_t* pdp;
+				page_dir_entry_t* pd;
+				page_table_entry_t* pt;
+
+				get_va_table_entries(addr, pm, pdp, pd, pt);
+				
+				pt->writable(false);
+				flush_page(addr);
 			}
 		};
 	}

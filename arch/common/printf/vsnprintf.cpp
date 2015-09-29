@@ -202,7 +202,7 @@ retry_format:
 				buffer++;
 				count++;
 				break;
-
+				
 			default:
 				*buffer = *fmt;
 

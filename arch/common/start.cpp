@@ -205,7 +205,7 @@ extern "C" {
 		switch (*(uint8_t *)mctx->rip) {
 		case 0xc4: return captive::arch::do_device_read(mctx);
 		case 0xc5: return captive::arch::do_device_write(mctx);
-		default: fatal("illegal instruction %02x\n", *(uint8_t *)mctx->rip);
+		default: dump_code(mctx->rip-20); fatal("illegal instruction %02x\n", *(uint8_t *)mctx->rip);
 		}
 	}
 

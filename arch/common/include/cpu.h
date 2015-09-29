@@ -16,6 +16,7 @@
 #include <disasm.h>
 #include <shared-jit.h>
 #include <txln-cache.h>
+#include <map>
 
 #define DECODE_CACHE_SIZE	8192
 #define DECODE_OBJ_SIZE		128
@@ -133,9 +134,12 @@ namespace captive {
 			virtual bool handle_data_fault(MMU::resolution_fault fault) = 0;
 			virtual bool handle_fetch_fault(MMU::resolution_fault fault) = 0;
 			
+			const char *get_reg_name(uint32_t offset) { return _reg_names[offset]; }
+			
 		protected:
 			MMU *_mmu;
 			JIT *_jit;
+			std::map<uint32_t, const char *> _reg_names;
 			
 			virtual bool decode_instruction_virt(uint8_t isa, gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(uint8_t isa, gpa_t addr, Decode *insn) = 0;
@@ -145,6 +149,11 @@ namespace captive {
 
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;
+			}
+			
+			inline void add_reg_name(uint32_t offset, const char *name)
+			{
+				_reg_names[offset] = name;
 			}
 
 			Trace *_trace;

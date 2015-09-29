@@ -42,13 +42,10 @@ bool CPU::run_block_jit()
 		// If the return code is greater than zero, then we returned
 		// from a fault.
 
-		// If we're tracing, add a descriptive message, and close the
-		// trace packet.
-		if (unlikely(trace().enabled())) {
-			trace().add_str("memory exception taken");
-			trace().end_record();
+		if (rc == 2) {
+			printf("XXX\n");
 		}
-
+		
 		// Make sure interrupts are enabled.
 		__local_irq_enable();
 	}
@@ -64,6 +61,7 @@ bool CPU::run_block_jit_safepoint()
 	uint32_t region_virt_base = 1;
 	uint32_t region_phys_base = 1;
 
+	bool should_mark = false;
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -101,13 +99,13 @@ bool CPU::run_block_jit_safepoint()
 			}
 
 			// Mark the physical page corresponding to the PC as executed
-			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
+			should_mark = true;
 
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 			region_phys_base = phys_pc & 0xfffff000;
 		}
-
+		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		if (blk->txln) {
 			auto ptr = block_txln_cache->entry_ptr(virt_pc >> 2);
@@ -117,10 +115,16 @@ bool CPU::run_block_jit_safepoint()
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
 			blk->loop_header = true;
+
 			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 			mmu().disable_writes();
 
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
+		}
+		
+		if (should_mark) {
+			should_mark = false;
+			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
 		}
 	} while(step_ok);
 	
@@ -132,8 +136,7 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 {
 	TranslationContext ctx(malloc::data_alloc);
 	if (!translate_block(ctx, pa)) {
-		printf("jit: block translation failed\n");
-		return NULL;
+		fatal("jit: block translation failed\n");
 	}
 
 	bool emit_interrupt_check = mode == MODE_BLOCK;
@@ -142,8 +145,7 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 	BlockCompiler compiler(ctx, pa, tagged_registers(), emit_interrupt_check, emit_chaining_logic);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
-		printf("jit: block compilation failed\n");
-		return NULL;
+		fatal("jit: block compilation failed\n");
 	}
 
 	if (mode == MODE_BLOCK) {
@@ -156,8 +158,6 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 	return fn;
 }
 
-//#define DEBUG_TRANSLATION
-
 bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 {
 	using namespace captive::shared;
@@ -168,7 +168,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 #ifdef DEBUG_TRANSLATION
 	printf("jit: translating block %x\n", pa);
 #endif
-
+	
 	std::set<uint32_t> seen_pcs;
 	seen_pcs.insert(pa);
 	Decode *insn = get_decode(0);
@@ -184,7 +184,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		ctx.add_instruction(IRInstruction::barrier());
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(isa, pc, insn)) {
-			printf("jit: unhandled decode fault @ %08x\n", pc);
+			printf("jit: unhandled decode fault @ %08x (%08x)\n", pc, *(uint32_t *)(0x100000000ULL | insn->pc));
 			return false;
 		}
 		
@@ -201,7 +201,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		}
 
 		// Translate this instruction into the context.
-		if (unlikely(trace().enabled())) {
+		if (unlikely(jit().trace())) {
 			ctx.add_instruction(IRInstruction::trace_start());
 		}
 		
@@ -210,7 +210,7 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			return false;
 		}
 		
-		if (unlikely(trace().enabled())) {
+		if (unlikely(jit().trace())) {
 			ctx.add_instruction(IRInstruction::trace_end());
 		}
 

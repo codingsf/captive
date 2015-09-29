@@ -17,17 +17,20 @@ namespace captive {
 				class Coprocessor : public CoreDevice
 				{
 				public:
-					Coprocessor(Environment& env);
+					Coprocessor(Environment& env, uint32_t id);
 					virtual ~Coprocessor();
 
 					bool read(CPU& cpu, uint32_t reg, uint32_t& data) override;
 					bool write(CPU& cpu, uint32_t reg, uint32_t data) override;
 
+					uint32_t id() const { return _id; }
+					
 				protected:
 					virtual bool mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) = 0;
 					virtual bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) = 0;
 
 				private:
+					uint32_t _id;
 					uint32_t op1, op2, rn, rm;
 				};
 			}

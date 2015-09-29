@@ -172,6 +172,9 @@ namespace captive {
 				void xorr(uint32_t val, const X86Register& dst);
 				void xorr(uint32_t val, uint8_t size, const X86Memory& dst);
 
+				void nott(const X86Register& dst);
+				void nott(const X86Memory& dst);
+				
 				void andd(const X86Register& src, const X86Register& dest);
 				void andd(const X86Register& src, const X86Memory& dest);
 				void andd(const X86Memory& src, const X86Register& dest);

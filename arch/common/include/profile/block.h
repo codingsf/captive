@@ -34,7 +34,8 @@ namespace captive {
 					loop_header = false;
 					
 					if (txln) {
-						malloc::data_alloc.free((void *)txln);
+						// TODO: FIXME: XXX
+						//malloc::data_alloc.free((void *)txln);
 						txln = NULL;
 					}
 					

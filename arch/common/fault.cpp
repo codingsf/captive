@@ -354,16 +354,16 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				if (fault == MMU::DEVICE_FAULT) {
 					handle_device_fault(core, mctx, out_pa);
 					return 0;
-				}
-
-				// Invoke the target platform behaviour for the memory fault
-				if (fault) { 
+				} else if (fault == MMU::SMC_FAULT) {
+					return 2;
+				} else if (fault == MMU::NONE) {
+					return 0;
+				} else {
+					// Invoke the target platform behaviour for the memory fault
 					// Return TRUE if we need to return to the safe-point, i.e. to do a side
 					// exit from the currently executing guest instruction.
 					core->handle_mmu_fault(fault);
 					return 1;
-				} else {
-					return 0;
 				}
 			} else {
 				// If the core couldn't handle the fault, then we've got a serious problem.
@@ -380,6 +380,9 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		printf("  type:   %s\n", (code & PF_WRITE) ? "write" : "read");
 		printf("  mode:   %s\n", (code & PF_USER_MODE) ? "user" : "kernel");
 		printf("  reason: %s\n", (code & PF_PRESENT) ? "permission" : "not present");
+		
+		dump_mcontext(mctx);
+		dump_stack();
 
 		abort();
 	}

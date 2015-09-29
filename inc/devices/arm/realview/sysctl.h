@@ -1,0 +1,47 @@
+/* 
+ * File:   sysctl.h
+ * Author: s0457958
+ *
+ * Created on 29 September 2015, 13:35
+ */
+
+#ifndef SYSCTL_H
+#define SYSCTL_H
+
+#include <devices/device.h>
+#include <chrono>
+
+namespace captive {
+	namespace devices {
+		namespace timers {
+			class TickSource;
+		}
+		
+		namespace arm {
+			namespace realview {
+				class SysCtl : public Device
+				{
+				public:
+					SysCtl(timers::TickSource& tick_source);
+
+					std::string name() const override { return "sysctl"; }
+					uint32_t size() const override { return 0x1000; }
+					
+					bool read(uint64_t off, uint8_t len, uint64_t& data) override;
+					bool write(uint64_t off, uint8_t len, uint64_t data) override;
+					
+				private:
+					typedef std::chrono::high_resolution_clock clock_t;
+					typedef std::chrono::duration<uint32_t, std::ratio<1, 24000000> > tick_24MHz_t;
+					typedef std::chrono::duration<uint32_t, std::ratio<1, 100> > tick_100Hz_t;
+
+					timers::TickSource& _tick_source;
+					uint64_t _start_time;
+				};
+			}
+		}
+	}
+}
+
+#endif /* SYSCTL_H */
+

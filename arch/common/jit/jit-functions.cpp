@@ -60,10 +60,10 @@ extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, 
 		break;
 
 	case 4: // READ REG
-		printf("R[%03d] => 0x%08x ", a1, a2);
+		printf("R[%s] => 0x%08x ", cpu->get_reg_name(a1), a2);
 		break;
 	case 5: // WRITE REG
-		printf("R[%03d] <= 0x%08x ", a1, a2);
+		printf("R[%s] <= 0x%08x ", cpu->get_reg_name(a1), a2);
 		break;
 		
 	case 6: // READ DEV

@@ -332,6 +332,20 @@ void X86Encoder::cltq()
 	emit8(0x98);
 }
 
+void X86Encoder::nott(const X86Register& dst)
+{
+	if (dst.size == 1) {
+		encode_opcode_mod_rm(0xf6, 2, dst);
+	} else {
+		encode_opcode_mod_rm(0xf7, 2, dst);
+	}
+}
+
+void X86Encoder::nott(const X86Memory& dst)
+{
+	assert(false);
+}
+
 void X86Encoder::andd(uint32_t val, uint8_t size, const X86Memory& dst)
 {
 	encode_arithmetic(4, val, size, dst);

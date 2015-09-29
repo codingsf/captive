@@ -531,6 +531,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "ror",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "clz",		.format = "IOXXXX", .has_side_effects = false },
 
+	{ .mnemonic = "not",		.format = "BXXXXX", .has_side_effects = false },
 	{ .mnemonic = "and",		.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "or",			.format = "IBXXXX", .has_side_effects = false },
 	{ .mnemonic = "xor",		.format = "IBXXXX", .has_side_effects = false },
@@ -2118,6 +2119,19 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			break;
 		}
 
+		case IRInstruction::NOT:
+		{
+			IROperand *dest = &insn->operands[0];
+			
+			if (dest->is_alloc_reg()) {
+				encoder.nott(register_from_operand(dest));
+			} else if (dest->is_alloc_stack()) {
+				encoder.nott(stack_from_operand(dest));
+			}
+			
+			break;
+		}
+		
 		case IRInstruction::AND:
 		case IRInstruction::OR:
 		case IRInstruction::XOR:
@@ -2938,8 +2952,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	if (dump_this_shit)
+	if (dump_this_shit || pa == 0x18e18) {
+		dump_ir();
 		asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+	}
 
 	return success;
 }

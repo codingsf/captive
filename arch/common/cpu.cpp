@@ -135,7 +135,7 @@ void CPU::invalidate_translations()
 void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
 {
 	if (virt_addr >= (va_t)0x100000000) return;
-
+	
 	Region *rgn = image->get_region((uint32_t)(uint64_t)phys_addr);
 
 	if (rgn) {

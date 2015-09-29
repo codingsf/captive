@@ -6,7 +6,17 @@
 using namespace captive::arch::arm;
 using namespace captive::arch::arm::devices;
 
-CoCo::CoCo(Environment& env) : Coprocessor(env), _R(false), _S(false), M(false), DATA_TCM_REGION(0x00000014), INSN_TCM_REGION(0x00000014)
+//#define DEBUG_COCO
+
+CoCo::CoCo(Environment& env) : Coprocessor(env, 15),
+		_R(false),
+		_S(false),
+		M(false),
+		DATA_TCM_REGION(0x00000014),
+		INSN_TCM_REGION(0x00000014),
+		CACHE_SIZE_SELECTION(0),
+		PRIMARY_REGION_REMAP(0x00098AA4),
+		NORMAL_REGION_REMAP(0x44E048E0)
 {
 
 }
@@ -18,7 +28,26 @@ CoCo::~CoCo()
 
 bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data)
 {
+#ifdef DEBUG_COCO
+	printf("mcr p15: rn=%d, op1=%d, rm=%d, op2=%d, data=%08x\n", rn, op1, rm, op2, data);
+#endif
+	
 	switch (rn) {
+	case 0:
+		switch (rm) {
+		case 0:
+			switch (op1) {
+			case 2:
+				switch (op2) {
+				case 0:
+					CACHE_SIZE_SELECTION = data;
+					return true;
+				}
+				break;
+			}
+			break;
+		}
+		break;
 	case 1:
 	{
 		L2 = (data & (1 << 26)) != 0;
@@ -207,6 +236,25 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			break;
 		}
 		break;
+		
+	case 10:
+		switch (rm) {
+		case 2:
+			switch (op1) {
+			case 0:
+				switch (op2) {
+				case 0:
+					PRIMARY_REGION_REMAP = data;
+					return true;
+				case 1:
+					NORMAL_REGION_REMAP = data;
+					return true;
+				}
+				break;
+			}
+			break;
+		}
+		break;
 	}
 	
 	printf("**** unknown system control coprocessor write: rn=%d, rm=%d, op1=%d, op2=%d, data=%x\n", rn, rm, op1, op2, data);
@@ -215,6 +263,10 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 
 bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data)
 {
+#ifdef DEBUG_COCO
+	printf("mrc p15: rn=%d, op1=%d, rm=%d, op2=%d\n", rn, op1, rm, op2);
+#endif
+	
 	data = 0;
 	
 	switch (rn) {
@@ -226,21 +278,58 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 0: // MAIN ID
 					//data = 0x41069265;		// ARMv5
-					data = 0x410fb767;		// ARM1176JZF-S
+					data = 0x413FC081;		// Cortex A8
 					return true;
 
 				case 1: // CACHE TYPE
 					//data = 0x0f006006;	// ARMv5
-					data = 0x10152152;	// ARM1176JZF-S
+					data = 0x80048004;	// Cortex A8
 					return true;
 
 				case 2: // TCM STATUS
 					//data = 0x00004004; // ARMv5
-					data = 0x00020002;	// ARM1176JZF-S
+					data = 0;	// Cortex A8
 					return true;
 
 				case 3:	// TLB TYPE
-					data = 0x00000800;	// ARM1176JZF-S
+					data = 0x00202001;	// Cortex A8
+					return true;
+
+				case 5:	// MP ID
+					data = 0;
+					return true;
+				}
+				break;
+				
+			case 1:
+				switch (op2) {
+				case 0: // CACHE SIZE IDENTIFICATION
+					switch (CACHE_SIZE_SELECTION) {
+					case 0:
+						data = 0xE00FE01A;
+						return true;
+					case 1:
+						data = 0x200FE01A;
+						return true;
+					case 2:
+						data = 0xF01FE03A;
+						return true;
+					default:
+						data = 0;
+						return true;
+					}
+					break;
+					
+				case 1:
+					data = 0x0A000023;
+					return true;
+				}
+				break;
+				
+			case 2:
+				switch (op2) {
+				case 0: // CACHE SIZE SELECTION
+					data = CACHE_SIZE_SELECTION;
 					return true;
 				}
 				break;
@@ -251,6 +340,11 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			switch (op1) {
 			case 0:
 				switch (op2) {
+				case 0:
+					//data = 0x00001031;
+					data = 0x00000031;
+					return true;
+					
 				case 4:
 					data = 0x01130003;
 					return true;
@@ -358,3 +452,75 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	printf("**** unknown system control coprocessor read: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
 	return true;
 }
+
+#ifdef DEBUG_COCO
+# define DEFINE_COCO_REGISTER(_crn, _op1, _crm, _op2, _name, _rw)
+#else
+# define DEFINE_COCO_REGISTER(_crn, _op1, _crm, _op2, _name, _rw)
+#endif
+
+DEFINE_COCO_REGISTER(0, 0, 0, 0, "Main ID", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 4, "Main ID", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 6, "Main ID", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 7, "Main ID", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 1, "Cache Type", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 2, "TCM Type", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 3, "TLB Type", false);
+DEFINE_COCO_REGISTER(0, 0, 0, 5, "Multiprocessor ID", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 0, "Processor Feature 0", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 1, "Processor Feature 1", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 2, "Debug Feature 0", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 3, "Auxiliary Feature 0", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 4, "Memory Model Feature 0", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 5, "Memory Model Feature 1", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 6, "Memory Model Feature 2", false);
+DEFINE_COCO_REGISTER(0, 0, 1, 7, "Memory Model Feature 3", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 0, "Instruction Set Attribute 0", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 1, "Instruction Set Attribute 1", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 2, "Instruction Set Attribute 2", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 3, "Instruction Set Attribute 3", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 4, "Instruction Set Attribute 4", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 5, "Instruction Set Attribute 5", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 6, "Instruction Set Attribute 6", false);
+DEFINE_COCO_REGISTER(0, 0, 2, 7, "Instruction Set Attribute 7", false);
+
+DEFINE_COCO_REGISTER(0, 0, 3, 0, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 1, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 2, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 3, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 4, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 5, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 6, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 3, 7, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 0, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 1, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 2, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 3, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 4, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 5, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 6, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 4, 7, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 0, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 1, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 2, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 3, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 4, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 5, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 6, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 5, 7, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 0, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 1, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 2, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 3, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 4, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 5, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 6, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 6, 7, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 0, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 1, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 2, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 3, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 4, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 5, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 6, "Reserved Feature ID", false);
+DEFINE_COCO_REGISTER(0, 0, 7, 7, "Reserved Feature ID", false);

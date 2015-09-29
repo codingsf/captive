@@ -189,13 +189,13 @@ bool KVMCpu::run()
 
 				devices::Device *dev = kvm_guest.lookup_device(regs.rdx);
 				if (dev != NULL) {
-					// TODO: FIXME: HACK
+					uint64_t offset = regs.rdx & (dev->size() - 1);
 					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
 						// Device Write
-						dev->write(regs.rdx & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
+						dev->write(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					} else {
 						// Device Read
-						dev->read(regs.rdx & 0xfff, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
+						dev->read(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					}
 				}
 			} else {

@@ -16,12 +16,15 @@ static inline void print_symbol(uint64_t sym)
 
 void dump_code(unsigned long int rip)
 {
-	printf("Code:\n");
+	rip &= ~0xfULL;
+
+	printf("Code @ %p:\n", rip);
 	
 	uint8_t *p = (uint8_t *)rip;
 	for (int i = 0; i < 0x100; i++) {
+		if (i % 16 == 0) printf("\n%03x: ", i);
+		
 		printf("%02x ", p[i]);
-		if (i % 10 == 0) printf("\n");
 	}
 	printf("\n");
 }
@@ -35,6 +38,17 @@ void dump_mcontext(const struct mcontext *mctx)
 	printf("  rdx = %016lx\n", mctx->rdx);
 	printf("  rsi = %016lx\n", mctx->rsi);
 	printf("  rdi = %016lx\n", mctx->rdi);
+	printf("  r8  = %016lx\n", mctx->r8);
+	printf("  r9  = %016lx\n", mctx->r9);
+	printf("  r10 = %016lx\n", mctx->r10);
+	printf("  r11 = %016lx\n", mctx->r11);
+	printf("  r12 = %016lx\n", mctx->r12);
+	printf("  r13 = %016lx\n", mctx->r13);
+	printf("  r14 = %016lx\n", mctx->r14);
+	printf("  r15 = %016lx\n", mctx->r15);
+	printf("  rsp = %016lx\n", 0);
+	printf("  rbp = %016lx\n", mctx->rbp);
+	printf("  rip = %016lx\n", mctx->rip);
 }
 
 void dump_stack()

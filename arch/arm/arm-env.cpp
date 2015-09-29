@@ -1,6 +1,7 @@
 #include <arm-env.h>
 #include <arm-cpu.h>
 #include <devices/coco.h>
+#include <devices/debug-coprocessor.h>
 
 #include <printf.h>
 
@@ -16,6 +17,7 @@ Environment *create_environment_arm(PerCPUData *per_cpu_data)
 arm_environment::arm_environment(arm_variant variant, PerCPUData *per_cpu_data) : Environment(per_cpu_data), _variant(variant)
 {
 	// TODO: Abstract into platform-specific setup
+	install_core_device(14, new devices::DebugCoprocessor(*this));
 	install_core_device(15, new devices::CoCo(*this));
 }
 

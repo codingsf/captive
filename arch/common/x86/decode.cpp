@@ -548,3 +548,31 @@ bool captive::arch::x86::decode_memory_instruction(const uint8_t *code, MemoryIn
 
 	return true;
 }
+
+void MemoryInstruction::dump()
+{
+	switch (type) {
+	case I_MOV: printf("mov "); break;
+	case I_MOVZX: printf("movzx "); break;
+	default: printf("???"); break;
+	}
+	
+	Source.dump();
+	printf(", ");
+	Dest.dump();
+	
+	printf("\n");
+}
+
+void Operand::dump()
+{
+	switch (type) {
+	case TYPE_IMMEDIATE: printf("$0x%x", immed_val); break;
+	case TYPE_REGISTER: printf("%s", reg_names[reg]); break;
+	case TYPE_MEMORY: 
+		if (mem.displacement)
+			printf("%d", mem.displacement);
+		printf("(%s)", reg_names[mem.base_reg_idx]);
+		break;
+	}
+}

@@ -28,6 +28,8 @@ namespace captive {
 
 				struct Operand Source;
 				struct Operand Dest;
+				
+				void dump();
 			};
 
 			bool decode_memory_instruction(const uint8_t *code, MemoryInstruction& inst);

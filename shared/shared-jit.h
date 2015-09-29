@@ -170,6 +170,7 @@ namespace captive {
 				ROR,
 				CLZ,
 
+				NOT,
 				AND,					// 21
 				OR,
 				XOR,
@@ -492,6 +493,12 @@ namespace captive {
 				return IRInstruction(CLZ, src, dst);
 			}
 
+			static IRInstruction bitwise_not(const IROperand& dst) {
+				assert(dst.is_vreg());
+
+				return IRInstruction(NOT, dst);
+			}
+			
 			static IRInstruction bitwise_and(const IROperand& src, const IROperand& dst) {
 				assert(src.size == dst.size);
 				assert(src.is_constant() || src.is_vreg());
