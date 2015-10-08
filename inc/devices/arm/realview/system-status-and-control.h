@@ -19,10 +19,10 @@ namespace captive {
 		
 		namespace arm {
 			namespace realview {
-				class SysCtl : public Device
+				class SystemStatusAndControl : public Device
 				{
 				public:
-					SysCtl(timers::TickSource& tick_source);
+					SystemStatusAndControl(timers::TickSource& tick_source);
 
 					std::string name() const override { return "sysctl"; }
 					uint32_t size() const override { return 0x1000; }
@@ -37,6 +37,10 @@ namespace captive {
 
 					timers::TickSource& _tick_source;
 					uint64_t _start_time;
+					
+					uint32_t osc[5];
+					
+					uint32_t colour_mode, lockval, leds;
 				};
 			}
 		}

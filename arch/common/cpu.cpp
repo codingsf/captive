@@ -169,7 +169,7 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 
 void CPU::handle_irq_raised(uint8_t irq_line)
 {
-	//printf("*** raised %d\n", irq_line);
+	//printf("*** raised %d %d\n", irq_line, cpu_data().isr);
 	jit_state.exit_chain = 1; //cpu_data().isr;
 }
 

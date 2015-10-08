@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-GIC::GIC(irq::IRQLine& irq) : irq(irq), cpu { 0, 0, 3 }, distrib { 0, 2 }
+GIC::GIC(irq::IRQLine& irq) : irq(irq), current_pending(1023), cpu { 0, 0, 3 }, distrib { 0, 2 }
 {
 	for (int i = 0; i < 24; i++) {
 		distrib.cpu_targets[i] = 0;
@@ -15,8 +15,6 @@ GIC::~GIC() {
 
 bool GIC::read(uint64_t off, uint8_t len, uint64_t& data)
 {
-	fprintf(stderr, "read: %x\n", off);
-	
 	switch (off) {
 	case 0x000:		// CPU Control Register
 		data = cpu.ctrl & 1;
@@ -31,13 +29,9 @@ bool GIC::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 		
 	case 0x00c:		// Interrupt Acknowledge
-		fprintf(stderr, "gic: ack\n");
+		data = acknowledge();		
 		return true;
-		
-	case 0x010:		// End of Interrupt
-		fprintf(stderr, "gic: eoi\n");
-		return true;
-		
+				
 	case 0x014:		// Running Interrupt
 		fprintf(stderr, "gic: run\n");
 		return true;
@@ -89,10 +83,10 @@ bool GIC::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool GIC::write(uint64_t off, uint8_t len, uint64_t data)
 {
-	fprintf(stderr, "write: %x %x\n", off, data);
 	switch (off) {
 	case 0x000:
 		cpu.ctrl = data & 1;
+		update();
 		return true;
 		
 	case 0x004:
@@ -103,8 +97,13 @@ bool GIC::write(uint64_t off, uint8_t len, uint64_t data)
 		cpu.binpnt = data & 0x7;
 		return true;
 		
+	case 0x010:
+		complete(data);
+		return true;
+		
 	case 0x1000:
 		distrib.ctrl = data & 1;
+		update();
 		return true;
 
 	case 0x1004:
@@ -145,10 +144,56 @@ bool GIC::write(uint64_t off, uint8_t len, uint64_t data)
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
-	fprintf(stderr, "RAISED\n");
+	if (!asserted.count(line.index())) {
+		asserted.insert(line.index());	
+		pending.insert(line.index());
+		update();
+	}
 }
 
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
-	fprintf(stderr, "RESCINDED\n");
+	if (asserted.count(line.index())) {
+		asserted.erase(line.index());
+		update();
+	}
+}
+
+void GIC::update()
+{
+	current_pending = 1023;
+
+	if (!(distrib.ctrl & 1) || !(cpu.ctrl & 1)) {
+		irq.rescind();		
+		return;
+	}
+	
+	bool raise = false;
+	
+	if (pending.size() > 0) {
+		current_pending = *pending.begin();
+		raise = true;
+	}
+	
+	if (raise) {
+		irq.raise();
+	} else {
+		irq.rescind();
+	}
+}
+
+uint32_t GIC::acknowledge()
+{
+	if (current_pending == 1023) return current_pending;
+	
+	current_running = current_pending;
+	update();
+	
+	return current_running;
+}
+
+void GIC::complete(uint32_t irq)
+{
+	current_running = 1023;
+	pending.erase(irq);
 }

@@ -67,7 +67,6 @@ bool CPU::run_block_jit_safepoint()
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
 			if (handle_irq(cpu_data().isr)) {
-				//printf("IRQ\n");
 				jit_state.exit_chain = 0;
 				cpu_data().interrupts_taken++;
 			}
@@ -115,7 +114,6 @@ bool CPU::run_block_jit_safepoint()
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
 			blk->loop_header = true;
-
 			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 			mmu().disable_writes();
 
@@ -181,12 +179,13 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
 	do {
-		ctx.add_instruction(IRInstruction::barrier());
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(isa, pc, insn)) {
 			printf("jit: unhandled decode fault @ %08x (%08x)\n", pc, *(uint32_t *)(0x100000000ULL | insn->pc));
 			return false;
 		}
+
+		ctx.add_instruction(IRInstruction::barrier(IROperand::pc(insn->pc), IROperand::const32(*(uint32_t *)(0x100000000ULL | insn->pc))));
 		
 #ifdef DEBUG_TRANSLATION
 		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)(0x100000000ULL | insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));

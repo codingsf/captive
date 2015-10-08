@@ -30,6 +30,8 @@ namespace captive {
 
 			private:
 				irq::IRQLine& _irq;
+				
+				uint32_t direction, sense, edges, event, mask, mode;
 			};
 		}
 	}

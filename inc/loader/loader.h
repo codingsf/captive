@@ -16,6 +16,7 @@ namespace captive {
 		{
 		public:
 			virtual bool install(uint8_t *gpm) = 0;
+			virtual uint32_t base_address() const = 0;
 		};
 		
 		class FileBasedLoader : public Loader

@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netinet/in.h>
 #include <unistd.h>
 
 using namespace captive;
@@ -81,4 +82,48 @@ bool UnixDomainSocket::connect()
 	
 	int len = strlen(sockaddr.sun_path) + sizeof(sockaddr.sun_family);
 	return ::connect(fd, (struct sockaddr *)&sockaddr, len) == 0;
+}
+
+void TCPSocket::listen(int max_pending)
+{
+	if (fd < 0) return;
+	::listen(fd, max_pending);
+}
+
+Socket *TCPSocket::accept()
+{
+	int clientfd = ::accept(fd, NULL, NULL);
+	return new Socket(clientfd);
+}
+
+TCPSocket::TCPSocket(std::string host, int port) : host(host), port(port)
+{
+}
+
+TCPSocket::~TCPSocket() {
+
+}
+
+
+bool TCPSocket::create()
+{
+	fd = ::socket(AF_INET, SOCK_STREAM, 0);
+	return fd >= 0;
+}
+
+bool TCPSocket::bind()
+{
+	struct sockaddr_in sockaddr;
+	
+	sockaddr.sin_family = AF_INET;
+	sockaddr.sin_addr.s_addr = INADDR_ANY;
+	sockaddr.sin_port = htons(port);
+	
+	int len = sizeof(sockaddr);
+	return ::bind(fd, (struct sockaddr *)&sockaddr, len) == 0;
+}
+
+bool TCPSocket::connect()
+{
+	return false;
 }

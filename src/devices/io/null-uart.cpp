@@ -24,8 +24,7 @@ bool NullUART::close()
 
 bool NullUART::read_char(uint8_t& ch)
 {
-	for (;;) pause();
-	return true;
+	return false;
 }
 
 bool NullUART::write_char(uint8_t ch)

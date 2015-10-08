@@ -269,7 +269,7 @@ namespace captive {
 			static IRInstruction flush_itlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_ITLB_ENTRY, addr); }
 			static IRInstruction flush_dtlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
 			
-			static IRInstruction barrier() { return IRInstruction(BARRIER); }
+			static IRInstruction barrier(const IROperand& pc, const IROperand& ir) { assert(pc.is_pc()); return IRInstruction(BARRIER, pc, ir); }
 			
 			static IRInstruction trace_start() { return IRInstruction(TRACE, IROperand::const8(0)); }
 			static IRInstruction trace_end() { return IRInstruction(TRACE, IROperand::const8(1)); }

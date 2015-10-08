@@ -290,6 +290,7 @@ namespace captive {
 							uint32_t BASE:16;
 							
 							inline uint32_t base_address() const { return BASE << 16; }
+							inline uint32_t ap() const { return APX << 2 | AP; }
 						} large packed;
 						
 						struct {
@@ -305,14 +306,15 @@ namespace captive {
 							uint32_t BASE:20;
 							
 							inline uint32_t base_address() const { return BASE << 12; }
+							inline uint32_t ap() const { return APX << 2 | AP; }
 						} small packed;
 					};
 					
 					inline l2_descriptor_type type() const
 					{
-						if (anon.TYPE0 == 0 && anon.TYPE1 == 0) {
+						if (anon.TYPE1 == 0 && anon.TYPE0 == 0) {
 							return FAULT;
-						} else if (anon.TYPE0 == 1 && anon.TYPE1 == 0) {
+						} else if (anon.TYPE1 == 0 && anon.TYPE0 == 1) {
 							return LARGE_PAGE;
 						} else if (anon.TYPE1 == 1) {
 							return SMALL_PAGE;
@@ -341,6 +343,7 @@ namespace captive {
 					PAGE_PERMISSION		= 15,
 				};
 
+				bool check_access_perms(uint32_t ap, const access_info& info);
 				bool resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, const l1_descriptor *l1);
 				bool resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, const l1_descriptor *l1);
 			};

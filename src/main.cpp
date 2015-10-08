@@ -8,6 +8,7 @@
 #include <loader/elf-loader.h>
 #include <loader/devtree-loader.h>
 #include <loader/atags-loader.h>
+#include <loader/initrd-loader.h>
 
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
@@ -97,7 +98,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the guest platform.
-	Platform *pfm = new Realview(*ts);
+	Platform *pfm = new Realview(*ts, std::string(argv[4]));
 
 	// Create the engine.
 	Engine engine(argv[1]);
@@ -143,7 +144,7 @@ int main(int argc, char **argv)
 	}
 
 	// Load the kernel
-	KernelLoader *kernel = KernelLoader::create_from_file(argv[2]);
+	auto kernel = KernelLoader::create_from_file(argv[2]);
 	if (!kernel) {
 		delete guest;
 		delete pfm;
@@ -163,6 +164,16 @@ int main(int argc, char **argv)
 	}
 
 	guest->guest_entrypoint(kernel->entrypoint());
+	
+	InitRDLoader initrd(argv[3], 0x8000000);
+	if (!guest->load(initrd)) {
+		delete guest;
+		delete pfm;
+		delete hv;
+
+		ERROR << "Unable to load initrd";
+		return 1;
+	}
 
 	// Load the device-tree
 	if (kernel->requires_device_tree()) {
@@ -176,7 +187,8 @@ int main(int argc, char **argv)
 			return 1;
 		}*/
 		
-		ATAGsLoader atags;
+		// Load atags
+		ATAGsLoader atags(initrd);
 		if (!guest->load(atags)) {
 			delete guest;
 			delete pfm;
@@ -186,9 +198,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
-	
-	// Load atags
-
+		
 	CPU *cpu = NULL;
 	if (verify_enabled()) {
 		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::BlockJIT : GuestCPUConfiguration::BlockJIT, true, (devices::timers::CallbackTickSource *)ts);
@@ -216,6 +226,8 @@ int main(int argc, char **argv)
 		ERROR << "Unable to initialise CPU";
 		return 1;
 	}
+	
+	pfm->add_core(*cpu);
 
 	// Start the tick source.
 	ts->start();
@@ -223,9 +235,6 @@ int main(int argc, char **argv)
 	// Start the platform.
 	pfm->start();
 	
-	// XXX: TODO: FIXME
-	//vs->cpu(*cpu);
-
 	if (!cpu->run()) {
 		ERROR << "Unable to run CPU";
 	}

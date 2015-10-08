@@ -19,9 +19,11 @@ namespace captive {
 		public:
 			ELFLoader(std::string filename);
 
-			virtual bool install(uint8_t* gpm) override;
-			virtual gpa_t entrypoint() const override;
-			virtual bool requires_device_tree() const override;
+			bool install(uint8_t* gpm) override;
+			gpa_t entrypoint() const override;
+			bool requires_device_tree() const override;
+			
+			uint32_t base_address() const override { return 0; }
 			
 			static bool match(const uint8_t *buffer);
 

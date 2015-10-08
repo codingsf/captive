@@ -61,6 +61,8 @@ namespace captive {
 				}
 
 				virtual bool have_raised_irqs() const override;
+				
+				inline constexpr uint32_t count() const { return nr_lines; }
 
 			private:
 				IRQLine lines[nr_lines];

@@ -72,9 +72,10 @@ bool FileBackedAsyncBlockDevice::open_file(std::string filename, bool read_only)
 	if (_file_size % block_size() != 0) {
 		_block_count++;
 	}
-	
+		
+	bzero((void *)&_aio, sizeof(_aio));
 	if (io_setup(128, &_aio)) {
-		ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "Unable to setup AIO";
+		ERROR << CONTEXT(FileBackedAsyncBlockDevice) << "Unable to setup AIO:" << strerror(errno);
 		close(_file_descr);
 		_file_descr = -1;
 		

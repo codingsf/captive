@@ -29,6 +29,10 @@ namespace captive {
 				CPU *create_cpu() override;
 				
 				inline arm_variant variant() const { return _variant; }
+
+			protected:
+				bool prepare_boot_cpu(CPU *core) override;
+				bool prepare_bootloader() override;
 				
 			private:
 				arm_variant _variant;

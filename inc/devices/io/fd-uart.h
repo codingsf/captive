@@ -1,12 +1,12 @@
 /* 
- * File:   socket-uart.h
+ * File:   fd-uart.h
  * Author: s0457958
  *
  * Created on 03 August 2015, 13:28
  */
 
-#ifndef SOCKET_UART_H
-#define	SOCKET_UART_H
+#ifndef FD_UART_H
+#define	FD_UART_H
 
 #include <devices/io/uart.h>
 
@@ -32,5 +32,5 @@ namespace captive {
 	}
 }
 
-#endif	/* SOCKET_UART_H */
+#endif	/* FD_UART_H */
 

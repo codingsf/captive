@@ -30,3 +30,25 @@ CPU *arm_environment::create_cpu()
 {
 	return new arm_cpu(*this, per_cpu_data);
 }
+
+bool arm_environment::prepare_boot_cpu(CPU* core)
+{
+	arm_cpu *arm_core = (arm_cpu *)core;
+	
+	arm_core->reg_offsets.RB[1]  = 0x769;	// Machine ID
+	arm_core->reg_offsets.RB[2]  = 0x100;	// Device Tree / ATAGs
+	arm_core->reg_offsets.RB[12] = core->cpu_data().entrypoint;		// Kernel Entry Point
+	arm_core->reg_offsets.RB[15] = 0;		// Start Address
+	
+	return true;
+}
+
+bool arm_environment::prepare_bootloader()
+{
+	volatile uint32_t *mem = (volatile uint32_t *)0;
+	*mem++ = 0xef000000;		// swi 0
+	*mem++ = 0xe1a00000;		// nop
+	*mem++ = 0xe12fff1c;		// bx ip
+
+	return true;
+}

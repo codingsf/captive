@@ -176,7 +176,8 @@ bool arm_mmu_v5::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	if (likely(have_side_effects)) {
 		*(armcpu().reg_offsets.DFSR) = fsr;
 		*(armcpu().reg_offsets.IFSR) = fsr;
-		*(armcpu().reg_offsets.FAR) = va;
+		*(armcpu().reg_offsets.DFAR) = va;
+		*(armcpu().reg_offsets.IFAR) = va;
 	}
 
 	return true;
@@ -311,8 +312,8 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	}
 
 #ifdef DEBUG_MMU
-	printf("---\n");
-	printf("mmu-v6: resolving %08x\n", va);
+	printf("--- ttbr0=%08x, ttbr1=%08x, ttbcr=%08x\n", *armcpu().reg_offsets.TTBR0, *armcpu().reg_offsets.TTBR1, *armcpu().reg_offsets.TTBCR);
+	printf("mmu-v6: resolving %08x for %s in %s\n", va, mem_access_types[info.type], mem_access_modes[info.mode]);
 #endif
 	
 	uint32_t ttbr = *armcpu().reg_offsets.TTBR0;
@@ -370,25 +371,47 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	}
 
 	if (likely(have_side_effects)) {
-		*(armcpu().reg_offsets.FAR) = va;
-
 		if (fault == MMU::FETCH_FAULT) {
+			*(armcpu().reg_offsets.IFAR) = va;
 			*(armcpu().reg_offsets.IFSR) = (uint32_t)arm_fault;
 		} else {
-			uint32_t fsr = (domain << 4) | ((uint32_t)arm_fault);
+			uint32_t fsr = (((uint32_t)domain & 0xf) << 4) | (((uint32_t)arm_fault) & 0xf);
 			if (fault == MMU::WRITE_FAULT) {
 				fsr |= (1 << 11);
 			}
 			
+			*(armcpu().reg_offsets.DFAR) = va;
 			*(armcpu().reg_offsets.DFSR) = fsr;
 		}
 		
 		#ifdef DEBUG_MMU
-			printf("mmu-v6: fault va=%08x far=%08x dfsr=%08x ifsr=%08x\n", va, *(armcpu().reg_offsets.FAR), *(armcpu().reg_offsets.DFSR), *(armcpu().reg_offsets.IFSR));
+			printf("mmu-v6: fault va=%08x dfar=%08x ifar=%08x dfsr=%08x ifsr=%08x\n", va, *(armcpu().reg_offsets.DFAR), *(armcpu().reg_offsets.IFAR), *(armcpu().reg_offsets.DFSR), *(armcpu().reg_offsets.IFSR));
 		#endif
 	}
 
 	return true;
+}
+
+bool arm_mmu_v6::check_access_perms(uint32_t ap, const access_info& info)
+{
+#ifdef DEBUG_MMU
+	printf("mmu-v6: checking permissions %d kernel=%d, write=%d\n", ap, info.is_kernel(), info.is_write());
+#endif
+	
+	switch(ap) {
+	case 0: return false;
+	case 1: return info.is_kernel();
+	case 2: return info.is_kernel() || info.is_read() || info.is_fetch();
+	case 3: return true;
+	case 4: return false;
+	case 5: return info.is_kernel() && (info.is_read() || info.is_fetch());
+	case 6: return info.is_read() || info.is_fetch();
+	case 7: return info.is_read() || info.is_fetch();
+
+	default:
+		printf("mmu: unknown access permission type %d\n", ap);
+		return false;
+	}
 }
 
 bool arm_mmu_v6::resolve_section(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, const l1_descriptor *l1)
@@ -415,6 +438,11 @@ bool arm_mmu_v6::resolve_section(gva_t va, gpa_t& pa, const access_info& info, a
 #ifdef DEBUG_MMU
 		printf("mmu-v6: AP=%d\n", l1->section.ap());
 #endif
+
+		if (!check_access_perms(l1->section.ap(), info)) {
+			fault = SECTION_PERMISSION;
+			return true;
+		}
 		break;
 	}
 	
@@ -428,7 +456,9 @@ bool arm_mmu_v6::resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, ar
 	printf("mmu-v6: resolving coarse for %08x\n", va);
 #endif
 	
-	const l2_descriptor *l2 = (const l2_descriptor *)resolve_guest_phys(l1->coarse_page_table.base_address());
+	const l2_descriptor *l2_base = (const l2_descriptor *)resolve_guest_phys(l1->coarse_page_table.base_address());
+	const l2_descriptor *l2 = &l2_base[(va >> 12) & 0xff];
+	
 	
 #ifdef DEBUG_MMU
 	printf("mmu-v6: resolved L2 @ %p data=%08x type=%d\n", l2, l2->data, l2->type());
@@ -447,10 +477,6 @@ bool arm_mmu_v6::resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, ar
 	case 2:
 		fault = PAGE_DOMAIN;
 		return true;
-
-	case 1:
-		// TODO
-		break;
 	}
 	
 	switch (l2->type()) {
@@ -459,10 +485,24 @@ bool arm_mmu_v6::resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, ar
 		return true;
 		
 	case l2_descriptor::SMALL_PAGE:
+		if (dacr == 1) {
+			if (!check_access_perms(l2->small.ap(), info)) {
+				fault = PAGE_PERMISSION;
+				return true;
+			}
+		}
+		
 		pa = l2->small.base_address() | (va & 0xfff);
 		break;
 		
 	case l2_descriptor::LARGE_PAGE:
+		if (dacr == 1) {
+			if (!check_access_perms(l2->large.ap(), info)) {
+				fault = PAGE_PERMISSION;
+				return true;
+			}
+		}
+
 		pa = l2->large.base_address() | (va & 0xffff);
 		break;
 		

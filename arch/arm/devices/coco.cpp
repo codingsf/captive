@@ -9,14 +9,13 @@ using namespace captive::arch::arm::devices;
 //#define DEBUG_COCO
 
 CoCo::CoCo(Environment& env) : Coprocessor(env, 15),
-		_R(false),
-		_S(false),
-		M(false),
+		_A(false), _C(false), _Z(false), _I(false), _EE(false), _TRE(false), _AFE(false), _TE(false),
 		DATA_TCM_REGION(0x00000014),
 		INSN_TCM_REGION(0x00000014),
 		CACHE_SIZE_SELECTION(0),
 		PRIMARY_REGION_REMAP(0x00098AA4),
-		NORMAL_REGION_REMAP(0x44E048E0)
+		NORMAL_REGION_REMAP(0x44E048E0),
+		CONTEXT_ID(0)
 {
 
 }
@@ -50,6 +49,28 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 	case 1:
 	{
+		if ((data & 1) && !cpu.mmu().enabled()) {
+			cpu.mmu().enable();
+		} else if (!(data & 1) && cpu.mmu().enabled()) {
+			cpu.mmu().disable();
+		}
+		
+		_A   = !!(data & (1 << 1));
+		_C   = !!(data & (1 << 2));
+		_Z   = !!(data & (1 << 11));
+		_I   = !!(data & (1 << 12));
+		*(((arm_cpu&)cpu).reg_offsets.cpV) = !!(data & (1 << 13));
+		_EE  = !!(data & (1 << 25));
+		_TRE = !!(data & (1 << 28));
+		_AFE = !!(data & (1 << 29));
+		_TE  = !!(data & (1 << 30));
+
+		assert(!_AFE);
+		assert(!_EE);
+		assert(!_TE);
+		assert(!_A);
+		
+		/*AFE = (data & (1 << 29)) != 0;
 		L2 = (data & (1 << 26)) != 0;
 		EE = (data & (1 << 25)) != 0;
 		VE = (data & (1 << 24)) != 0;
@@ -77,7 +98,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			cpu.mmu().enable();
 		} else {
 			cpu.mmu().disable();
-		}
+		}*/
 
 		return true;
 	}
@@ -202,6 +223,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		switch (rm) {
 		case 5:
 		case 6:
+		case 7:
 			cpu.mmu().invalidate_virtual_mappings();
 			return true;
 		}
@@ -255,6 +277,22 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			break;
 		}
 		break;
+		
+	case 13:
+		switch (rm) {
+		case 0:
+			switch (op1) {
+			case 0:
+				switch (op2) {
+				case 1:
+					CONTEXT_ID = data;
+					return true;
+				}
+				break;
+			}
+			break;
+		}
+		break;
 	}
 	
 	printf("**** unknown system control coprocessor write: rn=%d, rm=%d, op1=%d, op2=%d, data=%x\n", rn, rm, op1, op2, data);
@@ -278,12 +316,12 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 0: // MAIN ID
 					//data = 0x41069265;		// ARMv5
-					data = 0x413FC081;		// Cortex A8
+					data = 0x410fc083;		// Cortex A8
 					return true;
 
 				case 1: // CACHE TYPE
 					//data = 0x0f006006;	// ARMv5
-					data = 0x80048004;	// Cortex A8
+					data = 0x82048004;	// Cortex A8
 					return true;
 
 				case 2: // TCM STATUS
@@ -292,7 +330,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 					return true;
 
 				case 3:	// TLB TYPE
-					data = 0x00202001;	// Cortex A8
+					data = 0; //0x00202001;	// Cortex A8
 					return true;
 
 				case 5:	// MP ID
@@ -306,13 +344,13 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				case 0: // CACHE SIZE IDENTIFICATION
 					switch (CACHE_SIZE_SELECTION) {
 					case 0:
-						data = 0xE00FE01A;
+						data = 0xe007e01a;
 						return true;
 					case 1:
-						data = 0x200FE01A;
+						data = 0x2007e01a;
 						return true;
 					case 2:
-						data = 0xF01FE03A;
+						data = 0xf0000000;
 						return true;
 					default:
 						data = 0;
@@ -342,15 +380,16 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 0:
 					//data = 0x00001031;
-					data = 0x00000031;
+					data = 0x00001131;
 					return true;
 					
 				case 4:
-					data = 0x01130003;
+					//data = 0x01100003;
+					data = 0x31100003;
 					return true;
 					
 				case 5:
-					data = 0x10030302;
+					data = 0x20000000;
 					return true;
 				}
 				break;
@@ -362,11 +401,11 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			case 0:
 				switch (op2) {
 				case 0:
-					data = 0x00140011;
+					data = 0x00101111;
 					return true;
 					
 				case 3:
-					data = 0x01102131;
+					data = 0x11112131;
 					return true;
 					
 				case 5:
@@ -381,8 +420,46 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 
 	case 1:	// System Control
 		data = 0;
-
-		//NIBBLE 0
+		
+		// M - MMU Enabled
+		if (cpu.mmu().enabled()) {
+			data |= 1;
+		}
+		
+		// A - Strict Alignment
+		data |= _A << 1;
+		
+		// C - Data Caching
+		data |= _C << 2;
+		
+		// 6:3 - RAO, 10:7, RAZ
+		data |= 0xf << 3;
+		
+		// Z
+		data |= _Z << 11;
+		
+		// I
+		data |= _I << 12;
+		
+		// V
+		data |= (!!*(((arm_cpu&)cpu).reg_offsets.cpV)) << 13;
+		
+		// 24:14 - 0b01100010100
+		data |= 0x314 << 14;
+		
+		// EE
+		data |= _EE << 25;
+		
+		// TRE
+		data |= _TRE << 28;
+		
+		// AFE
+		data |= _AFE << 29;
+		
+		// TE
+		data |= _TE << 30;
+		
+		/*//NIBBLE 0
 		data |= M << 0; // MMU
 		data |= 0 << 1; //Strict alignment
 		data |= 1 << 2; //L1 U$ or D$
@@ -416,12 +493,14 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		data |= 0 << 20; //ST
 		data |= 0 << 21; //FI
 		data |= 1 << 22; //U
-		data |= 0 << 23; //XP
+		data |= XP << 23; //XP
 
 		//NIBBLE 6
 		data |= 0 << 24; //VE
 		data |= 0 << 25; //EE
 		data |= 0 << 26; //L2
+		
+		data |= AFE << 29; //AFE*/
 
 		return true;
 		
@@ -447,9 +526,25 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 			break;
 		}
 		break;
+		
+	case 13:
+		switch (rm) {
+		case 0:
+			switch (op1) {
+			case 0:
+				switch (op2) {
+				case 1:
+					data = CONTEXT_ID;
+					return true;
+				}
+				break;
+			}
+			break;
+		}
+		break;
 	}
 
-	printf("**** unknown system control coprocessor read: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
+	fatal("**** unknown system control coprocessor read: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
 	return true;
 }
 

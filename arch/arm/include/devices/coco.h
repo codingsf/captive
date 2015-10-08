@@ -20,41 +20,23 @@ namespace captive {
 					CoCo(Environment& env);
 					~CoCo();
 
-					inline bool R() const { return _R; }
-					inline bool S() const { return _S; }
+					inline bool R() const { return false; }
+					inline bool S() const { return false; }
+					inline bool A() const { return _A; }
 
 				protected:
 					bool mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t data) override;
 					bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
 
 				private:
-					bool L2;
-					bool EE;
-					bool VE;
-					bool XP;
-					bool U;
-					bool FI;
-					bool L4;
-					bool RR;
-					bool I;
-					bool Z;
-					bool F;
-					bool _R;
-					bool _S;
-					bool B;
-					bool L;
-					bool D;
-					bool P;
-					bool W;
-					bool C;
-					bool A;
-					bool M;
+					bool _A, _C, _Z, _I, _EE, _TRE, _AFE, _TE;
 					
 					uint32_t DATA_TCM_REGION;
 					uint32_t INSN_TCM_REGION;
 					uint32_t CACHE_SIZE_SELECTION;
 					uint32_t PRIMARY_REGION_REMAP;
 					uint32_t NORMAL_REGION_REMAP;
+					uint32_t CONTEXT_ID;
 				};
 			}
 		}

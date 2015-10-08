@@ -8,9 +8,12 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
+#include <list>
+
 namespace captive {
 	namespace hypervisor {
 		class GuestConfiguration;
+		class CPU;
 	}
 	
 	namespace platform {
@@ -24,6 +27,14 @@ namespace captive {
 			
 			virtual bool start() = 0;
 			virtual bool stop() = 0;
+			
+			inline void add_core(hypervisor::CPU& core) { _cores.push_back(&core); }
+			
+		protected:
+			inline const std::list<hypervisor::CPU *>& cores() const { return _cores; }
+			
+		private:
+			std::list<hypervisor::CPU *> _cores;
 		};
 	}
 }

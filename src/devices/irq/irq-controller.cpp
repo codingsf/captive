@@ -49,5 +49,6 @@ bool IRQController<nr_lines>::have_raised_irqs() const
 }
 
 
+template class IRQController<96u>;
 template class IRQController<32u>;
 template class IRQController<2u>;

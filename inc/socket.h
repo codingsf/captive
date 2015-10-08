@@ -61,6 +61,23 @@ namespace captive {
 	private:
 		std::string path;
 	};
+	
+	class TCPSocket : public ServerSocket, public ClientSocket, public Socket
+	{
+	public:
+		TCPSocket(std::string host, int port);
+		virtual ~TCPSocket();
+		
+		bool connect() override;
+		void listen(int max_pending=8) override;
+		Socket *accept() override;
+		bool create() override;
+		bool bind() override;
+		
+	private:
+		std::string host;
+		int port;
+	};
 }
 
 #endif	/* SOCKET_H */

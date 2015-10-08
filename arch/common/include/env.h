@@ -50,6 +50,10 @@ namespace captive {
 				return devices[id];
 			}
 
+		protected:
+			virtual bool prepare_boot_cpu(CPU *core) = 0;
+			virtual bool prepare_bootloader() = 0;
+			
 		private:
 			CoreDevice *devices[16];
 

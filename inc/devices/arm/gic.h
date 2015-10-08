@@ -11,10 +11,12 @@
 #include <devices/device.h>
 #include <devices/irq/irq-controller.h>
 
+#include <set>
+
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class GIC : public Device, public irq::IRQController<32u>
+			class GIC : public Device, public irq::IRQController<96u>
 			{
 			public:
 				GIC(irq::IRQLine& irq);
@@ -32,6 +34,8 @@ namespace captive {
 
 			private:
 				irq::IRQLine& irq;
+				std::set<uint32_t> asserted, pending;
+				uint32_t current_pending, current_running;
 				
 				struct {
 					uint32_t ctrl, prio_mask, binpnt;
@@ -46,6 +50,11 @@ namespace captive {
 					uint32_t cpu_targets[24];
 					uint32_t config[6];
 				} distrib;
+				
+				uint32_t acknowledge();
+				void complete(uint32_t irq);
+
+				void update();
 			};
 		}
 	}

@@ -273,7 +273,7 @@ void KVMCpu::stop()
 bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run& rs)
 {
 	uint64_t offset = pa & (device->size() - 1);
-	DEBUG << CONTEXT(CPU) << "Handling Device Access: name=" << device->name() << ", is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
+	DEBUG << CONTEXT(CPU) << "Handling Device Access: pa=" << std::hex << pa << ", name=" << device->name() << ", is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
 
 	if (rs.mmio.is_write) {
 		return device->write(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);

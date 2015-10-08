@@ -577,7 +577,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	
 	{ .mnemonic = "set flags zn",	.format = "IXXXXX", .has_side_effects = true },
 
-	{ .mnemonic = "barrier",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "barrier",	.format = "NNXXXX", .has_side_effects = true },
 	{ .mnemonic = "trace",		.format = "NIIIII", .has_side_effects = true },
 };
 
@@ -1713,7 +1713,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				if (value->type == IROperand::CONSTANT) {
 					switch (value->size) {
 					case 8:
-						encoder.mov8(value->value, X86Memory::get(guest_regs_reg, offset->value));
+						encoder.mov(value->value, get_temp(0, 8));
+						encoder.mov(get_temp(0, 8), X86Memory::get(guest_regs_reg, offset->value));
+						
+						//encoder.mov8(value->value, X86Memory::get(guest_regs_reg, offset->value));
 						break;
 					case 4:
 						encoder.mov4(value->value, X86Memory::get(guest_regs_reg, offset->value));
@@ -2952,8 +2955,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		*slot = value;
 	}
 
-	if (dump_this_shit || pa == 0x18e18) {
-		dump_ir();
+	if (dump_this_shit) {
 		asm volatile("out %0, $0xff\n" :: "a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
 	}
 
