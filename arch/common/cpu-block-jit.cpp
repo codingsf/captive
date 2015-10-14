@@ -36,16 +36,6 @@ bool CPU::run_block_jit()
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
-		// Reset the executing translation flag.
-		_exec_txl = false;
-
-		// If the return code is greater than zero, then we returned
-		// from a fault.
-
-		if (rc == 2) {
-			printf("XXX\n");
-		}
-		
 		// Make sure interrupts are enabled.
 		__local_irq_enable();
 	}
@@ -80,8 +70,6 @@ bool CPU::run_block_jit_safepoint()
 			}
 		}
 		
-		assert(*tagged_registers().ISA == 0);
-
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
 		
@@ -174,14 +162,13 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	int insn_count = 0;
 
 	uint8_t isa = *tagged_registers().ISA;
-	assert(isa == 0);
 	
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
 	do {
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(isa, pc, insn)) {
-			printf("jit: unhandled decode fault @ %08x (%08x)\n", pc, *(uint32_t *)(0x100000000ULL | insn->pc));
+			printf("jit: unhandled decode fault @ isa=%d %08x (%08x)\n", isa, pc, *(uint32_t *)(0x100000000ULL | insn->pc));
 			return false;
 		}
 

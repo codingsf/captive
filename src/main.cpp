@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 
 	guest->guest_entrypoint(kernel->entrypoint());
 	
-	InitRDLoader initrd(argv[3], 0x8000000);
+	/*InitRDLoader initrd(argv[3], 0x8000000);
 	if (!guest->load(initrd)) {
 		delete guest;
 		delete pfm;
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 
 		ERROR << "Unable to load initrd";
 		return 1;
-	}
+	}*/
 
 	// Load the device-tree
 	if (kernel->requires_device_tree()) {
@@ -188,7 +188,7 @@ int main(int argc, char **argv)
 		}*/
 		
 		// Load atags
-		ATAGsLoader atags(initrd);
+		ATAGsLoader atags; //(initrd);
 		if (!guest->load(atags)) {
 			delete guest;
 			delete pfm;

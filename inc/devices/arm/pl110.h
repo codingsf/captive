@@ -24,7 +24,12 @@ namespace captive {
 			class PL110 : public Primecell
 			{
 			public:
-				PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq);
+				enum DeviceVariant {
+					V_PL110,
+					V_PL111,
+				};
+				
+				PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq, DeviceVariant v = V_PL110);
 				virtual ~PL110();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;

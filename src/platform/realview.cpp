@@ -43,7 +43,7 @@ using namespace captive::devices::gfx;
 using namespace captive::devices::io;
 using namespace captive::devices::io::virtio;
 
-Realview::Realview(devices::timers::TickSource& ts, std::string block_device_file)
+Realview::Realview(devices::timers::TickSource& ts, std::string block_device_file) : socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x20000000));
@@ -105,13 +105,13 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	uart0 = new devices::arm::PL011(*gic0->get_irq_line(44), *console);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10009000, *uart0));
 
-	socket_uart = new devices::io::SocketUART(9233);
+	/*socket_uart = new devices::io::SocketUART(9233);
 	if (!socket_uart->open()) {
 		ERROR << "Unable to create UART socket";
 		throw 0;
-	}
+	}*/
 	
-	uart1 = new devices::arm::PL011(*gic0->get_irq_line(45), *socket_uart);
+	uart1 = new devices::arm::PL011(*gic0->get_irq_line(45), *new devices::io::NullUART());
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1000a000, *uart1));
 	
 	uart2 = new devices::arm::PL011(*gic0->get_irq_line(46), *new devices::io::NullUART());
@@ -148,7 +148,7 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	vs->keyboard(*ps2kbd);
 	vs->mouse(*ps2mse);
 	
-	PL110 *lcd = new PL110(*vs, *gic0->get_irq_line(55));
+	PL110 *lcd = new PL110(*vs, *gic0->get_irq_line(55), PL110::V_PL111);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10020000, *lcd));
 	
 	FileBackedAsyncBlockDevice *bdev = new FileBackedAsyncBlockDevice();
@@ -162,8 +162,8 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *vbd));
 }
 
-Realview::~Realview() {
-	socket_uart->close();
+Realview::~Realview()
+{
 }
 
 bool Realview::start()
@@ -180,7 +180,8 @@ bool Realview::stop()
 	uart1->stop_reading();
 	uart0->stop_reading();
 	
-	socket_uart->close();
+	if (socket_uart)
+		socket_uart->close();
 	return true;
 }
 
