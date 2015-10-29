@@ -27,5 +27,5 @@ void captive::logging::configure_logging_contexts()
 		}
 	}
 
-	//registered_logging_contexts.find("LLVMRegionJIT")->second->enable();
+	//registered_logging_contexts.find("GICDistributor")->second->enable();
 }

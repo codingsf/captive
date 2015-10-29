@@ -165,10 +165,12 @@ extern "C" {
 	
 	void handle_trap_irq(struct mcontext *mctx)
 	{
+		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
+		uint32_t code = cpu->cpu_data().signal_code;
+
 		apic_write(EOI, 0);
 
-		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
-		switch (cpu->cpu_data().signal_code) {
+		switch (code) {
 		case 1:
 			captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
 			do {

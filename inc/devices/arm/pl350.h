@@ -8,7 +8,6 @@
 #ifndef PL350_H
 #define PL350_H
 
-
 #include <devices/arm/primecell.h>
 
 namespace captive {

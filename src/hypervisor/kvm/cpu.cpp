@@ -209,6 +209,7 @@ bool KVMCpu::run()
 		case KVM_EXIT_MMIO:
 			if (cpu_run_struct->mmio.phys_addr >= 0x100000000 && cpu_run_struct->mmio.phys_addr < 0x200000000) {
 				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
+				
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
 				if (dev != NULL) {
 					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct))) {

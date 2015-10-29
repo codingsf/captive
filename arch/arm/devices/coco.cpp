@@ -68,37 +68,8 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		assert(!_AFE);
 		assert(!_EE);
 		assert(!_TE);
-		assert(!_A);
 		
-		/*AFE = (data & (1 << 29)) != 0;
-		L2 = (data & (1 << 26)) != 0;
-		EE = (data & (1 << 25)) != 0;
-		VE = (data & (1 << 24)) != 0;
-		XP = (data & (1 << 23)) != 0;
-		U = (data & (1 << 22)) != 0;
-		FI = (data & (1 << 21)) != 0;
-		L4 = (data & (1 << 15)) != 0;
-		RR = (data & (1 << 14)) != 0;
-		*(((arm_cpu&)cpu).reg_offsets.cpV) = !!(data & (1 << 13));
-		I = (data & (1 << 12)) != 0;
-		Z = (data & (1 << 11)) != 0;
-		F = (data & (1 << 10)) != 0;
-		_R = (data & (1 << 9)) != 0;
-		_S = (data & (1 << 8)) != 0;
-		B = (data & (1 << 7)) != 0;
-		L = (data & (1 << 6)) != 0;
-		D = (data & (1 << 5)) != 0;
-		P = (data & (1 << 4)) != 0;
-		W = (data & (1 << 3)) != 0;
-		C = (data & (1 << 2)) != 0;
-		A = (data & (1 << 1)) != 0;
-		M = (data & (1 << 0)) != 0;
-
-		if (M) {
-			cpu.mmu().enable();
-		} else {
-			cpu.mmu().disable();
-		}*/
+		//assert(!_A);
 
 		return true;
 	}
@@ -106,116 +77,128 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	case 7:
 		cpu.mmu().invalidate_virtual_mappings();
 		switch (rm) {
+		case 0:
+			switch (op2) {
+			case 4:		// WFI
+				printf("WFI\n");
+				return true;
+			}
+			break;
+				
+		case 1:
+			switch (op1) {
 			case 0:
 				switch (op2) {
-				case 4:		// WFI
-					printf("WFI\n");
+				case 0:
+				case 6:
 					return true;
 				}
 				break;
-				
-			case 5:
-				switch (op2) {
-				case 0:		// Invalidate entire I$
-					return true;
-					
-				case 1:		// Invalidate I$ LINE	(MVA)
-					return true;
-					
-				case 2:		// Invalidate I$ LINE	(SET/WAY)
-					return true;
-					
-				case 4:		// Flush prefetch buffer
-					return true;
-					
-				case 6:		// Flush BT$
-					return true;
-					
-				case 7:		// Flush BT$ entry
-					return true;
-				}
-				break;
-				
-			case 6:
-				switch (op2) {
-				case 0:		// Invalidate entire D$
-					return true;
-				case 1:		// Invalidate D$ LINE	(MVA)
-					return true;
-				case 2:		// Invalidate D$ LINE	(SET/WAY)
-					return true;
-				}
-				break;
-				
-			case 7:
-				switch (op2) {
-				case 0:		// Invalidate unified $
-					return true;
-				case 1:		// Invalidate unified $ line	(MVA)
-					return true;
-				case 2:		// Invalidate unified $ line	(SET/WAY)
-					return true;
-				}
-				break;
-				
-			case 10:
-				switch (op2) {
-				case 0:		// Clean entire D$
-					return true;
-				case 1:		// Clean D$ line	(MVA)
-					return true;
-				case 2:		// Clean D$ line	(SET/WAY)
-					return true;
-				case 3:		// Test and Clean
-					return true;
-				case 4:		// Data Sync Barrier
-					return true;
-				case 5:		// Data Mem Barrier
-					return true;
-				}
-				break;
-				
-			case 11:
-				switch (op2) {
-				case 0:		// Clean entire unified $
-					return true;
-				case 1:		// Clean unified $ line		(MVA)
-					return true;
-				case 2:		// Clean unified $			(SET/WAY)
-					return true;
-				}
-				break;
-				
-			case 13:
-				switch (op2) {
-				case 1:		// Prefetch I$ line		(MVA)
-					return true;
-				}
-				break;
-				
-			case 14:
-				switch (op2) {
-				case 0:		// Clean and Invalidate entire D$
-					return true;
-				case 1:		// Clean and Invalidate D$ line		(MVA)
-					return true;
-				case 2:		// Clean and Invalidate D$ line		(SET/WAY)
-					return true;
-				case 3:		// Test, clean and invalidate
-					return true;
-				}
-				break;
-				
-			case 15:
-				switch (op2) {
-				case 0:		// Clean and Invalidate entire unified $
-					return true;
-				case 1:		// Clean and Invalidate unified $ line	(MVA)
-					return true;
-				case 2:		// Clean and Invalidate unified $ line	(SET/WAY)
-					return true;
-				}
-				break;
+			}
+			break;
+			
+		case 5:
+			switch (op2) {
+			case 0:		// Invalidate entire I$
+				return true;
+
+			case 1:		// Invalidate I$ LINE	(MVA)
+				return true;
+
+			case 2:		// Invalidate I$ LINE	(SET/WAY)
+				return true;
+
+			case 4:		// Flush prefetch buffer
+				return true;
+
+			case 6:		// Flush BT$
+				return true;
+
+			case 7:		// Flush BT$ entry
+				return true;
+			}
+			break;
+
+		case 6:
+			switch (op2) {
+			case 0:		// Invalidate entire D$
+				return true;
+			case 1:		// Invalidate D$ LINE	(MVA)
+				return true;
+			case 2:		// Invalidate D$ LINE	(SET/WAY)
+				return true;
+			}
+			break;
+
+		case 7:
+			switch (op2) {
+			case 0:		// Invalidate unified $
+				return true;
+			case 1:		// Invalidate unified $ line	(MVA)
+				return true;
+			case 2:		// Invalidate unified $ line	(SET/WAY)
+				return true;
+			}
+			break;
+
+		case 10:
+			switch (op2) {
+			case 0:		// Clean entire D$
+				return true;
+			case 1:		// Clean D$ line	(MVA)
+				return true;
+			case 2:		// Clean D$ line	(SET/WAY)
+				return true;
+			case 3:		// Test and Clean
+				return true;
+			case 4:		// Data Sync Barrier
+				return true;
+			case 5:		// Data Mem Barrier
+				return true;
+			}
+			break;
+
+		case 11:
+			switch (op2) {
+			case 0:		// Clean entire unified $
+				return true;
+			case 1:		// Clean unified $ line		(MVA)
+				return true;
+			case 2:		// Clean unified $			(SET/WAY)
+				return true;
+			}
+			break;
+
+		case 13:
+			switch (op2) {
+			case 1:		// Prefetch I$ line		(MVA)
+				return true;
+			}
+			break;
+
+		case 14:
+			switch (op2) {
+			case 0:		// Clean and Invalidate entire D$
+				return true;
+			case 1:		// Clean and Invalidate D$ line		(MVA)
+				return true;
+			case 2:		// Clean and Invalidate D$ line		(SET/WAY)
+				return true;
+			case 3:		// Test, clean and invalidate
+				return true;
+			}
+			break;
+
+		case 15:
+			switch (op2) {
+			case 0:		// Clean and Invalidate entire unified $
+				return true;
+			case 1:		// Clean and Invalidate unified $ line	(MVA)
+				return true;
+			case 2:		// Clean and Invalidate unified $ line	(SET/WAY)
+				return true;
+			}
+			break;
 		}
 		break;
 		
@@ -287,6 +270,9 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				case 1:
 					CONTEXT_ID = data;
 					return true;
+				case 4:
+					TPID = data;
+					return true;
 				}
 				break;
 			}
@@ -316,12 +302,14 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 0: // MAIN ID
 					//data = 0x41069265;		// ARMv5
-					data = 0x410fc083;		// Cortex A8
+					//data = 0x410fc083;		// Cortex A8
+					data = 0x414fc091;		// Cortex A9
 					return true;
 
 				case 1: // CACHE TYPE
 					//data = 0x0f006006;	// ARMv5
-					data = 0x82048004;	// Cortex A8
+					//data = 0x82048004;	// Cortex A8
+					data = 0x83338003;
 					return true;
 
 				case 2: // TCM STATUS
@@ -334,7 +322,7 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 					return true;
 
 				case 5:	// MP ID
-					data = 0;
+					data = 0x80000000;
 					return true;
 				}
 				break;
@@ -390,6 +378,10 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 					
 				case 5:
 					data = 0x20000000;
+					return true;
+
+				case 7:
+					data = 0x00000211;
 					return true;
 				}
 				break;
@@ -535,6 +527,25 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 1:
 					data = CONTEXT_ID;
+					return true;
+				case 4:
+					data = TPID;
+					return true;
+				}
+				break;
+			}
+			break;
+		}
+		break;
+		
+	case 15:
+		switch (rm) {
+		case 0:
+			switch (op1) {
+			case 4:
+				switch (op2) {
+				case 0:
+					data = 0x1f000000;
 					return true;
 				}
 				break;

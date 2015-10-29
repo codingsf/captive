@@ -313,7 +313,7 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 
 #ifdef DEBUG_MMU
 	printf("--- ttbr0=%08x, ttbr1=%08x, ttbcr=%08x\n", *armcpu().reg_offsets.TTBR0, *armcpu().reg_offsets.TTBR1, *armcpu().reg_offsets.TTBCR);
-	printf("mmu-v6: resolving %08x for %s in %s\n", va, mem_access_types[info.type], mem_access_modes[info.mode]);
+	printf("mmu-v6: (%08x) resolving %08x for %s in %s\n", armcpu().read_pc(), va, mem_access_types[info.type], mem_access_modes[info.mode]);
 #endif
 	
 	uint32_t ttbr = *armcpu().reg_offsets.TTBR0;

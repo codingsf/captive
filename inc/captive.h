@@ -170,6 +170,7 @@ namespace captive {
 #define DECLARE_CONTEXT(_ctx) namespace captive { namespace logging { __attribute__((init_priority(210))) LogContext LogContext##_ctx(#_ctx); } }
 #define DECLARE_CHILD_CONTEXT(_child, _parent) namespace captive { namespace logging { __attribute__((init_priority(210))) LogContext LogContext##_child(#_child, #_parent); } }
 #define USE_CONTEXT(_ctx) namespace captive { namespace logging { extern LogContext LogContext##_ctx; } }
+#define ENABLE_CONTEXT(_ctx)
 
 #define LAST_ERROR_TEXT strerror(errno)
 

@@ -36,7 +36,7 @@ namespace captive {
 					uint32_t CACHE_SIZE_SELECTION;
 					uint32_t PRIMARY_REGION_REMAP;
 					uint32_t NORMAL_REGION_REMAP;
-					uint32_t CONTEXT_ID;
+					uint32_t CONTEXT_ID, TPID;
 				};
 			}
 		}

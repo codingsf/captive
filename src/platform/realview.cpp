@@ -2,6 +2,8 @@
 
 #include <devices/arm/cpu-irq.h>
 #include <devices/arm/gic.h>
+#include <devices/arm/scu.h>
+#include <devices/arm/mptimer.h>
 #include <devices/arm/pl011.h>
 #include <devices/arm/pl022.h>
 #include <devices/arm/pl031.h>
@@ -13,6 +15,7 @@
 #include <devices/arm/pl110.h>
 #include <devices/arm/pl131.h>
 #include <devices/arm/pl180.h>
+#include <devices/arm/pl310.h>
 #include <devices/arm/pl350.h>
 #include <devices/arm/sp804.h>
 #include <devices/arm/sp805.h>
@@ -46,7 +49,9 @@ using namespace captive::devices::io::virtio;
 Realview::Realview(devices::timers::TickSource& ts, std::string block_device_file) : socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x20000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x70000000, 0x20000000));
 	
 	SystemStatusAndControl *statctl = new SystemStatusAndControl(ts);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *statctl));
@@ -57,23 +62,37 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	SystemController *syscon1 = new SystemController(SystemController::SYS_CTRL1);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1001A000, *syscon1));
 	
-	ArmCpuIRQController *cpu_irq = new ArmCpuIRQController();
-	cfg.cpu_irq_controller = cpu_irq;
+	ArmCpuIRQController *cpu0_irq = new ArmCpuIRQController();
+	cfg.cpu_irq_controller = cpu0_irq;
 	
-	GIC *gic0 = new GIC(*cpu_irq->get_irq_line(1));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x1e000000, *gic0));
+	ArmCpuIRQController *cpu1_irq = new ArmCpuIRQController();
+	// TODO: cfg.cpu_irq_controller = cpu_irq;
+	
+	SnoopControlUnit *scu = new SnoopControlUnit();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1f000000, *scu));
+	
+	PL310 *pl310 = new PL310();
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1f002000, *pl310));
+
+	GIC *gic0 = new GIC(*cpu0_irq->get_irq_line(1), *cpu1_irq->get_irq_line(1));
+	
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1f000100, gic0->get_cpu(0)));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1f001000, gic0->get_distributor()));
+
+	MPTimer *mpt = new MPTimer(ts, *gic0->get_irq_line(29));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1f000600, *mpt));
 	
 	SP804 *timer0 = new SP804(ts, *gic0->get_irq_line(36));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10011000, *timer0));
 
 	SP804 *timer1 = new SP804(ts, *gic0->get_irq_line(37));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10018000, *timer1));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10012000, *timer1));
 	
 	SP804 *timer2 = new SP804(ts, *gic0->get_irq_line(73));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10019000, *timer2));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10018000, *timer2));
 	
 	SP804 *timer3 = new SP804(ts, *gic0->get_irq_line(74));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10012000, *timer3));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10019000, *timer3));
 	
 	SP805 *wdog0 = new SP805();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1000f000, *wdog0));
