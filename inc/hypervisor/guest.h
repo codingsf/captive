@@ -15,14 +15,8 @@
 #include <hypervisor/gpa-resolver.h>
 
 namespace captive {
-	struct shmem_data;
-
 	namespace engine {
 		class Engine;
-	}
-
-	namespace jit {
-		class JIT;
 	}
 
 	namespace loader {
@@ -47,7 +41,7 @@ namespace captive {
 		public:
 			typedef void (*memory_callback_fn_t)(gpa_t gpa);
 
-			Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, platform::Platform& pfm);
+			Guest(Hypervisor& owner, engine::Engine& engine, platform::Platform& pfm);
 			virtual ~Guest();
 			virtual bool init();
 
@@ -59,9 +53,6 @@ namespace captive {
 
 			inline Hypervisor& owner() const { return _owner; }
 			inline engine::Engine& engine() const { return _engine; }
-			inline jit::JIT& jit() const { return _jit; }
-
-			virtual SharedMemory& shared_memory() const = 0;
 
 			inline platform::Platform& platform() const { return _pfm; }
 
@@ -73,7 +64,6 @@ namespace captive {
 		private:
 			Hypervisor& _owner;
 			engine::Engine& _engine;
-			jit::JIT& _jit;
 			platform::Platform& _pfm;
 
 			gpa_t _guest_entrypoint;

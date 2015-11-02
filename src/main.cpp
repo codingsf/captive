@@ -2,8 +2,6 @@
 #include <verify.h>
 #include <engine/engine.h>
 
-#include <jit/llvm.h>
-
 #include <loader/zimage-loader.h>
 #include <loader/elf-loader.h>
 #include <loader/devtree-loader.h>
@@ -28,7 +26,6 @@ DECLARE_CONTEXT(Main);
 using namespace captive;
 using namespace captive::engine;
 using namespace captive::devices::timers;
-using namespace captive::jit;
 using namespace captive::loader;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
@@ -69,9 +66,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	} else if (argc == 6) {
-		if (strcmp(argv[5], "--region") == 0) {
-			default_execution_mode = GuestCPUConfiguration::RegionJIT;
-		} else if (strcmp(argv[5], "--block") == 0) {
+		if (strcmp(argv[5], "--block") == 0) {
 			default_execution_mode = GuestCPUConfiguration::BlockJIT;
 		} else if (strcmp(argv[5], "--interp") == 0) {
 			default_execution_mode = GuestCPUConfiguration::Interpreter;
@@ -110,21 +105,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// Create the worker thread pool
-	ThreadPool worker_threads("jit-worker-", 0, 1);
-	worker_threads.start();
-
-	// Create the JIT
-	LLVMJIT jit(engine, worker_threads);
-	if (!jit.init()) {
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to initialise jit";
-		return 1;
-	}
-
-	Guest *guest = hv->create_guest(engine, (JIT&)jit, *pfm);
+	Guest *guest = hv->create_guest(engine, *pfm);
 	if (!guest) {
 		delete pfm;
 		delete hv;

@@ -105,8 +105,6 @@ namespace captive {
 				current_cpu = cpu;
 			}
 
-			bool verify_check();
-
 			virtual void *reg_state() = 0;
 			virtual size_t reg_state_size() = 0;
 			

@@ -17,7 +17,6 @@
 #include <shmem.h>
 
 #include <hypervisor/guest.h>
-#include <hypervisor/shared-memory.h>
 #include <util/spin-lock.h>
 
 #include <linux/kvm.h>
@@ -36,10 +35,9 @@ namespace captive {
 
 			class KVMGuest : public Guest {
 				friend class KVMCpu;
-				friend void ::MMIOThreadTrampoline(void *);
 
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, jit::JIT& jit, platform::Platform& pfm, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, platform::Platform& pfm, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;
@@ -50,37 +48,14 @@ namespace captive {
 
 				inline bool initialised() const { return _initialised; }
 
-				bool stage2_init(uint64_t& stack);
-
 				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
 
 				void do_guest_printf();
 
-				virtual SharedMemory& shared_memory() const { return (SharedMemory&)_shared_memory; }
-
 			private:
+				std::vector<KVMCpu *> kvm_cpus;
 				static void core_thread_proc(KVMCpu *core);
 				
-				class KVMSharedMemory : public SharedMemory
-				{
-					friend class KVMGuest;
-
-				public:
-					KVMSharedMemory();
-
-					void *allocate(size_t size) override;
-					void *reallocate(void *p, size_t size) override;
-					void free(void *p) override;
-
-				private:
-					void set_arena(void *arena, size_t arena_size);
-
-					void *_arena;
-					size_t _arena_size;
-				} _shared_memory;
-
-				std::vector<KVMCpu *> kvm_cpus;
-
 				bool _initialised;
 				int fd, irq_fd;
 				int next_cpu_id;
@@ -115,13 +90,10 @@ namespace captive {
 				bool attach_guest_devices();
 				devices::Device *lookup_device(uint64_t addr);
 
-				bool install_bios();
-				bool install_initial_pgt();
 				bool install_gdt();
 				bool install_tss();
-				bool prepare_verification_memory();
 
-				void *get_phys_buffer(uint64_t gpa);
+				void *get_phys_buffer(uint64_t gpa) const;
 
 				vm_mem_region *get_mem_slot();
 				void put_mem_slot(vm_mem_region *region);
@@ -129,23 +101,6 @@ namespace captive {
 				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags = 0, void *fixed_addr = NULL);
 				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
-
-				typedef uint64_t pte_t;
-				typedef pte_t *pm_t;
-				typedef pte_t *pdp_t;
-				typedef pte_t *pd_t;
-				typedef pte_t *pt_t;
-
-				inline uint64_t alloc_page()
-				{
-					uint64_t page = per_guest_data->next_phys_page;
-					per_guest_data->next_phys_page += 0x1000;
-
-					return page;
-				}
-
-				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
-				void map_huge_page(uint64_t va, uint64_t pa, uint32_t flags);
 
 				inline int vmioctl(unsigned long int req) const {
 					return vmioctl(req, (unsigned long int)0);

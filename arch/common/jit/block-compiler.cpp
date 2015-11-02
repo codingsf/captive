@@ -16,7 +16,6 @@
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
-extern "C" void jit_verify(void *cpu);
 extern "C" void jit_rum(void *cpu);
 extern "C" void jit_trace(void *cpu, uint8_t opcode, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
 
@@ -2700,17 +2699,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::VERIFY:
 		{
 			encoder.nop(X86Memory::get(REG_RAX, insn->operands[0].value));
-
-			emit_save_reg_state(1, stack_map);
-
-			load_state_field(0, REG_RDI);
-
-			// Load the address of the target function into a temporary, and perform an indirect call.
-			encoder.mov((uint64_t)&jit_verify, get_temp(0, 8));
-			encoder.call(get_temp(0, 8));
-
-			emit_restore_reg_state(1, stack_map);
-
 			break;
 		}
 

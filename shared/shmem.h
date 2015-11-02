@@ -29,13 +29,6 @@ namespace captive {
 		}
 	}
 
-	struct VerificationData {
-		bool verify_failed;
-		uint8_t barrier_enter[32];
-		uint8_t barrier_exit[32];
-		uint8_t cpu_data[256];
-	};
-
 	struct MemoryVector
 	{
 		void *base_address;
@@ -44,10 +37,9 @@ namespace captive {
 
 	struct PerGuestData {
 		uint64_t next_phys_page;
-
-		MemoryVector shared_memory;
-		MemoryVector heap;
+		
 		MemoryVector printf_buffer;
+		MemoryVector heap;
 	};
 
 	namespace queue {
@@ -82,11 +74,10 @@ namespace captive {
 
 	struct PerCPUData {
 		PerGuestData *guest_data;
-		volatile VerificationData *verify_data;
 
 		bool halt;
 
-		uint32_t isr;			// Interrupt Status Register
+		uint32_t isr;				// Interrupt Status Register
 		uint32_t async_action;		// Pending actions
 		uint32_t signal_code;		// Incoming signal code
 		uint64_t insns_executed;	// Number of instructions executed
@@ -96,13 +87,8 @@ namespace captive {
 		uint32_t entrypoint;		// Entrypoint of the guest
 
 		bool verbose_enabled;
-		bool verify_enabled;
-		uint32_t verify_tid;
 
 		uint32_t device_address;
-
-		lock::SpinLock rwu_ready_queue_lock;
-		queue::QueueItem *rwu_ready_queue;
 	};
 }
 

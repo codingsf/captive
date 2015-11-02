@@ -55,18 +55,6 @@ $(out): $(dep) $(obj) $(bios)
 	@echo "  AS      $(patsubst $(src-dir)/%,%,$@)"
 	$(q)$(as) -o $@ $(asflags) $<
 
-#$(src-dir)/jit/jit.o: $(src-dir)/jit/jit.cpp
-#	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-#	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-#
-$(src-dir)/jit/llvm.o: $(src-dir)/jit/llvm.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-
-$(src-dir)/jit/llvm-mm.o: $(src-dir)/jit/llvm-mm.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-
 %.d: %.cpp
 	$(q)$(cxx) -M -MT $(@:.d=.o) -o $@ $(cxxflags) $<
 

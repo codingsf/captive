@@ -178,10 +178,6 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)(0x100000000ULL | insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
 #endif
 
-		if (unlikely(cpu_data().verify_enabled)) {
-			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));
-		}
-
 		if (unlikely(cpu_data().verbose_enabled)) {
 			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));
 		}

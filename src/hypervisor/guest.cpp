@@ -11,7 +11,7 @@ DECLARE_CHILD_CONTEXT(Guest, Hypervisor);
 
 using namespace captive::hypervisor;
 
-Guest::Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, platform::Platform& pfm) : _owner(owner), _engine(engine), _jit(jit), _pfm(pfm)
+Guest::Guest(Hypervisor& owner, engine::Engine& engine, platform::Platform& pfm) : _owner(owner), _engine(engine), _pfm(pfm)
 {
 
 }

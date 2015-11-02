@@ -2,7 +2,6 @@
 #include <hypervisor/kvm/cpu.h>
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
-#include <jit/jit.h>
 #include <platform/platform.h>
 #include <verify.h>
 #include <shared-jit.h>
@@ -60,6 +59,7 @@ bool KVMCpu::init()
 		return false;
 
 	// Attach the CPU IRQ controller
+	// TODO: FIX FOR MULTICORE
 	owner().platform().config().cpu_irq_controller->attach(*this);
 
 	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
@@ -294,47 +294,6 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 	//DEBUG << CONTEXT(CPU) << "Hypercall " << data;
 
 	switch(data) {
-	case 1:
-	{
-		uint64_t stack;
-
-		if (kvm_guest.stage2_init(stack)) {
-			struct kvm_regs regs;
-			vmioctl(KVM_GET_REGS, &regs);
-
-			// Entry Point
-			regs.rip = kvm_guest.engine().entrypoint();
-
-			// Stack + Base Pointer
-			regs.rsp = stack;
-			regs.rbp = 0;
-
-			// Startup Arguments
-			regs.rdi = (uint64_t)&per_cpu_data();
-
-			per_cpu_data().entrypoint = kvm_guest.guest_entrypoint();
-
-			vmioctl(KVM_SET_REGS, &regs);
-
-			// Cause a TLB invalidation - maybe?
-			struct kvm_sregs sregs;
-			vmioctl(KVM_GET_SREGS, &sregs);
-			vmioctl(KVM_SET_SREGS, &sregs);
-
-			/*struct kvm_guest_debug dbg;
-			bzero(&dbg, sizeof(dbg));
-			dbg.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
-			if (vmioctl(KVM_SET_GUEST_DEBUG, &dbg)) {
-				ERROR << "Unable to set debug flags";
-				return false;
-			}*/
-
-			return true;
-		} else {
-			return false;
-		}
-	}
-
 	case 2:
 		DEBUG << CONTEXT(CPU) << "Abort Requested";
 		return false;
@@ -362,30 +321,6 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		config().verify_tick_source()->do_tick();
 		return true;
 
-	case 10: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-		regs.rax = (uint64_t)owner().shared_memory().allocate(arg1);
-		vmioctl(KVM_SET_REGS, &regs);
-
-		return true;
-	}
-
-	case 11: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-		regs.rax = (uint64_t)owner().shared_memory().reallocate((void *)arg1, arg2);
-		vmioctl(KVM_SET_REGS, &regs);
-
-		return true;
-	}
-
-	case 12: {
-		owner().shared_memory().free((void *)arg1);
-
-		return true;
-	}
-
 	case 13: {
 		std::stringstream cmd;
 		cmd << "addr2line -e arch/arm.arch " << std::hex << arg1;
@@ -393,31 +328,26 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		return true;
 	}
 	
-	case 14: {
-		owner().jit().analyse(*this, (captive::shared::RegionWorkUnit *)arg1);
-		return true;
-	}
-	
-	case 15: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-
-		std::stringstream fname;
-		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
-		FILE *f = fopen(fname.str().c_str(), "wb");
-
-		uint64_t gpa = regs.rdi & 0xffffffff;
-		gpa += 0x000300000000ULL;
-
-		void *ptr = kvm_guest.get_phys_buffer(gpa);
-		if (ptr) {
-			fwrite(ptr, regs.rsi, 1, f);
-		}
-
-		fflush(f);
-		fclose(f);
-		return true;
-	}
+//	case 15: {
+//		struct kvm_regs regs;
+//		vmioctl(KVM_GET_REGS, &regs);
+//
+//		std::stringstream fname;
+//		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
+//		FILE *f = fopen(fname.str().c_str(), "wb");
+//
+//		uint64_t gpa = regs.rdi & 0xffffffff;
+//		gpa += 0x000300000000ULL;
+//
+//		void *ptr = kvm_guest.get_phys_buffer(gpa);
+//		if (ptr) {
+//			fwrite(ptr, regs.rsi, 1, f);
+//		}
+//
+//		fflush(f);
+//		fclose(f);
+//		return true;
+//	}
 	}
 
 	return false;
