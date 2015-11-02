@@ -59,7 +59,7 @@ bool Engine::install(uint8_t* base)
 		if (phdr->p_type == PT_LOAD) {
 			uint64_t offset = phdr->p_vaddr - 0xffffffff80000000ULL;
 
-			DEBUG << CONTEXT(Engine) << "Loading @ " << std::hex << offset;
+			DEBUG << CONTEXT(Engine) << "Loading @ " << std::hex << offset << ENABLE;
 			memcpy(base + offset, lib + phdr->p_offset, phdr->p_filesz);
 		}
 	}

@@ -1,5 +1,4 @@
 #include <captive.h>
-#include <verify.h>
 #include <engine/engine.h>
 
 #include <loader/zimage-loader.h>
@@ -43,7 +42,7 @@ int main(int argc, char **argv)
 	captive::logging::configure_logging_contexts();
 
 	if (argc < 5 || argc > 7) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [{--interp | --block | --region} | --verify {0 | 1}]";
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs>";
 		return 1;
 	}
 
@@ -51,29 +50,6 @@ int main(int argc, char **argv)
 	if (!KVM::supported()) {
 		ERROR << "KVM is not supported";
 		return 1;
-	}
-
-	GuestCPUConfiguration::CPUExecutionMode default_execution_mode = GuestCPUConfiguration::BlockJIT;
-	
-	if (argc == 7) {
-		if (strcmp(argv[5], "--verify")) {
-			ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
-			return 1;
-		}
-
-		if (verify_prepare(atoi(argv[6]))) {
-			ERROR << "Unable to prepare verification mode";
-			return 1;
-		}
-	} else if (argc == 6) {
-		if (strcmp(argv[5], "--block") == 0) {
-			default_execution_mode = GuestCPUConfiguration::BlockJIT;
-		} else if (strcmp(argv[5], "--interp") == 0) {
-			default_execution_mode = GuestCPUConfiguration::Interpreter;
-		} else {
-			ERROR << "Invalid execution mode";
-			return 1;
-		}
 	}
 
 	// Create a new hypervisor.
@@ -84,13 +60,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the master tick source
-	TickSource *ts;
-
-	if (verify_enabled()) {
-		ts = new CallbackTickSource(1000);
-	} else {
-		ts = new MicrosecondTickSource();
-	}
+	TickSource *ts = new MicrosecondTickSource();
 
 	// Create the guest platform.
 	Platform *pfm = new Realview(*ts, std::string(argv[4]));
@@ -180,44 +150,6 @@ int main(int argc, char **argv)
 		}
 	}
 		
-	GuestCPUConfiguration cpu_cfg(default_execution_mode);
-	
-	CPU *cpu0 = guest->create_cpu(cpu_cfg);
-	CPU *cpu1 = guest->create_cpu(cpu_cfg);
-	
-	if (!cpu0 || !cpu1) {
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to create CPU";
-		return 1;
-	}
-
-	if (!cpu0->init()) {
-		delete cpu0;
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to initialise CPU0";
-		return 1;
-	}
-	
-	if (!cpu1->init()) {
-		delete cpu1;
-		delete cpu0;
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to initialise CPU1";
-		return 1;
-	}
-	
-	pfm->add_core(*cpu0);
-	pfm->add_core(*cpu1);
-
 	// Start the tick source.
 	ts->start();
 
@@ -239,8 +171,6 @@ int main(int argc, char **argv)
 	delete ts;
 	
 	// Clean-up
-	delete cpu1;
-	delete cpu0;
 	delete guest;
 	delete pfm;
 	delete hv;

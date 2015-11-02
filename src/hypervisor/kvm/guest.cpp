@@ -7,7 +7,6 @@
 #include <engine/engine.h>
 #include <devices/device.h>
 #include <shmem.h>
-#include <verify.h>
 
 #include <thread>
 #include <pthread.h>
@@ -26,9 +25,19 @@ using namespace captive::engine;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
 
-#define VERBOSE_ENABLED false
+#define VERBOSE_ENABLED			false
 
 #define DEFAULT_NR_SLOTS		32
+
+#define GPM_BASE_GPA			0x000000000ULL
+#define HEAP_BASE_GPA			0x100000000ULL
+#define EE_BASE_GPA				0x200000000ULL
+
+#define GPM_BASE_HVA			0x7f1000000000ULL
+#define HEAP_BASE_HVA			0x7f1100000000ULL
+#define EE_BASE_HVA				0x7f1200000000ULL
+
+#define SEGMENT_SIZE			0x100000000ULL
 
 KVMGuest::KVMGuest(KVM& owner, Engine& engine, platform::Platform& pfm, int fd) 
 	: Guest(owner, engine, pfm),
@@ -72,6 +81,14 @@ bool KVMGuest::init()
 
 	if (!attach_guest_devices())
 		return false;
+	
+	engine().install((uint8_t *)EE_BASE_HVA);
+	
+	for (auto core : platform().config().cores) {
+		if (!create_cpu(core)) {
+			return false;
+		}
+	}
 
 	_initialised = true;
 	return true;
@@ -92,13 +109,8 @@ bool KVMGuest::load(loader::Loader& loader)
 	return true;
 }
 
-CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
+bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 {
-	if (!initialised()) {
-		ERROR << "KVM guest is not yet initialised";
-		return NULL;
-	}
-
 	if (!config.validate()) {
 		ERROR << "Invalid CPU configuration";
 		return NULL;
@@ -112,9 +124,9 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	}
 
 	// Locate the storage location for the Per-CPU data, and initialise the structure.
-	PerCPUData *per_cpu_data = (PerCPUData *)get_phys_buffer(0);
+	PerCPUData *per_cpu_data = (PerCPUData *)get_phys_buffer(0);	// TODO: FIXME: ADDRESS
 	per_cpu_data->async_action = 0;
-	per_cpu_data->execution_mode = (uint32_t)config.execution_mode();
+	per_cpu_data->execution_mode = 0;
 	per_cpu_data->guest_data = per_guest_data;
 	per_cpu_data->insns_executed = 0;
 	per_cpu_data->interrupts_taken = 0;
@@ -123,18 +135,23 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->verbose_enabled = VERBOSE_ENABLED;
 
 	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
+	if (!cpu->init()) {
+		delete cpu;
+		return false;
+	}
+	
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
-	return cpu;
+	return true;
 }
 
 bool KVMGuest::run()
 {
 	std::list<std::thread *> core_threads;
 	
-	for (auto core : platform().cores()) {
-		auto core_thread = new std::thread(core_thread_proc, (KVMCpu *)core);
+	for (auto core : kvm_cpus) {
+		auto core_thread = new std::thread(core_thread_proc, core);
 		core_threads.push_back(core_thread);
 	}
 	
@@ -147,7 +164,7 @@ bool KVMGuest::run()
 
 void KVMGuest::core_thread_proc(KVMCpu *core)
 {
-	sleep(5);
+	core->run();
 }
 
 bool KVMGuest::attach_guest_devices()
@@ -229,13 +246,23 @@ bool KVMGuest::prepare_guest_irq()
 
 bool KVMGuest::prepare_guest_memory()
 {
-	uint64_t gpm_host_base = 0x7f1000000000ULL;
+	uint64_t gpm_host_base = GPM_BASE_HVA;
 	for (auto rgn : platform().config().memory_regions) {
-		alloc_guest_memory(rgn.base_address(), rgn.size(), 0, (void *)(gpm_host_base | (rgn.base_address() & 0xffffffffULL)));	// GPM
+		if (!alloc_guest_memory(rgn.base_address(), rgn.size(), 0, (void *)(gpm_host_base | (rgn.base_address() & 0xffffffffULL)))) {
+			ERROR << "Unable to allocate GPM memory";
+			return false;
+		}
 	}
 	
-	alloc_guest_memory(0x100000000, 0x100000000, 0, (void *)0x7f1100000000);	// HEAP
-	alloc_guest_memory(0x200000000, 0x100000000, 0, (void *)0x7f1200000000);	// ENGINE
+	if (!alloc_guest_memory(HEAP_BASE_GPA, SEGMENT_SIZE, 0, (void *)HEAP_BASE_HVA)) {
+		ERROR << "Unable to allocate HEAP memory";
+		return false;
+	}
+	
+	if (!alloc_guest_memory(EE_BASE_GPA,   SEGMENT_SIZE, 0, (void *)EE_BASE_HVA)) {
+		ERROR << "Unable to allocate EE memory";
+		return false;
+	}
 	
 	if (!install_gdt()) {
 		ERROR << CONTEXT(Guest) << "Unable to install GDT";

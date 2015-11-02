@@ -3,7 +3,6 @@
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
 #include <platform/platform.h>
-#include <verify.h>
 #include <shared-jit.h>
 
 #include <unistd.h>
@@ -60,7 +59,7 @@ bool KVMCpu::init()
 
 	// Attach the CPU IRQ controller
 	// TODO: FIX FOR MULTICORE
-	owner().platform().config().cpu_irq_controller->attach(*this);
+	config().cpu_irq_controller().attach(*this);
 
 	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
 	if ((int)cpu_run_struct_size == -1) {
@@ -87,31 +86,6 @@ void KVMCpu::interrupt(uint32_t code)
 	write(irqfd, &data, sizeof(data));
 }
 
-static KVMCpu *signal_cpu;
-static bool trap;
-
-uint64_t last_insns, last_intrs;
-
-static void handle_signal(int signo)
-{
-	if (signo == SIGUSR1) {
-		signal_cpu->interrupt(2);
-
-//		signal_cpu->per_cpu_data().async_action = 2;
-	} else if (signo == SIGUSR2) {
-		
-		fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
-		last_insns = signal_cpu->per_cpu_data().insns_executed;
-		last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
-	} else if (signo == SIGTRAP) {
-		trap = true;
-	}
-}
-
-static std::chrono::high_resolution_clock::time_point cpu_start_time;
-
-extern void trigger_irq_latency_measure();
-
 bool KVMCpu::run()
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
@@ -123,33 +97,61 @@ bool KVMCpu::run()
 		ERROR << CONTEXT(CPU) << "CPU not initialised";
 		return false;
 	}
-
-	signal_cpu = this;
-	signal(SIGUSR1, handle_signal);
-	signal(SIGUSR2, handle_signal);
-	signal(SIGTRAP, handle_signal);
+	
+	pthread_t self = pthread_self();
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(id() % 4, &cpuset);
+	
+	pthread_setaffinity_np(self, sizeof(cpuset), &cpuset);
+	
+	pthread_setname_np(self, std::string("vcpu-" + id()).c_str());
 
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
-	sregs.cs.base = 0xf0000;
+	sregs.cr0 = 0x80010007;	
+	sregs.cr3 = 0;			// PML4
+	sregs.cr4 = 0x6b0;		// PAE, PGE, PSE, OSFXSR, OSXMMEXCPT
+	
+	sregs.cs.base = 0;
+	sregs.cs.limit = 0;
+	sregs.cs.selector = 0;
+	sregs.ds.base = 0;
+	sregs.ds.limit = 0;
+	sregs.es.base = 0;
+	sregs.es.limit = 0;
+	sregs.fs.base = 0;
+	sregs.fs.limit = 0;
+	sregs.gs.base = 0;
+	sregs.gs.limit = 0;
+	sregs.ss.base = 0;
+	sregs.ss.limit = 0;
+	
+	sregs.gdt.base = 0;
+	sregs.gdt.limit = 0;
+	
+	sregs.idt.base = 0;
+	sregs.idt.limit = 0;
 	vmioctl(KVM_SET_SREGS, &sregs);
+	
+	struct kvm_msrs msrs;
+	msrs.nmsrs = 1;
+	msrs.entries[0].index = 0xc0000080;
+	msrs.entries[0].data = 0x901;
+	vmioctl(KVM_SET_MSRS, &msrs);
+	
+	struct kvm_regs regs;
+	vmioctl(KVM_GET_REGS, &regs);
+	bzero(&regs, sizeof(regs));
+	regs.rflags = 0x2;
+	regs.rip = kvm_guest.engine().entrypoint();
+	vmioctl(KVM_SET_REGS, &regs);
 
-	cpu_start_time = std::chrono::high_resolution_clock::now();
-
-	DEBUG << CONTEXT(CPU) << "Running CPU " << id();
+	DEBUG << CONTEXT(CPU) << "Running CPU " << id() << ENABLE;
 	do {
 		rc = vmioctl(KVM_RUN);
 		if (rc < 0) {
 			if (errno == EINTR) {
-				if (trap) {
-					trap = false;
-					DEBUG << CONTEXT(CPU) << "Received SIGTRAP";
-					
-					printf("*** insns executed: %lu\n", per_cpu_data().insns_executed);
-					
-					dump_regs();
-				}
-
 				continue;
 			}
 
@@ -303,22 +305,9 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		dump_regs();
 		return false;
 
-	case 4: {
-		std::chrono::high_resolution_clock::time_point then = std::chrono::high_resolution_clock::now();
-		std::chrono::seconds dur = std::chrono::duration_cast<std::chrono::seconds>(then - cpu_start_time);
-
-		DEBUG << "Instruction Count: " << per_cpu_data().insns_executed;
-		DEBUG << "MIPS: " << ((per_cpu_data().insns_executed * 1e-6) / dur.count());
-		return true;
-	}
-
 	case 5:
 		dump_regs();
 		fgetc(stdin);
-		return true;
-
-	case 9:
-		config().verify_tick_source()->do_tick();
 		return true;
 
 	case 13: {
@@ -372,7 +361,7 @@ void KVMCpu::dump_regs()
 
 #define PREG(rg) << #rg " = " << std::hex << regs.rg << " (" << std::dec << regs.rg << ")" << std::endl
 
-	DEBUG << "Registers:" << std::endl
+	DEBUG << "CPU " << id() << " Registers:" << std::endl
 
 	PREG(rax)
 	PREG(rbx)

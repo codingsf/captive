@@ -47,8 +47,6 @@ namespace captive {
 
 			virtual bool load(loader::Loader& loader) = 0;
 
-			virtual CPU *create_cpu(const GuestCPUConfiguration& config) = 0;
-			
 			virtual bool run() = 0;
 
 			inline Hypervisor& owner() const { return _owner; }

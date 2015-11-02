@@ -43,7 +43,6 @@ namespace captive {
 				bool init() override;
 				bool load(loader::Loader& loader) override;
 
-				CPU *create_cpu(const GuestCPUConfiguration& config) override;
 				bool run() override;
 
 				inline bool initialised() const { return _initialised; }
@@ -55,6 +54,8 @@ namespace captive {
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
 				static void core_thread_proc(KVMCpu *core);
+				
+				bool create_cpu(const GuestCPUConfiguration& config);
 				
 				bool _initialised;
 				int fd, irq_fd;

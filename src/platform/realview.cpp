@@ -62,11 +62,11 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	SystemController *syscon1 = new SystemController(SystemController::SYS_CTRL1);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1001A000, *syscon1));
 	
-	ArmCpuIRQController *cpu0_irq = new ArmCpuIRQController();
-	cfg.cpu_irq_controller = cpu0_irq;
-	
-	ArmCpuIRQController *cpu1_irq = new ArmCpuIRQController();
-	// TODO: cfg.cpu_irq_controller = cpu_irq;
+	GuestCPUConfiguration core0(*new ArmCpuIRQController());
+	GuestCPUConfiguration core1(*new ArmCpuIRQController());
+
+	cfg.cores.push_back(core0);	
+	cfg.cores.push_back(core1);	
 	
 	SnoopControlUnit *scu = new SnoopControlUnit();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1f000000, *scu));
@@ -74,7 +74,7 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	PL310 *pl310 = new PL310();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1f002000, *pl310));
 
-	GIC *gic0 = new GIC(*cpu0_irq->get_irq_line(1), *cpu1_irq->get_irq_line(1));
+	GIC *gic0 = new GIC(*((ArmCpuIRQController&)core0.cpu_irq_controller()).get_irq_line(1), *((ArmCpuIRQController&)core1.cpu_irq_controller()).get_irq_line(1));
 	
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1f000100, gic0->get_cpu(0)));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1f001000, gic0->get_distributor()));
@@ -190,7 +190,7 @@ bool Realview::start()
 	uart0->start_reading();
 	uart1->start_reading();
 
-	vs->cpu(*cores().front());
+	//vs->cpu(*cores().front());
 	return true;
 }
 
