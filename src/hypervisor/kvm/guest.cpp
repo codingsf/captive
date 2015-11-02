@@ -2,6 +2,7 @@
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/cpu.h>
 #include <hypervisor/config.h>
+#include <platform/platform.h>
 #include <jit/jit.h>
 #include <loader/loader.h>
 #include <engine/engine.h>
@@ -86,7 +87,7 @@ struct {
 
 extern char __bios_bin_start, __bios_bin_end;
 
-KVMGuest::KVMGuest(KVM& owner, Engine& engine, jit::JIT& jit, const GuestConfiguration& config, int fd) : Guest(owner, engine, jit, config), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
+KVMGuest::KVMGuest(KVM& owner, Engine& engine, jit::JIT& jit, platform::Platform& pfm, int fd) : Guest(owner, engine, jit, pfm), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
 {
 
 }
@@ -193,9 +194,30 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	return cpu;
 }
 
+bool KVMGuest::run()
+{
+	std::list<std::thread *> core_threads;
+	
+	for (auto core : platform().cores()) {
+		auto core_thread = new std::thread(core_thread_proc, (KVMCpu *)core);
+		core_threads.push_back(core_thread);
+	}
+	
+	for (auto thread : core_threads) {
+		if (thread->joinable()) thread->join();
+	}
+	
+	return true;
+}
+
+void KVMGuest::core_thread_proc(KVMCpu *core)
+{
+	sleep(5);
+}
+
 bool KVMGuest::attach_guest_devices()
 {
-	for (const auto& device : config().devices) {
+	for (const auto& device : platform().config().devices) {
 		DEBUG << CONTEXT(Guest) << "Attaching device " << device.device().name() << " @ " << std::hex << device.base_address();
 
 		device.device().attach(*this);
@@ -338,7 +360,7 @@ bool KVMGuest::prepare_guest_memory()
 	jit().set_shared_memory(_shared_memory);
 
 	DEBUG << CONTEXT(Guest) << "Installing guest memory regions";
-	for (auto& region : config().memory_regions) {
+	for (auto& region : platform().config().memory_regions) {
 		struct vm_mem_region *vm_region = alloc_guest_memory(GPM_PHYS_BASE + region.base_address(), region.size());
 		if (!vm_region) {
 			release_all_guest_memory();

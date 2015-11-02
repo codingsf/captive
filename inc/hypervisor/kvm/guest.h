@@ -39,13 +39,14 @@ namespace captive {
 				friend void ::MMIOThreadTrampoline(void *);
 
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, jit::JIT& jit, platform::Platform& pfm, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;
 				bool load(loader::Loader& loader) override;
 
 				CPU *create_cpu(const GuestCPUConfiguration& config) override;
+				bool run() override;
 
 				inline bool initialised() const { return _initialised; }
 
@@ -58,6 +59,8 @@ namespace captive {
 				virtual SharedMemory& shared_memory() const { return (SharedMemory&)_shared_memory; }
 
 			private:
+				static void core_thread_proc(KVMCpu *core);
+				
 				class KVMSharedMemory : public SharedMemory
 				{
 					friend class KVMGuest;

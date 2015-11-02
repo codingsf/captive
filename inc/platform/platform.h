@@ -28,9 +28,7 @@ namespace captive {
 			virtual bool start() = 0;
 			virtual bool stop() = 0;
 			
-			inline void add_core(hypervisor::CPU& core) { _cores.push_back(&core); }
-			
-		protected:
+			inline void add_core(hypervisor::CPU& core) { _cores.push_back(&core); }			
 			inline const std::list<hypervisor::CPU *>& cores() const { return _cores; }
 			
 		private:

@@ -3,6 +3,7 @@
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
 #include <jit/jit.h>
+#include <platform/platform.h>
 #include <verify.h>
 #include <shared-jit.h>
 
@@ -59,7 +60,7 @@ bool KVMCpu::init()
 		return false;
 
 	// Attach the CPU IRQ controller
-	owner().config().cpu_irq_controller->attach(*this);
+	owner().platform().config().cpu_irq_controller->attach(*this);
 
 	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
 	if ((int)cpu_run_struct_size == -1) {

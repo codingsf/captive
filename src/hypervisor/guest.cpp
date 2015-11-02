@@ -1,4 +1,5 @@
 #include <captive.h>
+#include <platform/platform.h>
 #include <hypervisor/config.h>
 #include <hypervisor/guest.h>
 
@@ -10,7 +11,7 @@ DECLARE_CHILD_CONTEXT(Guest, Hypervisor);
 
 using namespace captive::hypervisor;
 
-Guest::Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config) : _owner(owner), _engine(engine), _jit(jit), _config(config)
+Guest::Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, platform::Platform& pfm) : _owner(owner), _engine(engine), _jit(jit), _pfm(pfm)
 {
 
 }
@@ -22,7 +23,7 @@ Guest::~Guest()
 
 bool Guest::init()
 {
-	if (!config().validate())
+	if (!platform().config().validate())
 		return false;
 
 	return true;

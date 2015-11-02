@@ -29,6 +29,10 @@ namespace captive {
 		class Loader;
 	}
 
+	namespace platform {
+		class Platform;
+	}
+	
 	namespace hypervisor {
 		class Hypervisor;
 		class CPU;
@@ -43,13 +47,15 @@ namespace captive {
 		public:
 			typedef void (*memory_callback_fn_t)(gpa_t gpa);
 
-			Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config);
+			Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, platform::Platform& pfm);
 			virtual ~Guest();
 			virtual bool init();
 
 			virtual bool load(loader::Loader& loader) = 0;
 
 			virtual CPU *create_cpu(const GuestCPUConfiguration& config) = 0;
+			
+			virtual bool run() = 0;
 
 			inline Hypervisor& owner() const { return _owner; }
 			inline engine::Engine& engine() const { return _engine; }
@@ -57,7 +63,7 @@ namespace captive {
 
 			virtual SharedMemory& shared_memory() const = 0;
 
-			inline const GuestConfiguration& config() const { return _config; }
+			inline platform::Platform& platform() const { return _pfm; }
 
 			inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
 			inline void guest_entrypoint(gpa_t ep) { _guest_entrypoint = ep; }
@@ -68,7 +74,7 @@ namespace captive {
 			Hypervisor& _owner;
 			engine::Engine& _engine;
 			jit::JIT& _jit;
-			const GuestConfiguration& _config;
+			platform::Platform& _pfm;
 
 			gpa_t _guest_entrypoint;
 		};

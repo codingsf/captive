@@ -199,16 +199,12 @@ int main(int argc, char **argv)
 		}
 	}
 		
-	CPU *cpu = NULL;
-	if (verify_enabled()) {
-		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::BlockJIT : GuestCPUConfiguration::BlockJIT, true, (devices::timers::CallbackTickSource *)ts);
-		cpu = guest->create_cpu(cpu_cfg);
-	} else {
-		GuestCPUConfiguration cpu_cfg(default_execution_mode);
-		cpu = guest->create_cpu(cpu_cfg);
-	}
-
-	if (!cpu) {
+	GuestCPUConfiguration cpu_cfg(default_execution_mode);
+	
+	CPU *cpu0 = guest->create_cpu(cpu_cfg);
+	CPU *cpu1 = guest->create_cpu(cpu_cfg);
+	
+	if (!cpu0 || !cpu1) {
 		delete guest;
 		delete pfm;
 		delete hv;
@@ -217,17 +213,29 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!cpu->init()) {
-		delete cpu;
+	if (!cpu0->init()) {
+		delete cpu0;
 		delete guest;
 		delete pfm;
 		delete hv;
 
-		ERROR << "Unable to initialise CPU";
+		ERROR << "Unable to initialise CPU0";
 		return 1;
 	}
 	
-	pfm->add_core(*cpu);
+	if (!cpu1->init()) {
+		delete cpu1;
+		delete cpu0;
+		delete guest;
+		delete pfm;
+		delete hv;
+
+		ERROR << "Unable to initialise CPU1";
+		return 1;
+	}
+	
+	pfm->add_core(*cpu0);
+	pfm->add_core(*cpu1);
 
 	// Start the tick source.
 	ts->start();
@@ -235,7 +243,7 @@ int main(int argc, char **argv)
 	// Start the platform.
 	pfm->start();
 	
-	if (!cpu->run()) {
+	if (!guest->run()) {
 		ERROR << "Unable to run CPU";
 	}
 
@@ -250,7 +258,8 @@ int main(int argc, char **argv)
 	delete ts;
 	
 	// Clean-up
-	delete cpu;
+	delete cpu1;
+	delete cpu0;
 	delete guest;
 	delete pfm;
 	delete hv;
