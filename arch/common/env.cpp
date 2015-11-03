@@ -163,8 +163,6 @@ bool Environment::run()
 	prepare_boot_cpu(core);
 	
 	core->mmu().set_page_device(VA_OF_GPA(0x10000000));
-	
-	core->mmu().set_page_device(VA_OF_GPA(0x10000000));
 	core->mmu().set_page_device(VA_OF_GPA(0x10001000));
 	core->mmu().set_page_device(VA_OF_GPA(0x1001A000));
 	core->mmu().set_page_device(VA_OF_GPA(0x1e000000));

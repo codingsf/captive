@@ -196,8 +196,15 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 	printf("\n");*/
 	
 	captive::arch::x86::MemoryInstruction inst;
-	if (!decode_memory_instruction((const uint8_t *)mctx->rip, inst))
+	if (!x86::decode_memory_instruction((const uint8_t *)mctx->rip, inst)) {
+		printf("code: ");
+		for (int i = 0; i < 8; i++) {
+			printf("%02x ", ((uint8_t *)mctx->rip)[i]);
+		}
+		printf("\n");
+		
 		fatal("unable to decode memory instruction\n");
+	}
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {

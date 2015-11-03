@@ -23,6 +23,8 @@
 #include <devices/timers/callback-tick-source.h>
 #include <devices/timers/microsecond-tick-source.h>
 
+#include <signal.h>
+
 DECLARE_CONTEXT(Main);
 
 using namespace captive;
@@ -35,8 +37,20 @@ using namespace captive::hypervisor::kvm;
 using namespace captive::platform;
 using namespace captive::util;
 
+static void handle_segv(int sig, siginfo_t *siginfo, void *ucontext)
+{
+	fprintf(stderr, "error: seg-fault @ %p\n", siginfo->si_addr);
+	exit(1);
+}
+
 int main(int argc, char **argv)
 {
+	struct sigaction segv_action;
+	segv_action.sa_sigaction = handle_segv;
+	segv_action.sa_flags = SA_SIGINFO;
+	
+	sigaction(SIGSEGV, &segv_action, NULL);
+	
 	const CommandLine *cl = CommandLine::parse(argc, argv);
 
 	if (cl::Help) {

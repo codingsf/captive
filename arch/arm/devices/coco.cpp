@@ -6,7 +6,7 @@
 using namespace captive::arch::arm;
 using namespace captive::arch::arm::devices;
 
-//#define DEBUG_COCO
+#define DEBUG_COCO
 
 CoCo::CoCo(Environment& env) : Coprocessor(env, 15),
 		_A(false), _C(false), _Z(false), _I(false), _EE(false), _TRE(false), _AFE(false), _TE(false),
@@ -69,36 +69,6 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		assert(!_EE);
 		assert(!_TE);
 		assert(!_A);
-		
-		/*AFE = (data & (1 << 29)) != 0;
-		L2 = (data & (1 << 26)) != 0;
-		EE = (data & (1 << 25)) != 0;
-		VE = (data & (1 << 24)) != 0;
-		XP = (data & (1 << 23)) != 0;
-		U = (data & (1 << 22)) != 0;
-		FI = (data & (1 << 21)) != 0;
-		L4 = (data & (1 << 15)) != 0;
-		RR = (data & (1 << 14)) != 0;
-		*(((arm_cpu&)cpu).reg_offsets.cpV) = !!(data & (1 << 13));
-		I = (data & (1 << 12)) != 0;
-		Z = (data & (1 << 11)) != 0;
-		F = (data & (1 << 10)) != 0;
-		_R = (data & (1 << 9)) != 0;
-		_S = (data & (1 << 8)) != 0;
-		B = (data & (1 << 7)) != 0;
-		L = (data & (1 << 6)) != 0;
-		D = (data & (1 << 5)) != 0;
-		P = (data & (1 << 4)) != 0;
-		W = (data & (1 << 3)) != 0;
-		C = (data & (1 << 2)) != 0;
-		A = (data & (1 << 1)) != 0;
-		M = (data & (1 << 0)) != 0;
-
-		if (M) {
-			cpu.mmu().enable();
-		} else {
-			cpu.mmu().disable();
-		}*/
 
 		return true;
 	}
