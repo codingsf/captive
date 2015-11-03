@@ -380,6 +380,42 @@ static bool decode_rm(const uint8_t **code, X86InstructionPrefixes pfx, Operand&
 		}
 		
 		break;
+		
+	case 2:
+		oper.type = Operand::TYPE_MEMORY;
+		
+		oper.mem.displacement = *(const int32_t *)(*code);
+		oper.mem.index_reg_idx = Operand::R_Z;
+		oper.mem.scale = 0;
+		
+		*code = *code + 4;
+
+		if (pfx & REX_B) {
+			switch (rm) {
+			case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R8D; else oper.mem.base_reg_idx = Operand::R_R8; break;
+			case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R9D; else oper.mem.base_reg_idx = Operand::R_R9; break;
+			case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R10D; else oper.mem.base_reg_idx = Operand::R_R10; break;
+			case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R11D; else oper.mem.base_reg_idx = Operand::R_R11; break;
+			case 4:	return false;
+			case 5:	return false;
+			case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R14D; else oper.mem.base_reg_idx = Operand::R_R14; break;
+			case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_R15D; else oper.mem.base_reg_idx = Operand::R_R15; break;
+			}
+		} else {
+			switch (rm) {
+			case 0: if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EAX; else oper.mem.base_reg_idx = Operand::R_RAX; break;
+			case 1:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ECX; else oper.mem.base_reg_idx = Operand::R_RCX; break;
+			case 2:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDX; else oper.mem.base_reg_idx = Operand::R_RDX; break;
+			case 3:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EBX; else oper.mem.base_reg_idx = Operand::R_RBX; break;
+			case 4:	return false;
+			case 5:	return false;
+			case 6:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_ESI; else oper.mem.base_reg_idx = Operand::R_RSI; break;
+			case 7:	if (pfx & ADDRESS_SIZE_OVERRIDE) oper.mem.base_reg_idx = Operand::R_EDI; else oper.mem.base_reg_idx = Operand::R_RDI; break;
+			}
+		}
+		
+		break;
+		
 	default: return false;
 	}
 
