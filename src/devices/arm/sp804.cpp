@@ -2,6 +2,8 @@
 #include <devices/irq/irq-line.h>
 #include <captive.h>
 
+#include <mutex>
+
 using namespace captive::devices::arm;
 
 SP804::SP804(timers::TickSource& tick_source, irq::IRQLine& irq) : Primecell(0x00141804), ticks(1000), irq(irq)

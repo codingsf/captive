@@ -144,6 +144,8 @@ bool GIC::write(uint64_t off, uint8_t len, uint64_t data)
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
+	std::unique_lock<std::mutex> l(lock);
+	
 	if (!asserted.count(line.index())) {
 		asserted.insert(line.index());	
 		pending.insert(line.index());
@@ -153,6 +155,8 @@ void GIC::irq_raised(irq::IRQLine& line)
 
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
+	std::unique_lock<std::mutex> l(lock);
+	
 	if (asserted.count(line.index())) {
 		asserted.erase(line.index());
 		update();
@@ -184,6 +188,7 @@ void GIC::update()
 
 uint32_t GIC::acknowledge()
 {
+	std::unique_lock<std::mutex> l(lock);
 	if (current_pending == 1023) return current_pending;
 	
 	current_running = current_pending;
@@ -194,6 +199,8 @@ uint32_t GIC::acknowledge()
 
 void GIC::complete(uint32_t irq)
 {
+	std::unique_lock<std::mutex> l(lock);
+	
 	current_running = 1023;
 	pending.erase(irq);
 }

@@ -14,12 +14,14 @@ PL081::~PL081()
 
 bool PL081::read(uint64_t off, uint8_t len, uint64_t& data)
 {
-	Primecell::read(off, len, data);
-	return true;
+	if (Primecell::read(off, len, data))
+		return true;
+	return false;;
 }
 
 bool PL081::write(uint64_t off, uint8_t len, uint64_t data)
 {
-	Primecell::write(off, len, data);
-	return true;
+	if (Primecell::write(off, len, data))
+		return true;
+	return false;
 }

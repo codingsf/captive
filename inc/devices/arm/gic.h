@@ -12,6 +12,7 @@
 #include <devices/irq/irq-controller.h>
 
 #include <set>
+#include <mutex>
 
 namespace captive {
 	namespace devices {
@@ -33,6 +34,8 @@ namespace captive {
 				void irq_rescinded(irq::IRQLine& line) override;
 
 			private:
+				std::mutex lock;
+				
 				irq::IRQLine& irq;
 				std::set<uint32_t> asserted, pending;
 				uint32_t current_pending, current_running;
