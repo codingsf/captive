@@ -6,7 +6,7 @@
 using namespace captive::arch::arm;
 using namespace captive::arch::arm::devices;
 
-#define DEBUG_COCO
+//#define DEBUG_COCO
 
 CoCo::CoCo(Environment& env) : Coprocessor(env, 15),
 		_A(false), _C(false), _Z(false), _I(false), _EE(false), _TRE(false), _AFE(false), _TE(false),

@@ -61,7 +61,8 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	cfg.cpu_irq_controller = cpu_irq;
 	
 	GIC *gic0 = new GIC(*cpu_irq->get_irq_line(1));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x1e000000, *gic0));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1e000000, gic0->get_cpu(0)));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x1e001000, gic0->get_distributor()));
 	
 	SP804 *timer0 = new SP804(ts, *gic0->get_irq_line(36));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10011000, *timer0));
