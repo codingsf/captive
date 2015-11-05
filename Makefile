@@ -45,7 +45,7 @@ $(bios): .FORCE
 
 $(out): $(dep) $(obj) $(bios)
 	@echo "  LD      $(patsubst $(bin-dir)/%,%,$@)"
-	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(bios) `llvm-config --ldflags` `llvm-config --libs engine ipo x86 mcjit`
+	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(bios)
 
 %.o: %.cpp
 	@echo "  C++     $(patsubst $(src-dir)/%,%,$@)"
@@ -54,18 +54,6 @@ $(out): $(dep) $(obj) $(bios)
 %.o: %.S
 	@echo "  AS      $(patsubst $(src-dir)/%,%,$@)"
 	$(q)$(as) -o $@ $(asflags) $<
-
-#$(src-dir)/jit/jit.o: $(src-dir)/jit/jit.cpp
-#	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-#	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-#
-$(src-dir)/jit/llvm.o: $(src-dir)/jit/llvm.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-
-$(src-dir)/jit/llvm-mm.o: $(src-dir)/jit/llvm-mm.cpp
-	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
 
 %.d: %.cpp
 	$(q)$(cxx) -M -MT $(@:.d=.o) -o $@ $(cxxflags) $<

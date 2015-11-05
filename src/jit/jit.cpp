@@ -251,3 +251,23 @@ void JIT::analyse(captive::hypervisor::CPU& cpu, captive::shared::RegionWorkUnit
 
 	_worker_threads.queue_work((captive::util::action_t)analyse_async, NULL, work);
 }
+
+NullJIT::NullJIT() : JIT(*new util::ThreadPool("x", 0, 0))
+{
+
+}
+
+NullJIT::~NullJIT()
+{
+
+}
+
+bool NullJIT::init()
+{
+	return true;
+}
+
+void* NullJIT::compile_region(shared::RegionWorkUnit* rwu)
+{
+	return NULL;
+}

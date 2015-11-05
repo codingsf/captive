@@ -58,6 +58,16 @@ namespace captive {
 			static std::string render_instruction(const shared::IRInstruction& insn);
 			static std::string render_operand(const shared::IROperand& oper);
 		};
+		
+		class NullJIT : public JIT
+		{
+		public:
+			NullJIT();
+			virtual ~NullJIT();
+			
+			bool init() override;
+			void *compile_region(shared::RegionWorkUnit *rwu) override;
+		};
 	}
 }
 

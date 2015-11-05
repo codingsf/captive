@@ -2,13 +2,13 @@
 #include <verify.h>
 #include <engine/engine.h>
 
-#include <jit/llvm.h>
-
 #include <loader/zimage-loader.h>
 #include <loader/elf-loader.h>
 #include <loader/devtree-loader.h>
 #include <loader/atags-loader.h>
 #include <loader/initrd-loader.h>
+
+#include <jit/jit.h>
 
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
@@ -123,22 +123,9 @@ int main(int argc, char **argv)
 		ERROR << "Unable to initialise engine";
 		return 1;
 	}
-
-	// Create the worker thread pool
-	ThreadPool worker_threads("jit-worker-", 0, 1);
-	worker_threads.start();
-
-	// Create the JIT
-	LLVMJIT jit(engine, worker_threads);
-	if (!jit.init()) {
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to initialise jit";
-		return 1;
-	}
-
-	Guest *guest = hv->create_guest(engine, (JIT&)jit, *pfm);
+	
+	captive::jit::NullJIT nj;
+	Guest *guest = hv->create_guest(engine, nj, *pfm);
 	if (!guest) {
 		delete pfm;
 		delete hv;
