@@ -34,6 +34,7 @@
 #include <devices/io/virtio/virtio-block-device.h>
 
 #include <devices/gfx/sdl-virtual-screen.h>
+#include <devices/gfx/null-virtual-screen.h>
 
 #include <devices/timers/microsecond-tick-source.h>
 #include <devices/timers/callback-tick-source.h>
@@ -152,13 +153,20 @@ int main(int argc, char **argv)
 	devices::arm::VersatileSIC *sic = new devices::arm::VersatileSIC(*vic->get_irq_line(31));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10003000, *sic));
 
-	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12), *create_socket_uart("uart0"));
+	devices::io::UART *uart0p = create_socket_uart("uart0");
+	uart0p->open();
+	devices::io::UART *uart1p = create_socket_uart("uart1");
+	uart1p->open();
+	devices::io::UART *uart2p = create_socket_uart("uart2");
+	uart2p->open();
+
+	devices::arm::PL011 *uart0 = new devices::arm::PL011(*vic->get_irq_line(12), *uart0p);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f1000, *uart0));
 
-	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13), *create_socket_uart("uart1"));
+	devices::arm::PL011 *uart1 = new devices::arm::PL011(*vic->get_irq_line(13), *uart1p);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f2000, *uart1));
 
-	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14), *create_socket_uart("uart2"));
+	devices::arm::PL011 *uart2 = new devices::arm::PL011(*vic->get_irq_line(14), *uart2p);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x101f3000, *uart2));
 
 	devices::arm::PL031 *rtc = new devices::arm::PL031();
@@ -176,9 +184,11 @@ int main(int argc, char **argv)
 	devices::arm::PL080 *dma = new devices::arm::PL080();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10130000, *dma));
 
-	devices::gfx::SDLVirtualScreen *vs = new devices::gfx::SDLVirtualScreen();
-	vs->keyboard(*ps2kbd);
-	vs->mouse(*ps2mse);
+//	devices::gfx::SDLVirtualScreen *vs = new devices::gfx::SDLVirtualScreen();
+//	vs->keyboard(*ps2kbd);
+//	vs->mouse(*ps2mse);
+
+	devices::gfx::NullVirtualScreen *vs = new devices::gfx::NullVirtualScreen();
 
 	devices::arm::PL110 *lcd = new devices::arm::PL110(*vs, *vic->get_irq_line(16));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10120000, *lcd));
@@ -246,7 +256,7 @@ int main(int argc, char **argv)
 	}
 
 	// Create the worker thread pool
-	ThreadPool worker_threads("jit-worker-", 0, 1);
+	ThreadPool worker_threads("jit-worker-", 0, 7);
 	worker_threads.start();
 
 	// Create the JIT
@@ -331,7 +341,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	vs->cpu(*cpu);
+	//vs->cpu(*cpu);
 
 	// Start the tick source
 	ts->start();

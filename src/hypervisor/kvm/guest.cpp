@@ -1,3 +1,4 @@
+
 #include <hypervisor/kvm/kvm.h>
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/cpu.h>
@@ -11,6 +12,10 @@
 
 #include <thread>
 #include <pthread.h>
+
+extern "C" {
+#include <hugetlbfs.h>
+}
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -516,6 +521,10 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 
 	// Allocate a userspace buffer for the region.
 	int mmap_flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS;
+
+#ifdef HUGETLB
+	mmap_flags |= MAP_HUGETLB;
+#endif
 
 	if (fixed_addr) {
 		mmap_flags |= MAP_FIXED;

@@ -21,7 +21,7 @@ common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread -fno-rtti
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++11
 asflags  := -g
-ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lz -lncurses -ltinfo -lrt
+ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lz -lncurses -ltinfo -lrt -lhugetlbfs
 
 cc  := gcc
 cxx := g++
@@ -55,10 +55,6 @@ $(out): $(dep) $(obj) $(bios)
 	@echo "  AS      $(patsubst $(src-dir)/%,%,$@)"
 	$(q)$(as) -o $@ $(asflags) $<
 
-#$(src-dir)/jit/jit.o: $(src-dir)/jit/jit.cpp
-#	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
-#	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
-#
 $(src-dir)/jit/llvm.o: $(src-dir)/jit/llvm.cpp
 	@echo "  C++ [L] $(patsubst $(src-dir)/%,%,$@)"
 	$(q)$(cxx) -c -o $@ $(cxxflags) `llvm-config --cxxflags` $<
