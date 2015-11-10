@@ -24,6 +24,8 @@
 #include <devices/timers/microsecond-tick-source.h>
 
 #include <signal.h>
+#include <execinfo.h>
+#include <malloc.h>
 
 DECLARE_CONTEXT(Main);
 
@@ -39,7 +41,21 @@ using namespace captive::util;
 
 static void handle_segv(int sig, siginfo_t *siginfo, void *ucontext)
 {
+	void **backtrace_buffer = (void **)calloc(64, sizeof(void *));
+	char **backtrace_syms;
+	
 	fprintf(stderr, "error: seg-fault @ %p\n", siginfo->si_addr);
+	
+	int nr = backtrace(backtrace_buffer, 64);
+	fprintf(stderr, "backtrace: %d frames\n", nr);
+	
+	backtrace_syms = backtrace_symbols(backtrace_buffer, nr);
+	if (backtrace_syms) {
+		for (int i = 0; i < nr; i++) {
+			fprintf(stderr, "[%02d] %s\n", i, backtrace_syms[i]);
+		}
+	}
+	
 	exit(1);
 }
 
