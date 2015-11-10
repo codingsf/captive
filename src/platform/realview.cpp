@@ -46,7 +46,10 @@ using namespace captive::devices::io::virtio;
 Realview::Realview(devices::timers::TickSource& ts, std::string block_device_file) : socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
-	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x20000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x20000000));	// ???
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x70000000, 0x20000000));
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0xc0000000, 0x40000000));
 	
 	SystemStatusAndControl *statctl = new SystemStatusAndControl(ts);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *statctl));
@@ -178,6 +181,8 @@ bool Realview::start()
 
 bool Realview::stop()
 {
+	delete vs;
+	
 	uart1->stop_reading();
 	uart0->stop_reading();
 	
