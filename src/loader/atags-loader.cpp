@@ -31,12 +31,6 @@ bool ATAGsLoader::install(uint8_t* gpm)
 	*base++ = 0x10000000;
 	*base++ = 0x00000000;
 	
-	// MEM
-	*base++ = 4;
-	*base++ = 0x54410002;
-	*base++ = 0x10000000;
-	*base++ = 0x70000000;
-	
 	if (_initrd) {
 		// INITRD
 		*base++ = 4;
