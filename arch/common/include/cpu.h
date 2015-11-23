@@ -248,8 +248,8 @@ namespace captive {
 				MODE_REGION,
 			};
 			
-			captive::shared::block_txln_fn compile_block(profile::Block *blk, gpa_t pa, enum block_compilation_mode mode);
-			bool translate_block(jit::TranslationContext& ctx, gpa_t pa);
+			captive::shared::block_txln_fn compile_block(profile::Block *blk, uint8_t isa_mode, gpa_t pa, enum block_compilation_mode mode);
+			bool translate_block(jit::TranslationContext& ctx, uint8_t isa, gpa_t pa);
 		};
 	}
 }

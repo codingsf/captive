@@ -229,6 +229,7 @@ namespace captive {
 				void cmp(const X86Memory& src, const X86Register& dst);
 				void cmp(uint32_t val, const X86Register& dst);
 				void cmp1(uint8_t val, const X86Memory& dst);
+				void cmp1(uint8_t val, const X86Register& dst);
 				void cmp2(uint16_t val, const X86Memory& dst);
 				void cmp4(uint32_t val, const X86Memory& dst);
 				void cmp8(uint64_t val, const X86Memory& dst);

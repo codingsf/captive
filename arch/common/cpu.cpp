@@ -103,7 +103,7 @@ bool CPU::run()
 	case 1:
 		return run_block_jit();
 	case 2:
-		return run_region_jit();
+		return false;
 	case 3:
 		return run_test();
 	default:

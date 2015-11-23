@@ -169,22 +169,6 @@ extern "C" {
 
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
-		case 1:
-			captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
-			do {
-				captive::queue::QueueItem *qi = captive::queue::dequeue(&(cpu->cpu_data().rwu_ready_queue));
-				captive::lock::spinlock_release(&(cpu->cpu_data().rwu_ready_queue_lock));
-
-				if (!qi) break;
-
-				if (qi->data) cpu->register_region((captive::shared::RegionWorkUnit *)qi->data);
-				captive::arch::malloc::shmem_alloc.free(qi);
-
-				captive::lock::spinlock_acquire(&(cpu->cpu_data().rwu_ready_queue_lock));
-			} while(true);
-
-			break;
-
 		case 2:
 			cpu->dump_state();
 			break;

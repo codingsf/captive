@@ -50,9 +50,10 @@ static void dump_insn(IRInstruction *insn);
  * FS	Base Pointer to JIT STATE structure
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check, bool emit_chaining_logic) 
+BlockCompiler::BlockCompiler(TranslationContext& ctx, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check, bool emit_chaining_logic) 
 	: ctx(ctx),
 		encoder(malloc::code_alloc),
+		isa_mode(isa_mode),
 		pa(pa),
 		tagged_regs(tagged_regs),
 		emit_interrupt_check(emit_interrupt_check),
@@ -1143,11 +1144,18 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	// TODO: Check ISA
 	
 	encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(ISA)), REG_CL);
-	encoder.test(REG_CL, REG_CL);
-	encoder.jz(6);
-	encoder.mov(1, REG_EAX);
-	encoder.ret();
 	
+	if (isa_mode == 0) {
+		encoder.test(REG_CL, REG_CL);
+		encoder.jz(6);
+		encoder.mov(1, REG_EAX);
+		encoder.ret();
+	} else {
+		encoder.cmp(isa_mode, REG_CL);
+		encoder.je(6);
+		encoder.mov(1, REG_EAX);
+		encoder.ret();
+	}
 	
 	uint32_t prologue_offset = encoder.current_offset();
 	if(max_stack > 0x40)
@@ -1170,6 +1178,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::BARRIER:
 		case IRInstruction::NOP:
 			break;
+			
+		case IRInstruction::CMOV:
+		{
+			printf("not implemented cmov\n");
+			return false;
+		}
 
 		case IRInstruction::MOV:
 		{

@@ -102,7 +102,7 @@ bool CPU::run_block_jit_safepoint()
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
 			blk->loop_header = true;
-			blk->txln = compile_block(blk, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
+			blk->txln = compile_block(blk, *tagged_registers().ISA, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 			mmu().disable_writes();
 
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
@@ -118,17 +118,17 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_compilation_mode mode)
+captive::shared::block_txln_fn CPU::compile_block(Block *blk, uint8_t isa_mode, gpa_t pa, block_compilation_mode mode)
 {
 	TranslationContext ctx(malloc::data_alloc);
-	if (!translate_block(ctx, pa)) {
+	if (!translate_block(ctx, isa_mode, pa)) {
 		fatal("jit: block translation failed\n");
 	}
 
 	bool emit_interrupt_check = mode == MODE_BLOCK;
 	bool emit_chaining_logic = mode == MODE_BLOCK;
 	
-	BlockCompiler compiler(ctx, pa, tagged_registers(), emit_interrupt_check, emit_chaining_logic);
+	BlockCompiler compiler(ctx, isa_mode, pa, tagged_registers(), emit_interrupt_check, emit_chaining_logic);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		fatal("jit: block compilation failed\n");
@@ -144,15 +144,17 @@ captive::shared::block_txln_fn CPU::compile_block(Block *blk, gpa_t pa, block_co
 	return fn;
 }
 
-bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
+//#define DEBUG_TRANSLATION
+
+bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 {
 	using namespace captive::shared;
 
 	// We MUST begin in block zero.
 	assert(ctx.current_block() == 0);
-
+	
 #ifdef DEBUG_TRANSLATION
-	printf("jit: translating block %x\n", pa);
+	printf("jit: translating block %x in mode %d\n", pa, isa);
 #endif
 	
 	std::set<uint32_t> seen_pcs;
@@ -160,8 +162,8 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 	Decode *insn = get_decode(0);
 
 	int insn_count = 0;
-
-	uint8_t isa = *tagged_registers().ISA;
+	
+	bool dyn_pred = false;
 	
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);
@@ -171,12 +173,13 @@ bool CPU::translate_block(TranslationContext& ctx, gpa_t pa)
 			printf("jit: unhandled decode fault @ isa=%d %08x (%08x)\n", isa, pc, *(uint32_t *)(0x100000000ULL | insn->pc));
 			return false;
 		}
-
+		
 		ctx.add_instruction(IRInstruction::barrier(IROperand::pc(insn->pc), IROperand::const32(*(uint32_t *)(0x100000000ULL | insn->pc))));
 		
-#ifdef DEBUG_TRANSLATION
+//#ifdef DEBUG_TRANSLATION
+		if (isa != 0)
 		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)(0x100000000ULL | insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
-#endif
+//#endif
 
 		if (unlikely(cpu_data().verify_enabled)) {
 			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));

@@ -27,12 +27,13 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(TranslationContext& ctx, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check = false, bool emit_chaining_logic = false);
+				BlockCompiler(TranslationContext& ctx, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check = false, bool emit_chaining_logic = false);
 				bool compile(shared::block_txln_fn& fn);
 
 			private:
 				TranslationContext& ctx;
 				x86::X86Encoder encoder;
+				uint8_t isa_mode;
 				gpa_t pa;
 				const CPU::TaggedRegisters& tagged_regs;
 				bool emit_interrupt_check;
