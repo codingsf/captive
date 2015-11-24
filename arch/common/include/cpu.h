@@ -185,7 +185,7 @@ namespace captive {
 				const struct region_chain_cache_entry *region_txln_cache;		// 24
 				const struct block_chain_cache_entry *block_txln_cache;		// 32
 				uint64_t *insn_counter;									// 40
-				uint8_t exit_chain;										// 48
+				uint32_t exit_chain;										// 48
 			} packed jit_state;
 			
 			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }
