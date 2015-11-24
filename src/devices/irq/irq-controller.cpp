@@ -22,6 +22,11 @@ void IRQControllerBase::irq_rescinded(IRQLine& line)
 
 }
 
+void IRQControllerBase::irq_acknowledged(IRQLine& line)
+{
+
+}
+
 template<uint32_t nr_lines>
 IRQController<nr_lines>::IRQController()
 {

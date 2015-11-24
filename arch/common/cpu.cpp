@@ -171,12 +171,20 @@ void CPU::handle_irq_raised(uint8_t irq_line)
 {
 	//printf("*** raised %d %d\n", irq_line, cpu_data().isr);
 	jit_state.exit_chain = 1; //cpu_data().isr;
+	Memory::wbinvd();
 }
 
 void CPU::handle_irq_rescinded(uint8_t irq_line)
 {
 	//printf("*** rescinded %d\n", irq_line);
 	//jit_state.exit_chain = cpu_data().isr;
+}
+
+void CPU::handle_irq_acknowledged(uint8_t irq_line)
+{
+	//printf("*** acked %d\n", irq_line);
+	jit_state.exit_chain = 0;
+	Memory::wbinvd();
 }
 
 static uint32_t pc_ring_buffer[256];

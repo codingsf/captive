@@ -31,6 +31,7 @@ namespace captive {
 			protected:
 				virtual void irq_raised(IRQLine& line);
 				virtual void irq_rescinded(IRQLine& line);
+				virtual void irq_acknowledged(IRQLine& line);
 			};
 
 			class CPUIRQController {
@@ -41,7 +42,7 @@ namespace captive {
 
 			protected:
 				inline hypervisor::CPU& cpu() const { return *_cpu; }
-
+				
 			private:
 				hypervisor::CPU *_cpu;
 			};

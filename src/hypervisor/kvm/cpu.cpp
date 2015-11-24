@@ -23,12 +23,12 @@ USE_CONTEXT(CPU);
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd, PerCPUData *per_cpu_data)
+KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int *irqfds, PerCPUData *per_cpu_data)
 	: CPU(owner, config, per_cpu_data),
 	_initialised(false),
 	_id(id),
 	fd(fd),
-	irqfd(irqfd),
+	irqfds(irqfds),
 	cpu_run_struct(NULL),
 	cpu_run_struct_size(0)
 {
@@ -83,7 +83,25 @@ void KVMCpu::interrupt(uint32_t code)
 	per_cpu_data().signal_code = code;
 
 	uint64_t data = 0;
-	write(irqfd, &data, sizeof(data));
+	write(irqfds[0], &data, sizeof(data));
+}
+
+void KVMCpu::raise_guest_interrupt(uint8_t irq)
+{
+	uint64_t data = 0;
+	write(irqfds[1], &data, sizeof(data));
+}
+
+void KVMCpu::rescind_guest_interrupt(uint8_t irq)
+{
+	uint64_t data = 0;
+	write(irqfds[2], &data, sizeof(data));
+}
+
+void KVMCpu::acknowledge_guest_interrupt(uint8_t irq)
+{
+	uint64_t data = 0;
+	write(irqfds[3], &data, sizeof(data));
 }
 
 static KVMCpu *signal_cpu;

@@ -57,7 +57,6 @@ bool CPU::run_block_jit_safepoint()
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(cpu_data().isr)) {
 			if (handle_irq(cpu_data().isr)) {
-				jit_state.exit_chain = 0;
 				cpu_data().interrupts_taken++;
 			}
 		}

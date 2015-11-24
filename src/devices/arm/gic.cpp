@@ -307,6 +307,8 @@ uint32_t GICCPUInterface::acknowledge()
 #ifdef DEBUG_IRQ
 	fprintf(stderr, "gic: acknowledge %d\n", current_pending);
 #endif
+	
+	this->irq.acknowledge();
 
 	uint32_t irq = current_pending;
 	if (irq == 1023 || owner.get_gic_irq(irq).priority >= running_priority) {
@@ -322,7 +324,7 @@ uint32_t GICCPUInterface::acknowledge()
 	} else {
 		running_priority = owner.get_gic_irq(irq).priority;
 	}
-	
+		
 	update();
 	return irq;
 }

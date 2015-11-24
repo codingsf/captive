@@ -77,7 +77,10 @@ trap_\name:
 trap_macro unk,0
 trap_macro unk_arg,1
 trap_macro gpf,1
-trap_macro irq,0
+trap_macro irq0,0
+trap_macro irq1,0
+trap_macro irq2,0
+trap_macro irq3,0
 
 .global trap_pf
 .global trap_illegal

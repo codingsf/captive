@@ -26,13 +26,17 @@ namespace captive {
 
 			class KVMCpu : public CPU {
 			public:
-				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int irqfd, PerCPUData *per_cpu_data);
+				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int *irqfds, PerCPUData *per_cpu_data);
 				~KVMCpu();
 
 				bool init();
 				bool run() override;
 				void stop() override;
 				void interrupt(uint32_t code) override;
+				
+				void raise_guest_interrupt(uint8_t irq) override;
+				void rescind_guest_interrupt(uint8_t irq) override;
+				void acknowledge_guest_interrupt(uint8_t irq) override;
 
 				inline bool initialised() const { return _initialised; }
 				inline int id() const { return _id; }
@@ -52,7 +56,7 @@ namespace captive {
 			private:
 				bool _initialised;
 				int _id;
-				int fd, irqfd;
+				int fd, *irqfds;
 				
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;

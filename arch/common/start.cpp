@@ -163,7 +163,7 @@ extern "C" {
 		abort();
 	}
 	
-	void handle_trap_irq(struct mcontext *mctx)
+	void handle_trap_irq0(struct mcontext *mctx)
 	{
 		apic_write(EOI, 0);
 
@@ -172,16 +172,31 @@ extern "C" {
 		case 2:
 			cpu->dump_state();
 			break;
-
-		case 0x100 ... 0x1ff:
-			//printf("IRQ RAISED: %d\n", cpu->cpu_data().signal_code & 0xff);
-			cpu->handle_irq_raised(cpu->cpu_data().signal_code & 0xff);
-			break;
-		case 0x200 ... 0x2ff:
-			//printf("IRQ RESCINDED: %d\n", cpu->cpu_data().signal_code & 0xff);
-			cpu->handle_irq_rescinded(cpu->cpu_data().signal_code & 0xff);
-			break;
 		}
+	}
+	
+	void handle_trap_irq1(struct mcontext *mctx)
+	{
+		apic_write(EOI, 0);
+		
+		//printf("*** RAISED\n");
+		captive::arch::CPU::get_active_cpu()->handle_irq_raised(1);
+	}
+	
+	void handle_trap_irq2(struct mcontext *mctx)
+	{
+		apic_write(EOI, 0);
+		
+		//printf("*** RESCINDED\n");
+		captive::arch::CPU::get_active_cpu()->handle_irq_rescinded(1);
+	}
+
+	void handle_trap_irq3(struct mcontext *mctx)
+	{
+		apic_write(EOI, 0);
+		
+		//printf("*** ACKED\n");
+		captive::arch::CPU::get_active_cpu()->handle_irq_acknowledged(1);
 	}
 	
 	int handle_trap_illegal(struct mcontext *mctx)

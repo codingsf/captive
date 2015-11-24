@@ -15,12 +15,18 @@ void ArmCpuIRQController::irq_raised(IRQLine& line)
 {
 	DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Raised: " << line.index();
 	cpu().per_cpu_data().isr |= (1 << line.index());
-	cpu().interrupt(0x100 | (uint8_t)line.index());
+	cpu().raise_guest_interrupt(line.index());
 }
 
 void ArmCpuIRQController::irq_rescinded(IRQLine& line)
 {
 	DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Rescinded: " << line.index();
 	cpu().per_cpu_data().isr &= ~(1 << line.index());
-	cpu().interrupt(0x200 | (uint8_t)line.index());
+	cpu().rescind_guest_interrupt(line.index());
+}
+
+void ArmCpuIRQController::irq_acknowledged(IRQLine& line)
+{
+	DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Acknowledged: " << line.index();
+	cpu().acknowledge_guest_interrupt(line.index());
 }

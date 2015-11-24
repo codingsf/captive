@@ -24,3 +24,8 @@ void IRQLine::rescind()
 		_controller->irq_rescinded(*this);
 	}
 }
+
+void IRQLine::acknowledge()
+{
+	_controller->irq_acknowledged(*this);
+}

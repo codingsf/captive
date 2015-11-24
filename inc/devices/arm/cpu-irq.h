@@ -18,6 +18,7 @@ namespace captive {
 			public:
 				void irq_raised(irq::IRQLine& line) override;
 				void irq_rescinded(irq::IRQLine& line) override;
+				void irq_acknowledged(irq::IRQLine& line) override;
 			};
 		}
 	}

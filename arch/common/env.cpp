@@ -21,7 +21,10 @@ extern "C" void int82_handler(struct mcontext *);
 extern "C" void int83_handler(struct mcontext *);
 extern "C" void int85_handler(struct mcontext *);
 
-extern "C" void trap_irq(struct mcontext *);
+extern "C" void trap_irq0(struct mcontext *);
+extern "C" void trap_irq1(struct mcontext *);
+extern "C" void trap_irq2(struct mcontext *);
+extern "C" void trap_irq3(struct mcontext *);
 
 struct IDT {
 	uint16_t off_low;
@@ -111,7 +114,10 @@ void Environment::install_idt()
 	set_idt(&idt[0x0e], trap_pf);
 
 	// IRQ Handler
-	set_idt(&idt[0x30], trap_irq);
+	set_idt(&idt[0x30], trap_irq0);
+	set_idt(&idt[0x31], trap_irq1);
+	set_idt(&idt[0x32], trap_irq2);
+	set_idt(&idt[0x33], trap_irq3);
 
 	// Software-interrupt handlers
 	set_idt(&idt[0x80], int80_handler, true);

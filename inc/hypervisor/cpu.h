@@ -31,6 +31,9 @@ namespace captive {
 			inline PerCPUData& per_cpu_data() const { return *_per_cpu_data; }
 
 			virtual void interrupt(uint32_t code) = 0;
+			virtual void raise_guest_interrupt(uint8_t irq) = 0;
+			virtual void rescind_guest_interrupt(uint8_t irq) = 0;
+			virtual void acknowledge_guest_interrupt(uint8_t irq) = 0;
 
 		private:
 			Guest& _owner;

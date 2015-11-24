@@ -22,6 +22,7 @@ namespace captive {
 
 				void raise();
 				void rescind();
+				void acknowledge();
 
 				inline bool raised() const { return _raised; }
 				inline uint32_t index() const { return _index; }

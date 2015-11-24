@@ -192,7 +192,7 @@ CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	
 	per_cpu_data->verbose_enabled = VERBOSE_ENABLED;
 
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fd, per_cpu_data);
+	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fds, per_cpu_data);
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
@@ -249,6 +249,18 @@ bool KVMGuest::prepare_guest_irq()
 	irqchip.chip.ioapic.redirtbl[16].fields.vector = 0x30;
 	irqchip.chip.ioapic.redirtbl[16].fields.trig_mode = 1;
 	irqchip.chip.ioapic.redirtbl[16].fields.mask = 0;
+	
+	irqchip.chip.ioapic.redirtbl[17].fields.vector = 0x31;
+	irqchip.chip.ioapic.redirtbl[17].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[17].fields.mask = 0;
+	
+	irqchip.chip.ioapic.redirtbl[18].fields.vector = 0x32;
+	irqchip.chip.ioapic.redirtbl[18].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[18].fields.mask = 0;
+
+	irqchip.chip.ioapic.redirtbl[19].fields.vector = 0x33;
+	irqchip.chip.ioapic.redirtbl[19].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[19].fields.mask = 0;
 
 	DEBUG << CONTEXT(Guest) << "Configuring IRQ chip";
 	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
@@ -256,17 +268,61 @@ bool KVMGuest::prepare_guest_irq()
 		return false;
 	}
 
-	DEBUG << CONTEXT(Guest) << "Creating IRQ fd";
-	irq_fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
-	if (irq_fd < 0) {
+	DEBUG << CONTEXT(Guest) << "Creating IRQ fds";
+
+	struct kvm_irqfd irqfd;
+	bzero(&irqfd, sizeof(irqfd));
+
+	irq_fds[0] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (irq_fds[0] < 0) {
 		ERROR << "Unable to create IRQ fd";
 		return false;
 	}
 
-	struct kvm_irqfd irqfd;
-	bzero(&irqfd, sizeof(irqfd));
-	irqfd.fd = irq_fd;
+	irqfd.fd = irq_fds[0];
 	irqfd.gsi = 16;
+
+	if (vmioctl(KVM_IRQFD, &irqfd)) {
+		ERROR << "Unable to install IRQ fd";
+		return false;
+	}
+	
+	irq_fds[1] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (irq_fds[1] < 0) {
+		ERROR << "Unable to create IRQ fd";
+		return false;
+	}
+
+	irqfd.fd = irq_fds[1];
+	irqfd.gsi = 17;
+
+	if (vmioctl(KVM_IRQFD, &irqfd)) {
+		ERROR << "Unable to install IRQ fd";
+		return false;
+	}
+	
+	irq_fds[2] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (irq_fds[2] < 0) {
+		ERROR << "Unable to create IRQ fd";
+		return false;
+	}
+
+	irqfd.fd = irq_fds[2];
+	irqfd.gsi = 18;
+
+	if (vmioctl(KVM_IRQFD, &irqfd)) {
+		ERROR << "Unable to install IRQ fd";
+		return false;
+	}
+	
+	irq_fds[3] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (irq_fds[3] < 0) {
+		ERROR << "Unable to create IRQ fd";
+		return false;
+	}
+
+	irqfd.fd = irq_fds[3];
+	irqfd.gsi = 19;
 
 	if (vmioctl(KVM_IRQFD, &irqfd)) {
 		ERROR << "Unable to install IRQ fd";

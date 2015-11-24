@@ -121,6 +121,7 @@ namespace captive {
 
 			void handle_irq_raised(uint8_t irq_line);
 			void handle_irq_rescinded(uint8_t irq_line);
+			void handle_irq_acknowledged(uint8_t irq_line);
 			
 			// Behaviours
 			virtual bool handle_irq(uint32_t isr) = 0;
@@ -179,13 +180,13 @@ namespace captive {
 			} packed;
 
 			struct {
-				void *cpu;												// 0
-				void *registers;										// 8
-				uint64_t registers_size;								// 16
-				const struct region_chain_cache_entry *region_txln_cache;		// 24
+				void *cpu;													// 0
+				void *registers;											// 8
+				uint64_t registers_size;									// 16
+				const struct region_chain_cache_entry *region_txln_cache;	// 24
 				const struct block_chain_cache_entry *block_txln_cache;		// 32
-				uint64_t *insn_counter;									// 40
-				uint32_t exit_chain;										// 48
+				uint64_t *insn_counter;										// 40
+				uint64_t exit_chain;										// 48
 			} packed jit_state;
 			
 			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }
