@@ -22,6 +22,7 @@
 #include <devices/arm/realview/system-status-and-control.h>
 #include <devices/arm/realview/system-controller.h>
 
+#include <devices/gfx/null-virtual-screen.h>
 #include <devices/gfx/sdl-virtual-screen.h>
 
 #include <devices/io/console-uart.h>
@@ -104,7 +105,10 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1000d000, *ssp));
 	
 	auto console = new devices::io::ConsoleUART();
-	//console->open();
+	
+#ifdef NULL_VIRTUAL_SCREEN
+	console->open();
+#endif
 	
 	uart0 = new devices::arm::PL011(*gic0->get_irq_line(44), *console);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10009000, *uart0));
@@ -148,9 +152,13 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 	PL050 *mse = new devices::arm::PL050(*ps2mse);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10007000, *mse));
 
+#ifdef NULL_VIRTUAL_SCREEN
+	vs = new NullVirtualScreen();
+#else
 	vs = new SDLVirtualScreen();
 	vs->keyboard(*ps2kbd);
 	vs->mouse(*ps2mse);
+#endif
 	
 	PL110 *lcd = new PL110(*vs, *gic0->get_irq_line(55), PL110::V_PL111);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10020000, *lcd));
@@ -175,7 +183,10 @@ bool Realview::start()
 	uart0->start_reading();
 	uart1->start_reading();
 
+#ifndef NULL_VIRTUAL_SCREEN
 	vs->cpu(*cores().front());
+#endif
+	
 	return true;
 }
 

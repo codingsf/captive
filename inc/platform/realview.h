@@ -19,6 +19,7 @@ namespace captive {
 		}
 		
 		namespace gfx {
+			class NullVirtualScreen;
 			class SDLVirtualScreen;
 		}
 		
@@ -46,7 +47,11 @@ namespace captive {
 		private:
 			hypervisor::GuestConfiguration cfg;
 			devices::arm::PL011 *uart0, *uart1, *uart2, *uart3;
+#ifdef NULL_VIRTUAL_SCREEN
+			devices::gfx::NullVirtualScreen *vs;
+#else
 			devices::gfx::SDLVirtualScreen *vs;
+#endif
 			devices::io::SocketUART *socket_uart;
 		};
 	}
