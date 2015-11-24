@@ -114,11 +114,11 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	if (!peephole()) return false;
 	timer.tick("peepholer");
 
-	//sort_ir();
 	//if (!value_merging()) return false;
 	timer.tick("value-merging");
 
-	//if(!reg_value_reuse()) return false;
+	sort_ir();
+	if(!reg_value_reuse()) return false;
 	timer.tick("reg-val-reuse");
 
 	if (!sort_ir()) return false;
@@ -3362,132 +3362,97 @@ bool BlockCompiler::reorder_blocks()
 
 bool BlockCompiler::reg_value_reuse()
 {
-	std::map<IRRegId, uint32_t> ir_regs_to_machine_regs;
-	std::map<uint32_t, IROperand> stored_regs;
-	std::map<uint32_t, IRInstruction*> last_write;
-	std::map<uint32_t, bool> used_entries;
-	
-//	printf("*********** %x\n", pa);
-	
+// Reuse values read from registers (rather than reloading from memory)
+	// A value becomes live when it is
+	// - read from a register into a vreg
+	// - written from a vreg to a register
+	// A value is killed when the vreg is written to (the value is overwritten)
+	//
+
+	// Maps of register offsets to vregs
+	std::map<uint32_t, IROperand> offset_to_vreg;
+	std::map<IROperand, uint32_t> vreg_to_offset;
+
 	for(unsigned int ir_idx = 0; ir_idx < ctx.count(); ++ir_idx) {
 		IRInstruction *insn = ctx.at(ir_idx);
-		if(insn->ir_block == NOP_BLOCK) continue;
-		
-		uint32_t reg_offset;
-		uint32_t max_num_cached_regs = 4;
-		
-		switch(insn->type) {
-			// If we make a read of a value which is cached, replace the read with a mov of the cached value
-			// If the register is not cached, then add it to the cache
-			case IRInstruction::READ_REG:
-				assert(insn->operands[1].is_vreg());
-				assert(insn->operands[0].is_constant());
-				
-				reg_offset = insn->operands[0].value;
-				
-				// PC offset
-				if(reg_offset == REG_OFFSET_OF(PC)) continue;
-				
-				if(stored_regs.count(reg_offset)) {
-					insn->type = IRInstruction::MOV;
-					insn->operands[0] = stored_regs[reg_offset];
-					used_entries[reg_offset] = true;
-					break;
-				} else {
-					stored_regs[reg_offset] = insn->operands[1];
-					ir_regs_to_machine_regs[insn->operands[1].value] = reg_offset;
-					
-					if(stored_regs.size() > max_num_cached_regs) {
-						uint32_t eliminate_reg = (*stored_regs.begin()).first;
-						
-						for(auto i : used_entries) if(i.second == false) eliminate_reg = i.first;
-						
-						ir_regs_to_machine_regs.erase(stored_regs[eliminate_reg].value);
-						stored_regs.erase(eliminate_reg);
-						last_write.erase(eliminate_reg);
-						used_entries.erase(eliminate_reg);
-					}
-				}
-				break;
+		auto &descr = insn_descriptors[insn->type];
 
-			// If we store a value to a register, cache the value for next time we use the register
-			case IRInstruction::WRITE_REG:
-				reg_offset = insn->operands[1].value;
-				
-				// PC Offset
-				if(reg_offset == REG_OFFSET_OF(PC)) continue;
-				
-				// If we've previously written to this offset, zap out the old write since this one kills it
-				// We can only do this if the reg is in both caches since otherwise it might have been loaded since 
-				// its last real store
-				if(last_write.count(reg_offset) && stored_regs.count(reg_offset)) {
-					make_instruction_nop(last_write[reg_offset], true);
-					used_entries[reg_offset] = true;
-				}
-				
-				last_write[reg_offset] = insn;
-				stored_regs[reg_offset] = insn->operands[0];
-				if(insn->operands[0].is_vreg()) ir_regs_to_machine_regs[insn->operands[0].value] = reg_offset;
-				
-				// If we've got a lot of cached registers, clear some out to avoid host reg pressure getting too high
-				if(stored_regs.size() > max_num_cached_regs) {
-					uint32_t eliminate_reg = (*stored_regs.begin()).first;
+		// First, check to see if the vregs containing any live values have been killed
+		for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
+			const IROperand &op = insn->operands[op_idx];
 
-					for(auto i : used_entries) if(i.second == false) eliminate_reg = i.first;
-
-					ir_regs_to_machine_regs.erase(stored_regs[eliminate_reg].value);
-					last_write.erase(eliminate_reg);
-					used_entries.erase(eliminate_reg);
-					stored_regs.erase(eliminate_reg);
+			// If this operand is written to
+			if(descr.format[op_idx] == 'O' || descr.format[op_idx] == 'B') {
+				if(vreg_to_offset.count(op)) {
+					offset_to_vreg.erase(vreg_to_offset[op]);
+					vreg_to_offset.erase(op);
 				}
-				
-				break;
-				
-			// If we have any control flow, then ditch the whole cache
-			case IRInstruction::JMP:
-			case IRInstruction::BRANCH:
-			case IRInstruction::RET:
-			case IRInstruction::DISPATCH:
-			case IRInstruction::READ_MEM:
-			case IRInstruction::WRITE_MEM:
-			case IRInstruction::READ_MEM_USER:
-			case IRInstruction::WRITE_MEM_USER:
-			case IRInstruction::WRITE_DEVICE:
-			case IRInstruction::READ_DEVICE:
-			case IRInstruction::CALL:
-				stored_regs.clear();
-				last_write.clear();
-				used_entries.clear();
-				ir_regs_to_machine_regs.clear();
-//				printf("ZAP!\n");
-				break;
-			default:
-				
-				const struct insn_descriptor *desc = &insn_descriptors[insn->type];
-				
-				// If this instruction writes to a vreg containing a cached register value, then erase that cached 
-				// value
-				for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
-					IROperand *op = &(insn->operands[op_idx]);
-					if(op->is_vreg() && desc->format[op_idx] != 'I') {
-						IRRegId vreg = op->value;
-						if(ir_regs_to_machine_regs.count(vreg)) {
-							uint32_t offset = ir_regs_to_machine_regs[vreg];
-							stored_regs.erase(offset);
-							last_write.erase(offset);
-							used_entries.erase(offset);
-							ir_regs_to_machine_regs.erase(vreg);
-						}
-					}
-				}
-				
-				break;
+			}
 		}
-		
-//		dump_insn(insn);
-//		printf("\n");
+
+		switch(insn->type) {
+		case IRInstruction::JMP:
+		case IRInstruction::BRANCH:
+		case IRInstruction::READ_MEM:
+		case IRInstruction::READ_MEM_USER:
+		case IRInstruction::WRITE_MEM:
+		case IRInstruction::WRITE_MEM_USER:
+		case IRInstruction::LDPC:
+		case IRInstruction::INCPC:
+		case IRInstruction::CALL:
+		case IRInstruction::DISPATCH:
+		case IRInstruction::RET:
+		case IRInstruction::READ_DEVICE:
+		case IRInstruction::WRITE_DEVICE:
+
+			offset_to_vreg.clear();
+			vreg_to_offset.clear();
+			break;
+
+
+		case IRInstruction::READ_REG:
+		{
+			// If this is a register read, make a value live
+			IROperand &offset = insn->operands[0];
+			IROperand &vreg = insn->operands[1];
+
+			assert(vreg.is_vreg());
+			assert(offset.is_constant());
+
+			// XXX ARM HAX don't try and cache the PC or flags
+			if(offset.value >= REG_OFFSET_OF(PC)) break;
+
+			if(offset_to_vreg.count(offset.value)) {
+				// reuse the already-live value for this instruction
+				insn->type = IRInstruction::MOV;
+				insn->operands[0] = offset_to_vreg[offset.value];
+			} else {
+				// mark the value as live
+				offset_to_vreg[offset.value] = vreg;
+				vreg_to_offset[vreg] = offset.value;
+			}
+
+			break;
+		}
+		case IRInstruction::WRITE_REG:
+		{
+			// if this is a write to any live regs, kill them
+			IROperand &offset = insn->operands[1];
+			IROperand &value = insn->operands[0];
+
+			// XXX ARM HAX don't try and cache the PC
+			if(offset.value >= REG_OFFSET_OF(PC)) break;
+
+			offset_to_vreg[offset.value] = value;
+			if(value.is_vreg()) vreg_to_offset[value] = offset.value;
+
+			break;
+		}
+		default:
+			break;
+		}
 	}
-	
+
 	return true;
 }
 

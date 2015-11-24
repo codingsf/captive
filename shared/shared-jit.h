@@ -129,6 +129,11 @@ namespace captive {
 
 			static IROperand block(IRBlockId id) { return IROperand(BLOCK, (uint64_t)id, 0); }
 			static IROperand func(void *addr) { return IROperand(FUNC, (uint64_t)addr, 0); }
+			
+			bool operator<(const IROperand& other) const
+			{
+				return alloc_data < other.alloc_data;
+			}
 		} __packed;
 
 		struct IRInstruction
