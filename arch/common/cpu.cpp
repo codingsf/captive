@@ -54,8 +54,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	__wrmsr(0xc0000100, (uint64_t)&jit_state);
 	
 	// Populate the GS register with the address of the emulated user page table.
-	__wrmsr(0xc0000101, (uint64_t)0x400000000ULL);	// GS Base
-	__wrmsr(0xc0000102, (uint64_t)0x400000000ULL);	// Kernel GS Base
+	__wrmsr(0xc0000101, (uint64_t)GPM_EMULATED_VIRT_START);	// GS Base
+	__wrmsr(0xc0000102, (uint64_t)GPM_EMULATED_VIRT_START);	// Kernel GS Base
 
 	invalidate_virtual_mappings();
 }
@@ -118,9 +118,9 @@ bool CPU::run_test()
 
 	*v1; *v2;
 
-	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((va_t)v1), mmu().is_page_dirty((va_t)v2), *v1, *v2);
+	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((hva_t)v1), mmu().is_page_dirty((hva_t)v2), *v1, *v2);
 	*v1 = 1;
-	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((va_t)v1), mmu().is_page_dirty((va_t)v2), *v1, *v2);
+	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((hva_t)v1), mmu().is_page_dirty((hva_t)v2), *v1, *v2);
 
 
 	return true;
@@ -132,9 +132,9 @@ void CPU::invalidate_translations()
 	invalidate_virtual_mappings();
 }
 
-void CPU::invalidate_translation(pa_t phys_addr, va_t virt_addr)
+void CPU::invalidate_translation(hpa_t phys_addr, hva_t virt_addr)
 {
-	if (virt_addr >= (va_t)0x100000000) return;
+	if (virt_addr >= (hva_t)0x100000000ULL) return;
 	
 	Region *rgn = image->get_region((uint32_t)(uint64_t)phys_addr);
 
@@ -187,74 +187,3 @@ void CPU::handle_irq_acknowledged(uint8_t irq_line)
 	Memory::wbinvd();
 }
 
-static uint32_t pc_ring_buffer[256];
-static uint32_t pc_ring_buffer_ptr;
-
-bool CPU::verify_check()
-{
-	Barrier *enter = (Barrier *)cpu_data().verify_data->barrier_enter;
-	Barrier *exit = (Barrier *)cpu_data().verify_data->barrier_exit;
-
-	// If we're not the primary CPU, copy our state into the shared memory region.
-	if (cpu_data().verify_tid > 0) {
-		memcpy((void *)cpu_data().verify_data->cpu_data, (const void *)reg_state(), reg_state_size());
-	}
-
-	// Wait on the entry barrier
-	enter->wait(cpu_data().verify_tid);
-
-	// Tick!
-	asm volatile("out %0, $0xff" :: "a"(9));
-	
-	pc_ring_buffer[pc_ring_buffer_ptr] = read_pc();
-	pc_ring_buffer_ptr = (pc_ring_buffer_ptr + 1) % 256;
-
-	// If we're the primary CPU, perform verification.
-	if (cpu_data().verify_tid == 0) {
-		// Compare OUR register state to the other CPU's.
-		if (memcmp((const void *)reg_state(), (const void *)cpu_data().verify_data->cpu_data, reg_state_size())) {
-			cpu_data().verify_data->verify_failed = true;
-		} else {
-			cpu_data().verify_data->verify_failed = false;
-		}
-
-	}
-
-	// Wait on the exit barrier
-	exit->wait(cpu_data().verify_tid);
-
-	// Check to see if we failed, and if so, dump our state and return a failure code.
-	if (cpu_data().verify_data->verify_failed) {
-		gva_t this_pc = read_pc();
-		printf("*** DIVERGENCE DETECTED @ %08x ***\n", this_pc);
-		dump_state();
-
-		for (int i = pc_ring_buffer_ptr; i < pc_ring_buffer_ptr + 256; i++) {
-			gva_t virt_pc = pc_ring_buffer[i % 256];
-			gpa_t phys_pc = 0;
-
-			MMU::access_info info;
-			info.mode = MMU::ACCESS_KERNEL;
-			info.type = MMU::ACCESS_READ;
-
-			MMU::resolution_fault fault;
-			bool ok = mmu().resolve_gpa(virt_pc, phys_pc, info, fault, false);
-
-			if (virt_pc == this_pc)
-				printf("=>");
-			else
-				printf("  ");
-
-			uint32_t pc_data = 0;
-			if (ok && fault == 0) {
-				pc_data = *(uint32_t *)(0x100000000ULL | phys_pc);
-			}
-
-			printf(" VIRT=%08x, PHYS=%08x, DATA=%08x\n", virt_pc, phys_pc, pc_data);
-		}
-
-		return false;
-	} else {
-		return true;
-	}
-}

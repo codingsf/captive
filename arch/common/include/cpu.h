@@ -25,13 +25,6 @@
 extern "C" { void tail_call_ret0_only(); }
 
 namespace captive {
-	namespace shared {
-		struct BlockTranslation;
-		struct RegionTranslation;
-		struct RegionWorkUnit;
-		struct RegionImage;
-	}
-
 	namespace arch {
 		namespace jit {
 			class TranslationContext;
@@ -105,8 +98,6 @@ namespace captive {
 				current_cpu = cpu;
 			}
 
-			bool verify_check();
-
 			virtual void *reg_state() = 0;
 			virtual size_t reg_state_size() = 0;
 			
@@ -115,7 +106,7 @@ namespace captive {
 			void invalidate_virtual_mappings();
 			void invalidate_virtual_mapping(gva_t va);
 			void invalidate_translations();
-			void invalidate_translation(pa_t phys_page_base_addr, va_t virt_page_base_addr);
+			void invalidate_translation(hpa_t phys_page_base_addr, hva_t virt_page_base_addr);
 
 			void register_region(shared::RegionWorkUnit *rwu);
 

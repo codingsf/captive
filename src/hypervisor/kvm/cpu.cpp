@@ -2,9 +2,6 @@
 #include <hypervisor/kvm/cpu.h>
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
-#include <jit/jit.h>
-#include <verify.h>
-#include <shared-jit.h>
 
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -146,9 +143,74 @@ bool KVMCpu::run()
 	signal(SIGUSR2, handle_signal);
 	signal(SIGTRAP, handle_signal);
 
+	struct kvm_regs regs;
+	vmioctl(KVM_GET_REGS, &regs);
+	
+	regs.rdi = GUEST_SYS_GUEST_DATA_VIRT + 0x100;
+	regs.rip = kvm_guest.engine().entrypoint();
+	regs.rflags = 2;
+	regs.rsp = GUEST_HEAP_VIRT_BASE + HEAP_SIZE;
+	
+	vmioctl(KVM_SET_REGS, &regs);
+	
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
-	sregs.cs.base = 0xf0000;
+	sregs.idt.base = 0;
+	sregs.idt.limit = 0;
+	
+	sregs.gdt.base = GUEST_SYS_GDT_VIRT;
+	sregs.gdt.limit = 0x38;
+	
+	sregs.cr0 &= ~4;
+	sregs.cr0 |= 0x80010007;	
+	
+	sregs.cr3 = GUEST_SYS_INIT_PGT_PHYS;
+	sregs.cr4 = 0x6b0;
+	
+	sregs.efer |= 0x901;
+	
+	struct kvm_segment cs, ds, tr;
+	cs.base = 0;
+	cs.limit = 0xffffffff;
+	cs.dpl = 0;
+	cs.db = 0;
+	cs.g = 1;
+	cs.s = 1;
+	cs.l = 1;
+	cs.type = 0xb;
+	cs.present = 1;
+	cs.selector = 0x08;
+	
+	ds.base = 0;
+	ds.limit = 0xffffffff;
+	ds.dpl = 0;
+	ds.db = 1;
+	ds.g = 1;
+	ds.s = 1;
+	ds.l = 0;
+	ds.type = 0x3;
+	ds.present = 1;
+	ds.selector = 0x10;
+	
+	tr.base = 0;
+	tr.limit = 0xffffffff;
+	tr.dpl = 0;
+	tr.db = 1;
+	tr.g = 1;
+	tr.s = 0;
+	tr.l = 0;
+	tr.type = 0xb;
+	tr.present = 1;
+	tr.selector = 0x2b;
+	
+	sregs.ss = ds;
+	sregs.cs = cs;
+	sregs.ds = ds;
+	sregs.es = ds;
+	sregs.fs = ds;
+	sregs.gs = ds;
+	sregs.tr = tr;
+	
 	vmioctl(KVM_SET_SREGS, &sregs);
 
 	cpu_start_time = std::chrono::high_resolution_clock::now();
@@ -225,6 +287,7 @@ bool KVMCpu::run()
 			}
 			break;
 		case KVM_EXIT_MMIO:
+			fprintf(stderr, "mmio: %lx\n", cpu_run_struct->mmio.phys_addr);
 			if (cpu_run_struct->mmio.phys_addr >= 0x100000000 && cpu_run_struct->mmio.phys_addr < 0x200000000) {
 				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
@@ -310,47 +373,6 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 	//DEBUG << CONTEXT(CPU) << "Hypercall " << data;
 
 	switch(data) {
-	case 1:
-	{
-		uint64_t stack;
-
-		if (kvm_guest.stage2_init(stack)) {
-			struct kvm_regs regs;
-			vmioctl(KVM_GET_REGS, &regs);
-
-			// Entry Point
-			regs.rip = kvm_guest.engine().entrypoint();
-
-			// Stack + Base Pointer
-			regs.rsp = stack;
-			regs.rbp = 0;
-
-			// Startup Arguments
-			regs.rdi = (uint64_t)&per_cpu_data();
-
-			per_cpu_data().entrypoint = kvm_guest.guest_entrypoint();
-
-			vmioctl(KVM_SET_REGS, &regs);
-
-			// Cause a TLB invalidation - maybe?
-			struct kvm_sregs sregs;
-			vmioctl(KVM_GET_SREGS, &sregs);
-			vmioctl(KVM_SET_SREGS, &sregs);
-
-			/*struct kvm_guest_debug dbg;
-			bzero(&dbg, sizeof(dbg));
-			dbg.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
-			if (vmioctl(KVM_SET_GUEST_DEBUG, &dbg)) {
-				ERROR << "Unable to set debug flags";
-				return false;
-			}*/
-
-			return true;
-		} else {
-			return false;
-		}
-	}
-
 	case 2:
 		DEBUG << CONTEXT(CPU) << "Abort Requested";
 		return false;
@@ -378,39 +400,10 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		config().verify_tick_source()->do_tick();
 		return true;
 
-	case 10: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-		regs.rax = (uint64_t)owner().shared_memory().allocate(arg1);
-		vmioctl(KVM_SET_REGS, &regs);
-
-		return true;
-	}
-
-	case 11: {
-		struct kvm_regs regs;
-		vmioctl(KVM_GET_REGS, &regs);
-		regs.rax = (uint64_t)owner().shared_memory().reallocate((void *)arg1, arg2);
-		vmioctl(KVM_SET_REGS, &regs);
-
-		return true;
-	}
-
-	case 12: {
-		owner().shared_memory().free((void *)arg1);
-
-		return true;
-	}
-
 	case 13: {
 		std::stringstream cmd;
 		cmd << "addr2line -e arch/arm.arch " << std::hex << arg1;
 		system(cmd.str().c_str());
-		return true;
-	}
-	
-	case 14: {
-		owner().jit().analyse(*this, (captive::shared::RegionWorkUnit *)arg1);
 		return true;
 	}
 	
@@ -422,10 +415,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
 		FILE *f = fopen(fname.str().c_str(), "wb");
 
-		uint64_t gpa = regs.rdi & 0xffffffff;
-		gpa += 0x000300000000ULL;
-
-		void *ptr = kvm_guest.get_phys_buffer(gpa);
+		void *ptr = (void *)regs.rdi;
 		if (ptr) {
 			fwrite(ptr, regs.rsi, 1, f);
 		}

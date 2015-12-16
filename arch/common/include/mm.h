@@ -19,10 +19,6 @@ namespace captive {
 	namespace arch {
 		class MMU;
 
-		namespace arm {
-			class ArmMMU;
-		}
-
 		struct entry_t {
 			enum entry_flags_t {
 				// PTE
@@ -43,8 +39,8 @@ namespace captive {
 
 			uint64_t data;
 
-			inline uint64_t base_address() const { return data & ~0xfffULL; }
-			inline void base_address(uint64_t v) { data &= 0xfffULL; data |= v &~0xfffULL; }
+			inline hpa_t base_address() const { return data & ~0xfffULL; }
+			inline void base_address(hpa_t v) { data &= 0xfffULL; data |= v &~0xfffULL; }
 
 			inline uint16_t flags() const { return data & 0xfffULL; }
 			inline void flags(uint16_t v) { data &= ~0xfffULL; data |= v & 0xfffULL;}
@@ -123,39 +119,26 @@ namespace captive {
 
 		typedef uint16_t table_idx_t;
 		
-#define CR3 (pa_t)0x2000
+#define CR3 (hpa_t)0x40005000
 
 		class Memory {
 			friend class MMU;
-			friend class arm::ArmMMU;
 
 		public:
-			struct Page {
-				va_t va;
-				pa_t pa;
-			};
-
-			Memory(uint64_t first_phys_page);
-
-			static Page alloc_page();
-			static void free_page(Page& page);
-			static void map_page(va_t va, Page& page);
-
+			static void init();
+			
 		private:
-			static Memory *mm;
-
-			pa_t _next_phys_page;
-			va_t _data_base;
-
+			Memory();
+			
 			static uint64_t __force_order;
 
-			static inline pa_t read_cr3() {
+			static inline hpa_t read_cr3() {
 				uint64_t val;
 				asm volatile("mov %%cr3, %0\n\t" : "=r"(val), "=m"(__force_order));
-				return (pa_t)val;
+				return (hpa_t)val;
 			}
 
-			static inline void write_cr3(pa_t val) {
+			static inline void write_cr3(hpa_t val) {
 				asm volatile("mov %0, %%cr3" :: "r"((uint64_t)val), "m"(__force_order));
 			}
 
@@ -168,9 +151,11 @@ namespace captive {
 			static inline void write_cr4(uint64_t val) {
 				asm volatile("mov %0, %%cr4" :: "r"(val), "m"(__force_order));
 			}
+			
+			static uintptr_t alloc_pgt();
 
 		public:
-			static inline void flush_page(va_t addr) {
+			static inline void flush_page(hva_t addr) {
 				asm volatile("invlpg (%0)\n" :: "r"((uint64_t)addr) : "memory");
 			}
 
@@ -189,55 +174,51 @@ namespace captive {
 			}
 
 			#define BITS(val, start, end) ((((uint64_t)val) >> start) & (((1 << (end - start + 1)) - 1)))
-			#define PHYS_TO_VIRT(__pa) ((va_t)(0x200000000ULL + (uint64_t)__pa))
-
-			static inline void va_table_indicies(va_t va, table_idx_t& pm, table_idx_t& pdp, table_idx_t& pd, table_idx_t& pt) __attribute__((pure)) {
+			
+			static inline void va_table_indicies(hva_t va, table_idx_t& pm, table_idx_t& pdp, table_idx_t& pd, table_idx_t& pt) __attribute__((pure)) {
 				pm = BITS(va, 39, 47);
 				pdp = BITS(va, 30, 38);
 				pd = BITS(va, 21, 29);
 				pt = BITS(va, 12, 20);
 			}
 
-			static inline void get_va_table_entries(va_t va, page_map_entry_t*& pm, page_dir_ptr_entry_t*& pdp, page_dir_entry_t*& pd, page_table_entry_t*& pt, bool allocate=true) {
+			static inline void get_va_table_entries(hva_t va, page_map_entry_t*& pm, page_dir_ptr_entry_t*& pdp, page_dir_entry_t*& pd, page_table_entry_t*& pt, bool allocate=true) {
 				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
 				// L4 read_cr3()
-				pm = &((page_map_t *)PHYS_TO_VIRT(CR3))->entries[pm_idx];
+				pm = &((page_map_t *)HPA_TO_HVA(CR3))->entries[pm_idx];
 				if (pm->base_address() == 0) {
-					auto page = Memory::alloc_page();
-					pm->base_address((uint64_t)page.pa);
+					pm->base_address(alloc_pgt());
 					pm->present(true);
 					pm->writable(true);
 					pm->allow_user(true);
 				}
 
 				// L3
-				pdp = &((page_dir_ptr_t *)PHYS_TO_VIRT((pa_t)(uint64_t)pm->base_address()))->entries[pdp_idx];
+				pdp = &((page_dir_ptr_t *)HPA_TO_HVA(pm->base_address()))->entries[pdp_idx];
 				if (pdp->base_address() == 0) {
-					auto page = Memory::alloc_page();
-					pdp->base_address((uint64_t)page.pa);
+					pdp->base_address(alloc_pgt());
 					pdp->present(true);
 					pdp->writable(true);
 					pdp->allow_user(true);
 				}
 
 				// L2
-				pd = &((page_dir_t *)PHYS_TO_VIRT((pa_t)(uint64_t)pdp->base_address()))->entries[pd_idx];
+				pd = &((page_dir_t *)HPA_TO_HVA(pdp->base_address()))->entries[pd_idx];
 				if (pd->base_address() == 0) {
-					auto page = Memory::alloc_page();
-					pd->base_address((uint64_t)page.pa);
+					pd->base_address(alloc_pgt());
 					pd->present(true);
 					pd->writable(true);
 					pd->allow_user(true);
 				}
 
-				pt = &((page_table_t *)PHYS_TO_VIRT((pa_t)(uint64_t)pd->base_address()))->entries[pt_idx];
+				pt = &((page_table_t *)HPA_TO_HVA(pd->base_address()))->entries[pt_idx];
 			}
 
 			#undef BITS
 
-			static inline uint32_t get_va_flags(va_t va)
+			static inline uint32_t get_va_flags(hva_t va)
 			{
 				page_map_entry_t* pm;
 				page_dir_ptr_entry_t* pdp;
@@ -248,7 +229,7 @@ namespace captive {
 				return pt->flags();
 			}
 
-			static inline void set_va_flags(va_t va, uint32_t flags)
+			static inline void set_va_flags(hva_t va, uint32_t flags)
 			{
 				page_map_entry_t* pm;
 				page_dir_ptr_entry_t* pdp;
@@ -261,7 +242,7 @@ namespace captive {
 				flush_page(va);
 			}
 
-			static inline void prevent_writes(va_t addr) {
+			static inline void prevent_writes(hva_t addr) {
 				page_map_entry_t* pm;
 				page_dir_ptr_entry_t* pdp;
 				page_dir_entry_t* pd;

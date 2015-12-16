@@ -21,10 +21,6 @@ namespace captive {
 		class Engine;
 	}
 
-	namespace jit {
-		class JIT;
-	}
-
 	namespace loader {
 		class Loader;
 	}
@@ -43,7 +39,7 @@ namespace captive {
 		public:
 			typedef void (*memory_callback_fn_t)(gpa_t gpa);
 
-			Guest(Hypervisor& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config);
+			Guest(Hypervisor& owner, engine::Engine& engine, const GuestConfiguration& config);
 			virtual ~Guest();
 			virtual bool init();
 
@@ -53,9 +49,6 @@ namespace captive {
 
 			inline Hypervisor& owner() const { return _owner; }
 			inline engine::Engine& engine() const { return _engine; }
-			inline jit::JIT& jit() const { return _jit; }
-
-			virtual SharedMemory& shared_memory() const = 0;
 
 			inline const GuestConfiguration& config() const { return _config; }
 
@@ -67,7 +60,6 @@ namespace captive {
 		private:
 			Hypervisor& _owner;
 			engine::Engine& _engine;
-			jit::JIT& _jit;
 			const GuestConfiguration& _config;
 
 			gpa_t _guest_entrypoint;

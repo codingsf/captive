@@ -82,13 +82,6 @@ extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, 
 	}
 }
 
-extern "C" void jit_verify(captive::arch::CPU *cpu)
-{
-	if (!cpu->verify_check()) {
-		fatal("verification failed\n");
-	}
-}
-
 extern "C" void cpu_check_interrupts(captive::arch::CPU *cpu)
 {
 	if (unlikely(cpu->cpu_data().isr)) {

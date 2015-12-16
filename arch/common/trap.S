@@ -6,6 +6,10 @@
 start:
 	cli
 
+	mov $0xff, %eax
+	out %al, $0xa1
+	out %al, $0x21
+
 	movq $0xdeadbabecafef00d, %rax
 	push %rax
 	push %rax

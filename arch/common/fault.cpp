@@ -310,9 +310,9 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
-	if (va < 0x100000000 || (va >= 0x400000000 && va < 0x500000000)) {
+	if (va < 0x200000000) {	// XXX HACK HACK HACK
 		bool emulate_user = false;
-		if (va >= 0x400000000 && va < 0x500000000) {
+		if (va >= GPM_EMULATED_VIRT_START) {
 			emulate_user = true;
 		}
 		

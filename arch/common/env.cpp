@@ -91,7 +91,7 @@ void Environment::install_idt()
 	} packed IDTR;
 
 	IDTR.limit = sizeof(struct IDT) * 0x100;
-	IDTR.base = 0x200000300;
+	IDTR.base = 0x680040001000ULL;
 
 	IDT *idt = (IDT *)IDTR.base;
 
@@ -142,7 +142,7 @@ void Environment::setup_interrupts()
 
 bool Environment::init()
 {
-	install_gdt();
+	//install_gdt();
 	install_idt();
 	install_tss();
 	setup_interrupts();
@@ -168,35 +168,36 @@ bool Environment::run()
 	prepare_bootloader();
 	prepare_boot_cpu(core);
 	
-	core->mmu().set_page_device(VA_OF_GPA(0x10000000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10001000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1001A000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1e000000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10011000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10018000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10019000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10012000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1000f000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10010000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10013000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10014000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10015000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10017000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10004000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1000d000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10009000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1000a000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1000b000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1000c000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10030000));
-	core->mmu().set_page_device(VA_OF_GPA(0x1000e000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10005000));
-	core->mmu().set_page_device(VA_OF_GPA(0x100e1000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10002000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10006000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10007000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10020000));
-	core->mmu().set_page_device(VA_OF_GPA(0x10100000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10000000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10001000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1001A000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1e000000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1e001000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10011000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10018000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10019000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10012000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1000f000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10010000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10013000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10014000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10015000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10017000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10004000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1000d000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10009000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1000a000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1000b000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1000c000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10030000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1000e000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10005000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x100e1000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10002000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10006000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10007000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10020000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x10100000));
 
 	bool result = core->run();
 	delete core;

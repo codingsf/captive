@@ -1,5 +1,4 @@
 #include <captive.h>
-#include <verify.h>
 #include <engine/engine.h>
 
 #include <loader/zimage-loader.h>
@@ -7,8 +6,6 @@
 #include <loader/devtree-loader.h>
 #include <loader/atags-loader.h>
 #include <loader/initrd-loader.h>
-
-#include <jit/jit.h>
 
 #include <hypervisor/config.h>
 #include <hypervisor/cpu.h>
@@ -32,7 +29,6 @@ DECLARE_CONTEXT(Main);
 using namespace captive;
 using namespace captive::engine;
 using namespace captive::devices::timers;
-using namespace captive::jit;
 using namespace captive::loader;
 using namespace captive::hypervisor;
 using namespace captive::hypervisor::kvm;
@@ -93,11 +89,6 @@ int main(int argc, char **argv)
 			ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
 			return 1;
 		}
-
-		if (verify_prepare(atoi(argv[6]))) {
-			ERROR << "Unable to prepare verification mode";
-			return 1;
-		}
 	} else if (argc == 6) {
 		if (strcmp(argv[5], "--region") == 0) {
 			default_execution_mode = GuestCPUConfiguration::RegionJIT;
@@ -120,12 +111,7 @@ int main(int argc, char **argv)
 
 	// Create the master tick source
 	TickSource *ts;
-
-	if (verify_enabled()) {
-		ts = new CallbackTickSource(1000);
-	} else {
-		ts = new MicrosecondTickSource();
-	}
+	ts = new MicrosecondTickSource();
 
 	// Create the guest platform.
 	Platform *pfm = new Realview(*ts, std::string(argv[4]));
@@ -140,8 +126,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-	captive::jit::NullJIT nj;
-	Guest *guest = hv->create_guest(engine, nj, *pfm);
+	Guest *guest = hv->create_guest(engine, *pfm);
 	if (!guest) {
 		delete pfm;
 		delete hv;
@@ -216,14 +201,8 @@ int main(int argc, char **argv)
 		}
 	}
 		
-	CPU *cpu = NULL;
-	if (verify_enabled()) {
-		GuestCPUConfiguration cpu_cfg(verify_get_tid() == 0 ? GuestCPUConfiguration::BlockJIT : GuestCPUConfiguration::BlockJIT, true, (devices::timers::CallbackTickSource *)ts);
-		cpu = guest->create_cpu(cpu_cfg);
-	} else {
-		GuestCPUConfiguration cpu_cfg(default_execution_mode);
-		cpu = guest->create_cpu(cpu_cfg);
-	}
+	GuestCPUConfiguration cpu_cfg(default_execution_mode);
+	CPU *cpu = guest->create_cpu(cpu_cfg);
 
 	if (!cpu) {
 		delete guest;

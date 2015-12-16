@@ -99,7 +99,7 @@ bool arm_mmu_v5::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 
 	uint32_t ttbr = *armcpu().reg_offsets.TTBR0;
 	
-	l1_descriptor *ttb = (l1_descriptor *)resolve_guest_phys((gpa_t)(ttbr & ~0xfff));
+	l1_descriptor *ttb = (l1_descriptor *)GPA_TO_HVA((gpa_t)(ttbr & ~0xfff));
 	l1_descriptor *l1 = &ttb[va >> 20];
 
 	//printf("l1: va=%x type=%d, base addr=%x, ap=%d, dom=%d\n", va, l1->type(), l1->base_addr(), l1->ap(), l1->domain());
@@ -208,7 +208,7 @@ bool arm_mmu_v5::check_access_perms(uint32_t ap, bool kernel_mode, bool is_write
 
 bool arm_mmu_v5::resolve_coarse_page(gva_t va, gpa_t& pa, const access_info& info, arm_resolution_fault& fault, l1_descriptor *l1)
 {
-	l2_descriptor *coarse_table = (l2_descriptor *)resolve_guest_phys(l1->base_addr());
+	l2_descriptor *coarse_table = (l2_descriptor *)GPA_TO_HVA(l1->base_addr());
 	l2_descriptor *l2 = &coarse_table[((uint32_t)va >> 12) & 0xff];
 
 	if (l2->type() == l2_descriptor::TE_FAULT) {
@@ -318,7 +318,9 @@ bool arm_mmu_v6::resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resol
 	
 	uint32_t ttbr = *armcpu().reg_offsets.TTBR0;
 	
-	l1_descriptor *ttb = (l1_descriptor *)resolve_guest_phys((gpa_t)(ttbr & ~0xfff));
+	//printf("mmu: TTBR=%08x, CTXID=%08x\n", ttbr, *armcpu().reg_offsets.CTXID);
+		
+	l1_descriptor *ttb = (l1_descriptor *)GPA_TO_HVA((gpa_t)(ttbr & ~0xfff));
 	l1_descriptor *l1 = &ttb[va >> 20];
 	
 #ifdef DEBUG_MMU
@@ -456,7 +458,7 @@ bool arm_mmu_v6::resolve_coarse(gva_t va, gpa_t& pa, const access_info& info, ar
 	printf("mmu-v6: resolving coarse for %08x\n", va);
 #endif
 	
-	const l2_descriptor *l2_base = (const l2_descriptor *)resolve_guest_phys(l1->coarse_page_table.base_address());
+	const l2_descriptor *l2_base = (const l2_descriptor *)GPA_TO_HVA(l1->coarse_page_table.base_address());
 	const l2_descriptor *l2 = &l2_base[(va >> 12) & 0xff];
 	
 	

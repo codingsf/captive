@@ -8,14 +8,10 @@
 #ifndef PRINTF_H
 #define	PRINTF_H
 
+#include <define.h>
 #include <stdarg.h>
 
-namespace captive
-{
-	struct MemoryVector;
-}
-
-extern void printf_init(captive::MemoryVector&);
+extern void printf_init(uintptr_t base_address, size_t size);
 
 extern int printf(const char *fmt, ...);
 extern int fatal(const char *fmt, ...) __attribute__((noreturn));

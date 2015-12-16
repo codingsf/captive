@@ -25,7 +25,22 @@
 #define PAGE_INDEX_OF(_addr)	(((uint64_t)(_addr)) >> PAGE_BITS)
 #define PAGE_ADDRESS_OF(_addr)	(((uint64_t)(_addr)) & PAGE_ADDRESS_MASK)
 
-#define VA_OF_GPA(_gpa)			((va_t)(0x100000000ULL | (uint64_t)((uint32_t)(_gpa))))
+#define PHYS_TO_VIRT_BASE		((uintptr_t)(0x680000000000ULL))
+#define CODE_PHYS_BASE			((uintptr_t)0)
+#define CODE_VIRT_BASE			(PHYS_TO_VIRT_BASE | CODE_PHYS_BASE)
+#define GPM_PHYS_BASE			((uintptr_t)0x100000000ULL)
+#define GPM_VIRT_BASE			(PHYS_TO_VIRT_BASE | GPM_PHYS_BASE)
+#define GPM_VIRT_START			((uintptr_t)0)
+#define GPM_EMULATED_VIRT_START	((uintptr_t)0x100000000ULL)
+#define HEAP_PHYS_BASE			((uintptr_t)0x200000000ULL)
+#define HEAP_VIRT_BASE			(PHYS_TO_VIRT_BASE | HEAP_PHYS_BASE)
+
+#define GPA_TO_HPA(_gpa)		((hpa_t)(GPM_PHYS_BASE | (uint32_t)(_gpa)))
+#define GPA_TO_HVA(_gpa)		((hva_t)(GPM_VIRT_BASE | (uint32_t)(_gpa)))
+#define HPA_TO_HVA(_hpa)		((hva_t)(PHYS_TO_VIRT_BASE | (uintptr_t)(_hpa)))
+#define HVA_TO_HPA(_hva)		((hpa_t)((uintptr_t)(_hva) & ~0xfff000000000ULL))
+
+#define GVA_TO_EMULATED_HVA(_gva) ((hva_t)(GPM_EMULATED_VIRT_START | (uint32_t)(_gva)))
 
 typedef unsigned long size_t;
 
@@ -39,10 +54,12 @@ typedef signed short int16_t;
 typedef signed int int32_t;
 typedef signed long long int int64_t;
 
+typedef unsigned long uintptr_t;
+typedef signed long intptr_t;
 typedef unsigned long ptrdiff_t;
 
-typedef void *pa_t;
-typedef void *va_t;
+typedef uintptr_t hpa_t;
+typedef uintptr_t hva_t;
 
 typedef uint32_t gpa_t;
 typedef uint32_t gva_t;

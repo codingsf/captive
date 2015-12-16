@@ -13,10 +13,10 @@ static inline void putch(char c)
 static char *fast_buffer;
 static int fast_buffer_size;
 
-void printf_init(captive::MemoryVector& printf_buffer)
+void printf_init(uintptr_t base_address, size_t size)
 {
-	fast_buffer = (char *)printf_buffer.base_address;
-	fast_buffer_size = printf_buffer.size;
+	fast_buffer = (char *)base_address;
+	fast_buffer_size = size;
 }
 
 int printf(const char *fmt, ...)

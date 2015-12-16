@@ -41,10 +41,6 @@ namespace captive {
 				bool _enabled;
 				
 				inline arm_cpu& armcpu() const { return (arm_cpu&)cpu(); }
-				
-				inline void *resolve_guest_phys(gpa_t gpa) const __attribute__((pure)) {
-					return (void *)(0x100000000ULL + (uint64_t)gpa);
-				}
 			};
 			
 			class arm_mmu_v5 : public arm_mmu

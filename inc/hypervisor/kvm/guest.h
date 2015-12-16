@@ -22,6 +22,51 @@
 
 #include <linux/kvm.h>
 
+#define HOST_GPM_BASE			(uintptr_t)0x680100000000ULL
+#define GUEST_GPM_VIRT_BASE		(uintptr_t)0x680100000000ULL
+#define GUEST_GPM_PHYS_BASE		(uintptr_t)0x100000000ULL
+#define GPM_SIZE				(size_t)0x100000000ULL
+
+#define HOST_HEAP_BASE			(uintptr_t)0x680200000000ULL
+#define GUEST_HEAP_VIRT_BASE	(uintptr_t)0x680200000000ULL
+#define GUEST_HEAP_PHYS_BASE	(uintptr_t)0x200000000ULL
+#define HEAP_SIZE				(size_t)0x100000000ULL
+
+#define HOST_CODE_BASE			(uintptr_t)0x680000000000ULL
+#define GUEST_CODE_VIRT_BASE	(uintptr_t)0xffffffff80000000ULL
+#define GUEST_CODE_PHYS_BASE	(uintptr_t)0x0000000000000000ULL
+#define CODE_SIZE				(size_t)0x40000000ULL
+
+#define HOST_SYS_BASE			(uintptr_t)0x680040000000ULL
+#define GUEST_SYS_VIRT_BASE		(uintptr_t)0x680040000000ULL
+#define GUEST_SYS_PHYS_BASE		(uintptr_t)0x000040000000ULL
+#define SYS_SIZE				(size_t)0x40000000ULL
+
+#define GUEST_LAPIC_PHYS_BASE	(uintptr_t)0x0000fee00000ULL
+#define GUEST_LAPIC_VIRT_BASE	(uintptr_t)0x67fffee00000ULL
+
+#define SYS_GDT_OFFSET			0
+#define SYS_IDT_OFFSET			0x1000
+#define SYS_TSS_OFFSET			0x2000
+#define SYS_PRINTF_OFFSET		0x3000
+#define SYS_GUEST_DATA_OFFSET	0x4000
+#define SYS_INIT_PGT_OFFSET		0x5000
+
+#define HOST_SYS_GDT				(HOST_SYS_BASE + SYS_GDT_OFFSET)
+#define HOST_SYS_IDT				(HOST_SYS_BASE + SYS_IDT_OFFSET)
+#define HOST_SYS_TSS				(HOST_SYS_BASE + SYS_TSS_OFFSET)
+#define HOST_SYS_PRINTF				(HOST_SYS_BASE + SYS_PRINTF_OFFSET)
+#define HOST_SYS_GUEST_DATA			(HOST_SYS_BASE + SYS_GUEST_DATA_OFFSET)
+#define HOST_SYS_INIT_PGT			(HOST_SYS_BASE + SYS_INIT_PGT_OFFSET)
+#define HOST_SYS_KERNEL_STACK_TOP	(HOST_SYS_BASE + SYS_SIZE)
+
+#define GUEST_SYS_GDT_PHYS			(GUEST_SYS_PHYS_BASE + SYS_GDT_OFFSET)
+#define GUEST_SYS_GDT_VIRT			(GUEST_SYS_VIRT_BASE + SYS_GDT_OFFSET)
+#define GUEST_SYS_INIT_PGT_PHYS		(GUEST_SYS_PHYS_BASE + SYS_INIT_PGT_OFFSET)
+#define GUEST_SYS_GUEST_DATA_VIRT	(GUEST_SYS_VIRT_BASE + SYS_GUEST_DATA_OFFSET)
+#define GUEST_SYS_PRINTF_VIRT		(GUEST_SYS_VIRT_BASE + SYS_PRINTF_OFFSET)
+#define GUEST_SYS_KERNEL_STACK_TOP	(GUEST_SYS_VIRT_BASE + SYS_SIZE)
+
 extern void MMIOThreadTrampoline(void *);
 
 namespace captive {
@@ -39,7 +84,7 @@ namespace captive {
 				friend void ::MMIOThreadTrampoline(void *);
 
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, jit::JIT& jit, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, const GuestConfiguration& config, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;
@@ -49,33 +94,11 @@ namespace captive {
 
 				inline bool initialised() const { return _initialised; }
 
-				bool stage2_init(uint64_t& stack);
-
 				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
 
 				void do_guest_printf();
 
-				virtual SharedMemory& shared_memory() const { return (SharedMemory&)_shared_memory; }
-
 			private:
-				class KVMSharedMemory : public SharedMemory
-				{
-					friend class KVMGuest;
-
-				public:
-					KVMSharedMemory();
-
-					void *allocate(size_t size) override;
-					void *reallocate(void *p, size_t size) override;
-					void free(void *p) override;
-
-				private:
-					void set_arena(void *arena, size_t arena_size);
-
-					void *_arena;
-					size_t _arena_size;
-				} _shared_memory;
-
 				std::vector<KVMCpu *> kvm_cpus;
 
 				bool _initialised;
@@ -112,14 +135,11 @@ namespace captive {
 				bool attach_guest_devices();
 				devices::Device *lookup_device(uint64_t addr);
 
-				bool install_bios();
-				bool install_initial_pgt();
 				bool install_gdt();
 				bool install_tss();
-				bool prepare_verification_memory();
-
-				void *get_phys_buffer(uint64_t gpa);
-
+				
+				void dump_memory();
+				
 				vm_mem_region *get_mem_slot();
 				void put_mem_slot(vm_mem_region *region);
 
@@ -133,14 +153,19 @@ namespace captive {
 				typedef pte_t *pd_t;
 				typedef pte_t *pt_t;
 
-				inline uint64_t alloc_page()
+				uint64_t next_init_pgt_page;
+				
+				inline uint64_t alloc_init_pgt_page()
 				{
-					uint64_t page = per_guest_data->next_phys_page;
-					per_guest_data->next_phys_page += 0x1000;
-
-					return page;
+					uint64_t next = next_init_pgt_page;
+					next_init_pgt_page += 0x1000;
+					
+					return next;
 				}
+				
+				void *sys_guest_phys_to_host_virt(uint64_t addr);
 
+				void map_pages(uint64_t va, uint64_t pa, uint64_t size, uint32_t flags, bool use_huge_pages=true);
 				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
 				void map_huge_page(uint64_t va, uint64_t pa, uint32_t flags);
 

@@ -30,16 +30,20 @@ PageAllocator::PageAllocator() : _zone(NULL), _zone_size(0)
 	}
 }
 
-void PageAllocator::init(void *zone, size_t zone_size)
+void PageAllocator::init(uintptr_t virt_base, uintptr_t phys_base, size_t zone_size)
 {
-	_zone = zone;
+	_zone = (void *)virt_base;
+	_zone_phys = (void *)phys_base;
 	_zone_size = zone_size;
 
 	FreeArea *current_block = &_free_areas[MAX_ORDER-1];
 	
 	uint32_t block_size = (1 << (MAX_ORDER - 1)) * 4096;
+
+	printf("page-allocator: init: va=%p, pa=%p, zone_size=%lx, block_size=%x\n", virt_base, phys_base, zone_size, block_size);
+
 	for (int i = 0; i < zone_size / block_size; i++) {
-		current_block->next = (FreeArea *)((uint64_t)zone + (i * block_size));
+		current_block->next = (FreeArea *)(virt_base + (i * block_size));
 		current_block = current_block->next;
 	}
 	

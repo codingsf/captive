@@ -65,17 +65,17 @@ namespace captive {
 
 			inline CPU& cpu() const { return _cpu; }
 
-			void set_page_executed(va_t va);
-			void clear_page_executed(va_t va);
-			bool is_page_executed(va_t va);
-			bool clear_if_page_executed(va_t va);
+			void set_page_executed(hva_t va);
+			void clear_page_executed(hva_t va);
+			bool is_page_executed(hva_t va);
+			bool clear_if_page_executed(hva_t va);
 			
-			void set_page_device(va_t va);
-			bool is_page_device(va_t va);
+			void set_page_device(hva_t va);
+			bool is_page_device(hva_t va);
 
-			void set_page_dirty(va_t va, bool dirty);
-			bool is_page_dirty(va_t va);
-			uint32_t page_checksum(va_t va);
+			void set_page_dirty(hva_t va, bool dirty);
+			bool is_page_dirty(hva_t va);
+			uint32_t page_checksum(hva_t va);
 
 			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault, bool emulate_user);
 			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
@@ -89,14 +89,6 @@ namespace captive {
 
 		private:
 			CPU& _cpu;
-
-			inline pa_t gpa_to_hpa(gpa_t gpa) const {
-				return (pa_t)(0x100000000ULL | (uint64_t)gpa);
-			}
-
-			inline gpa_t hpa_to_gpa(pa_t gpa) const {
-				return (gpa_t)((uint64_t)gpa & 0xffffffffULL);
-			}
 		};
 	}
 }

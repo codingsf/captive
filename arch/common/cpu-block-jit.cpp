@@ -109,7 +109,7 @@ bool CPU::run_block_jit_safepoint()
 		
 		if (should_mark) {
 			should_mark = false;
-			mmu().set_page_executed(VA_OF_GPA(PAGE_ADDRESS_OF(phys_pc)));
+			mmu().set_page_executed(GPA_TO_HVA(PAGE_ADDRESS_OF(phys_pc)));
 		}
 	} while(step_ok);
 	
@@ -169,20 +169,15 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 	do {
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(isa, pc, insn)) {
-			printf("jit: unhandled decode fault @ isa=%d %08x (%08x)\n", isa, pc, *(uint32_t *)(0x100000000ULL | insn->pc));
+			printf("jit: unhandled decode fault @ isa=%d %08x (%08x)\n", isa, pc, *(uint32_t *)(GPA_TO_HVA(insn->pc)));
 			return false;
 		}
 		
-		ctx.add_instruction(IRInstruction::barrier(IROperand::pc(insn->pc), IROperand::const32(*(uint32_t *)(0x100000000ULL | insn->pc))));
+		ctx.add_instruction(IRInstruction::barrier(IROperand::pc(insn->pc), IROperand::const32(*(uint32_t *)(GPA_TO_HVA(insn->pc)))));
 		
-//#ifdef DEBUG_TRANSLATION
-		if (isa != 0)
-		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)(0x100000000ULL | insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
-//#endif
-
-		if (unlikely(cpu_data().verify_enabled)) {
-			ctx.add_instruction(IRInstruction::verify(IROperand::pc(insn->pc)));
-		}
+#ifdef DEBUG_TRANSLATION
+		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)GPA_TO_HVA(insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
+#endif
 
 		if (unlikely(cpu_data().verbose_enabled)) {
 			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));

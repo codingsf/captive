@@ -27,7 +27,7 @@ namespace captive {
 			public:
 				PageAllocator();
 				
-				void init(void *zone, size_t zone_size);
+				void init(uintptr_t virt_base, uintptr_t phys_base, size_t zone_size);
 				
 				inline void *alloc_page() { return alloc_pages(1); }
 				void *alloc_pages(int nr_pages);
@@ -35,6 +35,7 @@ namespace captive {
 				
 			private:
 				void *_zone;
+				void *_zone_phys;
 				size_t _zone_size;
 				uint32_t _zone_pages;
 				

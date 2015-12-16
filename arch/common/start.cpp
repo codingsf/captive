@@ -24,7 +24,7 @@ static void call_static_constructors()
 }
 
 //static uint32_t volatile * const lapic = (uint32_t volatile * const)0x280002000;
-#define lapic ((volatile uint32_t *)0x280002000)
+#define lapic ((volatile uint32_t *)0x67fffee00000ULL)
 
 // Local APIC registers, divided by 4 for use as uint[] indices.
 #define ID      (0x0020)   // ID
@@ -99,23 +99,29 @@ extern int do_device_write(struct mcontext *);
 extern "C" {
 	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{
-		printf("no time for that now...\n");
+		printf("no time for that now... cpu_data=%p\n", cpu_data);
 
 		// Run the static constructors.
+		printf("calling static constructors...\n");
 		call_static_constructors();
 
 		// Initialise IRQs.
+		printf("initialising irqs...\n");
 		init_irqs();
 
 		// Initialise the printf() system.
-		printf_init(cpu_data->guest_data->printf_buffer);
+		printf("initialising printf @ %p\n", cpu_data->guest_data->printf_buffer);
+		printf_init(cpu_data->guest_data->printf_buffer, 0x1000);
 
 		// Initialise the malloc() memory allocation system.
-		captive::arch::malloc::page_alloc.init(cpu_data->guest_data->heap.base_address, cpu_data->guest_data->heap.size);
+		printf("initialising malloc @ pa=%p, va=%p, size=%x\n", cpu_data->guest_data->heap_phys_base, cpu_data->guest_data->heap_virt_base, cpu_data->guest_data->heap_size);
+		captive::arch::malloc::page_alloc.init(cpu_data->guest_data->heap_virt_base, cpu_data->guest_data->heap_phys_base, cpu_data->guest_data->heap_size);
 		
 		// Initialise the memory manager.
-		captive::arch::Memory mm(cpu_data->guest_data->next_phys_page);
+		printf("initialising mmu...\n");
+		captive::arch::Memory::init();
 
+		printf("creating environment...\n");
 		captive::arch::Environment *env = create_environment_arm(cpu_data);
 
 		if (!env) {

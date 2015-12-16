@@ -30,7 +30,7 @@ static inline void switch_to_kernel_mode(void)
 
 static inline void switch_to_user_mode(void)
 {
-	//if (!in_user_mode())
+	if (!in_user_mode())
 		asm("int $0x81\n");
 }
 
