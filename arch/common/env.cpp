@@ -70,19 +70,6 @@ static inline void wrmsr(uint32_t msr_id, uint64_t msr_value)
 	asm volatile ( "rex.b wrmsr" : : "c" (msr_id), "a" (low), "d" (high) );
 }
 
-void Environment::install_gdt()
-{
-	struct {
-		uint16_t limit;
-		uint64_t base;
-	} packed GDTR;
-
-	GDTR.limit = 8 * 7;
-	GDTR.base = 0x200000100;
-
-	asm volatile("lgdt %0\n" :: "m"(GDTR));
-}
-
 void Environment::install_idt()
 {
 	struct {
@@ -129,11 +116,6 @@ void Environment::install_idt()
 	asm volatile("lidt %0\n" :: "m"(IDTR));
 }
 
-void Environment::install_tss()
-{
-	asm volatile("ltr %0\n" :: "a"((uint16_t)0x2b));
-}
-
 void Environment::setup_interrupts()
 {
 	// Enable interrupts
@@ -142,9 +124,7 @@ void Environment::setup_interrupts()
 
 bool Environment::init()
 {
-	//install_gdt();
 	install_idt();
-	install_tss();
 	setup_interrupts();
 	
 	return true;

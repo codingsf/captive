@@ -4,16 +4,23 @@
 .globl start
 .extern start_environment
 start:
+	// Disable interrupts
 	cli
 
+	// Disable the PIC (we're using the IOAPIC/LAPIC)
 	mov $0xff, %eax
 	out %al, $0xa1
 	out %al, $0x21
 
+	// Load the task register
+	mov $0x2b, %eax
+	ltr %ax
+
+	// Stack canary
 	movq $0xdeadbabecafef00d, %rax
 	push %rax
-	push %rax
 
+	// Go!
 	jmp start_environment
 
 .macro push_regs

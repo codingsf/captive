@@ -57,9 +57,7 @@ namespace captive {
 		private:
 			CoreDevice *devices[16];
 
-			void install_gdt();
 			void install_idt();
-			void install_tss();
 			void setup_interrupts();
 
 		protected:
