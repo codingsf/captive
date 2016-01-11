@@ -192,6 +192,7 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 
 	// Locate the storage location for the Per-CPU data, and initialise the structure.
 	PerCPUData *per_cpu_data = (PerCPUData *)(HOST_SYS_GUEST_DATA + (0x100 * (next_cpu_id + 1)));
+	per_cpu_data->id = next_cpu_id;
 	per_cpu_data->guest_data = (PerGuestData *)GUEST_SYS_GUEST_DATA_VIRT;
 	per_cpu_data->async_action = 0;
 	per_cpu_data->execution_mode = 0;

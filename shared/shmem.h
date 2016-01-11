@@ -38,6 +38,8 @@ namespace captive {
 	};
 
 	struct PerCPUData {
+		uint64_t id;
+		
 		PerGuestData *guest_data;
 				
 		bool halt;

@@ -13,7 +13,7 @@ DECLARE_CONTEXT(Engine)
 using namespace captive;
 using namespace captive::engine;
 
-Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _entrypoint(0)
+Engine::Engine(std::string libfile) : loaded(false), libfile(libfile), _boot_entrypoint(0), _core_entrypoint(0)
 {
 
 }
@@ -101,7 +101,8 @@ bool Engine::install(uint8_t* base)
 		}
 	}
 
-	_entrypoint = hdr->e_entry;
+	_boot_entrypoint = hdr->e_entry;
+	_core_entrypoint = 0; //hdr->e_entry;
 
 	return true;
 }

@@ -6,6 +6,7 @@
 #include <env.h>
 #include <cpu.h>
 #include <mmu.h>
+#include <smp.h>
 #include <malloc/malloc.h>
 #include <malloc/page-allocator.h>
 
@@ -23,72 +24,6 @@ static void call_static_constructors()
 	}
 }
 
-//static uint32_t volatile * const lapic = (uint32_t volatile * const)0x280002000;
-#define lapic ((volatile uint32_t *)0x67fffee00000ULL)
-
-// Local APIC registers, divided by 4 for use as uint[] indices.
-#define ID      (0x0020)   // ID
-#define VER     (0x0030)   // Version
-#define TPR     (0x0080)   // Task Priority
-#define EOI     (0x00B0)   // EOI
-#define SVR     (0x00F0)   // Spurious Interrupt Vector
-  #define ENABLE     0x00000100   // Unit Enable
-#define ESR     (0x0280)   // Error Status
-#define ICRLO   (0x0300)   // Interrupt Command
-  #define INIT       0x00000500   // INIT/RESET
-  #define STARTUP    0x00000600   // Startup IPI
-  #define DELIVS     0x00001000   // Delivery status
-  #define ASSERT     0x00004000   // Assert interrupt (vs deassert)
-  #define DEASSERT   0x00000000
-  #define LEVEL      0x00008000   // Level triggered
-  #define BCAST      0x00080000   // Send to all APICs, including self.
-  #define BUSY       0x00001000
-  #define FIXED      0x00000000
-#define ICRHI   (0x0310)   // Interrupt Command [63:32]
-#define TIMER   (0x0320)   // Local Vector Table 0 (TIMER)
-  #define X1         0x0000000B   // divide counts by 1
-  #define PERIODIC   0x00020000   // Periodic
-#define PCINT   (0x0340)   // Performance Counter LVT
-#define LINT0   (0x0350)   // Local Vector Table 1 (LINT0)
-#define LINT1   (0x0360)   // Local Vector Table 2 (LINT1)
-#define ERROR   (0x0370)   // Local Vector Table 3 (ERROR)
-  #define MASKED     0x00010000   // Interrupt masked
-#define TICR    (0x0380)   // Timer Initial Count
-#define TCCR    (0x0390)   // Timer Current Count
-#define TDCR    (0x03E0)   // Timer Divide Configuration
-
-static void apic_write(uint32_t reg, uint32_t value)
-{
-	lapic[reg >> 2] = value;
-	lapic[1];
-}
-
-static uint32_t apic_read(uint32_t reg)
-{
-	return lapic[reg >> 2];
-}
-
-static void init_irqs()
-{
-	apic_write(SVR, 0x1ff);
-
-	apic_write(LINT0, MASKED);
-	apic_write(LINT1, MASKED);
-	apic_write(ERROR, MASKED);
-
-	apic_write(ESR, 0);
-	apic_write(ESR, 0);
-
-	apic_write(EOI, 0);
-
-	apic_write(ICRHI, 0);
-	apic_write(ICRLO, BCAST | INIT | LEVEL);
-
-	while (apic_read(ICRLO) & DELIVS);
-
-	apic_write(TPR, 0);
-}
-
 extern void foo(void);
 
 namespace captive { namespace arch {
@@ -97,17 +32,21 @@ extern int do_device_write(struct mcontext *);
 } }
 
 extern "C" {
-	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
+	void __attribute__((noreturn)) start_run_core(captive::PerCPUData *cpu_data)
 	{
-		printf("no time for that now... cpu_data=%p, entry_point=%x\n", cpu_data, cpu_data->entrypoint);
+		printf("run core waiting...\n");
+		for (;;);
+	}
 
+	void __attribute__((noreturn)) start_boot_core(captive::PerCPUData *cpu_data)
+	{
 		// Run the static constructors.
 		printf("calling static constructors...\n");
 		call_static_constructors();
 
 		// Initialise IRQs.
 		printf("initialising irqs...\n");
-		init_irqs();
+		captive::arch::lapic_init_irqs();
 
 		// Initialise the printf() system.
 		printf("initialising printf @ %p\n", cpu_data->guest_data->printf_buffer);
@@ -120,6 +59,11 @@ extern "C" {
 		// Initialise the memory manager.
 		printf("initialising mmu...\n");
 		captive::arch::Memory::init();
+		
+		// Initialise other CPUs
+		printf("initialising cpu 1...\n");
+		captive::arch::smp_init_cpu(1);
+		captive::arch::smp_cpu_start(1);
 
 		printf("creating environment...\n");
 		captive::arch::Environment *env = create_environment_arm(cpu_data);
@@ -139,7 +83,16 @@ extern "C" {
 		printf("done\n");
 		abort();
 	}
-
+	
+	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data, int id)
+	{
+		printf("--------------------------------------------------------------------\n");
+		printf("*** VCPU %d starting... (per_cpu_data=%p)\n", id, cpu_data);
+	
+		if (id == 0) start_boot_core(cpu_data);
+		else start_run_core(cpu_data);
+	}
+	
 	void handle_trap_unk(struct mcontext *mctx)
 	{
 		printf("unhandled exception: rip=0x%lx\n", mctx->rip);
@@ -163,7 +116,7 @@ extern "C" {
 			}
 		}
 
-		printf("general protection fault: rip=0x%lx, code=0x%x, pc=0x%08x, ir=%08x\n", mctx->rip, mctx->extra, cpu ? cpu->read_pc() : 0, cpu ? *((uint32_t *)cpu->read_pc()) : 0);
+		printf("general protection fault: rip=0x%lx, code=0x%x, pc=0x%08x, ir=%08x\n", mctx->rip, mctx->extra, cpu ? cpu->read_pc() : 0, cpu ? *((uint32_t *)(uintptr_t)cpu->read_pc()) : 0);
 		dump_mcontext(mctx);
 		dump_stack();
 		abort();
@@ -171,7 +124,7 @@ extern "C" {
 	
 	void handle_trap_irq0(struct mcontext *mctx)
 	{
-		apic_write(EOI, 0);
+		captive::arch::lapic_acknowledge_irq();
 
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
@@ -183,7 +136,7 @@ extern "C" {
 	
 	void handle_trap_irq1(struct mcontext *mctx)
 	{
-		apic_write(EOI, 0);
+		captive::arch::lapic_acknowledge_irq();
 		
 		//printf("*** RAISED\n");
 		captive::arch::CPU::get_active_cpu()->handle_irq_raised(1);
@@ -191,7 +144,7 @@ extern "C" {
 	
 	void handle_trap_irq2(struct mcontext *mctx)
 	{
-		apic_write(EOI, 0);
+		captive::arch::lapic_acknowledge_irq();
 		
 		//printf("*** RESCINDED\n");
 		captive::arch::CPU::get_active_cpu()->handle_irq_rescinded(1);
@@ -199,7 +152,7 @@ extern "C" {
 
 	void handle_trap_irq3(struct mcontext *mctx)
 	{
-		apic_write(EOI, 0);
+		captive::arch::lapic_acknowledge_irq();
 		
 		//printf("*** ACKED\n");
 		captive::arch::CPU::get_active_cpu()->handle_irq_acknowledged(1);

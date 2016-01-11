@@ -22,7 +22,8 @@ namespace captive {
 			bool init();
 			bool install(uint8_t *base);
 
-			uint64_t entrypoint() const { return _entrypoint; }
+			uint64_t boot_entrypoint() const { return _boot_entrypoint; }
+			uint64_t core_entrypoint() const { return _core_entrypoint; }
 
 			inline bool lookup_symbol(std::string name, uint64_t& symbol) {
 				auto sym = symbols.find(name);
@@ -41,7 +42,7 @@ namespace captive {
 			uint8_t *lib;
 			size_t lib_size;
 
-			uint64_t _entrypoint;
+			uint64_t _boot_entrypoint, _core_entrypoint;
 
 			std::map<std::string, uint64_t> symbols;
 		};

@@ -143,10 +143,11 @@ bool KVMCpu::run()
 	struct kvm_regs regs;
 	vmioctl(KVM_GET_REGS, &regs);
 	
-	regs.rdi = GUEST_SYS_GUEST_DATA_VIRT + 0x100;
-	regs.rip = kvm_guest.engine().entrypoint();
+	regs.rdi = GUEST_SYS_GUEST_DATA_VIRT + (0x100 * (id() + 1));
+	regs.rip = kvm_guest.engine().boot_entrypoint();
+	regs.rsi = id();
 	regs.rflags = 2;
-	regs.rsp = GUEST_HEAP_VIRT_BASE + HEAP_SIZE;
+	regs.rsp = GUEST_HEAP_VIRT_BASE + HEAP_SIZE - (0x100000 * (id()));
 	
 	vmioctl(KVM_SET_REGS, &regs);
 	
@@ -230,7 +231,9 @@ bool KVMCpu::run()
 			}
 
 			ERROR << CONTEXT(CPU) << "Unable to run VCPU: " << LAST_ERROR_TEXT;
-			return false;
+			
+			run_cpu = false;
+			continue;
 		}
 
 		switch (cpu_run_struct->exit_reason) {
