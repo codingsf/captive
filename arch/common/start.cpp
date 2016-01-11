@@ -61,9 +61,9 @@ extern "C" {
 		captive::arch::Memory::init();
 		
 		// Initialise other CPUs
-		printf("initialising cpu 1...\n");
+		/*printf("initialising cpu 1...\n");
 		captive::arch::smp_init_cpu(1);
-		captive::arch::smp_cpu_start(1);
+		captive::arch::smp_cpu_start(1);*/
 
 		printf("creating environment...\n");
 		captive::arch::Environment *env = create_environment_arm(cpu_data);

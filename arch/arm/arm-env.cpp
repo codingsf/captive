@@ -11,10 +11,10 @@ using namespace captive::arch::arm;
 
 Environment *create_environment_arm(PerCPUData *per_cpu_data)
 {
-	return new arm_environment(arm_environment::ARMv7, per_cpu_data);
+	return new arm_environment(arm_environment::ARMv7, arm_environment::CortexA8, per_cpu_data);
 }
 
-arm_environment::arm_environment(arm_variant variant, PerCPUData *per_cpu_data) : Environment(per_cpu_data), _variant(variant)
+arm_environment::arm_environment(enum arch_variant _arch_variant, enum core_variant _core_variant, PerCPUData *per_cpu_data) : Environment(per_cpu_data), _arch_variant(_arch_variant), _core_variant(_core_variant)
 {
 	// TODO: Abstract into platform-specific setup
 	install_core_device(14, new devices::DebugCoprocessor(*this));
@@ -34,9 +34,14 @@ CPU *arm_environment::create_cpu()
 bool arm_environment::prepare_boot_cpu(CPU* core)
 {
 	arm_cpu *arm_core = (arm_cpu *)core;
+
+	if (_core_variant == CortexA8)	
+		arm_core->reg_offsets.RB[1]  = 0x769;	// Machine ID Cortex A8
+	else if (_core_variant == CortexA9)
+		arm_core->reg_offsets.RB[1]  = 0x76d;	// Machine ID Cortex A9
+	else
+		return false;
 	
-	//arm_core->reg_offsets.RB[1]  = 0x769;	// Machine ID Cortex A8
-	arm_core->reg_offsets.RB[1]  = 0x76d;	// Machine ID Cortex A9
 	arm_core->reg_offsets.RB[2]  = 0x100;	// Device Tree / ATAGs
 	arm_core->reg_offsets.RB[12] = core->cpu_data().entrypoint;		// Kernel Entry Point
 	arm_core->reg_offsets.RB[15] = 0;		// Start Address

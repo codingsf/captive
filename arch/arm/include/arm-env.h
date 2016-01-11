@@ -16,26 +16,34 @@ namespace captive {
 			class arm_environment : public Environment
 			{
 			public:
-				enum arm_variant
+				enum arch_variant
 				{
 					ARMv5,
 					ARMv6,
 					ARMv7
 				};
+				
+				enum core_variant
+				{
+					CortexA8,
+					CortexA9,
+				};
 
-				arm_environment(arm_variant variant, captive::PerCPUData *per_cpu_data);
+				arm_environment(arch_variant arch_variant, core_variant core_variant, captive::PerCPUData *per_cpu_data);
 				virtual ~arm_environment();
 
 				CPU *create_cpu() override;
 				
-				inline arm_variant variant() const { return _variant; }
+				inline arch_variant arch_variant() const { return _arch_variant; }
+				inline core_variant core_variant() const { return _core_variant; }
 
 			protected:
 				bool prepare_boot_cpu(CPU *core) override;
 				bool prepare_bootloader() override;
 				
 			private:
-				arm_variant _variant;
+				enum arch_variant _arch_variant;
+				enum core_variant _core_variant;
 			};
 		}
 	}

@@ -1,5 +1,6 @@
 #include <devices/coco.h>
 #include <arm-cpu.h>
+#include <arm-env.h>
 #include <mmu.h>
 #include <printf.h>
 
@@ -276,6 +277,8 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 
 bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data)
 {
+	enum arm_environment::core_variant core_type = ((arm_environment&)(cpu.env())).core_variant();
+	
 #ifdef DEBUG_COCO
 	printf("mrc p15: rn=%d, op1=%d, rm=%d, op2=%d\n", rn, op1, rm, op2);
 #endif
@@ -291,26 +294,55 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 0: // MAIN ID
 					//data = 0x41069265;		// ARMv5
-					//data = 0x410fc083;		// Cortex A8
-					data = 0x414fc091;		// Cortex A9
-					return true;
+					switch (core_type) {
+					case arm_environment::CortexA8:
+						data = 0x410fc083;		// Cortex A8
+						return true;
+					case arm_environment::CortexA9:
+						data = 0x414fc091;		// Cortex A9
+						return true;
+					}
+					
+					return false;
 
 				case 1: // CACHE TYPE
 					//data = 0x0f006006;		// ARMv5
-					//data = 0x82048004;		// Cortex A8
-					data = 0x83338003;		// Cortex A9
-					return true;
+					switch (core_type)
+					{
+					case arm_environment::CortexA8:
+						data = 0x82048004;		// Cortex A8
+						return true;
+					case arm_environment::CortexA9:
+						data = 0x83338003;		// Cortex A9
+						return true;
+					}
+					
+					return false;
 
 				case 2: // TCM STATUS
 					//data = 0x00004004;		// ARMv5
-					//data = 0;				// Cortex A8
-					data = 0;				// Cortex A9
-					return true;
+					switch (core_type)
+					{
+					case arm_environment::CortexA8:
+					case arm_environment::CortexA9:
+						data = 0;				// Cortex A8/A9
+						return true;
+					}
+					
+					return false;
 
 				case 3:	// TLB TYPE
-					//data = 0; //0x00202001;	// Cortex A8
-					data = 0;				// Cortex A9
-					return true;
+					switch (core_type) {
+					case arm_environment::CortexA8:
+						data = 0; //0x00202001;	// Cortex A8
+						return true;
+
+					case arm_environment::CortexA9:
+						data = 0;				// Cortex A9
+						return true;
+					}
+					
+					return false;
 
 				case 5:	// MP ID
 					data = 0x80000000;

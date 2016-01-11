@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 	ts = new MicrosecondTickSource();
 
 	// Create the guest platform.
-	Platform *pfm = new Realview(Realview::CORTEX_A9, *ts, std::string(argv[4]));
+	Platform *pfm = new Realview(Realview::CORTEX_A8, *ts, std::string(argv[4]));
 
 	// Create the engine.
 	Engine engine(argv[1]);

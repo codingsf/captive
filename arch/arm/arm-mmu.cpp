@@ -37,7 +37,7 @@ arm_mmu::~arm_mmu()
 
 MMU *arm_mmu::create(arm_cpu& cpu)
 {
-	if (((arm_environment &)cpu.env()).variant() == arm_environment::ARMv5)
+	if (((arm_environment &)cpu.env()).arch_variant() == arm_environment::ARMv5)
 		return new arm_mmu_v5(cpu);
 	else
 		return new arm_mmu_v6(cpu);
