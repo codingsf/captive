@@ -12,6 +12,7 @@
 #include <hypervisor/cpu.h>
 #include <sys/ioctl.h>
 #include <linux/kvm.h>
+#include <vector>
 
 namespace captive {
 	namespace devices {
@@ -23,10 +24,24 @@ namespace captive {
 
 		namespace kvm {
 			class KVMGuest;
-
+			class KVMCpu;
+			
+			class IRQFD {
+			public:
+				IRQFD(KVMGuest& owner);
+				~IRQFD();
+				
+				bool attach(int gsi);
+				void raise();
+				
+			private:
+				KVMGuest& owner;
+				int fd, gsi;
+			};
+			
 			class KVMCpu : public CPU {
 			public:
-				KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int *irqfds, PerCPUData *per_cpu_data);
+				KVMCpu(int id, KVMGuest& owner, const GuestCPUConfiguration& config, int fd, PerCPUData *per_cpu_data);
 				~KVMCpu();
 
 				bool init();
@@ -39,7 +54,6 @@ namespace captive {
 				void acknowledge_guest_interrupt(uint8_t irq) override;
 
 				inline bool initialised() const { return _initialised; }
-				inline int id() const { return _id; }
 
 				inline int vmioctl(unsigned long int req) const {
 					return vmioctl(req, (unsigned long int)0);
@@ -55,12 +69,16 @@ namespace captive {
 
 			private:
 				bool _initialised;
-				int _id;
-				int fd, *irqfds;
+				int fd;
 				
 				struct kvm_run *cpu_run_struct;
 				uint32_t cpu_run_struct_size;
-
+				
+				IRQFD irq_signal;
+				IRQFD irq_raise;
+				IRQFD irq_rescind;
+				IRQFD irq_ack;
+				
 				bool setup_interrupts();
 
 				bool handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2);

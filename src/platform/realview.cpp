@@ -13,11 +13,14 @@
 #include <devices/arm/pl110.h>
 #include <devices/arm/pl131.h>
 #include <devices/arm/pl180.h>
+#include <devices/arm/pl310.h>
 #include <devices/arm/pl350.h>
 #include <devices/arm/sp804.h>
 #include <devices/arm/sp805.h>
 #include <devices/arm/sp810.h>
 #include <devices/arm/sbcon.h>
+#include <devices/arm/scu.h>
+#include <devices/arm/mptimer.h>
 #include <devices/arm/primecell-stub.h>
 #include <devices/arm/realview/system-status-and-control.h>
 #include <devices/arm/realview/system-controller.h>
@@ -44,7 +47,7 @@ using namespace captive::devices::gfx;
 using namespace captive::devices::io;
 using namespace captive::devices::io::virtio;
 
-Realview::Realview(devices::timers::TickSource& ts, std::string block_device_file) : socket_uart(NULL)
+Realview::Realview(Variant variant, devices::timers::TickSource& ts, std::string block_device_file) : variant(variant), socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
@@ -60,25 +63,46 @@ Realview::Realview(devices::timers::TickSource& ts, std::string block_device_fil
 
 	SystemController *syscon1 = new SystemController(SystemController::SYS_CTRL1);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1001A000, *syscon1));
-	
-	ArmCpuIRQController *cpu_irq = new ArmCpuIRQController();
-	cfg.cpu_irq_controller = cpu_irq;
-	
-	GIC *gic0 = new GIC(*cpu_irq->get_irq_line(1));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x1e000000, gic0->get_cpu(0)));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x1e001000, gic0->get_distributor()));
-	
-	SP804 *timer0 = new SP804(ts, *gic0->get_irq_line(36));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10011000, *timer0));
 
-	SP804 *timer1 = new SP804(ts, *gic0->get_irq_line(37));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10018000, *timer1));
+	ArmCpuIRQController *core0irq = new ArmCpuIRQController();
+	GuestCPUConfiguration core0(*core0irq);
+	cfg.cores.push_back(core0);
 	
-	SP804 *timer2 = new SP804(ts, *gic0->get_irq_line(73));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10019000, *timer2));
+	GIC *gic0 = new GIC();
+	gic0->add_core(*core0irq->get_irq_line(1), 0);
+
+	if (variant == CORTEX_A9) {
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1f000100, gic0->get_core(0)));
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1f001000, gic0->get_distributor()));
+
+		ArmCpuIRQController *core1irq = new ArmCpuIRQController();
+		GuestCPUConfiguration core1(*core1irq);
+		cfg.cores.push_back(core1);
+
+		gic0->add_core(*core1irq->get_irq_line(1), 1);
+		
+		SnoopControlUnit *scu = new SnoopControlUnit();
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1f000000, *scu));
+		
+		MPTimer *mpt = new MPTimer(ts, *gic0->get_irq_line(29));
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1f000600, *mpt));
+		
+		PL310 *pl310 = new PL310();
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1f002000, *pl310));
+	} else {
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1e000000, gic0->get_core(0)));
+		cfg.devices.push_back(GuestDeviceConfiguration(0x1e001000, gic0->get_distributor()));
+	}
 	
-	SP804 *timer3 = new SP804(ts, *gic0->get_irq_line(74));
-	cfg.devices.push_back(GuestDeviceConfiguration(0x10012000, *timer3));
+	SP804 *timer01 = new SP804(ts, *gic0->get_irq_line(36));
+	SP804 *timer23 = new SP804(ts, *gic0->get_irq_line(37));
+	SP804 *timer45 = new SP804(ts, *gic0->get_irq_line(73));
+	SP804 *timer67 = new SP804(ts, *gic0->get_irq_line(74));
+
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10011000, *timer01));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10012000, *timer23));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10018000, *timer45));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10019000, *timer67));
 	
 	SP805 *wdog0 = new SP805();
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1000f000, *wdog0));
@@ -184,7 +208,7 @@ bool Realview::start()
 	uart1->start_reading();
 
 #ifndef NULL_VIRTUAL_SCREEN
-	vs->cpu(*cores().front());
+	//vs->cpu(*cores().front());
 #endif
 	
 	return true;

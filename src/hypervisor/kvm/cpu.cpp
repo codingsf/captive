@@ -12,6 +12,7 @@
 #include <devices/timers/callback-tick-source.h>
 #include <sys/eventfd.h>
 #include <sys/signal.h>
+#include <fcntl.h>
 #include <chrono>
 #include <sstream>
 #include <iomanip>
@@ -20,14 +21,16 @@ USE_CONTEXT(CPU);
 
 using namespace captive::hypervisor::kvm;
 
-KVMCpu::KVMCpu(KVMGuest& owner, const GuestCPUConfiguration& config, int id, int fd, int *irqfds, PerCPUData *per_cpu_data)
-	: CPU(owner, config, per_cpu_data),
+KVMCpu::KVMCpu(int id, KVMGuest& owner, const GuestCPUConfiguration& config, int fd, PerCPUData *per_cpu_data)
+	: CPU(id, owner, config, per_cpu_data),
 	_initialised(false),
-	_id(id),
 	fd(fd),
-	irqfds(irqfds),
 	cpu_run_struct(NULL),
-	cpu_run_struct_size(0)
+	cpu_run_struct_size(0),
+	irq_signal(owner),
+	irq_raise(owner),
+	irq_rescind(owner),
+	irq_ack(owner)
 {
 
 }
@@ -56,7 +59,7 @@ bool KVMCpu::init()
 		return false;
 
 	// Attach the CPU IRQ controller
-	owner().config().cpu_irq_controller->attach(*this);
+	config().irq_controller().attach(*this);
 
 	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
 	if ((int)cpu_run_struct_size == -1) {
@@ -77,28 +80,22 @@ bool KVMCpu::init()
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	per_cpu_data().signal_code = code;
-
-	uint64_t data = 0;
-	write(irqfds[0], &data, sizeof(data));
+	assert(false);
 }
 
 void KVMCpu::raise_guest_interrupt(uint8_t irq)
 {
-	uint64_t data = 0;
-	write(irqfds[1], &data, sizeof(data));
+	irq_raise.raise();
 }
 
 void KVMCpu::rescind_guest_interrupt(uint8_t irq)
 {
-	uint64_t data = 0;
-	write(irqfds[2], &data, sizeof(data));
+	irq_rescind.raise();
 }
 
 void KVMCpu::acknowledge_guest_interrupt(uint8_t irq)
 {
-	uint64_t data = 0;
-	write(irqfds[3], &data, sizeof(data));
+	irq_ack.raise();
 }
 
 static KVMCpu *signal_cpu;
@@ -396,10 +393,6 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		fgetc(stdin);
 		return true;
 
-	case 9:
-		config().verify_tick_source()->do_tick();
-		return true;
-
 	case 13: {
 		std::stringstream cmd;
 		cmd << "addr2line -e arch/arm.arch " << std::hex << arg1;
@@ -501,5 +494,49 @@ void KVMCpu::dump_regs()
 
 bool KVMCpu::setup_interrupts()
 {
+	if (!irq_signal.attach((id() * 4) + 0)) return false;
+	if (!irq_raise.attach((id() * 4) + 1)) return false;
+	if (!irq_rescind.attach((id() * 4) + 2)) return false;
+	if (!irq_ack.attach((id() * 4) + 3)) return false;
+	
 	return true;
+}
+
+IRQFD::IRQFD(KVMGuest& owner) : owner(owner), fd(-1), gsi(0)
+{
+	fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
+	if (fd < 0) {
+		ERROR << "Unable to create IRQ fd";
+		throw 0;
+	}
+}
+
+IRQFD::~IRQFD()
+{
+	close(fd);
+}
+
+bool IRQFD::attach(int gsi)
+{
+	assert(fd >= 0);
+	DEBUG << CONTEXT(CPU) << "Attaching IRQFD to GSI=" << gsi << ENABLE;
+
+	struct kvm_irqfd irqfd;
+	bzero(&irqfd, sizeof(irqfd));
+
+	irqfd.fd = fd;
+	irqfd.gsi = gsi;
+
+	if (owner.vmioctl(KVM_IRQFD, &irqfd)) {
+		ERROR << "Unable to install IRQ fd";
+		return false;
+	}
+	
+	return true;
+}
+
+void IRQFD::raise()
+{
+	uint64_t data = 0;
+	write(fd, &data, sizeof(data));
 }

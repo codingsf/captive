@@ -99,7 +99,7 @@ extern int do_device_write(struct mcontext *);
 extern "C" {
 	void __attribute__((noreturn)) start_environment(captive::PerCPUData *cpu_data)
 	{
-		printf("no time for that now... cpu_data=%p\n", cpu_data);
+		printf("no time for that now... cpu_data=%p, entry_point=%x\n", cpu_data, cpu_data->entrypoint);
 
 		// Run the static constructors.
 		printf("calling static constructors...\n");

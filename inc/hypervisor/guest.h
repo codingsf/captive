@@ -15,10 +15,12 @@
 #include <hypervisor/gpa-resolver.h>
 
 namespace captive {
-	struct shmem_data;
-
 	namespace engine {
 		class Engine;
+	}
+
+	namespace platform {
+		class Platform;
 	}
 
 	namespace loader {
@@ -37,30 +39,32 @@ namespace captive {
 		class Guest : public GPAResolver
 		{
 		public:
+			static __thread CPU *current_core;
+			
 			typedef void (*memory_callback_fn_t)(gpa_t gpa);
 
-			Guest(Hypervisor& owner, engine::Engine& engine, const GuestConfiguration& config);
+			Guest(Hypervisor& owner, engine::Engine& engine, platform::Platform& pfm);
 			virtual ~Guest();
 			virtual bool init();
 
 			virtual bool load(loader::Loader& loader) = 0;
 
-			virtual CPU *create_cpu(const GuestCPUConfiguration& config) = 0;
-
 			inline Hypervisor& owner() const { return _owner; }
 			inline engine::Engine& engine() const { return _engine; }
 
-			inline const GuestConfiguration& config() const { return _config; }
+			inline platform::Platform& platform() const { return _pfm; }
 
 			inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
 			inline void guest_entrypoint(gpa_t ep) { _guest_entrypoint = ep; }
 
 			virtual bool resolve_gpa(gpa_t gpa, void*& out_addr) const = 0;
+			
+			virtual bool run() = 0;
 
 		private:
 			Hypervisor& _owner;
 			engine::Engine& _engine;
-			const GuestConfiguration& _config;
+			platform::Platform& _pfm;
 
 			gpa_t _guest_entrypoint;
 		};

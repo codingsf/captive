@@ -19,8 +19,10 @@ namespace captive {
 		class CPU
 		{
 		public:
-			CPU(Guest& owner, const GuestCPUConfiguration& config, PerCPUData *per_cpu_data);
+			CPU(int id, Guest& owner, const GuestCPUConfiguration& config, PerCPUData *per_cpu_data);
 			virtual ~CPU();
+			
+			int id() const { return _id; }
 
 			virtual bool init();
 			virtual bool run() = 0;
@@ -36,6 +38,7 @@ namespace captive {
 			virtual void acknowledge_guest_interrupt(uint8_t irq) = 0;
 
 		private:
+			int _id;
 			Guest& _owner;
 			const GuestCPUConfiguration& _config;
 			PerCPUData *_per_cpu_data;

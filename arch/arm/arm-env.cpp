@@ -35,7 +35,8 @@ bool arm_environment::prepare_boot_cpu(CPU* core)
 {
 	arm_cpu *arm_core = (arm_cpu *)core;
 	
-	arm_core->reg_offsets.RB[1]  = 0x769;	// Machine ID
+	//arm_core->reg_offsets.RB[1]  = 0x769;	// Machine ID Cortex A8
+	arm_core->reg_offsets.RB[1]  = 0x76d;	// Machine ID Cortex A9
 	arm_core->reg_offsets.RB[2]  = 0x100;	// Device Tree / ATAGs
 	arm_core->reg_offsets.RB[12] = core->cpu_data().entrypoint;		// Kernel Entry Point
 	arm_core->reg_offsets.RB[15] = 0;		// Start Address

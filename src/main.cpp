@@ -71,8 +71,8 @@ int main(int argc, char **argv)
 	
 	captive::logging::configure_logging_contexts();
 
-	if (argc < 5 || argc > 7) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [{--interp | --block | --region} | --verify {0 | 1}]";
+	if (argc < 5) {
+		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs>";
 		return 1;
 	}
 
@@ -80,26 +80,6 @@ int main(int argc, char **argv)
 	if (!KVM::supported()) {
 		ERROR << "KVM is not supported";
 		return 1;
-	}
-
-	GuestCPUConfiguration::CPUExecutionMode default_execution_mode = GuestCPUConfiguration::BlockJIT;
-	
-	if (argc == 7) {
-		if (strcmp(argv[5], "--verify")) {
-			ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs> [--verify {0 | 1}]";
-			return 1;
-		}
-	} else if (argc == 6) {
-		if (strcmp(argv[5], "--region") == 0) {
-			default_execution_mode = GuestCPUConfiguration::RegionJIT;
-		} else if (strcmp(argv[5], "--block") == 0) {
-			default_execution_mode = GuestCPUConfiguration::BlockJIT;
-		} else if (strcmp(argv[5], "--interp") == 0) {
-			default_execution_mode = GuestCPUConfiguration::Interpreter;
-		} else {
-			ERROR << "Invalid execution mode";
-			return 1;
-		}
 	}
 
 	// Create a new hypervisor.
@@ -114,7 +94,7 @@ int main(int argc, char **argv)
 	ts = new MicrosecondTickSource();
 
 	// Create the guest platform.
-	Platform *pfm = new Realview(*ts, std::string(argv[4]));
+	Platform *pfm = new Realview(Realview::CORTEX_A9, *ts, std::string(argv[4]));
 
 	// Create the engine.
 	Engine engine(argv[1]);
@@ -126,6 +106,16 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
+	// Load the kernel
+	auto kernel = KernelLoader::create_from_file(argv[2]);
+	if (!kernel) {
+		delete pfm;
+		delete hv;
+
+		ERROR << "Unable to detect type of guest kernel";
+		return 1;
+	}
+
 	Guest *guest = hv->create_guest(engine, *pfm);
 	if (!guest) {
 		delete pfm;
@@ -134,6 +124,8 @@ int main(int argc, char **argv)
 		ERROR << "Unable to create guest VM";
 		return 1;
 	}
+	
+	guest->guest_entrypoint(kernel->entrypoint());
 
 	// Initialise the guest
 	if (!guest->init()) {
@@ -145,17 +137,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// Load the kernel
-	auto kernel = KernelLoader::create_from_file(argv[2]);
-	if (!kernel) {
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to detect type of guest kernel";
-		return 1;
-	}
-	
 	if (!guest->load(*kernel)) {
 		delete guest;
 		delete pfm;
@@ -164,9 +145,7 @@ int main(int argc, char **argv)
 		ERROR << "Unable to load guest kernel";
 		return 1;
 	}
-
-	guest->guest_entrypoint(kernel->entrypoint());
-	
+		
 	/*InitRDLoader initrd(argv[3], 0x8000000);
 	if (!guest->load(initrd)) {
 		delete guest;
@@ -201,37 +180,13 @@ int main(int argc, char **argv)
 		}
 	}
 		
-	GuestCPUConfiguration cpu_cfg(default_execution_mode);
-	CPU *cpu = guest->create_cpu(cpu_cfg);
-
-	if (!cpu) {
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to create CPU";
-		return 1;
-	}
-
-	if (!cpu->init()) {
-		delete cpu;
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to initialise CPU";
-		return 1;
-	}
-	
-	pfm->add_core(*cpu);
-
 	// Start the tick source.
 	ts->start();
 
 	// Start the platform.
 	pfm->start();
-	
-	if (!cpu->run()) {
+
+	if (!guest->run()) {
 		ERROR << "Unable to run CPU";
 	}
 
@@ -246,7 +201,6 @@ int main(int argc, char **argv)
 	delete ts;
 	
 	// Clean-up
-	delete cpu;
 	delete guest;
 	delete pfm;
 	delete hv;

@@ -1,11 +1,13 @@
 #include <devices/arm/gic.h>
+#include <hypervisor/guest.h>
+#include <hypervisor/cpu.h>
 #include <captive.h>
 
 DECLARE_CONTEXT(GIC);
 DECLARE_CHILD_CONTEXT(GICDistributor, GIC);
 DECLARE_CHILD_CONTEXT(GICCPU, GIC);
 
-// #define DEBUG_IRQ
+//#define DEBUG_IRQ
 
 using namespace captive::devices::arm;
 
@@ -186,7 +188,7 @@ bool GICDistributorInterface::write(uint64_t off, uint8_t len, uint64_t data)
 		return true;
 		
 	case 0xf00:
-		fprintf(stderr, "******* gic: write to icdsgir %x\n", data);
+		sgi(data);
 		return true;
 	}
 	
@@ -194,7 +196,32 @@ bool GICDistributorInterface::write(uint64_t off, uint8_t len, uint64_t data)
 	return false;
 }
 
-GICCPUInterface::GICCPUInterface(GIC& owner, irq::IRQLine& irq) : owner(owner), irq(irq), ctrl(0), prio_mask(0), binpnt(3), current_pending(1023), running_irq(1023), running_priority(0x100)
+void GICDistributorInterface::sgi(uint32_t data)
+{
+	int cpu = hypervisor::Guest::current_core->id();
+	int mask;
+	uint32_t irq = data & 0x3ff;
+	
+	switch ((data >> 24) & 3) {
+	case 0:
+		mask = (data >> 16) & 0xf;
+		break;
+	case 1:
+		mask = 0xf ^ (1 << cpu);
+		break;
+	case 2:
+		mask = 1 << cpu;
+		break;
+	default:
+		fprintf(stderr, "error: bad soft int target filter\n");
+		return;
+	}
+	
+	owner.get_gic_irq(irq).pending = true;
+	owner.update();
+}
+
+GICCPUInterface::GICCPUInterface(GIC& owner, irq::IRQLine& irq, int id) : owner(owner), irq(irq), id(id), ctrl(0), prio_mask(0), binpnt(3), current_pending(1023), running_irq(1023), running_priority(0x100)
 {
 	for (int i = 0; i < 96; i++) {
 		last_active[i] = 1023;
@@ -366,9 +393,7 @@ void GICCPUInterface::complete(uint32_t irq)
 	update();
 }
 
-GIC::GIC(irq::IRQLine& irq0) : 
-		cpu(GICCPUInterface(*this, irq0)),
-		distributor(GICDistributorInterface(*this))
+GIC::GIC() : distributor(GICDistributorInterface(*this))
 {
 	bzero(&irqs, sizeof(irqs));
 	
@@ -379,12 +404,23 @@ GIC::GIC(irq::IRQLine& irq0) :
 
 GIC::~GIC()
 {
+	for (auto core : cores) {
+		delete core;
+	}
+	
+	cores.clear();
+}
+
+void GIC::add_core(irq::IRQLine& irq, int id)
+{
+	GICCPUInterface *iface = new GICCPUInterface(*this, irq, id);
+	cores.push_back(iface);
 }
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
 	gic_irq& irq = get_gic_irq(line.index());
-	
+
 	if (!irq.raised) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: raise %d\n", irq.index);
@@ -413,5 +449,6 @@ void GIC::irq_rescinded(irq::IRQLine& line)
 
 void GIC::update()
 {
-	cpu.update();
+	for (auto core : cores)
+		core->update();
 }

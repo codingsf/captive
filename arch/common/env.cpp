@@ -178,6 +178,9 @@ bool Environment::run()
 	core->mmu().set_page_device(GPA_TO_HVA(0x10007000));
 	core->mmu().set_page_device(GPA_TO_HVA(0x10020000));
 	core->mmu().set_page_device(GPA_TO_HVA(0x10100000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1f000000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1f001000));
+	core->mmu().set_page_device(GPA_TO_HVA(0x1f002000));
 
 	bool result = core->run();
 	delete core;

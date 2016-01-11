@@ -40,7 +40,7 @@ namespace captive {
 					
 					uint32_t osc[5];
 					
-					uint32_t colour_mode, lockval, leds;
+					uint32_t colour_mode, lockval, leds, flags;
 				};
 			}
 		}

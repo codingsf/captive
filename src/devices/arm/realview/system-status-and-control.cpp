@@ -15,7 +15,8 @@ SystemStatusAndControl::SystemStatusAndControl(timers::TickSource& tick_source) 
 	osc { 0x00012c5c, 0x00002cc0, 0x00002c75, 0x00020211, 0x00002c75 },
 	colour_mode(0x1f00),
 	lockval(0),
-	leds(0)
+	leds(0),
+	flags(0)
 {
 	
 }
@@ -24,7 +25,8 @@ bool SystemStatusAndControl::read(uint64_t off, uint8_t len, uint64_t& data)
 {
 	switch (off) {
 	case 0x000:
-		data = 0x01780500;
+		//data = 0x01780500		// Cortex A8;
+		data = 0x1182f500;		// Cortex A9;
 		return true;
 		
 	case 0x004:
@@ -39,12 +41,24 @@ bool SystemStatusAndControl::read(uint64_t off, uint8_t len, uint64_t& data)
 		data = lockval;
 		return true;
 		
+	case 0x30:
+		data = flags;
+		return true;
+		
 	case 0x05c:
 		data = std::chrono::duration_cast<tick_24MHz_t>(std::chrono::milliseconds(_tick_source.count() - _start_time)).count();
 		return true;
 		
 	case 0x50:
 		data = colour_mode;
+		return true;
+		
+	case 0x84:
+		data = 0x0c000000;
+		return true;
+		
+	case 0x88:
+		data = 0xff000000;
 		return true;
 		
 	case 0x00c ... 0x001c:
@@ -70,6 +84,14 @@ bool SystemStatusAndControl::write(uint64_t off, uint8_t len, uint64_t data)
 	case 0x20:
 		if (data == LOCK_VALUE) lockval = data;
 		else lockval = data & 0x7fff;
+		return true;
+		
+	case 0x30:
+		flags |= data;
+		return true;
+		
+	case 0x34:
+		flags &= ~data;
 		return true;
 		
 	case 0x050:

@@ -13,6 +13,7 @@
 
 #include <set>
 #include <mutex>
+#include <vector>
 
 namespace captive {
 	namespace devices {
@@ -27,7 +28,7 @@ namespace captive {
 				friend class GICDistributorInterface;
 				
 			public:
-				GICCPUInterface(GIC& owner, irq::IRQLine& irq);
+				GICCPUInterface(GIC& owner, irq::IRQLine& irq, int id);
 				virtual ~GICCPUInterface();
 				
 				std::string name() const override { return "gic-cpu"; }
@@ -41,6 +42,7 @@ namespace captive {
 			private:
 				GIC& owner;
 				irq::IRQLine& irq;
+				int id;
 				
 				uint32_t last_active[96], running_irq;
 				
@@ -80,6 +82,8 @@ namespace captive {
 				void clear_enabled(uint32_t base, uint8_t bits);
 				void set_pending(uint32_t base, uint8_t bits);
 				void clear_pending(uint32_t base, uint8_t bits);
+
+				void sgi(uint32_t data);
 			};
 
 			class GIC : public irq::IRQController<96u>
@@ -88,10 +92,12 @@ namespace captive {
 				friend class GICDistributorInterface;
 				
 			public:
-				GIC(irq::IRQLine& irq0);
+				GIC();
 				virtual ~GIC();
 				
-				GICCPUInterface& get_cpu(int id) { assert(id == 0); return cpu; }
+				void add_core(irq::IRQLine& irq, int id);
+				
+				GICCPUInterface& get_core(int id) { return *cores[id]; }
 				GICDistributorInterface& get_distributor() { return distributor; }
 
 			protected:
@@ -101,7 +107,7 @@ namespace captive {
 			private:
 				std::mutex lock;
 				
-				GICCPUInterface cpu;
+				std::vector<GICCPUInterface *> cores;
 				GICDistributorInterface distributor;
 				
 				struct gic_irq {
@@ -120,7 +126,7 @@ namespace captive {
 					assert(index < 96);
 					return irqs[index];
 				}
-												
+							
 				void update();
 			};
 		}

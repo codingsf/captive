@@ -36,7 +36,13 @@ namespace captive {
 		class Realview : public Platform
 		{
 		public:
-			Realview(devices::timers::TickSource& ts, std::string block_device_file);
+			enum Variant
+			{
+				CORTEX_A8,
+				CORTEX_A9,
+			};
+			
+			Realview(Variant variant, devices::timers::TickSource& ts, std::string block_device_file);
 			virtual ~Realview();
 			
 			const hypervisor::GuestConfiguration& config() const override;
@@ -45,6 +51,7 @@ namespace captive {
 			bool stop() override;
 			
 		private:
+			Variant variant;
 			hypervisor::GuestConfiguration cfg;
 			devices::arm::PL011 *uart0, *uart1, *uart2, *uart3;
 #ifdef NULL_VIRTUAL_SCREEN

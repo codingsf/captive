@@ -31,7 +31,7 @@ namespace captive {
 				virtual ~KVM();
 
 				bool init() override;
-				Guest *create_guest(engine::Engine& engine, const platform::Platform& platform) override;
+				Guest *create_guest(engine::Engine& engine, platform::Platform& platform) override;
 
 				int version() const;
 

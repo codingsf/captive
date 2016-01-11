@@ -15,7 +15,8 @@ CoCo::CoCo(Environment& env) : Coprocessor(env, 15),
 		CACHE_SIZE_SELECTION(0),
 		PRIMARY_REGION_REMAP(0x00098AA4),
 		NORMAL_REGION_REMAP(0x44E048E0),
-		CONTEXT_ID(0)
+		CONTEXT_ID(0),
+		TPID(0)
 {
 
 }
@@ -257,6 +258,10 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				case 1:
 					CONTEXT_ID = data;
 					return true;
+					
+				case 4:
+					TPID = data;
+					return true;
 				}
 				break;
 			}
@@ -286,25 +291,29 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 0: // MAIN ID
 					//data = 0x41069265;		// ARMv5
-					data = 0x410fc083;		// Cortex A8
+					//data = 0x410fc083;		// Cortex A8
+					data = 0x414fc091;		// Cortex A9
 					return true;
 
 				case 1: // CACHE TYPE
-					//data = 0x0f006006;	// ARMv5
-					data = 0x82048004;	// Cortex A8
+					//data = 0x0f006006;		// ARMv5
+					//data = 0x82048004;		// Cortex A8
+					data = 0x83338003;		// Cortex A9
 					return true;
 
 				case 2: // TCM STATUS
-					//data = 0x00004004; // ARMv5
-					data = 0;	// Cortex A8
+					//data = 0x00004004;		// ARMv5
+					//data = 0;				// Cortex A8
+					data = 0;				// Cortex A9
 					return true;
 
 				case 3:	// TLB TYPE
-					data = 0; //0x00202001;	// Cortex A8
+					//data = 0; //0x00202001;	// Cortex A8
+					data = 0;				// Cortex A9
 					return true;
 
 				case 5:	// MP ID
-					data = 0;
+					data = 0x80000000;
 					return true;
 				}
 				break;
@@ -360,6 +369,10 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 					
 				case 5:
 					data = 0x20000000;
+					return true;
+					
+				case 7:
+					data = 0x00000211;
 					return true;
 				}
 				break;
@@ -429,49 +442,6 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		// TE
 		data |= _TE << 30;
 		
-		/*//NIBBLE 0
-		data |= M << 0; // MMU
-		data |= 0 << 1; //Strict alignment
-		data |= 1 << 2; //L1 U$ or D$
-		data |= 0 << 3; //Write buffer
-
-		//NIBBLE 1
-		data |= 0x7 << 4; //SBO
-		data |= 0 << 7; //B (endianness)
-
-		//NIBBLE 2
-		data |= _S << 8; //S (system protection)
-		data |= _R << 9; //R (rom protect)
-		data |= 0 << 10; //F (implementation defined)
-		data |= 0 << 11; //BPU
-
-		//NIBBLE 3
-		data |= 1 << 12; //I L1 I$
-
-		data |= (!!(*(((arm_cpu&)cpu).reg_offsets.cpV)) << 13); //V, exception vectors
-
-		data |= 0 << 14; //RR
-		data |= 0 << 15; //L4
-
-		//NIBBLE 4
-		data |= 1 << 16; //DT
-		data |= 0 << 17; //SBZ
-		data |= 0 << 18; //IT //QEMU HACK
-		data |= 1 << 19; //SBZ //QEMU HACK
-
-		//NIBBLE 5
-		data |= 0 << 20; //ST
-		data |= 0 << 21; //FI
-		data |= 1 << 22; //U
-		data |= XP << 23; //XP
-
-		//NIBBLE 6
-		data |= 0 << 24; //VE
-		data |= 0 << 25; //EE
-		data |= 0 << 26; //L2
-		
-		data |= AFE << 29; //AFE*/
-
 		return true;
 		
 	case 7:
@@ -505,6 +475,26 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				switch (op2) {
 				case 1:
 					data = CONTEXT_ID;
+					return true;
+					
+				case 4:
+					data = TPID;
+					return true;
+				}
+				break;
+			}
+			break;
+		}
+		break;
+		
+	case 15:
+		switch (rm) {
+		case 0:
+			switch (op1) {
+			case 4:
+				switch (op2) {
+				case 0:
+					data = 0x1f000000;
 					return true;
 				}
 				break;

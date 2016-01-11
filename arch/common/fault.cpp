@@ -307,7 +307,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 {
 	uint64_t code = mctx->extra;
 	uint64_t rip = mctx->rip;
-
+	
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
 	if (va < 0x200000000) {	// XXX HACK HACK HACK

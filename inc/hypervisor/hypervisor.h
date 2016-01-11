@@ -28,7 +28,7 @@ namespace captive {
 			virtual ~Hypervisor();
 
 			virtual bool init();
-			virtual Guest *create_guest(engine::Engine& engine, const platform::Platform& platform) = 0;
+			virtual Guest *create_guest(engine::Engine& engine, platform::Platform& platform) = 0;
 		};
 	}
 }

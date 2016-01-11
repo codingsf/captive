@@ -5,6 +5,7 @@
 #include <loader/loader.h>
 #include <engine/engine.h>
 #include <devices/device.h>
+#include <platform/platform.h>
 #include <shmem.h>
 
 #include <thread>
@@ -49,7 +50,12 @@ using namespace captive::hypervisor::kvm;
 
 extern char __bios_bin_start, __bios_bin_end;
 
-KVMGuest::KVMGuest(KVM& owner, Engine& engine, const GuestConfiguration& config, int fd) : Guest(owner, engine, config), _initialised(false), fd(fd), next_cpu_id(0), next_slot_idx(0)
+KVMGuest::KVMGuest(KVM& owner, Engine& engine, platform::Platform& pfm, int fd)
+	: Guest(owner, engine, pfm),
+	_initialised(false),
+	fd(fd),
+	next_cpu_id(0),
+	next_slot_idx(0)
 {
 
 }
@@ -87,7 +93,11 @@ bool KVMGuest::init()
 	if (!attach_guest_devices())
 		return false;
 	
-	//dump_memory();
+	for (auto core : platform().config().cores) {
+		if (!create_cpu(core)) {
+			return false;
+		}
+	}
 
 	_initialised = true;
 	return true;
@@ -109,46 +119,103 @@ bool KVMGuest::load(loader::Loader& loader)
 	return true;
 }
 
-CPU* KVMGuest::create_cpu(const GuestCPUConfiguration& config)
+bool KVMGuest::run()
 {
-	if (!initialised()) {
-		ERROR << "KVM guest is not yet initialised";
-		return NULL;
+	std::list<std::thread *> core_threads;
+	
+	for (auto core : kvm_cpus) {
+		auto core_thread = new std::thread(core_thread_proc, core);
+		core_threads.push_back(core_thread);
 	}
+	
+	for (auto thread : core_threads) {
+		if (thread->joinable()) thread->join();
+	}
+	
+	return true;
+}
 
+void KVMGuest::core_thread_proc(KVMCpu *core)
+{
+	Guest::current_core = core;
+	core->run();
+}
+
+bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
+{
 	if (!config.validate()) {
 		ERROR << "Invalid CPU configuration";
-		return NULL;
+		return false;
 	}
 
 	DEBUG << CONTEXT(Guest) << "Creating KVM VCPU";
 	int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, next_cpu_id);
 	if (cpu_fd < 0) {
 		ERROR << "Failed to create KVM VCPU: " << LAST_ERROR_TEXT;
-		return NULL;
+		return false;
+	}
+	
+	struct kvm_irqchip irqchip;
+	bzero(&irqchip, sizeof(irqchip));
+	irqchip.chip_id = 2;
+
+	if (vmioctl(KVM_GET_IRQCHIP, &irqchip)) {
+		ERROR << "Unable to retrieve IRQCHIP";
+		return false;
+	}
+			
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.vector = 0x30;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.mask = 0;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.dest_id = next_cpu_id;
+	
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.vector = 0x31;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.mask = 0;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.dest_id = next_cpu_id;
+	
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.vector = 0x32;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.mask = 0;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.dest_id = next_cpu_id;
+
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.vector = 0x33;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.mask = 0;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.dest_id = next_cpu_id;
+
+	DEBUG << CONTEXT(Guest) << "Configuring IRQ chip";
+	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
+		ERROR << "Unable to configure IRQCHIP";
+		return false;
 	}
 
 	// Locate the storage location for the Per-CPU data, and initialise the structure.
 	PerCPUData *per_cpu_data = (PerCPUData *)(HOST_SYS_GUEST_DATA + (0x100 * (next_cpu_id + 1)));
 	per_cpu_data->guest_data = (PerGuestData *)GUEST_SYS_GUEST_DATA_VIRT;
 	per_cpu_data->async_action = 0;
-	per_cpu_data->execution_mode = (uint32_t)config.execution_mode();
+	per_cpu_data->execution_mode = 0;
 	per_cpu_data->insns_executed = 0;
 	per_cpu_data->interrupts_taken = 0;
 	per_cpu_data->isr = 0;
 	per_cpu_data->verbose_enabled = false;
 	per_cpu_data->entrypoint = guest_entrypoint();
+
+	KVMCpu *cpu = new KVMCpu(next_cpu_id, *this, config, cpu_fd, per_cpu_data);
+	if (!cpu->init()) {
+		delete cpu;
+		return false;
+	}
 	
-	KVMCpu *cpu = new KVMCpu(*this, config, next_cpu_id, cpu_fd, irq_fds, per_cpu_data);
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
-	return cpu;
+	return true;
 }
 
 bool KVMGuest::attach_guest_devices()
 {
-	for (const auto& device : config().devices) {
+	for (const auto& device : platform().config().devices) {
 		DEBUG << CONTEXT(Guest) << "Attaching device " << device.device().name() << " @ " << std::hex << device.base_address();
 
 		device.device().attach(*this);
@@ -182,107 +249,13 @@ bool KVMGuest::prepare_guest_irq()
 		return false;
 	}
 
-	struct kvm_irqchip irqchip;
-	bzero(&irqchip, sizeof(irqchip));
-	irqchip.chip_id = 2;
-
-	if (vmioctl(KVM_GET_IRQCHIP, &irqchip)) {
-		ERROR << "Unable to retrieve IRQCHIP";
-		return false;
-	}
-
-	// GSI 16 will be our externally signalled interrupt - route it to
-	// vector 0x30, and unmask it.  Also, set it to be level triggered
-	irqchip.chip.ioapic.redirtbl[16].fields.vector = 0x30;
-	irqchip.chip.ioapic.redirtbl[16].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[16].fields.mask = 0;
-	
-	irqchip.chip.ioapic.redirtbl[17].fields.vector = 0x31;
-	irqchip.chip.ioapic.redirtbl[17].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[17].fields.mask = 0;
-	
-	irqchip.chip.ioapic.redirtbl[18].fields.vector = 0x32;
-	irqchip.chip.ioapic.redirtbl[18].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[18].fields.mask = 0;
-
-	irqchip.chip.ioapic.redirtbl[19].fields.vector = 0x33;
-	irqchip.chip.ioapic.redirtbl[19].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[19].fields.mask = 0;
-
-	DEBUG << CONTEXT(Guest) << "Configuring IRQ chip";
-	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
-		ERROR << "Unable to configure IRQCHIP";
-		return false;
-	}
-
-	DEBUG << CONTEXT(Guest) << "Creating IRQ fds";
-
-	struct kvm_irqfd irqfd;
-	bzero(&irqfd, sizeof(irqfd));
-
-	irq_fds[0] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
-	if (irq_fds[0] < 0) {
-		ERROR << "Unable to create IRQ fd";
-		return false;
-	}
-
-	irqfd.fd = irq_fds[0];
-	irqfd.gsi = 16;
-
-	if (vmioctl(KVM_IRQFD, &irqfd)) {
-		ERROR << "Unable to install IRQ fd";
-		return false;
-	}
-	
-	irq_fds[1] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
-	if (irq_fds[1] < 0) {
-		ERROR << "Unable to create IRQ fd";
-		return false;
-	}
-
-	irqfd.fd = irq_fds[1];
-	irqfd.gsi = 17;
-
-	if (vmioctl(KVM_IRQFD, &irqfd)) {
-		ERROR << "Unable to install IRQ fd";
-		return false;
-	}
-	
-	irq_fds[2] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
-	if (irq_fds[2] < 0) {
-		ERROR << "Unable to create IRQ fd";
-		return false;
-	}
-
-	irqfd.fd = irq_fds[2];
-	irqfd.gsi = 18;
-
-	if (vmioctl(KVM_IRQFD, &irqfd)) {
-		ERROR << "Unable to install IRQ fd";
-		return false;
-	}
-	
-	irq_fds[3] = eventfd(0, O_NONBLOCK | O_CLOEXEC);
-	if (irq_fds[3] < 0) {
-		ERROR << "Unable to create IRQ fd";
-		return false;
-	}
-
-	irqfd.fd = irq_fds[3];
-	irqfd.gsi = 19;
-
-	if (vmioctl(KVM_IRQFD, &irqfd)) {
-		ERROR << "Unable to install IRQ fd";
-		return false;
-	}
-
 	return true;
 }
 
 bool KVMGuest::prepare_guest_memory()
 {
 	// Prepare Guest Physical Memory
-	for (auto& region : config().memory_regions) {
+	for (auto& region : platform().config().memory_regions) {
 		void *hva = (void *)((uint64_t)HOST_GPM_BASE + region.base_address());
 		
 		DEBUG << CONTEXT(Guest) << "Installing GPM region, base=" << std::hex << region.base_address() << ", size=" << region.size() << ", hva=" << hva;

@@ -29,6 +29,7 @@ extern "C" int block_trampoline(void *, void*);
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
+	printf("--------------------------------------------------------------------\n");
 	
 	//trace().enable();
 	//jit().trace(true);
@@ -161,8 +162,6 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 	Decode *insn = get_decode(0);
 
 	int insn_count = 0;
-	
-	bool dyn_pred = false;
 	
 	gpa_t pc = pa;
 	gpa_t page = PAGE_ADDRESS_OF(pc);

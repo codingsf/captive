@@ -60,7 +60,7 @@ bool KVM::init()
 	return true;
 }
 
-Guest* KVM::create_guest(engine::Engine& engine, const platform::Platform& pfm)
+Guest* KVM::create_guest(engine::Engine& engine, platform::Platform& pfm)
 {
 	// Ensure we've been initialised.
 	if (!initialised()) {
@@ -84,7 +84,7 @@ Guest* KVM::create_guest(engine::Engine& engine, const platform::Platform& pfm)
 
 	// Create (and register) the representative guest object.
 	DEBUG << CONTEXT(Hypervisor) << "Creating guest object";
-	KVMGuest *guest = new KVMGuest(*this, engine, pfm.config(), guest_fd);
+	KVMGuest *guest = new KVMGuest(*this, engine, pfm, guest_fd);
 	known_guests.push_back(guest);
 
 	return guest;

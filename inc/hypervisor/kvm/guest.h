@@ -78,31 +78,36 @@ namespace captive {
 		namespace kvm {
 			class KVM;
 			class KVMCpu;
-
+			class IRQFD;
+			
 			class KVMGuest : public Guest {
 				friend class KVMCpu;
+				friend class IRQFD;
 				friend void ::MMIOThreadTrampoline(void *);
 
 			public:
-				KVMGuest(KVM& owner, engine::Engine& engine, const GuestConfiguration& config, int fd);
+				KVMGuest(KVM& owner, engine::Engine& engine, platform::Platform& pfm, int fd);
 				virtual ~KVMGuest();
 
 				bool init() override;
 				bool load(loader::Loader& loader) override;
-
-				CPU *create_cpu(const GuestCPUConfiguration& config) override;
 
 				inline bool initialised() const { return _initialised; }
 
 				bool resolve_gpa(gpa_t gpa, void*& out_addr) const override;
 
 				void do_guest_printf();
-
+				
+				bool run() override;
+				
 			private:
 				std::vector<KVMCpu *> kvm_cpus;
+				static void core_thread_proc(KVMCpu *core);
+				
+				bool create_cpu(const GuestCPUConfiguration& config);
 
 				bool _initialised;
-				int fd, irq_fds[4];
+				int fd;
 				int next_cpu_id;
 				int next_slot_idx;
 

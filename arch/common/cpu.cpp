@@ -39,13 +39,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	jit_state.cpu = this;
 	
-	jit_state.block_txln_cache = block_txln_cache->ptr();
-	
-	if (_per_cpu_data->execution_mode == 2) { // If we're a region jit
-		jit_state.region_txln_cache = region_txln_cache->ptr();
-	} else {
-		jit_state.region_txln_cache = NULL;
-	}
+	jit_state.block_txln_cache = block_txln_cache->ptr();	
+	jit_state.region_txln_cache = NULL;
 	
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.exit_chain = 0;
@@ -97,18 +92,7 @@ bool CPU::handle_pending_action(uint32_t action)
 
 bool CPU::run()
 {
-	switch (_per_cpu_data->execution_mode) {
-	case 0:
-		return false;
-	case 1:
-		return run_block_jit();
-	case 2:
-		return false;
-	case 3:
-		return run_test();
-	default:
-		return false;
-	}
+	return run_block_jit();
 }
 
 bool CPU::run_test()
