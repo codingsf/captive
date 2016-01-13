@@ -29,10 +29,10 @@ namespace captive {
 					CortexA9,
 				};
 
-				arm_environment(arch_variant arch_variant, core_variant core_variant, captive::PerCPUData *per_cpu_data);
+				arm_environment(arch_variant arch_variant, core_variant core_variant, captive::PerGuestData *per_guest_data);
 				virtual ~arm_environment();
 
-				CPU *create_cpu() override;
+				CPU *create_cpu(captive::PerCPUData *per_cpu_data) override;
 				
 				inline arch_variant arch_variant() const { return _arch_variant; }
 				inline core_variant core_variant() const { return _core_variant; }

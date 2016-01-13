@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-PL022::PL022() : Primecell(0x00241022)
+PL022::PL022() : Primecell(0xdeadbeef) //0x00241022)
 {
 
 }

@@ -10,6 +10,7 @@
 
 #include <list>
 #include <map>
+#include <unordered_map>
 
 #include <sys/ioctl.h>
 
@@ -99,8 +100,20 @@ namespace captive {
 				void do_guest_printf();
 				
 				bool run() override;
+				void stop() override;
+				
+				void guest_entrypoint(gpa_t entrypoint) override;
 				
 			private:
+				typedef bool (*event_callback_t)(int fd, bool is_input, void *data);
+
+				struct event_loop_event
+				{
+					int fd;
+					event_callback_t cb;
+					void *data;
+				};
+				
 				std::vector<KVMCpu *> kvm_cpus;
 				static void core_thread_proc(KVMCpu *core);
 				
@@ -110,6 +123,7 @@ namespace captive {
 				int fd;
 				int next_cpu_id;
 				int next_slot_idx;
+				int epollfd, stopfd;
 
 				struct vm_mem_region {
 					struct kvm_userspace_memory_region kvm;
@@ -133,12 +147,15 @@ namespace captive {
 					const GuestDeviceConfiguration *cfg;
 				};
 
-				std::list<dev_desc> devices;
+				std::map<uint64_t, dev_desc> devices;
 
+				bool prepare_event_loop();
+				bool attach_event(int fd, event_callback_t cb, bool input, bool output, void *data);
+				void cleanup_event_loop();
 				bool prepare_guest_irq();
 				bool prepare_guest_memory();
 				bool attach_guest_devices();
-				devices::Device *lookup_device(uint64_t addr);
+				devices::Device *lookup_device(uint64_t addr, uint64_t& base_addr);
 
 				bool install_gdt();
 				bool install_tss();

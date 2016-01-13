@@ -54,19 +54,17 @@ namespace captive {
 
 			inline platform::Platform& platform() const { return _pfm; }
 
-			inline gpa_t guest_entrypoint() const { return _guest_entrypoint; }
-			inline void guest_entrypoint(gpa_t ep) { _guest_entrypoint = ep; }
+			virtual void guest_entrypoint(gpa_t ep) = 0;
 
 			virtual bool resolve_gpa(gpa_t gpa, void*& out_addr) const = 0;
 			
 			virtual bool run() = 0;
+			virtual void stop() = 0;
 
 		private:
 			Hypervisor& _owner;
 			engine::Engine& _engine;
 			platform::Platform& _pfm;
-
-			gpa_t _guest_entrypoint;
 		};
 	}
 }

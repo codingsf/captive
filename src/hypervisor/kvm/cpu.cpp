@@ -80,7 +80,8 @@ bool KVMCpu::init()
 
 void KVMCpu::interrupt(uint32_t code)
 {
-	assert(false);
+	per_cpu_data().async_action = code;
+	irq_signal.raise();
 }
 
 void KVMCpu::raise_guest_interrupt(uint8_t irq)
@@ -98,31 +99,6 @@ void KVMCpu::acknowledge_guest_interrupt(uint8_t irq)
 	irq_ack.raise();
 }
 
-static KVMCpu *signal_cpu;
-static bool trap;
-
-uint64_t last_insns, last_intrs;
-
-static void handle_signal(int signo)
-{
-	if (signo == SIGUSR1) {
-		signal_cpu->interrupt(2);
-
-//		signal_cpu->per_cpu_data().async_action = 2;
-	} else if (signo == SIGUSR2) {
-		
-		fprintf(stderr, "%lu\t%lu\t%lu\t%lu\n", signal_cpu->per_cpu_data().insns_executed, signal_cpu->per_cpu_data().interrupts_taken, signal_cpu->per_cpu_data().insns_executed - last_insns, signal_cpu->per_cpu_data().interrupts_taken - last_intrs);
-		last_insns = signal_cpu->per_cpu_data().insns_executed;
-		last_intrs = signal_cpu->per_cpu_data().interrupts_taken;
-	} else if (signo == SIGTRAP) {
-		trap = true;
-	}
-}
-
-static std::chrono::high_resolution_clock::time_point cpu_start_time;
-
-extern void trigger_irq_latency_measure();
-
 bool KVMCpu::run()
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
@@ -134,11 +110,6 @@ bool KVMCpu::run()
 		ERROR << CONTEXT(CPU) << "CPU not initialised";
 		return false;
 	}
-
-	signal_cpu = this;
-	signal(SIGUSR1, handle_signal);
-	signal(SIGUSR2, handle_signal);
-	signal(SIGTRAP, handle_signal);
 
 	struct kvm_regs regs;
 	vmioctl(KVM_GET_REGS, &regs);
@@ -218,15 +189,6 @@ bool KVMCpu::run()
 		rc = vmioctl(KVM_RUN);
 		if (rc < 0) {
 			if (errno == EINTR) {
-				if (trap) {
-					trap = false;
-					DEBUG << CONTEXT(CPU) << "Received SIGTRAP";
-					
-					printf("*** insns executed: %lu\n", per_cpu_data().insns_executed);
-					
-					dump_regs();
-				}
-
 				continue;
 			}
 
@@ -267,9 +229,10 @@ bool KVMCpu::run()
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);
 
-				devices::Device *dev = kvm_guest.lookup_device(regs.rdx);
+				uint64_t base_addr;
+				devices::Device *dev = kvm_guest.lookup_device(regs.rdx, base_addr);
 				if (dev != NULL) {
-					uint64_t offset = regs.rdx & (dev->size() - 1);
+					uint64_t offset = regs.rdx - base_addr;
 					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
 						// Device Write
 						dev->write(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
@@ -287,16 +250,29 @@ bool KVMCpu::run()
 			}
 			break;
 		case KVM_EXIT_MMIO:
-			fprintf(stderr, "mmio: %lx\n", cpu_run_struct->mmio.phys_addr);
 			if (cpu_run_struct->mmio.phys_addr >= 0x100000000 && cpu_run_struct->mmio.phys_addr < 0x200000000) {
-				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr - 0x100000000;
-				devices::Device *dev = kvm_guest.lookup_device(converted_pa);
+				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr & 0xffffffff;
+				
+				uint64_t base_addr;
+				devices::Device *dev = kvm_guest.lookup_device(converted_pa, base_addr);
+				
 				if (dev != NULL) {
-					if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct))) {
-						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
+					uint64_t offset = converted_pa - base_addr;
+					if (cpu_run_struct->mmio.is_write) {
+						run_cpu = dev->write(offset, cpu_run_struct->mmio.len, *(uint64_t *)&cpu_run_struct->mmio.data[0]);
+					} else {
+						run_cpu = dev->read(offset, cpu_run_struct->mmio.len, *(uint64_t *)&cpu_run_struct->mmio.data[0]);
 					}
 					
-					break;
+					if (!run_cpu) {
+						fprintf(stderr, "device io failed: %s: base=%lx, pa=%lx\n", dev->name().c_str(), base_addr, converted_pa);
+					}
+					
+					/*if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct))) {
+						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
+					}*/
+					
+					continue;
 				} else {
 					ERROR << CONTEXT(CPU) << "Device Not Found: " << std::hex << converted_pa;
 				}
@@ -348,6 +324,7 @@ bool KVMCpu::run()
 void KVMCpu::stop()
 {
 	per_cpu_data().halt = true;
+	interrupt(1);
 }
 
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
@@ -370,7 +347,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
 
-	//DEBUG << CONTEXT(CPU) << "Hypercall " << data;
+	DEBUG << CONTEXT(CPU) << "Hypercall " << data;
 
 	switch(data) {
 	case 2:
@@ -386,8 +363,8 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		std::chrono::high_resolution_clock::time_point then = std::chrono::high_resolution_clock::now();
 		std::chrono::seconds dur = std::chrono::duration_cast<std::chrono::seconds>(then - cpu_start_time);
 
-		DEBUG << "Instruction Count: " << per_cpu_data().insns_executed;
-		DEBUG << "MIPS: " << ((per_cpu_data().insns_executed * 1e-6) / dur.count());
+		DEBUG << "Instruction Count: " << per_cpu_data().insns_executed << ENABLE;
+		DEBUG << "MIPS: " << ((per_cpu_data().insns_executed * 1e-6) / dur.count()) << ENABLE;
 		return true;
 	}
 

@@ -23,6 +23,7 @@ extern "C" {
 #include <sys/mman.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
+#include <sys/signal.h>
 #include <linux/kvm.h>
 
 #include <iomanip>
@@ -62,8 +63,10 @@ KVMGuest::KVMGuest(KVM& owner, Engine& engine, platform::Platform& pfm, int fd)
 
 KVMGuest::~KVMGuest()
 {
-	if (initialised())
+	if (initialised()) {
 		release_all_guest_memory();
+		cleanup_event_loop();
+	}
 
 	DEBUG << CONTEXT(Guest) << "Closing KVM VM";
 	close(fd);
@@ -72,6 +75,9 @@ KVMGuest::~KVMGuest()
 bool KVMGuest::init()
 {
 	if (!Guest::init())
+		return false;
+	
+	if (!prepare_event_loop())
 		return false;
 
 	// Initialise memory region slot pool.
@@ -103,6 +109,57 @@ bool KVMGuest::init()
 	return true;
 }
 
+static bool stop_callback(int fd, bool is_input, void *p)
+{
+	return false;
+}
+
+bool KVMGuest::prepare_event_loop()
+{
+	stopfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (stopfd < 0) {
+		ERROR << CONTEXT(Guest) << "Unable to create stop eventfd";
+		return false;
+	}
+
+	epollfd = epoll_create1(0);
+	if (epollfd < 0) {
+		ERROR << CONTEXT(Guest) << "Unable to create epollfd";
+		close(stopfd);
+		return false;
+	}
+	
+	return attach_event(stopfd, stop_callback, true, false, NULL);
+}
+
+bool KVMGuest::attach_event(int fd, event_callback_t cb, bool input, bool output, void *data)
+{
+	struct event_loop_event *loop_event = new struct event_loop_event();
+	loop_event->fd = fd;
+	loop_event->cb = cb;
+	loop_event->data = data;
+	
+	struct epoll_event evt;
+	evt.data.ptr = (void *)loop_event;
+	evt.events = EPOLLET;
+	
+	if (input) evt.events |= EPOLLIN;
+	if (output) evt.events |= EPOLLOUT;
+	
+	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &evt) < 0) {
+		ERROR << CONTEXT(Guest) << "Unable to attach event";
+		return false;
+	}
+	
+	return true;
+}
+
+void KVMGuest::cleanup_event_loop()
+{
+	close(epollfd);
+	close(stopfd);
+}
+
 bool KVMGuest::load(loader::Loader& loader)
 {
 	if (!initialised()) {
@@ -119,15 +176,49 @@ bool KVMGuest::load(loader::Loader& loader)
 	return true;
 }
 
+void KVMGuest::guest_entrypoint(gpa_t entrypoint)
+{
+	per_guest_data->entrypoint = entrypoint;
+}
+
 bool KVMGuest::run()
 {
+	// Create and run each core thread.
 	std::list<std::thread *> core_threads;
-	
 	for (auto core : kvm_cpus) {
 		auto core_thread = new std::thread(core_thread_proc, core);
 		core_threads.push_back(core_thread);
 	}
 	
+#define MAX_EVENTS	8
+	
+	struct epoll_event evts[MAX_EVENTS];
+	
+	bool terminate = false;
+	while (!terminate) {
+		int count = epoll_wait(epollfd, evts, MAX_EVENTS, -1);
+		
+		if (count < 0) {
+			if (errno != EINTR) {
+				ERROR << CONTEXT(Guest) << "epoll error: " << LAST_ERROR_TEXT;
+				break;
+			}
+		} else {
+			for (int i = 0; i < count; i++) {
+				if (evts[i].data.ptr) {
+					const struct event_loop_event *loop_event = (const struct event_loop_event *)evts[i].data.ptr;
+					terminate = !loop_event->cb(loop_event->fd, (evts[i].events & EPOLLIN), loop_event->data);
+				}
+			}
+		}
+	}
+		
+	// Signal each core to stop.
+	for (auto core : kvm_cpus) {
+		core->stop();
+	}
+	
+	// Wait for core threads to terminate.
 	for (auto thread : core_threads) {
 		if (thread->joinable()) thread->join();
 	}
@@ -135,10 +226,20 @@ bool KVMGuest::run()
 	return true;
 }
 
+void KVMGuest::stop()
+{
+	uint64_t value = 1;
+	write(stopfd, &value, sizeof(value));
+}
+
 void KVMGuest::core_thread_proc(KVMCpu *core)
 {
+	std::string thread_name = "core-" + std::to_string(core->id());
+	pthread_setname_np(pthread_self(), thread_name.c_str());
+	
 	Guest::current_core = core;
 	core->run();
+	core->owner().stop();
 }
 
 bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
@@ -200,7 +301,6 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->interrupts_taken = 0;
 	per_cpu_data->isr = 0;
 	per_cpu_data->verbose_enabled = false;
-	per_cpu_data->entrypoint = guest_entrypoint();
 
 	KVMCpu *cpu = new KVMCpu(next_cpu_id, *this, config, cpu_fd, per_cpu_data);
 	if (!cpu->init()) {
@@ -211,6 +311,21 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
+	return true;
+}
+
+static bool dev_callback(int fd, bool is_input, void *p)
+{
+	uint32_t v = 0;
+
+	if (is_input) {
+		read(fd, &v, sizeof(v));
+		fprintf(stderr, "*** in %d\n", v);
+	} else {
+		fprintf(stderr, "*** out\n");
+		//write(fd, &v, sizeof(v));
+	}
+	
 	return true;
 }
 
@@ -225,19 +340,25 @@ bool KVMGuest::attach_guest_devices()
 		desc.cfg = &device;
 		desc.dev = &device.device();
 
-		devices.push_back(desc);
+		devices[device.base_address()] = desc;
 	}
 
 	return true;
 }
 
-captive::devices::Device *KVMGuest::lookup_device(uint64_t addr)
+captive::devices::Device *KVMGuest::lookup_device(uint64_t addr, uint64_t& base_addr)
 {
-	for (const auto& desc : devices) {
-		if (addr >= desc.cfg->base_address() && addr < desc.cfg->base_address() + desc.dev->size()) {
-			return desc.dev;
+	for (auto desc : devices) {
+		if (addr >= desc.second.cfg->base_address() && addr < desc.second.cfg->base_address() + desc.second.dev->size()) {
+			base_addr = desc.first;
+			return desc.second.dev;
 		}
 	}
+	
+	/*auto candidate = devices.lower_bound(addr);
+	if (candidate == devices.end()) return NULL;
+	
+	if (addr < candidate->second.cfg->base_address() + candidate->second.dev->size()) return candidate->second.dev;*/
 
 	return NULL;
 }
@@ -456,6 +577,8 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 		ERROR << "Unable to allocate fixed memory";
 		return NULL;
 	}
+	
+	madvise(rgn->host_buffer, size, MADV_MERGEABLE);
 
 	// Store the buffer address in the KVM memory structure.
 	rgn->kvm.userspace_addr = (uint64_t) rgn->host_buffer;

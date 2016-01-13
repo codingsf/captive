@@ -9,12 +9,12 @@ using namespace captive;
 using namespace captive::arch;
 using namespace captive::arch::arm;
 
-Environment *create_environment_arm(PerCPUData *per_cpu_data)
+Environment *create_environment_arm(PerGuestData *per_guest_data)
 {
-	return new arm_environment(arm_environment::ARMv7, arm_environment::CortexA8, per_cpu_data);
+	return new arm_environment(arm_environment::ARMv7, arm_environment::CortexA8, per_guest_data);
 }
 
-arm_environment::arm_environment(enum arch_variant _arch_variant, enum core_variant _core_variant, PerCPUData *per_cpu_data) : Environment(per_cpu_data), _arch_variant(_arch_variant), _core_variant(_core_variant)
+arm_environment::arm_environment(enum arch_variant _arch_variant, enum core_variant _core_variant, PerGuestData *per_guest_data) : Environment(per_guest_data), _arch_variant(_arch_variant), _core_variant(_core_variant)
 {
 	// TODO: Abstract into platform-specific setup
 	install_core_device(14, new devices::DebugCoprocessor(*this));
@@ -26,7 +26,7 @@ arm_environment::~arm_environment()
 
 }
 
-CPU *arm_environment::create_cpu()
+CPU *arm_environment::create_cpu(PerCPUData *per_cpu_data)
 {
 	return new arm_cpu(*this, per_cpu_data);
 }
@@ -43,7 +43,7 @@ bool arm_environment::prepare_boot_cpu(CPU* core)
 		return false;
 	
 	arm_core->reg_offsets.RB[2]  = 0x100;	// Device Tree / ATAGs
-	arm_core->reg_offsets.RB[12] = core->cpu_data().entrypoint;		// Kernel Entry Point
+	arm_core->reg_offsets.RB[12] = per_guest_data->entrypoint;		// Kernel Entry Point
 	arm_core->reg_offsets.RB[15] = 0;		// Start Address
 	
 	return true;

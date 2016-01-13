@@ -55,13 +55,27 @@ static void handle_segv(int sig, siginfo_t *siginfo, void *ucontext)
 	exit(1);
 }
 
+static Guest *current_guest;
+static void handle_intr(int sig, siginfo_t *siginfo, void *ucontext)
+{
+	fprintf(stderr, "*** received SIGINT\n");
+	if (current_guest) {
+		current_guest->stop();
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct sigaction segv_action;
 	segv_action.sa_sigaction = handle_segv;
 	segv_action.sa_flags = SA_SIGINFO;
+
+	struct sigaction intr_action;
+	intr_action.sa_sigaction = handle_intr;
+	intr_action.sa_flags = SA_SIGINFO;
 	
 	sigaction(SIGSEGV, &segv_action, NULL);
+	sigaction(SIGINT, &intr_action, NULL);
 	
 	const CommandLine *cl = CommandLine::parse(argc, argv);
 
@@ -125,8 +139,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-	guest->guest_entrypoint(kernel->entrypoint());
-
+	current_guest = guest;
+	
 	// Initialise the guest
 	if (!guest->init()) {
 		delete guest;
@@ -145,7 +159,9 @@ int main(int argc, char **argv)
 		ERROR << "Unable to load guest kernel";
 		return 1;
 	}
-		
+
+	guest->guest_entrypoint(kernel->entrypoint());
+
 	/*InitRDLoader initrd(argv[3], 0x8000000);
 	if (!guest->load(initrd)) {
 		delete guest;

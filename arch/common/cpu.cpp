@@ -67,28 +67,20 @@ CPU::~CPU()
 bool CPU::handle_pending_action(uint32_t action)
 {
 	switch (action) {
-	case 2:
-	{
-		//struct mallinfo mi = dlmallinfo();
-		//printf("*** malloc info ***\n");
-		//printf("used: %d\nfree: %d\n", mi.uordblks, mi.fordblks);
+	case 1:
+		return false;
 
+	case 2:
 		dump_state();
 		return true;
-	}
 
 	case 3:
 		trace().enable();
-		return true;
-
-	case 4:
-		asm volatile("out %0, $0xff\n" :: "a"(4));
 		return true;
 	}
 
 	return false;
 }
-
 
 bool CPU::run()
 {

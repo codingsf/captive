@@ -19,13 +19,13 @@ namespace captive {
 		class Environment
 		{
 		public:
-			Environment(PerCPUData *per_cpu_data);
+			Environment(PerGuestData *per_guest_data);
 			virtual ~Environment();
 
 			virtual bool init();
-			bool run();
+			bool run(PerCPUData *per_cpu_data);
 
-			virtual CPU *create_cpu() = 0;
+			virtual CPU *create_cpu(PerCPUData *per_cpu_data) = 0;
 
 			bool write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t data);
 			bool read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data);
@@ -61,7 +61,7 @@ namespace captive {
 			void setup_interrupts();
 
 		protected:
-			PerCPUData *per_cpu_data;
+			PerGuestData *per_guest_data;
 		};
 	}
 }

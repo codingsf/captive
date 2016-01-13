@@ -160,7 +160,7 @@ namespace captive {
 			}
 
 			static inline void flush_tlb() {
-				write_cr3(read_cr3());
+				write_cr3(CR3);
 			}
 
 			static inline void flush_tlb_all() {

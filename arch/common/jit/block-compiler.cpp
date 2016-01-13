@@ -1142,7 +1142,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	
 	// TODO: Check ISA
 	
-	encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(ISA)), REG_CL);
+	/*encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(ISA)), REG_CL);
 	
 	if (isa_mode == 0) {
 		encoder.test(REG_CL, REG_CL);
@@ -1154,7 +1154,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		encoder.je(6);
 		encoder.mov(1, REG_EAX);
 		encoder.ret();
-	}
+	}*/
 	
 	uint32_t prologue_offset = encoder.current_offset();
 	if(max_stack > 0x40)

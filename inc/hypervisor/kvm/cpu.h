@@ -12,7 +12,9 @@
 #include <hypervisor/cpu.h>
 #include <sys/ioctl.h>
 #include <linux/kvm.h>
+
 #include <vector>
+#include <chrono>
 
 namespace captive {
 	namespace devices {
@@ -78,6 +80,8 @@ namespace captive {
 				IRQFD irq_raise;
 				IRQFD irq_rescind;
 				IRQFD irq_ack;
+				
+				std::chrono::high_resolution_clock::time_point cpu_start_time;
 				
 				bool setup_interrupts();
 

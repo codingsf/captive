@@ -65,9 +65,11 @@ bool CPU::run_block_jit_safepoint()
 		// Check to see if there are any pending actions coming in from
 		// the hypervisor.
 		if (unlikely(cpu_data().async_action)) {
-			if (handle_pending_action(cpu_data().async_action)) {
-				cpu_data().async_action = 0;
-			}
+			bool result = handle_pending_action(cpu_data().async_action);
+			cpu_data().async_action = 0;
+			step_ok = !cpu_data().halt;
+			
+			if (!result) continue;
 		}
 		
 		gva_t virt_pc = (gva_t)read_pc();

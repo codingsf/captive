@@ -39,7 +39,7 @@ struct IDT {
 using namespace captive;
 using namespace captive::arch;
 
-Environment::Environment(PerCPUData *per_cpu_data) : per_cpu_data(per_cpu_data)
+Environment::Environment(PerGuestData *per_guest_data) : per_guest_data(per_guest_data)
 {
 	bzero(devices, sizeof(devices));
 }
@@ -130,9 +130,9 @@ bool Environment::init()
 	return true;
 }
 
-bool Environment::run()
+bool Environment::run(PerCPUData *per_cpu_data)
 {
-	CPU *core = create_cpu();
+	CPU *core = create_cpu(per_cpu_data);
 	if (!core) {
 		printf("error: unable to create core\n");
 		return false;
@@ -145,7 +145,10 @@ bool Environment::run()
 		return false;
 	}
 	
+	printf("env: preparing bootloader\n");
 	prepare_bootloader();
+	
+	printf("env: preparing boot core entrypoint=%08x\n", per_guest_data->entrypoint);
 	prepare_boot_cpu(core);
 	
 	core->mmu().set_page_device(GPA_TO_HVA(0x10000000));

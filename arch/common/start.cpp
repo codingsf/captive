@@ -10,7 +10,7 @@
 #include <malloc/malloc.h>
 #include <malloc/page-allocator.h>
 
-extern captive::arch::Environment *create_environment_arm(captive::PerCPUData *per_cpu_data);
+extern captive::arch::Environment *create_environment_arm(captive::PerGuestData *per_guest_data);
 
 extern void (*__init_array_start []) (void);
 extern void (*__init_array_end []) (void);
@@ -66,14 +66,14 @@ extern "C" {
 		captive::arch::smp_cpu_start(1);*/
 
 		printf("creating environment...\n");
-		captive::arch::Environment *env = create_environment_arm(cpu_data);
+		captive::arch::Environment *env = create_environment_arm(cpu_data->guest_data);
 
 		if (!env) {
 			printf("error: unable to create environment\n");
 		} else {
 			if (!env->init()) {
 				printf("error: unable to initialise environment\n");
-			} else if (!env->run()) {
+			} else if (!env->run(cpu_data)) {
 				printf("error: unable to launch environment\n");
 			}
 

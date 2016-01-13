@@ -30,6 +30,8 @@ namespace captive {
 	}
 
 	struct PerGuestData {
+		uint32_t entrypoint;
+		
 		uintptr_t printf_buffer;
 		
 		uintptr_t heap_virt_base;
@@ -51,7 +53,6 @@ namespace captive {
 		uint64_t interrupts_taken;
 		
 		uint32_t execution_mode;	// Mode of execution
-		uint32_t entrypoint;		// Entrypoint of the guest
 
 		bool verbose_enabled;
 	};

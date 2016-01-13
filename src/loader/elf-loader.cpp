@@ -74,7 +74,8 @@ bool ELFLoader::install(uint8_t* gpm)
 	}
 
 	_entrypoint = (gpa_t)hdr->e_entry;
-
+	DEBUG << CONTEXT(ELF) << "Entry Point @ " << std::hex << _entrypoint;
+	
 	close();
 
 	return true;
