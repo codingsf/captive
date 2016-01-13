@@ -237,6 +237,12 @@ void KVMGuest::core_thread_proc(KVMCpu *core)
 	std::string thread_name = "core-" + std::to_string(core->id());
 	pthread_setname_np(pthread_self(), thread_name.c_str());
 	
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(0, &cpuset);
+	
+	pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+	
 	Guest::current_core = core;
 	core->run();
 	core->owner().stop();
