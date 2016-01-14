@@ -17,7 +17,16 @@ extern "C" {
 		case 5: // Flush DTLB Entry
 			captive::arch::CPU::get_active_cpu()->mmu().invalidate_virtual_mapping((gva_t)arg);
 			return 0;
+			
+		case 6: // Invalidate I$
+			captive::arch::CPU::get_active_cpu()->invalidate_virtual_mappings();
+			return 0;
+
+		case 7: // Invalidate I$ Entry
+			captive::arch::CPU::get_active_cpu()->invalidate_virtual_mapping((gva_t)arg);
+			return 0;
 		}
+		
 		return -1;
 	}
 }

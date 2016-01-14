@@ -376,7 +376,7 @@ bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
 		return true;
 	} else {
 		access_info info;
-
+		
 		info.type = ACCESS_FETCH;
 		info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
 

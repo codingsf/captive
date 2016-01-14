@@ -74,7 +74,7 @@ bool CPU::run_block_jit_safepoint()
 		
 		gva_t virt_pc = (gva_t)read_pc();
 		gpa_t phys_pc;
-		
+
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
@@ -93,6 +93,8 @@ bool CPU::run_block_jit_safepoint()
 			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 			region_phys_base = phys_pc & 0xfffff000;
+		} else {
+			phys_pc = region_phys_base | (virt_pc & 0xfff);
 		}
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
@@ -104,7 +106,7 @@ bool CPU::run_block_jit_safepoint()
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
 			blk->loop_header = true;
-			blk->txln = compile_block(blk, *tagged_registers().ISA, PAGE_ADDRESS_OF(phys_pc) | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
+			blk->txln = compile_block(blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
 			mmu().disable_writes();
 
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
@@ -112,7 +114,7 @@ bool CPU::run_block_jit_safepoint()
 		
 		if (should_mark) {
 			should_mark = false;
-			mmu().set_page_executed(GPA_TO_HVA(PAGE_ADDRESS_OF(phys_pc)));
+			mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
 		}
 	} while(step_ok);
 	
