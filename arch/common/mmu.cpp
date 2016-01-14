@@ -210,7 +210,7 @@ void MMU::disable_writes()
 	}
 }
 
-bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault, bool emulate_user)
+bool MMU::handle_fault(const struct resolve_request& request, struct resolve_response& response)
 {
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
@@ -218,10 +218,10 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	page_table_entry_t *pt;
 
 	hva_t host_va;
-	if (emulate_user) {
-		host_va = GVA_TO_EMULATED_HVA(va);
+	if (request.emulate_user) {
+		host_va = GVA_TO_EMULATED_HVA(request.va);
 	} else {
-		host_va = (hva_t)(va);
+		host_va = (hva_t)(request.va);
 	}
 	
 	Memory::get_va_table_entries(host_va, pm, pdp, pd, pt);
@@ -290,17 +290,18 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	// If the fault happened because of a device access, catch this early
 	// before we go over the lookup rigmaroll.
 	if (pt->device()) {
-		out_pa = (gpa_t)((pt->base_address() & 0xffffffff) | (va & 0xfff));
+		response.pa = (gpa_t)((pt->base_address() & 0xffffffff) | (request.va & 0xfff));
 		goto handle_device;
 	}
 
 	if (!enabled()) {
-		fault = NONE;
+		response.fault = NONE;
+		response.pa = (gpa_t)request.va;
 
-		pt->base_address(GPA_TO_HPA(va));
+		pt->base_address(GPA_TO_HPA(response.pa));
 		pt->present(true);
 		pt->allow_user(true);
-		pt->writable(info.is_write());
+		pt->writable(request.is_write());
 		
 		//printf("mmu: %08x disabled: va=pa=%08x hpa=%lx, hva=%lx\n", _cpu.read_pc(), va, pt->base_address(), GPA_TO_HVA(pt->base_address()));
 
@@ -308,32 +309,29 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 			pt->device(true);
 			pt->present(false);
 
-			out_pa = (gpa_t)va;
 			goto handle_device;
 		}
 	} else {
 		gpa_t pa;
 	
-		if (!resolve_gpa(va, pa, info, fault)) {
+		if (!resolve_gpa(request, response, true)) {
 			return false;
 		}
 
-		if (fault == NONE) {
+		if (response.fault == NONE) {
 			// Update the corresponding page table address entry and mark it as
 			// present and writable.  Note, assigning the base address will mask
 			// out the bottom twelve bits of the incoming address, to ensure it's
 			// a page-aligned value.
-			pt->base_address((uint64_t)GPA_TO_HPA(pa));
+			pt->base_address((uint64_t)GPA_TO_HPA(response.pa));
 			pt->present(true);
-			pt->allow_user(info.is_user());
-			pt->writable(info.is_write());
+			pt->allow_user(request.is_user());
+			pt->writable(request.is_write());
 
-			if (is_page_device(GPA_TO_HVA(pa))) {
+			if (is_page_device(GPA_TO_HVA(response.pa))) {
 				pt->device(true);
 				pt->present(false);
 
-				out_pa = pa;
-				
 				Memory::flush_page(host_va);
 				goto handle_device;
 			}
@@ -347,13 +345,13 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 		}
 	}
 
-	if (pt->present() && info.is_write() && fault == NONE) {
+	if (pt->present() && request.is_write() && response.fault == NONE) {
 		if (clear_if_page_executed(GPA_TO_HVA(pt->base_address()))) {
-			cpu().invalidate_translation(pt->base_address(), (hva_t)va);
+			cpu().invalidate_translation(pt->base_address(), (hva_t)request.va);
 
 			//printf("PC: %08x, VA: %08x\n", _cpu.read_pc(), (uint32_t)va);
-			if ((_cpu.read_pc() & ~0xfff) == (uint32_t)(va & ~0xfff)) {
-				fault = SMC_FAULT;
+			if ((_cpu.read_pc() & ~0xfff) == (uint32_t)(request.va & ~0xfff)) {
+				response.fault = SMC_FAULT;
 			}
 		}
 	}
@@ -362,30 +360,32 @@ bool MMU::handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolut
 	return true;
 
 handle_device:
-	fault = DEVICE_FAULT;
+	response.fault = DEVICE_FAULT;
 	return true;
 }
 
-bool MMU::virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault)
+bool MMU::translate_fetch(gva_t va, struct resolve_response& rsp)
 {
 	uint32_t va_page = va >> 12;
 	uint32_t cache_idx = va_page % ITLB_SIZE;
 	
 	if (va_page != 0 && itlb[cache_idx].tag == va_page) {
-		pa = itlb[cache_idx].value | (va & 0xfff);
+		rsp.fault = NONE;
+		rsp.pa = itlb[cache_idx].value | (va & 0xfff);
 		return true;
 	} else {
-		access_info info;
+		struct resolve_request req;
 		
-		info.type = ACCESS_FETCH;
-		info.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
+		req.va = va;
+		req.type = ACCESS_FETCH;
+		req.mode = _cpu.kernel_mode() ? ACCESS_KERNEL : ACCESS_USER;
 
-		if (!resolve_gpa(va, pa, info, fault, true))
+		if (!resolve_gpa(req, rsp, true))
 			return false;
 		
-		if (fault == NONE) {
+		if (rsp.fault == NONE) {
 			itlb[cache_idx].tag = va_page;
-			itlb[cache_idx].value = pa & ~0xfff;
+			itlb[cache_idx].value = rsp.pa & ~0xfff;
 		}
 		
 		return true;

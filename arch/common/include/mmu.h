@@ -38,22 +38,25 @@ namespace captive {
 				ACCESS_USER,
 				ACCESS_KERNEL,
 			};
-
-			enum fault_reason {
-				REASON_PAGE_INVALID,
-				REASON_PERMISSIONS_FAIL
-			};
-
-			struct access_info {
+			
+			struct resolve_request
+			{
+				gva_t va;
 				enum access_type type;
 				enum access_mode mode;
-				enum fault_reason reason;
-
+				bool emulate_user;
+				
 				inline bool is_read() const { return type == ACCESS_READ; }
 				inline bool is_write() const { return type == ACCESS_WRITE; }
 				inline bool is_fetch() const { return type == ACCESS_FETCH; }
 				inline bool is_kernel() const { return mode == ACCESS_KERNEL; }
 				inline bool is_user() const { return mode == ACCESS_USER; }
+			};
+			
+			struct resolve_response
+			{
+				gpa_t pa;
+				resolution_fault fault;
 			};
 
 			MMU(CPU& cpu);
@@ -77,10 +80,10 @@ namespace captive {
 			bool is_page_dirty(hva_t va);
 			uint32_t page_checksum(hva_t va);
 
-			bool handle_fault(gva_t va, gpa_t& out_pa, const access_info& info, resolution_fault& fault, bool emulate_user);
-			virtual bool resolve_gpa(gva_t va, gpa_t& pa, const access_info& info, resolution_fault& fault, bool have_side_effects = true) = 0;
+			bool handle_fault(const struct resolve_request& request, struct resolve_response& response);
+			virtual bool resolve_gpa(const struct resolve_request& request, struct resolve_response& response, bool have_side_effects = true) = 0;
 
-			bool virt_to_phys(gva_t va, gpa_t& pa, resolution_fault& fault);
+			bool translate_fetch(gva_t va, struct resolve_response& response);
 
 			void invalidate_virtual_mappings();
 			void invalidate_virtual_mapping(gva_t va);

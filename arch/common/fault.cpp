@@ -61,24 +61,24 @@ int do_device_read(struct mcontext *mctx)
 	default: fatal("unhandled base register %s for device read\n", x86::x86_register_names[inst.Source.mem.base_reg_idx]);
 	}
 
-	gpa_t pa;
-	MMU::resolution_fault fault;
-	MMU::access_info info;
+	MMU::resolve_request req;
+	MMU::resolve_response rsp;
 
-	info.type = MMU::ACCESS_READ;
-	info.mode = CPU::get_active_cpu()->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+	req.va = va;
+	req.type = MMU::ACCESS_READ;
+	req.mode = CPU::get_active_cpu()->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 
-	CPU::get_active_cpu()->mmu().resolve_gpa(va, pa, info, fault, true);
-	if (fault) {
-		printf("read @ %p va=%x fault=%d\n", mctx->rip - 2, va, fault);
-		return (int)fault;
+	CPU::get_active_cpu()->mmu().resolve_gpa(req, rsp, true);
+	if (rsp.fault) {
+		printf("read @ %p va=%x fault=%d\n", mctx->rip - 2, va, rsp.fault);
+		return (int)rsp.fault;
 	}
 
 	uint64_t value;
 	switch (inst.data_size) {
-	case 1: value = __in8(pa); break;
-	case 2: value = __in16(pa); break;
-	case 4: value = __in32(pa); break;
+	case 1: value = __in8(rsp.pa); break;
+	case 2: value = __in16(rsp.pa); break;
+	case 4: value = __in32(rsp.pa); break;
 	default: fatal("invalid data size for rewritten device read\n");
 	}
 	
@@ -127,40 +127,40 @@ int do_device_write(struct mcontext *mctx)
 	default: fatal("unhandled base register %s for device write\n", x86::x86_register_names[inst.Dest.mem.base_reg_idx]);
 	}
 
-	gpa_t pa;
-	MMU::resolution_fault fault;
-	MMU::access_info info;
+	MMU::resolve_request req;
+	MMU::resolve_response rsp;
 
-	info.type = MMU::ACCESS_WRITE;
-	info.mode = CPU::get_active_cpu()->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
+	req.va = va;
+	req.type = MMU::ACCESS_WRITE;
+	req.mode = CPU::get_active_cpu()->kernel_mode() ? MMU::ACCESS_KERNEL : MMU::ACCESS_USER;
 
-	CPU::get_active_cpu()->mmu().resolve_gpa(va, pa, info, fault, true);
-	if (fault) {
-		printf("write @ %p va=%x fault=%d\n", mctx->rip - 2, va, fault);
-		return (int)fault;
+	CPU::get_active_cpu()->mmu().resolve_gpa(req, rsp, true);
+	if (rsp.fault) {
+		printf("write @ %p va=%x fault=%d\n", mctx->rip - 2, va, rsp.fault);
+		return (int)rsp.fault;
 	}
 
 	switch (inst.Source.reg) {
-	case x86::Operand::R_EAX: __out32(pa, mctx->rax); break;
-	case x86::Operand::R_EBX: __out32(pa, mctx->rbx); break;
-	case x86::Operand::R_ECX: __out32(pa, mctx->rcx); break;
-	case x86::Operand::R_EDX: __out32(pa, mctx->rdx); break;
-	case x86::Operand::R_ESI: __out32(pa, mctx->rsi); break;
-	case x86::Operand::R_EDI: __out32(pa, mctx->rdi); break;
+	case x86::Operand::R_EAX: __out32(rsp.pa, mctx->rax); break;
+	case x86::Operand::R_EBX: __out32(rsp.pa, mctx->rbx); break;
+	case x86::Operand::R_ECX: __out32(rsp.pa, mctx->rcx); break;
+	case x86::Operand::R_EDX: __out32(rsp.pa, mctx->rdx); break;
+	case x86::Operand::R_ESI: __out32(rsp.pa, mctx->rsi); break;
+	case x86::Operand::R_EDI: __out32(rsp.pa, mctx->rdi); break;
 
-	case x86::Operand::R_AX: __out16(pa, mctx->rax); break;
-	case x86::Operand::R_BX: __out16(pa, mctx->rbx); break;
-	case x86::Operand::R_CX: __out16(pa, mctx->rcx); break;
-	case x86::Operand::R_DX: __out16(pa, mctx->rdx); break;
-	case x86::Operand::R_SI: __out16(pa, mctx->rsi); break;
-	case x86::Operand::R_DI: __out16(pa, mctx->rdi); break;
+	case x86::Operand::R_AX: __out16(rsp.pa, mctx->rax); break;
+	case x86::Operand::R_BX: __out16(rsp.pa, mctx->rbx); break;
+	case x86::Operand::R_CX: __out16(rsp.pa, mctx->rcx); break;
+	case x86::Operand::R_DX: __out16(rsp.pa, mctx->rdx); break;
+	case x86::Operand::R_SI: __out16(rsp.pa, mctx->rsi); break;
+	case x86::Operand::R_DI: __out16(rsp.pa, mctx->rdi); break;
 
-	case x86::Operand::R_AL: __out8(pa, mctx->rax); break;
-	case x86::Operand::R_BL: __out8(pa, mctx->rbx); break;
-	case x86::Operand::R_CL: __out8(pa, mctx->rcx); break;
-	case x86::Operand::R_DL: __out8(pa, mctx->rdx); break;
-	case x86::Operand::R_SIL: __out8(pa, mctx->rsi); break;
-	case x86::Operand::R_DIL: __out8(pa, mctx->rdi); break;
+	case x86::Operand::R_AL: __out8(rsp.pa, mctx->rax); break;
+	case x86::Operand::R_BL: __out8(rsp.pa, mctx->rbx); break;
+	case x86::Operand::R_CL: __out8(rsp.pa, mctx->rcx); break;
+	case x86::Operand::R_DL: __out8(rsp.pa, mctx->rdx); break;
+	case x86::Operand::R_SIL: __out8(rsp.pa, mctx->rsi); break;
+	case x86::Operand::R_DIL: __out8(rsp.pa, mctx->rdi); break;
 
 	default: fatal("unhandled source register %s for device write\n", x86::x86_register_names[inst.Source.reg]);
 	}
@@ -320,56 +320,52 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		captive::arch::CPU *core = captive::arch::CPU::get_active_cpu();
 
 		if (core) {
-			MMU::resolution_fault fault = (MMU::resolution_fault)0;
-			MMU::access_info info;
-
+			MMU::resolve_request req;
+			MMU::resolve_response rsp;
+			
+			req.va = va;
+			rsp.fault = MMU::NONE;
+			
 			// Prepare an access_info structure to describe the memory access
 			// to the MMU.
 			if (emulate_user) {
+				req.emulate_user = true;
 				// If we're emulating a user-mode instruction, mark this access as a USER access.
-				info.mode = MMU::ACCESS_USER;
+				req.mode = MMU::ACCESS_USER;
 			} else {
-				info.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
-			}
-
-			if (code & PF_PRESENT) {
-				// Detect the fault as being because a permissions check failed
-				info.reason = MMU::REASON_PERMISSIONS_FAIL;
-			} else {
-				// Detect the fault as being because the accessed page is invalid
-				info.reason = MMU::REASON_PAGE_INVALID;
+				req.emulate_user = false;
+				req.mode = (code & PF_USER_MODE) ? MMU::ACCESS_USER : MMU::ACCESS_KERNEL;
 			}
 
 			if ((uint32_t)va == core->read_pc() && !(code & PF_WRITE)) {
 				// Detect a fetch
-				info.type = MMU::ACCESS_FETCH;
+				req.type = MMU::ACCESS_FETCH;
 			} else {
 				// Detect a READ/WRITE
 				if (code & PF_WRITE) {
-					info.type = MMU::ACCESS_WRITE;
+					req.type = MMU::ACCESS_WRITE;
 				} else {
-					info.type = MMU::ACCESS_READ;
+					req.type = MMU::ACCESS_READ;
 				}
 			}
 
 			// Get the core's MMU to handle the fault.
-			gpa_t out_pa;
-			if (core->mmu().handle_fault((gva_t)va, out_pa, info, fault, emulate_user)) {
+			if (core->mmu().handle_fault(req, rsp)) {
 				// If we got this far, then the fault was handled by the core's logic.
 				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%s, type=%s, reason=%s\n", va, code, core->read_pc(), fault, info_modes[info.mode], info_types[info.type], info_reasons[info.reason]);
 
-				if (fault == MMU::DEVICE_FAULT) {
-					handle_device_fault(core, mctx, out_pa);
+				if (rsp.fault == MMU::DEVICE_FAULT) {
+					handle_device_fault(core, mctx, rsp.pa);
 					return 0;
-				} else if (fault == MMU::SMC_FAULT) {
+				} else if (rsp.fault == MMU::SMC_FAULT) {
 					return 2;
-				} else if (fault == MMU::NONE) {
+				} else if (rsp.fault == MMU::NONE) {
 					return 0;
 				} else {
 					// Invoke the target platform behaviour for the memory fault
 					// Return TRUE if we need to return to the safe-point, i.e. to do a side
 					// exit from the currently executing guest instruction.
-					core->handle_mmu_fault(fault);
+					core->handle_mmu_fault(rsp.fault);
 					return 1;
 				}
 			} else {

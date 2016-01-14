@@ -73,28 +73,25 @@ bool CPU::run_block_jit_safepoint()
 		}
 		
 		gva_t virt_pc = (gva_t)read_pc();
-		gpa_t phys_pc;
 
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			// This will perform a FETCH with side effects, so that we can impose the
 			// correct permissions checking for the block we're about to execute.
-			MMU::resolution_fault fault = MMU::NONE;
-			if (unlikely(!mmu().virt_to_phys(virt_pc, phys_pc, fault))) fatal("mmu: failed to translate for fetch\n");
+			MMU::resolve_response rsp;
+			if (unlikely(!mmu().translate_fetch(virt_pc, rsp))) fatal("mmu: failed to translate for fetch\n");
 
 			// If there was a fault, then switch back to the safe-point.
-			if (unlikely(fault)) {
-				if (!handle_mmu_fault(fault)) return false;
+			if (unlikely(rsp.fault)) {
+				if (!handle_mmu_fault(rsp.fault)) return false;
 				continue;
 			}
 
 			// Mark the physical page corresponding to the PC as executed
 			should_mark = true;
 
-			rgn = image->get_region(phys_pc);
+			rgn = image->get_region(rsp.pa);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
-			region_phys_base = phys_pc & 0xfffff000;
-		} else {
-			phys_pc = region_phys_base | (virt_pc & 0xfff);
+			region_phys_base = rsp.pa & 0xfffff000;
 		}
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
