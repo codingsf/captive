@@ -37,6 +37,12 @@ namespace captive {
 			virtual void rescind_guest_interrupt(uint8_t irq) = 0;
 			virtual void acknowledge_guest_interrupt(uint8_t irq) = 0;
 
+			void instrument_dump();
+			
+		protected:
+			void instrument_fn_enter(uint64_t fnptr, uint64_t callsite);
+			void instrument_fn_exit(uint64_t fnptr, uint64_t callsite);
+			
 		private:
 			int _id;
 			Guest& _owner;

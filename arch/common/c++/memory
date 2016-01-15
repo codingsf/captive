@@ -70,8 +70,8 @@ public:
 	}
 
 	//Use placement new to engage the constructor
-	void construct(pointer p, const T& val) { new((void*)p) T(val); }
-	void destroy(pointer p){ ((T*)p)->~T(); }	//Call destructor
+	inline void construct(pointer p, const T& val) { new((void*)p) T(val); }
+	inline void destroy(pointer p){ ((T*)p)->~T(); }	//Call destructor
 
 	size_type max_size() const throw();
 	template<class U> struct rebind { typedef allocator<U> other; };

@@ -245,6 +245,8 @@ void KVMGuest::core_thread_proc(KVMCpu *core)
 	
 	Guest::current_core = core;
 	core->run();
+	core->instrument_dump();
+	
 	core->owner().stop();
 }
 

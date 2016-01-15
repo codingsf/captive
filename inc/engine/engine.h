@@ -33,6 +33,17 @@ namespace captive {
 				symbol = sym->second;
 				return true;
 			}
+			
+			inline bool resolve_symbol(uint64_t symbol, std::string& name) {
+				for (auto sym : symbols) {
+					if (sym.second == symbol) {
+						name = sym.first;
+						return true;
+					}
+				}
+				
+				return false;
+			}
 
 		private:
 			bool load();

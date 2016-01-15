@@ -50,7 +50,7 @@ namespace captive {
 				virtual ~arm_mmu_v6();
 
 			protected:
-				bool resolve_gpa(const struct resolve_request& request, struct resolve_response& response, bool have_side_effects) override;
+				bool resolve_gpa(struct resolution_context& context, bool have_side_effects) override;
 
 			private:
 				struct l1_descriptor {
@@ -229,9 +229,9 @@ namespace captive {
 					PAGE_PERMISSION		= 15,
 				};
 
-				bool check_access_perms(uint32_t ap, const struct resolve_request& request);
-				bool resolve_section(const struct resolve_request& request, struct resolve_response& response, arm_resolution_fault& fault, const l1_descriptor *l1);
-				bool resolve_coarse(const struct resolve_request& request, struct resolve_response& response, arm_resolution_fault& fault, const l1_descriptor *l1);
+				bool update_permissions(uint32_t ap, struct resolution_context& context);
+				bool resolve_section(struct resolution_context& context, arm_resolution_fault& fault, const l1_descriptor *l1);
+				bool resolve_coarse(struct resolution_context& context, arm_resolution_fault& fault, const l1_descriptor *l1);
 			};
 		}
 	}

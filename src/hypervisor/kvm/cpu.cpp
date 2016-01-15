@@ -225,6 +225,14 @@ bool KVMCpu::run()
 				}
 			} else if (cpu_run_struct->io.port == 0xfd) {
 				dump_regs();
+			} else if (cpu_run_struct->io.port == 0xf1) {
+				struct kvm_regs regs;
+				vmioctl(KVM_GET_REGS, &regs);
+				instrument_fn_enter(regs.rdi, regs.rsi);
+			} else if (cpu_run_struct->io.port == 0xf2) {
+				struct kvm_regs regs;
+				vmioctl(KVM_GET_REGS, &regs);
+				instrument_fn_exit(regs.rdi, regs.rsi);
 			} else if (cpu_run_struct->io.port == 0xf0) {
 				struct kvm_regs regs;
 				vmioctl(KVM_GET_REGS, &regs);

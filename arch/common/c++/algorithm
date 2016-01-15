@@ -377,7 +377,7 @@ namespace std{
 		return result;
 	}
 
-	template<class T> _UCXXEXPORT void swap(T& a, T& b){
+	template<class T> _UCXXEXPORT inline void swap(T& a, T& b){
 		T temp(a);
 		a = b;
 		b = temp;
