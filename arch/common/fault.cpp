@@ -268,7 +268,7 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 	}
 
 	if ((int64_t)mctx->rip > 0) {
-		//rewrite_device_access(mctx->rip, (uint8_t *)mctx->rip, inst);
+		rewrite_device_access(mctx->rip, (uint8_t *)mctx->rip, inst);
 	}
 	
 	// Skip over the instruction
