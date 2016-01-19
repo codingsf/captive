@@ -166,7 +166,7 @@ void SDLVirtualScreen::window_thread_proc()
 
 		// Draw a frame
 		draw_frame();
-		usleep(10000);
+		usleep(20000);
 	}
 }
 

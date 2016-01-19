@@ -1,12 +1,12 @@
 #include <devices/arm/mptimer.h>
-#include <devices/timers/tick-source.h>
+#include <devices/timers/timer-manager.h>
 #include <devices/irq/irq-line.h>
 
 using namespace captive::devices::arm;
 
-MPTimer::MPTimer(timers::TickSource& ts, irq::IRQLine& irq) : ts(ts), irq(irq), enabled(false), auto_reload(false), irq_enabled(false), prescale(0), load(0), val(0), isr(0), start(0)
+MPTimer::MPTimer(timers::TimerManager& timer_manager, irq::IRQLine& irq) : timer_manager(timer_manager), irq(irq), enabled(false), auto_reload(false), irq_enabled(false), prescale(0), load(0), val(0), isr(0), start(0)
 {
-	ts.add_sink(*this);
+	timer_manager.add_timer(RATE_MHZ, *this);
 }
 
 MPTimer::~MPTimer() {
@@ -78,7 +78,7 @@ bool MPTimer::write(uint64_t off, uint8_t len, uint64_t data)
 	return false;
 }
 
-void MPTimer::tick(uint32_t period)
+void MPTimer::timer_expired(uint64_t ticks)
 {
 	if (enabled) {
 		if (val > 10000) {

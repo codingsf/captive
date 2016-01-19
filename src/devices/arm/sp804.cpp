@@ -6,12 +6,12 @@
 
 using namespace captive::devices::arm;
 
-SP804::SP804(timers::TickSource& tick_source, irq::IRQLine& irq) : Primecell(0x00141804), ticks(1000), irq(irq)
+SP804::SP804(timers::TimerManager& timer_manager, irq::IRQLine& irq) : Primecell(0x00141804), irq(irq)
 {
 	timers[0].owner(*this);
 	timers[1].owner(*this);
 
-	tick_source.add_sink(*this);
+	timer_manager.add_timer(RATE_MHZ, *this);
 }
 
 SP804::~SP804()
@@ -58,7 +58,7 @@ bool SP804::write(uint64_t off, uint8_t len, uint64_t data)
 	return false;
 }
 
-void SP804::tick(uint32_t period)
+void SP804::timer_expired(uint64_t ticks)
 {
 	if (timers[0].enabled()) timers[0].tick(ticks);
 	if (timers[1].enabled()) timers[1].tick(ticks);
@@ -144,11 +144,11 @@ bool SP804::SP804Timer::write(uint64_t off, uint8_t len, uint64_t data)
 	return true;
 }
 
-void SP804::SP804Timer::tick(uint32_t ticks)
+void SP804::SP804Timer::tick(uint64_t delta)
 {
 	if (!_enabled) return;
 
-	if (current_value <= ticks) {
+	if (current_value <= delta) {
 		_isr |= 1;
 
 		if (control_reg.bits.int_en) _owner->update_irq();
@@ -157,7 +157,7 @@ void SP804::SP804Timer::tick(uint32_t ticks)
 
 		if (control_reg.bits.one_shot) return;
 	} else {
-		current_value -= ticks;
+		current_value -= delta;
 	}
 }
 

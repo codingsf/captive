@@ -29,7 +29,7 @@ bool SBCON::write(uint64_t off, uint8_t len, uint64_t data)
 		out |= data & 3;
 		return true;
 	case 4:
-		out &= ~data;
+		out &= ~(data & 3);
 		return true;
 	}
 	

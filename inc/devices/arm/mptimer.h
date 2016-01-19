@@ -15,7 +15,7 @@
 #define MPTIMER_H
 
 #include <devices/device.h>
-#include <devices/timers/tick-source.h>
+#include <devices/timers/timer-manager.h>
 
 namespace captive {
 	namespace devices {
@@ -24,10 +24,10 @@ namespace captive {
 		}
 		
 		namespace arm {
-			class MPTimer : public Device, public timers::TickSink
+			class MPTimer : public Device, public timers::TimerSink
 			{
 			public:
-				MPTimer(timers::TickSource& ts, irq::IRQLine& irq);
+				MPTimer(timers::TimerManager& timer_manager, irq::IRQLine& irq);
 				virtual ~MPTimer();
 				
 				std::string name() const override { return "mptimer"; }
@@ -37,11 +37,10 @@ namespace captive {
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 				
-			protected:
-				void tick(uint32_t period) override;
+				void timer_expired(uint64_t ticks) override;
 
 			private:
-				timers::TickSource& ts;
+				timers::TimerManager& timer_manager;
 				irq::IRQLine& irq;
 				
 				bool enabled, auto_reload, irq_enabled;

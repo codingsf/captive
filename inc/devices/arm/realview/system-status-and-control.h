@@ -14,7 +14,7 @@
 namespace captive {
 	namespace devices {
 		namespace timers {
-			class TickSource;
+			class TimerManager;
 		}
 		
 		namespace arm {
@@ -22,7 +22,7 @@ namespace captive {
 				class SystemStatusAndControl : public Device
 				{
 				public:
-					SystemStatusAndControl(timers::TickSource& tick_source);
+					SystemStatusAndControl(timers::TimerManager& timer_manager);
 
 					std::string name() const override { return "sysctl"; }
 					uint32_t size() const override { return 0x1000; }
@@ -35,7 +35,7 @@ namespace captive {
 					typedef std::chrono::duration<uint32_t, std::ratio<1, 24000000> > tick_24MHz_t;
 					typedef std::chrono::duration<uint32_t, std::ratio<1, 100> > tick_100Hz_t;
 
-					timers::TickSource& _tick_source;
+					timers::TimerManager& _timer_manager;
 					uint64_t _start_time;
 					
 					uint32_t osc[5];

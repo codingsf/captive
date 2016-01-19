@@ -2,8 +2,9 @@
 
 using namespace captive;
 using namespace captive::platform;
+using namespace captive::devices::timers;
 
-Platform::Platform()
+Platform::Platform(TimerManager& timer_manager) : _timer_manager(timer_manager)
 {
 	
 }

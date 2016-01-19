@@ -1,3 +1,4 @@
+#if 0
 #include <devices/timers/microsecond-tick-source.h>
 #include <captive.h>
 #include <thread>
@@ -73,3 +74,4 @@ void MicrosecondTickSource::tick_thread_proc() {
 		}
 	}
 }
+#endif

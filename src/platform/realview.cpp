@@ -47,7 +47,7 @@ using namespace captive::devices::gfx;
 using namespace captive::devices::io;
 using namespace captive::devices::io::virtio;
 
-Realview::Realview(Variant variant, devices::timers::TickSource& ts, std::string block_device_file) : variant(variant), socket_uart(NULL)
+Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant, std::string block_device_file) : Platform(timer_manager), variant(variant), socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
@@ -55,7 +55,7 @@ Realview::Realview(Variant variant, devices::timers::TickSource& ts, std::string
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x70000000, 0x20000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0xc0000000, 0x40000000));
 	
-	SystemStatusAndControl *statctl = new SystemStatusAndControl(ts);
+	SystemStatusAndControl *statctl = new SystemStatusAndControl(timer_manager);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *statctl));
 
 	SystemController *syscon0 = new SystemController(SystemController::SYS_CTRL0);
@@ -84,7 +84,7 @@ Realview::Realview(Variant variant, devices::timers::TickSource& ts, std::string
 		SnoopControlUnit *scu = new SnoopControlUnit();
 		cfg.devices.push_back(GuestDeviceConfiguration(0x1f000000, *scu));
 		
-		MPTimer *mpt = new MPTimer(ts, *gic0->get_irq_line(29));
+		MPTimer *mpt = new MPTimer(timer_manager, *gic0->get_irq_line(29));
 		cfg.devices.push_back(GuestDeviceConfiguration(0x1f000600, *mpt));
 		
 		PL310 *pl310 = new PL310();
@@ -94,10 +94,10 @@ Realview::Realview(Variant variant, devices::timers::TickSource& ts, std::string
 		cfg.devices.push_back(GuestDeviceConfiguration(0x1e001000, gic0->get_distributor()));
 	}
 	
-	SP804 *timer01 = new SP804(ts, *gic0->get_irq_line(36));
-	SP804 *timer23 = new SP804(ts, *gic0->get_irq_line(37));
-	SP804 *timer45 = new SP804(ts, *gic0->get_irq_line(73));
-	SP804 *timer67 = new SP804(ts, *gic0->get_irq_line(74));
+	SP804 *timer01 = new SP804(timer_manager, *gic0->get_irq_line(36));
+	SP804 *timer23 = new SP804(timer_manager, *gic0->get_irq_line(37));
+	SP804 *timer45 = new SP804(timer_manager, *gic0->get_irq_line(73));
+	SP804 *timer67 = new SP804(timer_manager, *gic0->get_irq_line(74));
 
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10011000, *timer01));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10012000, *timer23));

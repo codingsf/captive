@@ -25,7 +25,7 @@ namespace captive {
 				virtual std::string name() const { return "pl031"; }
 				
 			private:
-				uint32_t dr, match, load, ctrl, mask, isr;
+				uint32_t match, load, ctrl, mask, isr;
 			};
 		}
 	}

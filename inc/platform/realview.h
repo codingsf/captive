@@ -22,11 +22,7 @@ namespace captive {
 			class NullVirtualScreen;
 			class SDLVirtualScreen;
 		}
-		
-		namespace timers {
-			class TickSource;
-		}
-		
+				
 		namespace io {
 			class SocketUART;
 		}
@@ -42,7 +38,7 @@ namespace captive {
 				CORTEX_A9,
 			};
 			
-			Realview(Variant variant, devices::timers::TickSource& ts, std::string block_device_file);
+			Realview(devices::timers::TimerManager& timer_manager, Variant variant, std::string block_device_file);
 			virtual ~Realview();
 			
 			const hypervisor::GuestConfiguration& config() const override;

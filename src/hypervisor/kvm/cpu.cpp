@@ -9,7 +9,6 @@
 
 #include <devices/device.h>
 #include <devices/irq/irq-controller.h>
-#include <devices/timers/callback-tick-source.h>
 #include <sys/eventfd.h>
 #include <sys/signal.h>
 #include <fcntl.h>

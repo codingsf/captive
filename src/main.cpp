@@ -17,8 +17,7 @@
 #include <util/thread-pool.h>
 #include <util/cl/options.h>
 
-#include <devices/timers/callback-tick-source.h>
-#include <devices/timers/microsecond-tick-source.h>
+#include <devices/timers/timer-manager.h>
 
 #include <signal.h>
 #include <execinfo.h>
@@ -103,12 +102,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// Create the master tick source
-	TickSource *ts;
-	ts = new MicrosecondTickSource();
+	// Create the timer manager
+	TimerManager timer_manager;
 
 	// Create the guest platform.
-	Platform *pfm = new Realview(Realview::CORTEX_A8, *ts, std::string(argv[4]));
+	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8, std::string(argv[4]));
 
 	// Create the engine.
 	Engine engine(argv[1]);
@@ -196,8 +194,8 @@ int main(int argc, char **argv)
 		}
 	}
 		
-	// Start the tick source.
-	ts->start();
+	// Start the timer manager
+	timer_manager.start();
 
 	// Start the platform.
 	pfm->start();
@@ -213,8 +211,7 @@ int main(int argc, char **argv)
 	//bdev->close_file();
 
 	// Stop the tick source
-	ts->stop();
-	delete ts;
+	timer_manager.stop();
 	
 	// Clean-up
 	delete guest;

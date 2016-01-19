@@ -9,7 +9,7 @@
 #define	SP804_H
 
 #include <devices/arm/primecell.h>
-#include <devices/timers/tick-source.h>
+#include <devices/timers/timer-manager.h>
 
 namespace captive {
 	namespace devices {
@@ -18,16 +18,16 @@ namespace captive {
 		}
 
 		namespace arm {
-			class SP804 : public Primecell, public timers::TickSink
+			class SP804 : public Primecell, public timers::TimerSink
 			{
 			public:
-				SP804(timers::TickSource& tick_source, irq::IRQLine& irq);
+				SP804(timers::TimerManager& timer_manager, irq::IRQLine& irq);
 				virtual ~SP804();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
 				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 
-				void tick(uint32_t period);
+				void timer_expired(uint64_t ticks) override;
 
 				std::string name() const override { return "sp804"; }
 
@@ -49,7 +49,7 @@ namespace captive {
 					inline bool irq_enabled() const { return control_reg.bits.int_en; }
 					inline uint32_t isr() const { return _isr; }
 
-					void tick(uint32_t ticks);
+					void tick(uint64_t delta);
 				private:
 					SP804 *_owner;
 					bool _enabled;
@@ -76,7 +76,6 @@ namespace captive {
 				};
 
 				SP804Timer timers[2];
-				uint32_t ticks;
 				irq::IRQLine& irq;
 			};
 		}

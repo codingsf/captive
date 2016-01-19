@@ -4,9 +4,8 @@
 
 using namespace captive::devices::arm;
 
-PL031::PL031() : Primecell(0x00041031), dr(0), match(0), load(0), ctrl(0), mask(0), isr(0)
+PL031::PL031() : Primecell(0x00041031), match(0), load(0), ctrl(0), mask(0), isr(0)
 {
-	dr = (uint32_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 PL031::~PL031()
@@ -21,7 +20,7 @@ bool PL031::read(uint64_t off, uint8_t len, uint64_t& data)
 	
 	switch (off) {
 	case 0x000:
-		data = dr;
+		data = (uint32_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 		return true;
 		
 	case 0x004:

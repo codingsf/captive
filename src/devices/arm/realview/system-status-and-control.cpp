@@ -1,5 +1,5 @@
 #include <devices/arm/realview/system-status-and-control.h>
-#include <devices/timers/tick-source.h>
+#include <devices/timers/timer-manager.h>
 
 #include <captive.h>
 
@@ -9,9 +9,8 @@ DECLARE_CONTEXT(SystemStatusAndControl);
 
 using namespace captive::devices::arm::realview;
 
-SystemStatusAndControl::SystemStatusAndControl(timers::TickSource& tick_source) : 
-	_tick_source(tick_source),
-	_start_time(tick_source.count()),
+SystemStatusAndControl::SystemStatusAndControl(timers::TimerManager& timer_manager) : 
+	_timer_manager(timer_manager),
 	osc { 0x00012c5c, 0x00002cc0, 0x00002c75, 0x00020211, 0x00002c75 },
 	colour_mode(0x1f00),
 	lockval(0),
@@ -25,8 +24,8 @@ bool SystemStatusAndControl::read(uint64_t off, uint8_t len, uint64_t& data)
 {
 	switch (off) {
 	case 0x000:
-		//data = 0x01780500		// Cortex A8;
-		data = 0x1182f500;		// Cortex A9;
+		data = 0x01780500;		// Cortex A8;
+		//data = 0x1182f500;		// Cortex A9;
 		return true;
 		
 	case 0x004:
@@ -46,7 +45,7 @@ bool SystemStatusAndControl::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 		
 	case 0x05c:
-		data = std::chrono::duration_cast<tick_24MHz_t>(std::chrono::milliseconds(_tick_source.count() - _start_time)).count();
+		data = std::chrono::duration_cast<tick_24MHz_t>(_timer_manager.ticks()).count();
 		return true;
 		
 	case 0x50:
