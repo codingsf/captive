@@ -125,6 +125,7 @@ namespace captive {
 			
 			virtual bool handle_data_fault(MMU::resolution_fault fault) = 0;
 			virtual bool handle_fetch_fault(MMU::resolution_fault fault) = 0;
+			virtual void handle_undefined_instruction() = 0;
 			
 			const char *get_reg_name(uint32_t offset) { return _reg_names[offset]; }
 			
