@@ -9,23 +9,30 @@
 #define	PL031_H
 
 #include <devices/arm/primecell.h>
+#include <devices/timers/timer-manager.h>
+#include <devices/irq/irq-line.h>
 
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class PL031 : public Primecell
+			class PL031 : public Primecell, public timers::TimerSink
 			{
 			public:
-				PL031();
+				PL031(timers::TimerManager& timer_manager, irq::IRQLine& irq);
 				virtual ~PL031();
 
-				virtual bool read(uint64_t off, uint8_t len, uint64_t& data) override;
-				virtual bool write(uint64_t off, uint8_t len, uint64_t data) override;
+				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
+				bool write(uint64_t off, uint8_t len, uint64_t data) override;
 				
-				virtual std::string name() const { return "pl031"; }
+				std::string name() const { return "pl031"; }
+				
+				void timer_expired(uint64_t ticks) override;
 				
 			private:
-				uint32_t match, load, ctrl, mask, isr;
+				irq::IRQLine& irq;
+				uint32_t dr, match, load, ctrl, mask, isr;
+				
+				void update_irq();
 			};
 		}
 	}

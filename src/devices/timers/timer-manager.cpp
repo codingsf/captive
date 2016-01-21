@@ -87,7 +87,7 @@ void TimerManager::timer_thread_proc()
 			// Is a timer expiring on this tick?  Trigger it.
 			if (timer->remaining <= delta) {
 				timer->remaining = timer->interval;
-				timer->sink->timer_expired(delta / timer->interval);
+				timer->sink->timer_expired((delta / timer->interval) + 1);
 			} else {
 				// Otherwise, ignore it.
 				timer->remaining -= delta;

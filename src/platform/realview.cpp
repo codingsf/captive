@@ -119,7 +119,7 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	PL061 *gpio2 = new PL061(*gic0->get_irq_line(40));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10015000, *gpio2));
 	
-	PL031 *rtc = new PL031();
+	PL031 *rtc = new PL031(timer_manager, *gic0->get_irq_line(42));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10017000, *rtc));
 	
 	PL041 *aaci = new PL041();
