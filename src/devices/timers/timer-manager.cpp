@@ -6,7 +6,9 @@ using namespace captive::devices::timers;
 
 TimerManager::TimerManager() : timer_thread(NULL)
 {
-	
+	for (int i = 0; i < MAX_TIMERS; i++) {
+		timers[i].valid = false;
+	}
 }
 
 TimerManager::~TimerManager()
@@ -38,7 +40,8 @@ void TimerManager::add_timer(std::chrono::nanoseconds interval, TimerSink& sink)
 	for (int i = 0; i < MAX_TIMERS; i++) {
 		if (!timers[i].valid) {
 			timers[i].interval = interval;
-			timers[i].remaining = interval;
+			timers[i].first_tick = timers[i].last_tick = std::chrono::high_resolution_clock::now();
+			timers[i].ticks = 0;
 			timers[i].sink = &sink;
 			timers[i].valid = true;
 			
@@ -63,38 +66,28 @@ void TimerManager::timer_thread_proc()
 {
 	struct timespec ts_in;
 	ts_in.tv_sec = 0;
-//	ts_in.tv_nsec = 1000000;
+	ts_in.tv_nsec = 1000000;
 	
-	std::chrono::high_resolution_clock::time_point before = std::chrono::high_resolution_clock::now();
-	std::chrono::high_resolution_clock::time_point after = before;
 	while (!terminate) {
-		// Calculate the sleep time, with a correction factor for the length of time it took to perform the previous
-		// iteration.  Then, sleeeep.
-		ts_in.tv_nsec = 1000000 - std::chrono::duration_cast<std::chrono::nanoseconds>(before - after).count();
 		nanosleep(&ts_in, NULL);
 		
-		// Record the 'after' time.
-		after = std::chrono::high_resolution_clock::now();
-		
-		// Determine exactly how long we slept for.
-		std::chrono::nanoseconds delta = std::chrono::duration_cast<std::chrono::nanoseconds>(after - before);
-		
-		// Find any times that have expired.
+		// Find any timers that are due to tick
 		for (int i = 0; i < MAX_TIMERS; i++) {
 			struct runtime_timer *timer = &timers[i];
 			if (!timer->valid) continue;
-			
-			// Is a timer expiring on this tick?  Trigger it.
-			if (timer->remaining <= delta) {
-				timer->remaining = timer->interval;
-				timer->sink->timer_expired((delta / timer->interval) + 1);
-			} else {
-				// Otherwise, ignore it.
-				timer->remaining -= delta;
+						
+			std::chrono::nanoseconds delta = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer->last_tick);
+			if (delta >= timer->interval) {
+				// Work out how many ticks there *should* have been since the last tick
+				uint64_t prev_ticks = timer->ticks;
+				//timer->ticks += (delta / timer->interval);
+				
+				timer->ticks = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer->first_tick) / timer->interval;
+
+				// Record the time of the last tick (which is NOW).
+				timer->last_tick = std::chrono::high_resolution_clock::now();
+				timer->sink->timer_expired(timer->ticks - prev_ticks);
 			}
 		}
-		
-		// Record the 'before' time.
-		before = std::chrono::high_resolution_clock::now();
 	}
 }

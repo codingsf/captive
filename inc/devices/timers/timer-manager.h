@@ -53,11 +53,12 @@ namespace captive {
 				std::chrono::high_resolution_clock::time_point start_time;
 				
 				struct runtime_timer {
-					runtime_timer() : valid(false), sink(NULL) { }
-					
 					bool valid;
+
 					std::chrono::nanoseconds interval;
-					std::chrono::nanoseconds remaining;
+					std::chrono::high_resolution_clock::time_point first_tick, last_tick;
+					uint64_t ticks;
+					
 					TimerSink *sink;
 				};
 				
