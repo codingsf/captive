@@ -40,7 +40,7 @@ void TimerManager::add_timer(std::chrono::nanoseconds interval, TimerSink& sink)
 	for (int i = 0; i < MAX_TIMERS; i++) {
 		if (!timers[i].valid) {
 			timers[i].interval = interval;
-			timers[i].first_tick = timers[i].last_tick = std::chrono::high_resolution_clock::now();
+			timers[i].first_tick = std::chrono::high_resolution_clock::now();
 			timers[i].ticks = 0;
 			timers[i].sink = &sink;
 			timers[i].valid = true;
@@ -68,26 +68,29 @@ void TimerManager::timer_thread_proc()
 	ts_in.tv_sec = 0;
 	ts_in.tv_nsec = 1000000;
 	
+	for (int i = 0; i < MAX_TIMERS; i++) {
+		if (timers[i].valid) {
+			timers[i].first_tick = std::chrono::high_resolution_clock::now();
+		}
+	}
+	
 	while (!terminate) {
-		nanosleep(&ts_in, NULL);
-		
 		// Find any timers that are due to tick
 		for (int i = 0; i < MAX_TIMERS; i++) {
 			struct runtime_timer *timer = &timers[i];
 			if (!timer->valid) continue;
-						
-			std::chrono::nanoseconds delta = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer->last_tick);
-			if (delta >= timer->interval) {
-				// Work out how many ticks there *should* have been since the last tick
-				uint64_t prev_ticks = timer->ticks;
-				//timer->ticks += (delta / timer->interval);
-				
-				timer->ticks = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer->first_tick) / timer->interval;
+			
+			std::chrono::nanoseconds delta_first_tick = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer->first_tick);
+			uint64_t integral_ticks = delta_first_tick / timer->interval;
+			uint64_t delta_ticks = integral_ticks - timer->ticks;
 
-				// Record the time of the last tick (which is NOW).
-				timer->last_tick = std::chrono::high_resolution_clock::now();
-				timer->sink->timer_expired(timer->ticks - prev_ticks);
+			if (delta_ticks > 0) {
+				// Update the number of ticks this timer should have had since it started.
+				timer->ticks = integral_ticks;
+				timer->sink->timer_expired(delta_ticks);
 			}
 		}
+
+		nanosleep(&ts_in, NULL);
 	}
 }

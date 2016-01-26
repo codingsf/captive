@@ -56,9 +56,9 @@ namespace captive {
 					bool valid;
 
 					std::chrono::nanoseconds interval;
-					std::chrono::high_resolution_clock::time_point first_tick, last_tick;
-					uint64_t ticks;
+					std::chrono::high_resolution_clock::time_point first_tick;
 					
+					uint64_t ticks;
 					TimerSink *sink;
 				};
 				

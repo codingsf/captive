@@ -154,8 +154,6 @@ void SP804::SP804Timer::tick(uint64_t delta)
 		if (control_reg.bits.int_en) _owner->update_irq();
 
 		init_period();
-
-		if (control_reg.bits.one_shot) return;
 	} else {
 		current_value -= delta;
 	}
