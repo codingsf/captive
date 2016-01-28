@@ -197,8 +197,6 @@ bool KVMCpu::run()
 			continue;
 		}
 		
-		fprintf(stderr, "************* exit\n");
-
 		switch (cpu_run_struct->exit_reason) {
 		case KVM_EXIT_DEBUG:
 			DEBUG << CONTEXT(CPU) << "DEBUG";
