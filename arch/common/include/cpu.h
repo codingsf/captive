@@ -63,7 +63,7 @@ namespace captive {
 			inline Environment& env() const { return _env; }
 			inline Trace& trace() const { return *_trace; }
 			inline PerCPUData& cpu_data() const { return *_per_cpu_data; }
-			
+						
 			inline const char *disassemble_address(uint8_t isa, gva_t va)
 			{
 				char decode_data[128];
@@ -96,6 +96,10 @@ namespace captive {
 
 			static inline void set_active_cpu(CPU* cpu) {
 				current_cpu = cpu;
+			}
+			
+			static inline PerCPUData *get_active_cpu_data() {
+				return current_cpu->_per_cpu_data;
 			}
 
 			virtual void *reg_state() = 0;

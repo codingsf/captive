@@ -38,6 +38,12 @@ namespace captive
 			virtual bool read(CPU& cpu, uint32_t reg, uint32_t& data) = 0;
 			virtual bool write(CPU& cpu, uint32_t reg, uint32_t data) = 0;
 		};
+		
+		extern void mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value);
+		extern void mmio_device_write(gpa_t pa, uint8_t size, uint64_t value);
+
+		extern int handle_fast_device_read(struct mcontext *mctx);
+		extern int handle_fast_device_write(struct mcontext *mctx);
 	}
 }
 

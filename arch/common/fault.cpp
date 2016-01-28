@@ -3,163 +3,10 @@
 #include <env.h>
 #include <cpu.h>
 #include <mmu.h>
+#include <device.h>
 #include <x86/decode.h>
 
 using namespace captive::arch;
-
-static inline void __out32(uint32_t address, uint32_t value)
-{
-	asm volatile("outl %0, $0xf0\n" :: "a"(value), "d"(address));
-}
-
-static inline void __out16(uint32_t address, uint16_t value)
-{
-	asm volatile("outw %0, $0xf0\n" :: "a"(value), "d"(address));
-}
-
-static inline void __out8(uint32_t address, uint8_t value)
-{
-	asm volatile("outb %0, $0xf0\n" :: "a"(value), "d"(address));
-}
-
-static inline uint32_t __in32(uint32_t address)
-{
-	uint32_t value;
-	asm volatile("inl $0xf0, %0\n" : "=a"(value) : "d"(address));
-	return value;
-}
-
-static inline uint16_t __in16(uint32_t address)
-{
-	uint16_t value;
-	asm volatile("inw $0xf0, %0\n" : "=a"(value) : "d"(address));
-	return value;
-}
-
-static inline uint8_t __in8(uint32_t address)
-{
-	uint8_t value;
-	asm volatile("inb $0xf0, %0\n" : "=a"(value) : "d"(address));
-	return value;
-}
-
-namespace captive { namespace arch {
-int do_device_read(struct mcontext *mctx)
-{
-	captive::arch::x86::MemoryInstruction inst;
-	x86::decode_memory_instruction((const uint8_t *)mctx->rip, inst);
-	mctx->rip += inst.length;
-	
-	assert(inst.Source.type == x86::Operand::TYPE_MEMORY);
-
-	uint32_t va = inst.Source.mem.displacement;
-	switch (inst.Source.mem.base_reg_idx) {
-	case x86::Operand::R_EAX: va += (uint32_t)mctx->rax; break;
-	case x86::Operand::R_EBX: va += (uint32_t)mctx->rbx; break;
-	case x86::Operand::R_ECX: va += (uint32_t)mctx->rcx; break;
-	case x86::Operand::R_EDX: va += (uint32_t)mctx->rdx; break;
-	default: fatal("unhandled base register %s for device read\n", x86::x86_register_names[inst.Source.mem.base_reg_idx]);
-	}
-
-	MMU::resolution_context rc(va);
-	rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_READ : MMU::USER_READ;
-
-	CPU::get_active_cpu()->mmu().resolve_gpa(rc, true);
-	if (rc.fault) {
-		printf("read @ %p va=%x fault=%d\n", mctx->rip - 2, va, rc.fault);
-		return (int)rc.fault;
-	}
-
-	uint64_t value;
-	switch (inst.data_size) {
-	case 1: value = __in8(rc.pa); break;
-	case 2: value = __in16(rc.pa); break;
-	case 4: value = __in32(rc.pa); break;
-	default: fatal("invalid data size for rewritten device read\n");
-	}
-	
-	//printf("F read  @ %016lx addr=%08x val=%08x\n", mctx->rip - 2, pa, value);
-
-	switch (inst.Dest.reg) {
-	case x86::Operand::R_EAX: mctx->rax = value; break;
-	case x86::Operand::R_EBX: mctx->rbx = value; break;
-	case x86::Operand::R_ECX: mctx->rcx = value; break;
-	case x86::Operand::R_EDX: mctx->rdx = value; break;
-	case x86::Operand::R_ESI: mctx->rsi = value; break;
-	case x86::Operand::R_EDI: mctx->rdi = value; break;
-
-	case x86::Operand::R_AX: mctx->rax = (mctx->rax & ~0xffffULL) | (value & 0xffff); break;
-	case x86::Operand::R_BX: mctx->rbx = (mctx->rbx & ~0xffffULL) | (value & 0xffff); break;
-	case x86::Operand::R_CX: mctx->rcx = (mctx->rcx & ~0xffffULL) | (value & 0xffff); break;
-	case x86::Operand::R_DX: mctx->rdx = (mctx->rdx & ~0xffffULL) | (value & 0xffff); break;
-	case x86::Operand::R_SI: mctx->rsi = (mctx->rsi & ~0xffffULL) | (value & 0xffff); break;
-	case x86::Operand::R_DI: mctx->rdi = (mctx->rdi & ~0xffffULL) | (value & 0xffff); break;
-
-	case x86::Operand::R_AL: mctx->rax = (mctx->rax & ~0xffULL) | (value & 0xff); break;
-	case x86::Operand::R_BL: mctx->rbx = (mctx->rbx & ~0xffULL) | (value & 0xff); break;
-	case x86::Operand::R_CL: mctx->rcx = (mctx->rcx & ~0xffULL) | (value & 0xff); break;
-	case x86::Operand::R_DL: mctx->rdx = (mctx->rdx & ~0xffULL) | (value & 0xff); break;
-
-	default: fatal("unhandled dest register %s for device read\n", x86::x86_register_names[inst.Dest.reg]);
-	}
-
-	return 0;
-}
-
-int do_device_write(struct mcontext *mctx)
-{
-	captive::arch::x86::MemoryInstruction inst;
-	x86::decode_memory_instruction((const uint8_t *)mctx->rip, inst);
-	mctx->rip += inst.length;
-
-	assert(inst.Dest.type == x86::Operand::TYPE_MEMORY);
-
-	uint32_t va = inst.Dest.mem.displacement;
-	switch (inst.Dest.mem.base_reg_idx) {
-	case x86::Operand::R_EAX: va += (uint32_t)mctx->rax; break;
-	case x86::Operand::R_EBX: va += (uint32_t)mctx->rbx; break;
-	case x86::Operand::R_ECX: va += (uint32_t)mctx->rcx; break;
-	case x86::Operand::R_EDX: va += (uint32_t)mctx->rdx; break;
-	default: fatal("unhandled base register %s for device write\n", x86::x86_register_names[inst.Dest.mem.base_reg_idx]);
-	}
-
-	MMU::resolution_context rc(va);
-	rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_WRITE : MMU::USER_WRITE;
-
-	CPU::get_active_cpu()->mmu().resolve_gpa(rc, true);
-	if (rc.fault) {
-		printf("write @ %p va=%x fault=%d\n", mctx->rip - 2, va, rc.fault);
-		return (int)rc.fault;
-	}
-
-	switch (inst.Source.reg) {
-	case x86::Operand::R_EAX: __out32(rc.pa, mctx->rax); break;
-	case x86::Operand::R_EBX: __out32(rc.pa, mctx->rbx); break;
-	case x86::Operand::R_ECX: __out32(rc.pa, mctx->rcx); break;
-	case x86::Operand::R_EDX: __out32(rc.pa, mctx->rdx); break;
-	case x86::Operand::R_ESI: __out32(rc.pa, mctx->rsi); break;
-	case x86::Operand::R_EDI: __out32(rc.pa, mctx->rdi); break;
-
-	case x86::Operand::R_AX: __out16(rc.pa, mctx->rax); break;
-	case x86::Operand::R_BX: __out16(rc.pa, mctx->rbx); break;
-	case x86::Operand::R_CX: __out16(rc.pa, mctx->rcx); break;
-	case x86::Operand::R_DX: __out16(rc.pa, mctx->rdx); break;
-	case x86::Operand::R_SI: __out16(rc.pa, mctx->rsi); break;
-	case x86::Operand::R_DI: __out16(rc.pa, mctx->rdi); break;
-
-	case x86::Operand::R_AL: __out8(rc.pa, mctx->rax); break;
-	case x86::Operand::R_BL: __out8(rc.pa, mctx->rbx); break;
-	case x86::Operand::R_CL: __out8(rc.pa, mctx->rcx); break;
-	case x86::Operand::R_DL: __out8(rc.pa, mctx->rdx); break;
-	case x86::Operand::R_SIL: __out8(rc.pa, mctx->rsi); break;
-	case x86::Operand::R_DIL: __out8(rc.pa, mctx->rdi); break;
-
-	default: fatal("unhandled source register %s for device write\n", x86::x86_register_names[inst.Source.reg]);
-	}
-
-	return 0;
-}
-} }
 
 static void rewrite_device_access(uint64_t rip, uint8_t *code, const captive::arch::x86::MemoryInstruction& inst)
 {
@@ -200,46 +47,41 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {
-		case x86::Operand::R_EAX: __out32(dev_addr, mctx->rax); break;
-		case x86::Operand::R_EBX: __out32(dev_addr, mctx->rbx); break;
-		case x86::Operand::R_ECX: __out32(dev_addr, mctx->rcx); break;
-		case x86::Operand::R_EDX: __out32(dev_addr, mctx->rdx); break;
-		case x86::Operand::R_ESI: __out32(dev_addr, mctx->rsi); break;
-		case x86::Operand::R_EDI: __out32(dev_addr, mctx->rdi); break;
+		case x86::Operand::R_EAX: mmio_device_write(dev_addr, 4, mctx->rax); break;
+		case x86::Operand::R_EBX: mmio_device_write(dev_addr, 4, mctx->rbx); break;
+		case x86::Operand::R_ECX: mmio_device_write(dev_addr, 4, mctx->rcx); break;
+		case x86::Operand::R_EDX: mmio_device_write(dev_addr, 4, mctx->rdx); break;
+		case x86::Operand::R_ESI: mmio_device_write(dev_addr, 4, mctx->rsi); break;
+		case x86::Operand::R_EDI: mmio_device_write(dev_addr, 4, mctx->rdi); break;
 
-		case x86::Operand::R_AX: __out16(dev_addr, mctx->rax); break;
-		case x86::Operand::R_BX: __out16(dev_addr, mctx->rbx); break;
-		case x86::Operand::R_CX: __out16(dev_addr, mctx->rcx); break;
-		case x86::Operand::R_DX: __out16(dev_addr, mctx->rdx); break;
-		case x86::Operand::R_SI: __out16(dev_addr, mctx->rsi); break;
-		case x86::Operand::R_DI: __out16(dev_addr, mctx->rdi); break;
+		case x86::Operand::R_AX: mmio_device_write(dev_addr, 2, mctx->rax); break;
+		case x86::Operand::R_BX: mmio_device_write(dev_addr, 2, mctx->rbx); break;
+		case x86::Operand::R_CX: mmio_device_write(dev_addr, 2, mctx->rcx); break;
+		case x86::Operand::R_DX: mmio_device_write(dev_addr, 2, mctx->rdx); break;
+		case x86::Operand::R_SI: mmio_device_write(dev_addr, 2, mctx->rsi); break;
+		case x86::Operand::R_DI: mmio_device_write(dev_addr, 2, mctx->rdi); break;
 
-		case x86::Operand::R_AL: __out8(dev_addr, mctx->rax); break;
-		case x86::Operand::R_BL: __out8(dev_addr, mctx->rbx); break;
-		case x86::Operand::R_CL: __out8(dev_addr, mctx->rcx); break;
-		case x86::Operand::R_DL: __out8(dev_addr, mctx->rdx); break;
-		case x86::Operand::R_SIL: __out8(dev_addr, mctx->rsi); break;
-		case x86::Operand::R_DIL: __out8(dev_addr, mctx->rdi); break;
+		case x86::Operand::R_AL: mmio_device_write(dev_addr, 1, mctx->rax); break;
+		case x86::Operand::R_BL: mmio_device_write(dev_addr, 1, mctx->rbx); break;
+		case x86::Operand::R_CL: mmio_device_write(dev_addr, 1, mctx->rcx); break;
+		case x86::Operand::R_DL: mmio_device_write(dev_addr, 1, mctx->rdx); break;
+		case x86::Operand::R_SIL: mmio_device_write(dev_addr, 1, mctx->rsi); break;
+		case x86::Operand::R_DIL: mmio_device_write(dev_addr, 1, mctx->rdi); break;
 		
-		case x86::Operand::R_R8B: __out8(dev_addr, mctx->r8); break;
-		case x86::Operand::R_R9B: __out8(dev_addr, mctx->r9); break;
-		case x86::Operand::R_R10B: __out8(dev_addr, mctx->r10); break;
-		case x86::Operand::R_R11B: __out8(dev_addr, mctx->r11); break;
-		case x86::Operand::R_R12B: __out8(dev_addr, mctx->r12); break;
-		case x86::Operand::R_R13B: __out8(dev_addr, mctx->r13); break;
-		case x86::Operand::R_R14B: __out8(dev_addr, mctx->r14); break;
-		case x86::Operand::R_R15B: __out8(dev_addr, mctx->r15); break;
+		case x86::Operand::R_R8B: mmio_device_write(dev_addr, 1, mctx->r8); break;
+		case x86::Operand::R_R9B: mmio_device_write(dev_addr, 1, mctx->r9); break;
+		case x86::Operand::R_R10B: mmio_device_write(dev_addr, 1, mctx->r10); break;
+		case x86::Operand::R_R11B: mmio_device_write(dev_addr, 1, mctx->r11); break;
+		case x86::Operand::R_R12B: mmio_device_write(dev_addr, 1, mctx->r12); break;
+		case x86::Operand::R_R13B: mmio_device_write(dev_addr, 1, mctx->r13); break;
+		case x86::Operand::R_R14B: mmio_device_write(dev_addr, 1, mctx->r14); break;
+		case x86::Operand::R_R15B: mmio_device_write(dev_addr, 1, mctx->r15); break;
 
 		default: fatal("unhandled source register %s\n", x86::x86_register_names[inst.Source.reg]);
 		}
 	} else if (inst.Source.type == x86::Operand::TYPE_MEMORY && inst.Dest.type == x86::Operand::TYPE_REGISTER) {
 		uint64_t value;
-		switch (inst.data_size) {
-		case 1: value = __in8(dev_addr); break;
-		case 2: value = __in16(dev_addr); break;
-		case 4: value = __in32(dev_addr); break;
-		default: fatal("unhandled data size %d\n", inst.data_size);
-		}
+		mmio_device_read(dev_addr, inst.data_size, value);
 		
 		switch (inst.Dest.reg) {
 		case x86::Operand::R_EAX: mctx->rax = (uint32_t)value; break;

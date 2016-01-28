@@ -183,6 +183,9 @@ void KVMGuest::guest_entrypoint(gpa_t entrypoint)
 
 bool KVMGuest::run()
 {
+	// Create the device thread
+	std::thread device_thread(device_thread_proc, (KVMGuest *)this);
+	
 	// Create and run each core thread.
 	std::list<std::thread *> core_threads;
 	for (auto core : kvm_cpus) {
@@ -223,6 +226,14 @@ bool KVMGuest::run()
 		if (thread->joinable()) thread->join();
 	}
 	
+	// Shutdown the device thread
+	per_guest_data->fast_device_operation = FAST_DEV_OP_QUIT;
+	captive::lock::barrier_wait(&per_guest_data->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
+	
+	if (device_thread.joinable()) {
+		device_thread.join();
+	}
+	
 	return true;
 }
 
@@ -230,6 +241,33 @@ void KVMGuest::stop()
 {
 	uint64_t value = 1;
 	write(stopfd, &value, sizeof(value));
+}
+
+void KVMGuest::device_thread_proc(KVMGuest *guest)
+{
+	pthread_setname_np(pthread_self(), "dev-comm");
+	
+	PerGuestData *pgd = guest->per_guest_data;
+	while (true) {
+		captive::lock::barrier_wait(&pgd->fd_hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
+		if (pgd->fast_device_operation == FAST_DEV_OP_QUIT) break;
+		
+		uint64_t base_addr;
+		captive::devices::Device *device = guest->lookup_device(pgd->fast_device_address, base_addr);
+		
+		if (!device) exit(0);
+		
+		uint64_t offset = pgd->fast_device_address - base_addr;
+		if (pgd->fast_device_operation == FAST_DEV_OP_WRITE) {
+			device->write(offset, pgd->fast_device_size, pgd->fast_device_value);
+		} else if (pgd->fast_device_operation == FAST_DEV_OP_READ) {
+			device->read(offset, pgd->fast_device_size, pgd->fast_device_value);
+		} else {
+			break;
+		}
+		
+		captive::lock::barrier_wait(&pgd->fd_guest_barrier, FAST_DEV_HYPERVISOR_TID);
+	}
 }
 
 void KVMGuest::core_thread_proc(KVMCpu *core)
@@ -319,21 +357,6 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	kvm_cpus.push_back(cpu);
 
 	next_cpu_id++;
-	return true;
-}
-
-static bool dev_callback(int fd, bool is_input, void *p)
-{
-	uint32_t v = 0;
-
-	if (is_input) {
-		read(fd, &v, sizeof(v));
-		fprintf(stderr, "*** in %d\n", v);
-	} else {
-		fprintf(stderr, "*** out\n");
-		//write(fd, &v, sizeof(v));
-	}
-	
 	return true;
 }
 
@@ -440,6 +463,13 @@ bool KVMGuest::prepare_guest_memory()
 	per_guest_data = (PerGuestData *)(HOST_SYS_GUEST_DATA);
 
 	DEBUG << CONTEXT(Guest) << "Initialising per-guest data structure @ " << std::hex << per_guest_data;
+	per_guest_data->fast_device_address = 0;
+	per_guest_data->fast_device_value = 0;
+	per_guest_data->fast_device_size = 0;
+	per_guest_data->fast_device_operation = 0;
+	captive::lock::barrier_init(&per_guest_data->fd_hypervisor_barrier);
+	captive::lock::barrier_init(&per_guest_data->fd_guest_barrier);
+	
 	per_guest_data->printf_buffer = GUEST_SYS_PRINTF_VIRT;
 	per_guest_data->heap_virt_base = GUEST_HEAP_VIRT_BASE;
 	per_guest_data->heap_phys_base = GUEST_HEAP_PHYS_BASE;

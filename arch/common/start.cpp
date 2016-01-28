@@ -7,6 +7,7 @@
 #include <cpu.h>
 #include <mmu.h>
 #include <smp.h>
+#include <device.h>
 #include <malloc/malloc.h>
 #include <malloc/page-allocator.h>
 
@@ -161,8 +162,8 @@ extern "C" {
 	int handle_trap_illegal(struct mcontext *mctx)
 	{
 		switch (*(uint8_t *)mctx->rip) {
-		case 0xc4: return captive::arch::do_device_read(mctx);
-		case 0xc5: return captive::arch::do_device_write(mctx);
+		case 0xc4: return captive::arch::handle_fast_device_read(mctx);
+		case 0xc5: return captive::arch::handle_fast_device_write(mctx);
 		default: dump_code(mctx->rip-20); fatal("illegal instruction %02x\n", *(uint8_t *)mctx->rip);
 		}
 	}

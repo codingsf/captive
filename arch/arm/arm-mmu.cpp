@@ -157,6 +157,9 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 	case MMU::KERNEL_FETCH:
 		rc.fault = MMU::FETCH_FAULT;
 		break;
+		
+	default:
+		fatal("unsupported requested permission combination\n");
 	}
 
 	if (likely(have_side_effects)) {

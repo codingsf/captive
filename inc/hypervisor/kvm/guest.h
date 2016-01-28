@@ -19,7 +19,6 @@
 
 #include <hypervisor/guest.h>
 #include <hypervisor/shared-memory.h>
-#include <util/spin-lock.h>
 
 #include <linux/kvm.h>
 
@@ -116,6 +115,7 @@ namespace captive {
 				
 				std::vector<KVMCpu *> kvm_cpus;
 				static void core_thread_proc(KVMCpu *core);
+				static void device_thread_proc(KVMGuest *guest);
 				
 				bool create_cpu(const GuestCPUConfiguration& config);
 

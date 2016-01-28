@@ -5,10 +5,6 @@
 
 using namespace captive::arch;
 
-static const char *mem_access_types[] = { "read", "write", "fetch" };
-static const char *mem_access_modes[] = { "user", "kernel" };
-static const char *mem_fault_types[] = { "none", "read", "write", "fetch" };
-
 #define ITLB_SIZE	8192
 
 static struct {
