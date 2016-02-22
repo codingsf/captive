@@ -33,9 +33,8 @@
 #include <devices/io/null-uart.h>
 #include <devices/io/socket-uart.h>
 #include <devices/io/ps2.h>
-#include <devices/io/file-backed-async-block-device.h>
+#include <devices/io/block/file-backed-async-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
-
 
 using namespace captive;
 using namespace captive::hypervisor;
@@ -45,6 +44,7 @@ using namespace captive::devices::arm;
 using namespace captive::devices::arm::realview;
 using namespace captive::devices::gfx;
 using namespace captive::devices::io;
+using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
 
 Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant, std::string block_device_file) : Platform(timer_manager), variant(variant), socket_uart(NULL)

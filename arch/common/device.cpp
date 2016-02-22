@@ -34,6 +34,8 @@ void captive::arch::mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value)
 	
 	pgd->fast_device_operation = FAST_DEV_OP_READ;
 	
+	//printf("reading\n");
+	
 	captive::lock::barrier_wait_nopause(&pgd->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
 	captive::lock::barrier_wait_nopause(&pgd->fd_guest_barrier, FAST_DEV_GUEST_TID);
 	
@@ -49,6 +51,8 @@ void captive::arch::mmio_device_write(gpa_t pa, uint8_t size, uint64_t value)
 	pgd->fast_device_value = value;
 	
 	pgd->fast_device_operation = FAST_DEV_OP_WRITE;
+	
+	//printf("writing %p\n", pa);
 	
 	captive::lock::barrier_wait_nopause(&pgd->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
 	captive::lock::barrier_wait_nopause(&pgd->fd_guest_barrier, FAST_DEV_GUEST_TID);

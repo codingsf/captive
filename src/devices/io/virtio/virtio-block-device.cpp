@@ -1,5 +1,5 @@
 #include <devices/io/virtio/virtio-block-device.h>
-#include <devices/io/async-block-device.h>
+#include <devices/io/block/async-block-device.h>
 #include <captive.h>
 
 #include <string.h>
@@ -7,6 +7,7 @@
 USE_CONTEXT(VirtIO);
 DECLARE_CHILD_CONTEXT(VirtIOBlockDevice, VirtIO);
 
+using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
 
 VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, AsyncBlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
@@ -23,7 +24,7 @@ VirtIOBlockDevice::~VirtIOBlockDevice()
 
 }
 
-static void read_event_callback(captive::devices::io::AsyncBlockRequest *rq, bool success)
+static void read_event_callback(AsyncBlockRequest *rq, bool success)
 {
 	VirtIOQueueEvent *evt = (VirtIOQueueEvent *)rq->opaque;
 
@@ -40,7 +41,7 @@ static void read_event_callback(captive::devices::io::AsyncBlockRequest *rq, boo
 	delete rq;
 }
 
-static void write_event_callback(captive::devices::io::AsyncBlockRequest *rq, bool success)
+static void write_event_callback(AsyncBlockRequest *rq, bool success)
 {
 	VirtIOQueueEvent *evt = (VirtIOQueueEvent *)rq->opaque;
 
