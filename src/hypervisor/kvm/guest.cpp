@@ -380,17 +380,25 @@ bool KVMGuest::attach_guest_devices()
 captive::devices::Device *KVMGuest::lookup_device(uint64_t addr, uint64_t& base_addr)
 {
 	for (auto desc : devices) {
-		if (addr >= desc.second.cfg->base_address() && addr < desc.second.cfg->base_address() + desc.second.dev->size()) {
+		if (addr >= desc.first && addr < desc.first + desc.second.dev->size()) {
 			base_addr = desc.first;
 			return desc.second.dev;
 		}
 	}
 	
 	/*auto candidate = devices.lower_bound(addr);
+	if (candidate->first != addr) candidate--;
 	if (candidate == devices.end()) return NULL;
 	
-	if (addr < candidate->second.cfg->base_address() + candidate->second.dev->size()) return candidate->second.dev;*/
+	//fprintf(stderr, "*** CANDIDATE %lx for %lx\n", candidate->first, addr);
 
+	if ((addr >= candidate->first) && (addr < (candidate->first + candidate->second.dev->size()))) {
+		base_addr = candidate->first;
+		
+		return candidate->second.dev;
+	}
+
+	//fprintf(stderr, "*** NO SUCH DEVICE\n");*/
 	return NULL;
 }
 

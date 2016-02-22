@@ -10,6 +10,7 @@
 
 #include <define.h>
 #include <devices/io/block/block-device.h>
+#include <devices/io/block/aio.h>
 #include <thread>
 
 //#define USE_POSIX_AIO
@@ -44,28 +45,8 @@ namespace captive {
 					uint64_t _file_size;
 					uint64_t _block_count;
 					bool _read_only;
-
-#ifndef USE_POSIX_AIO
-					aio_context_t _aio;
-					std::thread *_aio_thread;
-					bool _terminate;
-
-					static void aio_thread_proc(FileBackedBlockDevice *bdev);
-#else
-					static void posix_aio_notify(sigval_t);
-#endif
-
-					struct BlockDeviceRequestContext
-					{
-						BlockDeviceRequestContext(BlockDeviceRequest *rq, block_request_cb_t cb) : rq(rq), cb(cb) { }
-
-						BlockDeviceRequest *rq;
-						block_request_cb_t cb;
-
-#ifdef USE_POSIX_AIO
-						struct aiocb aio_cb;
-#endif
-					};
+					
+					AIO *_aio_impl;
 				};
 			}
 		}
