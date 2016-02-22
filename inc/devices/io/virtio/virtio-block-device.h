@@ -14,14 +14,14 @@ namespace captive {
 	namespace devices {
 		namespace io {
 			namespace block {
-				class AsyncBlockDevice;
+				class BlockDevice;
 			}
 			
 			namespace virtio {
 				class VirtIOBlockDevice : public VirtIO
 				{
 				public:
-					VirtIOBlockDevice(irq::IRQLine& irq, block::AsyncBlockDevice& bdev);
+					VirtIOBlockDevice(irq::IRQLine& irq, block::BlockDevice& bdev);
 					virtual ~VirtIOBlockDevice();
 
 				protected:
@@ -32,7 +32,7 @@ namespace captive {
 					void process_event(VirtIOQueueEvent *evt) override;
 
 				private:
-					block::AsyncBlockDevice& _bdev;
+					block::BlockDevice& _bdev;
 					
 					void handle_read_event(uint64_t sector, VirtIOQueueEvent *evt);
 					void handle_write_event(uint64_t sector, VirtIOQueueEvent *evt);

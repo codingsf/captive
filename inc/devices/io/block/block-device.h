@@ -14,7 +14,7 @@ namespace captive {
 	namespace devices {
 		namespace io {
 			namespace block {
-				struct AsyncBlockRequest
+				struct BlockDeviceRequest
 				{
 					uint64_t block_offset;
 					uint32_t block_count;
@@ -23,15 +23,15 @@ namespace captive {
 					void *opaque;
 				};
 
-				class AsyncBlockDevice
+				class BlockDevice
 				{
 				public:
-					typedef void (*block_request_cb_t)(AsyncBlockRequest *rq, bool success);
+					typedef void (*block_request_cb_t)(BlockDeviceRequest *rq, bool success);
 
-					AsyncBlockDevice(uint32_t block_size = 4096);
-					virtual ~AsyncBlockDevice();
+					BlockDevice(uint32_t block_size = 4096);
+					virtual ~BlockDevice();
 
-					virtual bool submit_request(AsyncBlockRequest *rq, block_request_cb_t cb) = 0;
+					virtual bool submit_request(BlockDeviceRequest *rq, block_request_cb_t cb) = 0;
 
 					inline uint32_t block_size() const { return _block_size; }
 
@@ -51,5 +51,5 @@ namespace captive {
 	}
 }
 
-#endif	/* ASYNC_BLOCK_DEVICE_H */
+#endif	/* BLOCK_DEVICE_H */
 

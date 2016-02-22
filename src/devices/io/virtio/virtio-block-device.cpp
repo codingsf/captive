@@ -1,5 +1,5 @@
 #include <devices/io/virtio/virtio-block-device.h>
-#include <devices/io/block/async-block-device.h>
+#include <devices/io/block/block-device.h>
 #include <captive.h>
 
 #include <string.h>
@@ -10,7 +10,7 @@ DECLARE_CHILD_CONTEXT(VirtIOBlockDevice, VirtIO);
 using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
 
-VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, AsyncBlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
+VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, BlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
 {
 	bzero(&config, sizeof(config));
 	config.capacity = bdev.blocks();
@@ -24,7 +24,7 @@ VirtIOBlockDevice::~VirtIOBlockDevice()
 
 }
 
-static void read_event_callback(AsyncBlockRequest *rq, bool success)
+static void read_event_callback(BlockDeviceRequest *rq, bool success)
 {
 	VirtIOQueueEvent *evt = (VirtIOQueueEvent *)rq->opaque;
 
@@ -41,7 +41,7 @@ static void read_event_callback(AsyncBlockRequest *rq, bool success)
 	delete rq;
 }
 
-static void write_event_callback(AsyncBlockRequest *rq, bool success)
+static void write_event_callback(BlockDeviceRequest *rq, bool success)
 {
 	VirtIOQueueEvent *evt = (VirtIOQueueEvent *)rq->opaque;
 
@@ -62,7 +62,7 @@ void VirtIOBlockDevice::handle_read_event(uint64_t sector, VirtIOQueueEvent* evt
 {
 	assert(evt->write_buffers.size() == 2);
 	
-	AsyncBlockRequest *rq = new AsyncBlockRequest();
+	BlockDeviceRequest *rq = new BlockDeviceRequest();
 	rq->block_count = evt->write_buffers.front().size / _bdev.block_size();
 	rq->block_offset = sector;
 	rq->buffer = (uint8_t *)evt->write_buffers.front().data;
@@ -87,7 +87,7 @@ void VirtIOBlockDevice::handle_write_event(uint64_t sector, VirtIOQueueEvent* ev
 	
 	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write Event";
 	
-	AsyncBlockRequest *rq = new AsyncBlockRequest();
+	BlockDeviceRequest *rq = new BlockDeviceRequest();
 	rq->block_count = evt->read_buffers.back().size / _bdev.block_size();
 	rq->block_offset = sector;
 	rq->buffer = (uint8_t *)evt->read_buffers.back().data;

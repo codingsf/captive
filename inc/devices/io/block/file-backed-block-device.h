@@ -9,7 +9,7 @@
 #define	FILE_BACKED_ASYNC_BLOCK_DEVICE_H
 
 #include <define.h>
-#include <devices/io/block/async-block-device.h>
+#include <devices/io/block/block-device.h>
 #include <thread>
 
 //#define USE_POSIX_AIO
@@ -24,13 +24,13 @@ namespace captive {
 	namespace devices {
 		namespace io {
 			namespace block {
-				class FileBackedAsyncBlockDevice : public AsyncBlockDevice
+				class FileBackedBlockDevice : public BlockDevice
 				{
 				public:
-					FileBackedAsyncBlockDevice();
-					~FileBackedAsyncBlockDevice();
+					FileBackedBlockDevice();
+					~FileBackedBlockDevice();
 
-					bool submit_request(AsyncBlockRequest *rq, block_request_cb_t cb) override;
+					bool submit_request(BlockDeviceRequest *rq, block_request_cb_t cb) override;
 
 					uint64_t blocks() const override { return _block_count; }
 
@@ -50,16 +50,16 @@ namespace captive {
 					std::thread *_aio_thread;
 					bool _terminate;
 
-					static void aio_thread_proc(FileBackedAsyncBlockDevice *bdev);
+					static void aio_thread_proc(FileBackedBlockDevice *bdev);
 #else
 					static void posix_aio_notify(sigval_t);
 #endif
 
-					struct AsyncBlockRequestContext
+					struct BlockDeviceRequestContext
 					{
-						AsyncBlockRequestContext(AsyncBlockRequest *rq, block_request_cb_t cb) : rq(rq), cb(cb) { }
+						BlockDeviceRequestContext(BlockDeviceRequest *rq, block_request_cb_t cb) : rq(rq), cb(cb) { }
 
-						AsyncBlockRequest *rq;
+						BlockDeviceRequest *rq;
 						block_request_cb_t cb;
 
 #ifdef USE_POSIX_AIO
@@ -72,4 +72,4 @@ namespace captive {
 	}
 }
 
-#endif	/* FILE_BACKED_ASYNC_BLOCK_DEVICE_H */
+#endif	/* FILE_BACKED_BLOCK_DEVICE_H */

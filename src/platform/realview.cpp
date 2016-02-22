@@ -33,7 +33,7 @@
 #include <devices/io/null-uart.h>
 #include <devices/io/socket-uart.h>
 #include <devices/io/ps2.h>
-#include <devices/io/block/file-backed-async-block-device.h>
+#include <devices/io/block/file-backed-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
 
 using namespace captive;
@@ -187,7 +187,7 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	PL110 *lcd = new PL110(*vs, *gic0->get_irq_line(55), PL110::V_PL111);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10020000, *lcd));
 	
-	FileBackedAsyncBlockDevice *bdev = new FileBackedAsyncBlockDevice();
+	FileBackedBlockDevice *bdev = new FileBackedBlockDevice();
 
 	if (!bdev->open_file(block_device_file)) {
 		ERROR << "Unable to open block device file '" << block_device_file << "'";
