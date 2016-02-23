@@ -267,15 +267,20 @@ bool MMU::handle_fault(struct resolution_context& rc)
 		// Determine the base address of the page table.
 		page_table_t *base = (page_table_t *)((uint64_t)pt & ~0xfffULL);
 
-		// Loop over each entry and clear the PRESENT flag.
-		for (int i = 0; i < 0x200; i++) {
-			if (!pd->present()) {
-				base->entries[i].present(false);
+		// Loop over each entry and clear the flags.
+		if (!pd->present()) {
+			for (int i = 0; i < 0x200; i++) {
+				base->entries[i].flags(0);
+				
+				/*present(false);
 				base->entries[i].device(false);
 				base->entries[i].allow_user(false);
+				base->entries[i].executable(false);*/
 			}
-			
-			if (!pd->writable()) base->entries[i].writable(false);
+		} else if (!pd->writable()) {
+			for (int i = 0; i < 0x200; i++) {
+				base->entries[i].writable(false);
+			}
 		}
 
 		// Set the PRESENT flag for the page table.
@@ -322,6 +327,7 @@ bool MMU::handle_fault(struct resolution_context& rc)
 			pt->present(true);
 			pt->allow_user(rc.allowed_permissions & (USER_READ | USER_WRITE | USER_FETCH));
 			pt->writable(rc.allowed_permissions & (USER_WRITE | KERNEL_WRITE));
+			pt->executable(rc.allowed_permissions & (USER_FETCH | KERNEL_FETCH));
 
 			if (is_page_device(GPA_TO_HVA(rc.pa))) {
 				pt->device(true);

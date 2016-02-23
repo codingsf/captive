@@ -34,7 +34,8 @@ namespace captive {
 
 				// CUSTOM
 				EXECUTED	= 1 << 9,
-				DEVICE		= 1 << 10
+				DEVICE		= 1 << 10,
+				EXECUTABLE	= 1 << 11,
 			};
 
 			uint64_t data;
@@ -59,6 +60,9 @@ namespace captive {
 
 			inline bool executed() const { return get_flag(EXECUTED); }
 			inline void executed(bool v) { set_flag(EXECUTED, v); }
+
+			inline bool executable() const { return get_flag(EXECUTABLE); }
+			inline void executable(bool v) { set_flag(EXECUTABLE, v); }
 
 			inline bool device() const { return get_flag(DEVICE); }
 			inline void device(bool v) { set_flag(DEVICE, v); }
@@ -252,6 +256,38 @@ namespace captive {
 				
 				pt->writable(false);
 				flush_page(addr);
+			}
+			
+			static inline bool quick_fetch(hva_t va, hpa_t& pa, bool user_mode)
+			{
+				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
+
+				page_map_entry_t* pm;
+				pm = &((page_map_t *)HPA_TO_HVA(CR3))->entries[pm_idx];
+				if (!pm->present()) {
+					return false;
+				}
+
+				page_dir_ptr_entry_t* pdp;
+				pdp = &((page_dir_ptr_t *)HPA_TO_HVA(pm->base_address()))->entries[pdp_idx];
+				if (!pdp->present()) {
+					return false;
+				}
+
+				page_dir_entry_t* pd;
+				pd = &((page_dir_t *)HPA_TO_HVA(pdp->base_address()))->entries[pd_idx];
+				if (!pd->present()) {
+					return false;
+				}
+
+				page_table_entry_t* pt = &((page_table_t *)HPA_TO_HVA(pd->base_address()))->entries[pt_idx];
+				if (!pt->present() || !pt->executable() || (!pt->allow_user() && user_mode)) {
+					return false;
+				}
+								
+				pa = pt->base_address();
+				return true;
 			}
 		};
 	}
