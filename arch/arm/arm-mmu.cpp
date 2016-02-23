@@ -22,9 +22,6 @@ static const char *arm_faults[] = {
 	"coarse-permission",
 };
 
-static const char *mem_access_types[] = { "read", "write", "fetch", "read-user", "write-user" };
-static const char *mem_access_modes[] = { "user", "kernel" };
-
 arm_mmu::arm_mmu(arm_cpu& cpu) : MMU(cpu), _coco((devices::CoCo&)*cpu.env().lookup_core_device(15)), _enabled(false)
 {
 
@@ -97,7 +94,7 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 
 #ifdef DEBUG_MMU
 	printf("--- ttbr0=%08x, ttbr1=%08x, ttbcr=%08x\n", *armcpu().reg_offsets.TTBR0, *armcpu().reg_offsets.TTBR1, *armcpu().reg_offsets.TTBCR);
-	printf("mmu-v6: resolving %08x for %s in %s\n", va, mem_access_types[info.type], mem_access_modes[info.mode]);
+	printf("mmu-v6: resolving %08x for perms=%x\n", rc.va, rc.requested_permissions);
 #endif
 	
 	uint32_t ttbr = *armcpu().reg_offsets.TTBR0;
@@ -133,13 +130,13 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 
 	if (arm_fault == NONE) {
 #ifdef DEBUG_MMU
-		printf("mmu-v6: resolved va=%08x => pa=%08x\n", va, pa);
+		printf("mmu-v6: resolved va=%08x => pa=%08x (aperms = %x)\n", rc.va, rc.pa, rc.allowed_permissions);
 #endif
 		return true;
 	}
 
 #ifdef DEBUG_MMU
-		printf("mmu-v6: fault va=%08x type=%d\n", va, arm_fault);
+		printf("mmu-v6: fault va=%08x type=%d\n", rc.va, arm_fault);
 #endif
 
 	switch (rc.requested_permissions) {
@@ -177,7 +174,7 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 		}
 		
 		#ifdef DEBUG_MMU
-			printf("mmu-v6: fault va=%08x dfar=%08x ifar=%08x dfsr=%08x ifsr=%08x\n", va, *(armcpu().reg_offsets.DFAR), *(armcpu().reg_offsets.IFAR), *(armcpu().reg_offsets.DFSR), *(armcpu().reg_offsets.IFSR));
+			printf("mmu-v6: fault va=%08x dfar=%08x ifar=%08x dfsr=%08x ifsr=%08x\n", rc.va, *(armcpu().reg_offsets.DFAR), *(armcpu().reg_offsets.IFAR), *(armcpu().reg_offsets.DFSR), *(armcpu().reg_offsets.IFSR));
 		#endif
 	}
 
@@ -186,10 +183,6 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 
 bool arm_mmu_v6::update_permissions(uint32_t ap, struct resolution_context& rc)
 {
-#ifdef DEBUG_MMU
-	printf("mmu-v6: checking permissions %d kernel=%d, write=%d\n", ap, info.is_kernel(), info.is_write());
-#endif
-	
 	switch(ap) {
 	case 0: rc.allowed_permissions = NO_PERMISSION; break;
 	case 1: rc.allowed_permissions = KERNEL_ALL; break;
@@ -204,14 +197,17 @@ bool arm_mmu_v6::update_permissions(uint32_t ap, struct resolution_context& rc)
 		printf("mmu: unknown access permission type %d\n", ap);
 		return false;
 	}
-	
+
+#ifdef DEBUG_MMU
+	printf("mmu-v6: updating permissions: aperms=%x\n", rc.allowed_permissions);
+#endif	
 	return true;
 }
 
 bool arm_mmu_v6::resolve_section(struct resolution_context& rc, arm_resolution_fault& fault, const l1_descriptor *l1)
 {
 #ifdef DEBUG_MMU
-	printf("mmu-v6: resolving section for %08x\n", va);
+	printf("mmu-v6: resolving section for %08x\n", rc.va);
 #endif
 	
 	uint32_t dacr = *(armcpu().reg_offsets.DACR);
@@ -240,6 +236,10 @@ bool arm_mmu_v6::resolve_section(struct resolution_context& rc, arm_resolution_f
 			return true;
 		}
 		break;
+		
+	case 3:
+		rc.allowed_permissions = ALL_READ_WRITE_FETCH;
+		break;
 	}
 	
 	rc.pa = l1->section.base_address() | (rc.va & 0xfffff);
@@ -249,7 +249,7 @@ bool arm_mmu_v6::resolve_section(struct resolution_context& rc, arm_resolution_f
 bool arm_mmu_v6::resolve_coarse(struct resolution_context& rc, arm_resolution_fault& fault, const l1_descriptor *l1)
 {
 #ifdef DEBUG_MMU
-	printf("mmu-v6: resolving coarse for %08x\n", va);
+	printf("mmu-v6: resolving coarse for %08x\n", rc.va);
 #endif
 	
 	const l2_descriptor *l2_base = (const l2_descriptor *)GPA_TO_HVA(l1->coarse_page_table.base_address());

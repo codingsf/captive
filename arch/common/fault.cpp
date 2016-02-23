@@ -183,7 +183,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 			// Get the core's MMU to handle the fault.
 			if (core->mmu().handle_fault(rc)) {
 				// If we got this far, then the fault was handled by the core's logic.
-				//printf("mmu: handled page-fault: va=%lx, code=%x, pc=%x, fault=%d, mode=%s, type=%s, reason=%s\n", va, code, core->read_pc(), fault, info_modes[info.mode], info_types[info.type], info_reasons[info.reason]);
+				//printf("mmu: handled page-fault: va=%lx, pa=%lx, rperms=%x, aperms=%x, fault=%x\n", rc.va, rc.pa, rc.requested_permissions, rc.allowed_permissions, rc.fault);
 
 				if (rc.fault == MMU::DEVICE_FAULT) {
 					handle_device_fault(core, mctx, rc.pa);

@@ -60,8 +60,8 @@ bool FileBackedBlockDevice::open_file(std::string filename, bool read_only)
 		_block_count++;
 	}
 	
-	//_aio_impl = new LinuxAIO(_file_descr, *this);
-	_aio_impl = new POSIXAIO(_file_descr, *this);
+	_aio_impl = new LinuxAIO(_file_descr, *this);
+	//_aio_impl = new POSIXAIO(_file_descr, *this);
 	
 	if (!_aio_impl->init()) {
 		close(_file_descr);

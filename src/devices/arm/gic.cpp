@@ -63,6 +63,19 @@ bool GICDistributorInterface::read(uint64_t off, uint8_t len, uint64_t& data)
 	case 0xc00 ... 0xc14:
 		data = config[(off & 0x1f) >> 2];
 		return true;
+		
+	case 0xfe0:
+		data = 0x90;
+		return true;
+	case 0xfe4:
+		data = 0x13;
+		return true;
+	case 0xfe8:
+		data = 0x4;
+		return true;
+	case 0xfec:
+		data = 0x0;
+		return true;
 	}
 	
 	ERROR << CONTEXT(GICDistributor) << "Unknown Register Read @ " << std::hex << off;
@@ -189,6 +202,12 @@ bool GICDistributorInterface::write(uint64_t off, uint8_t len, uint64_t data)
 		
 	case 0xf00:
 		sgi(data);
+		return true;
+		
+	case 0xf10 ... 0xf1c:
+		return true;
+
+	case 0xf20 ... 0xf2c:
 		return true;
 	}
 	

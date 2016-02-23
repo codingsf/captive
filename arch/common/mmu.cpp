@@ -317,7 +317,7 @@ bool MMU::handle_fault(struct resolution_context& rc)
 		if (!resolve_gpa(rc, true)) {
 			return false;
 		}
-
+		
 		if (rc.fault == NONE) {
 			// Update the corresponding page table address entry and mark it as
 			// present and writable.  Note, assigning the base address will mask
