@@ -52,6 +52,8 @@ bool LinuxAIO::init()
 	
 	_terminate = false;
 	_aio_thread = new std::thread(aio_thread_proc, this);
+	
+	return true;
 }
 
 bool LinuxAIO::submit(BlockDeviceRequest *rq, BlockDevice::block_request_cb_t callback)
