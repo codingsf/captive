@@ -136,17 +136,22 @@ int captive::arch::handle_fast_device_read(struct mcontext *mctx)
 	default: fatal("unhandled base register %s for device read\n", x86::x86_register_names[inst.Source.mem.base_reg_idx]);
 	}
 
-	MMU::resolution_context rc(va);
-	rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_READ : MMU::USER_READ;
+	hpa_t dev_addr;
+	if (!Memory::quick_read(va, dev_addr, !CPU::get_active_cpu()->kernel_mode())) {
+		MMU::resolution_context rc(va);
+		rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_READ : MMU::USER_READ;
 
-	CPU::get_active_cpu()->mmu().resolve_gpa(rc, true);
-	if (rc.fault) {
-		printf("read @ %p va=%x fault=%d\n", mctx->rip - 2, va, rc.fault);
-		return (int)rc.fault;
+		CPU::get_active_cpu()->mmu().resolve_gpa(rc, true);
+		if (rc.fault) {
+			printf("read @ %p va=%x fault=%d\n", mctx->rip - 2, va, rc.fault);
+			return (int)rc.fault;
+		}
+		
+		dev_addr = (gpa_t)rc.pa;
 	}
 
 	uint64_t value;
-	mmio_device_read(rc.pa, inst.data_size, value);
+	mmio_device_read((gpa_t)dev_addr, inst.data_size, value);
 	
 	//printf("F read  @ %016lx addr=%08x val=%08x\n", mctx->rip - 2, pa, value);
 
@@ -193,36 +198,41 @@ int captive::arch::handle_fast_device_write(struct mcontext *mctx)
 	default: fatal("unhandled base register %s for device write\n", x86::x86_register_names[inst.Dest.mem.base_reg_idx]);
 	}
 
-	MMU::resolution_context rc(va);
-	rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_WRITE : MMU::USER_WRITE;
+	hpa_t dev_addr;
+	if (!Memory::quick_write(va, dev_addr, !CPU::get_active_cpu()->kernel_mode())) {
+		MMU::resolution_context rc(va);
+		rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_WRITE : MMU::USER_WRITE;
 
-	CPU::get_active_cpu()->mmu().resolve_gpa(rc, true);
-	if (rc.fault) {
-		printf("write @ %p va=%x fault=%d\n", mctx->rip - 2, va, rc.fault);
-		return (int)rc.fault;
+		CPU::get_active_cpu()->mmu().resolve_gpa(rc, true);
+		if (rc.fault) {
+			printf("write @ %p va=%x fault=%d\n", mctx->rip - 2, va, rc.fault);
+			return (int)rc.fault;
+		}
+		
+		dev_addr = (hpa_t)rc.pa;
 	}
 
 	switch (inst.Source.reg) {
-	case x86::Operand::R_EAX: mmio_device_write(rc.pa, 4, mctx->rax); break;
-	case x86::Operand::R_EBX: mmio_device_write(rc.pa, 4, mctx->rbx); break;
-	case x86::Operand::R_ECX: mmio_device_write(rc.pa, 4, mctx->rcx); break;
-	case x86::Operand::R_EDX: mmio_device_write(rc.pa, 4, mctx->rdx); break;
-	case x86::Operand::R_ESI: mmio_device_write(rc.pa, 4, mctx->rsi); break;
-	case x86::Operand::R_EDI: mmio_device_write(rc.pa, 4, mctx->rdi); break;
+	case x86::Operand::R_EAX: mmio_device_write((gpa_t)dev_addr, 4, mctx->rax); break;
+	case x86::Operand::R_EBX: mmio_device_write((gpa_t)dev_addr, 4, mctx->rbx); break;
+	case x86::Operand::R_ECX: mmio_device_write((gpa_t)dev_addr, 4, mctx->rcx); break;
+	case x86::Operand::R_EDX: mmio_device_write((gpa_t)dev_addr, 4, mctx->rdx); break;
+	case x86::Operand::R_ESI: mmio_device_write((gpa_t)dev_addr, 4, mctx->rsi); break;
+	case x86::Operand::R_EDI: mmio_device_write((gpa_t)dev_addr, 4, mctx->rdi); break;
 
-	case x86::Operand::R_AX: mmio_device_write(rc.pa, 2, mctx->rax); break;
-	case x86::Operand::R_BX: mmio_device_write(rc.pa, 2, mctx->rbx); break;
-	case x86::Operand::R_CX: mmio_device_write(rc.pa, 2, mctx->rcx); break;
-	case x86::Operand::R_DX: mmio_device_write(rc.pa, 2, mctx->rdx); break;
-	case x86::Operand::R_SI: mmio_device_write(rc.pa, 2, mctx->rsi); break;
-	case x86::Operand::R_DI: mmio_device_write(rc.pa, 2, mctx->rdi); break;
+	case x86::Operand::R_AX: mmio_device_write((gpa_t)dev_addr, 2, mctx->rax); break;
+	case x86::Operand::R_BX: mmio_device_write((gpa_t)dev_addr, 2, mctx->rbx); break;
+	case x86::Operand::R_CX: mmio_device_write((gpa_t)dev_addr, 2, mctx->rcx); break;
+	case x86::Operand::R_DX: mmio_device_write((gpa_t)dev_addr, 2, mctx->rdx); break;
+	case x86::Operand::R_SI: mmio_device_write((gpa_t)dev_addr, 2, mctx->rsi); break;
+	case x86::Operand::R_DI: mmio_device_write((gpa_t)dev_addr, 2, mctx->rdi); break;
 
-	case x86::Operand::R_AL: mmio_device_write(rc.pa, 1, mctx->rax); break;
-	case x86::Operand::R_BL: mmio_device_write(rc.pa, 1, mctx->rbx); break;
-	case x86::Operand::R_CL: mmio_device_write(rc.pa, 1, mctx->rcx); break;
-	case x86::Operand::R_DL: mmio_device_write(rc.pa, 1, mctx->rdx); break;
-	case x86::Operand::R_SIL: mmio_device_write(rc.pa, 1, mctx->rsi); break;
-	case x86::Operand::R_DIL: mmio_device_write(rc.pa, 1, mctx->rdi); break;
+	case x86::Operand::R_AL: mmio_device_write((gpa_t)dev_addr, 1, mctx->rax); break;
+	case x86::Operand::R_BL: mmio_device_write((gpa_t)dev_addr, 1, mctx->rbx); break;
+	case x86::Operand::R_CL: mmio_device_write((gpa_t)dev_addr, 1, mctx->rcx); break;
+	case x86::Operand::R_DL: mmio_device_write((gpa_t)dev_addr, 1, mctx->rdx); break;
+	case x86::Operand::R_SIL: mmio_device_write((gpa_t)dev_addr, 1, mctx->rsi); break;
+	case x86::Operand::R_DIL: mmio_device_write((gpa_t)dev_addr, 1, mctx->rdi); break;
 
 	default: fatal("unhandled source register %s for device write\n", x86::x86_register_names[inst.Source.reg]);
 	}

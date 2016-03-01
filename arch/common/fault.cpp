@@ -144,7 +144,8 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 	
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
-	if (va < 0x200000000) {	// XXX HACK HACK HACK
+		
+	if (va < 0x100000000 || (va >= 0x8000000000 && va < 0x8100000000)) {	// XXX HACK HACK HACK
 		bool emulate_user = false;
 		if (va >= GPM_EMULATED_VIRT_START) {
 			emulate_user = true;
@@ -183,7 +184,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 			// Get the core's MMU to handle the fault.
 			if (core->mmu().handle_fault(rc)) {
 				// If we got this far, then the fault was handled by the core's logic.
-				//printf("mmu: handled page-fault: va=%lx, pa=%lx, rperms=%x, aperms=%x, fault=%x\n", rc.va, rc.pa, rc.requested_permissions, rc.allowed_permissions, rc.fault);
+				//printf("mmu: handled page-fault: va=%lx, pa=%lx, ctxid=%lx, rperms=%x, aperms=%x, fault=%x\n", rc.va, rc.pa, core->mmu().context_id(), rc.requested_permissions, rc.allowed_permissions, rc.fault);
 
 				if (rc.fault == MMU::DEVICE_FAULT) {
 					handle_device_fault(core, mctx, rc.pa);

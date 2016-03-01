@@ -56,7 +56,7 @@ namespace captive {
 				
 				const gva_t va;
 				gpa_t pa;
-
+								
 				enum permissions requested_permissions;
 				enum permissions allowed_permissions;
 				
@@ -101,8 +101,12 @@ namespace captive {
 
 			void invalidate_virtual_mappings();
 			void invalidate_virtual_mapping(gva_t va);
+			void invalidate_virtual_mapping_by_context_id(uint32_t context_id);
 
 			void disable_writes();
+			
+			inline uint32_t context_id() const { return _context_id; }
+			void context_id(uint32_t ctxid);
 
 		protected:
 			inline bool permit_access(const struct resolution_context& context) const
@@ -112,6 +116,7 @@ namespace captive {
 			
 		private:
 			CPU& _cpu;
+			uint32_t _context_id;
 		};
 	}
 }

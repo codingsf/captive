@@ -97,11 +97,9 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 	printf("mmu-v6: resolving %08x for perms=%x\n", rc.va, rc.requested_permissions);
 #endif
 	
-	uint32_t ttbr = *armcpu().reg_offsets.TTBR0;
+	uint32_t ttbr = (*armcpu().reg_offsets.TTBR0) & ~0xfff;
 	
-	//printf("mmu: TTBR=%08x, CTXID=%08x\n", ttbr, *armcpu().reg_offsets.CTXID);
-		
-	l1_descriptor *ttb = (l1_descriptor *)GPA_TO_HVA((gpa_t)(ttbr & ~0xfff));
+	l1_descriptor *ttb = (l1_descriptor *)GPA_TO_HVA((gpa_t)ttbr);
 	l1_descriptor *l1 = &ttb[rc.va >> 20];
 	
 #ifdef DEBUG_MMU

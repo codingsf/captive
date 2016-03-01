@@ -289,6 +289,70 @@ namespace captive {
 				pa = pt->base_address();
 				return true;
 			}
+			
+			static inline bool quick_read(hva_t va, hpa_t& pa, bool user_mode)
+			{
+				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
+
+				page_map_entry_t* pm;
+				pm = &((page_map_t *)HPA_TO_HVA(CR3))->entries[pm_idx];
+				if (!pm->present()) {
+					return false;
+				}
+
+				page_dir_ptr_entry_t* pdp;
+				pdp = &((page_dir_ptr_t *)HPA_TO_HVA(pm->base_address()))->entries[pdp_idx];
+				if (!pdp->present()) {
+					return false;
+				}
+
+				page_dir_entry_t* pd;
+				pd = &((page_dir_t *)HPA_TO_HVA(pdp->base_address()))->entries[pd_idx];
+				if (!pd->present()) {
+					return false;
+				}
+
+				page_table_entry_t* pt = &((page_table_t *)HPA_TO_HVA(pd->base_address()))->entries[pt_idx];
+				if (!pt->present() || (!pt->allow_user() && user_mode)) {
+					return false;
+				}
+								
+				pa = pt->base_address();
+				return true;
+			}
+			
+			static inline bool quick_write(hva_t va, hpa_t& pa, bool user_mode)
+			{
+				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
+
+				page_map_entry_t* pm;
+				pm = &((page_map_t *)HPA_TO_HVA(CR3))->entries[pm_idx];
+				if (!pm->present()) {
+					return false;
+				}
+
+				page_dir_ptr_entry_t* pdp;
+				pdp = &((page_dir_ptr_t *)HPA_TO_HVA(pm->base_address()))->entries[pdp_idx];
+				if (!pdp->present()) {
+					return false;
+				}
+
+				page_dir_entry_t* pd;
+				pd = &((page_dir_t *)HPA_TO_HVA(pdp->base_address()))->entries[pd_idx];
+				if (!pd->present()) {
+					return false;
+				}
+
+				page_table_entry_t* pt = &((page_table_t *)HPA_TO_HVA(pd->base_address()))->entries[pt_idx];
+				if (!pt->present() || !pt->writable() || (!pt->allow_user() && user_mode)) {
+					return false;
+				}
+								
+				pa = pt->base_address();
+				return true;
+			}
 		};
 	}
 }

@@ -132,7 +132,7 @@ namespace captive {
 			virtual void handle_undefined_instruction() = 0;
 			
 			const char *get_reg_name(uint32_t offset) { return _reg_names[offset]; }
-			
+						
 		protected:
 			MMU *_mmu;
 			JIT *_jit;
@@ -212,7 +212,7 @@ namespace captive {
 
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
-
+			
 			typedef Cache<struct region_chain_cache_entry, 0x100000> region_txln_cache_t;
 			typedef Cache<struct block_chain_cache_entry, 0x10000> block_txln_cache_t;
 			region_txln_cache_t *region_txln_cache;

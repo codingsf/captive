@@ -571,6 +571,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "XXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "flush ctxid",	.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "set ctxid",	.format = "IXXXXX", .has_side_effects = true },
 
 	{ .mnemonic = "adc flags",	.format = "IBIXXX", .has_side_effects = true },
 	{ .mnemonic = "sbc flags",	.format = "IBIXXX", .has_side_effects = true },
@@ -2750,6 +2752,46 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			break;
 		}
 		
+		case IRInstruction::FLUSH_CONTEXT_ID:
+		{
+			if (insn->operands[0].is_constant()) {
+				encoder.mov(insn->operands[0].value, REG_R14);
+			} else if (insn->operands[0].is_vreg()) {
+				if (insn->operands[0].is_alloc_reg()) {
+					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
+					encoder.mov(addr, REG_R14D);
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			encoder.mov(8, REG_ECX);
+			encoder.intt(0x85);
+			break;
+		}
+		
+		case IRInstruction::SET_CONTEXT_ID:
+		{
+			if (insn->operands[0].is_constant()) {
+				encoder.mov(insn->operands[0].value, REG_R14);
+			} else if (insn->operands[0].is_vreg()) {
+				if (insn->operands[0].is_alloc_reg()) {
+					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
+					encoder.mov(addr, REG_R14D);
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+
+			encoder.mov(9, REG_ECX);
+			encoder.intt(0x85);
+			break;
+		}
+		
 		case IRInstruction::SET_ZN_FLAGS:
 		{
 			IROperand *val = &insn->operands[0];
@@ -2826,6 +2868,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						encoder.add(src->value, register_from_operand(dst));
 					else
 						encoder.sub(src->value, register_from_operand(dst));
+				} else if (src->is_constant() && dst->is_alloc_stack()) {
+					assert(false);
 				} else if (src->is_alloc_reg() && dst->is_alloc_reg()) {
 					if (is_an_add)
 						encoder.add(register_from_operand(src), register_from_operand(dst));
@@ -2850,6 +2894,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					else
 						encoder.sub(tmp, stack_from_operand(dst));
 				} else {
+					printf("src:%d, dst:%d\n", src->alloc_mode, dst->alloc_mode);
 					assert(false);
 				}
 			} else {

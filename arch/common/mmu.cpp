@@ -12,20 +12,27 @@ static struct {
 	gpa_t value;
 } itlb[ITLB_SIZE];
 
-MMU::MMU(CPU& cpu) : _cpu(cpu)
+MMU::MMU(CPU& cpu) : _cpu(cpu), _context_id(0)
 {
 	//printf("mmu: allocating guest pdps\n");
 
 	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
+	page_dir_ptr_t *pdp0 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
+	page_dir_ptr_t *pdp1 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[1].base_address());
 
 	// Lower 4G and emulated 4G
-	for (int i = 0; i < 8; i++) {
-		pdp->entries[i].base_address(Memory::alloc_pgt());
-		pdp->entries[i].flags(0);
-		pdp->entries[i].present(false);
-		pdp->entries[i].writable(true);
-		pdp->entries[i].allow_user(true);
+	for (int i = 0; i < 4; i++) {
+		pdp0->entries[i].base_address(Memory::alloc_pgt());
+		pdp0->entries[i].flags(0);
+		pdp0->entries[i].present(false);
+		pdp0->entries[i].writable(true);
+		pdp0->entries[i].allow_user(true);
+		
+		pdp1->entries[i].base_address(Memory::alloc_pgt());
+		pdp1->entries[i].flags(0);
+		pdp1->entries[i].present(false);
+		pdp1->entries[i].writable(true);
+		pdp1->entries[i].allow_user(true);
 	}
 
 	Memory::flush_tlb();
@@ -39,6 +46,13 @@ MMU::~MMU()
 {
 
 }
+
+void MMU::context_id(uint32_t ctxid)
+{
+	_context_id = ctxid;
+	//printf("mmu: change context id: %x\n", _context_id);
+}
+
 
 void MMU::set_page_device(hva_t va)
 {
@@ -146,12 +160,15 @@ uint32_t MMU::page_checksum(hva_t va)
 void MMU::invalidate_virtual_mappings()
 {
 	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
+	page_dir_ptr_t *pdp0 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
+	page_dir_ptr_t *pdp1 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[1].base_address());
 
 	// Clear the present map and re-enable writing on the 4G + E4G mapping.
-	for (int i = 0; i < 8; i++) {
-		pdp->entries[i].present(false);
-		pdp->entries[i].writable(true);
+	for (int i = 0; i < 4; i++) {
+		pdp0->entries[i].present(false);
+		pdp0->entries[i].writable(true);
+		pdp1->entries[i].present(false);
+		pdp1->entries[i].writable(true);
 	}
 
 	// Flush the TLB
@@ -188,14 +205,22 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 	itlb[(va >> 12) % ITLB_SIZE].tag = 0;
 }
 
+void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
+{
+	invalidate_virtual_mappings();
+	//printf("mmu: invalidate by context id: %x\n", context_id);
+}
+
 void MMU::disable_writes()
 {
 	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
+	page_dir_ptr_t *pdp0 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
+	page_dir_ptr_t *pdp1 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[1].base_address());
 
 	// Clear the writable flag on the 4G + E4G mapping
-	for (int i = 0; i < 8; i++) {
-		pdp->entries[i].writable(false);
+	for (int i = 0; i < 4; i++) {
+		pdp0->entries[i].writable(false);
+		pdp1->entries[i].writable(false);
 	}
 	
 	// Flush the TLB
@@ -222,7 +247,14 @@ bool MMU::handle_fault(struct resolution_context& rc)
 	
 	Memory::get_va_table_entries(host_va, pm, pdp, pd, pt);
 
-	//printf("mmu: handle fault: va=%x hva=%lx pme(%p)=(%lx) pdpe(%p)=(%lx) pde(%p)=(%lx) pte(%p)=(%lx)\n", va, host_va, pm, pm->data, pdp, pdp->data, pd, pd->data, pt, pt->data);
+	/*printf("mmu: handle fault: va=%x hva=%lx ctxid=%x pme(%p)=(%lx) pdpe(%p)=(%lx) pde(%p)=(%lx) pte(%p)=(%lx)\n",
+			rc.va,
+			host_va,
+			*cpu().tagged_registers().CTXID,
+			pm, pm->data,
+			pdp, pdp->data,
+			pd, pd->data,
+			pt, pt->data);*/
 
 	if (!pm->present()) {
 		// The associated Page Directory Pointer Table is not marked as
@@ -325,9 +357,9 @@ bool MMU::handle_fault(struct resolution_context& rc)
 			// a page-aligned value.
 			pt->base_address((uint64_t)GPA_TO_HPA(rc.pa));
 			pt->present(true);
-			pt->allow_user(rc.allowed_permissions & (USER_READ | USER_WRITE | USER_FETCH));
-			pt->writable(rc.allowed_permissions & (USER_WRITE | KERNEL_WRITE));
-			pt->executable(rc.allowed_permissions & (USER_FETCH | KERNEL_FETCH));
+			pt->allow_user(!!(rc.allowed_permissions & (USER_READ | USER_WRITE | USER_FETCH)));
+			pt->writable(!!(rc.allowed_permissions & (USER_WRITE | KERNEL_WRITE)));
+			pt->executable(!!(rc.allowed_permissions & (USER_FETCH | KERNEL_FETCH)));
 
 			if (is_page_device(GPA_TO_HVA(rc.pa))) {
 				pt->device(true);
@@ -337,7 +369,13 @@ bool MMU::handle_fault(struct resolution_context& rc)
 				goto handle_device;
 			}
 
-			//printf("mmu: %08x no fault: va=%08x pa=%08x type=%s mode=%s\n", _cpu.read_pc(), va, pa, mem_access_types[info.type], mem_access_modes[info.mode]);
+			/*printf("mmu: [%08x] no fault: va=%08x, pa=%08x, rperms=%x, aperms=%x, ctxid=%x\n",
+					_cpu.read_pc(),
+					rc.va,
+					rc.pa,
+					rc.requested_permissions,
+					rc.allowed_permissions,
+					*cpu().tagged_registers().CTXID);*/
 		} else {
 			pt->present(false);
 			pt->device(false);
