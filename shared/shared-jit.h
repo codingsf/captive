@@ -217,6 +217,7 @@ namespace captive {
 				FLUSH_DTLB_ENTRY,
 				FLUSH_CONTEXT_ID,
 				SET_CONTEXT_ID,
+				PGT_CHANGE,
 				
 				ADC_WITH_FLAGS,			// 53
 				SBC_WITH_FLAGS,
@@ -277,6 +278,7 @@ namespace captive {
 			static IRInstruction flush_dtlb_entry(const IROperand& addr) { return IRInstruction(FLUSH_DTLB_ENTRY, addr); }
 			static IRInstruction flush_context_id(const IROperand& ctxid) { return IRInstruction(FLUSH_CONTEXT_ID, ctxid); }
 			static IRInstruction set_context_id(const IROperand& ctxid) { return IRInstruction(SET_CONTEXT_ID, ctxid); }
+			static IRInstruction pgt_change() { return IRInstruction(PGT_CHANGE); }
 			
 			static IRInstruction barrier(const IROperand& pc, const IROperand& ir) { assert(pc.is_pc()); return IRInstruction(BARRIER, pc, ir); }
 			

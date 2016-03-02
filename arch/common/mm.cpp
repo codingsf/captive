@@ -12,13 +12,16 @@ void Memory::init()
 {
 }
 
+extern "C" void __fast_zero_page(void *p);
+
 uintptr_t Memory::alloc_pgt()
 {
 	uintptr_t va = (uintptr_t)page_alloc.alloc_page();
 	uintptr_t pa = HVA_TO_HPA(va);
 	
 	//printf("mm: alloc page pa=%lx va=%lx\n", pa, va);
-		
-	bzero((void *)va, 0x1000);
+	
+	__fast_zero_page((void *)va);
+	//zero_page((void *)va);
 	return pa;
 }

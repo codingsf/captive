@@ -76,6 +76,7 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	}
 	
 	case 7:
+		printf("coco: unoptimised cache invalidation\n");
 		cpu.mmu().invalidate_virtual_mappings();
 		switch (rm) {
 			case 0:
@@ -192,6 +193,8 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 		break;
 		
 	case 8:
+		printf("coco: unoptimised tlb invalidation\n");
+		
 		switch (rm) {
 		case 5:
 		case 6:

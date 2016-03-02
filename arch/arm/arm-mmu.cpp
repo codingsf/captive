@@ -97,6 +97,8 @@ bool arm_mmu_v6::resolve_gpa(struct resolution_context& rc, bool have_side_effec
 	printf("mmu-v6: resolving %08x for perms=%x\n", rc.va, rc.requested_permissions);
 #endif
 	
+	//printf("mmu: va=%08x, ttbr0=%08x, ttbr1=%08x, ttbcr=%08x, ctxid=%x\n", rc.va, (*armcpu().reg_offsets.TTBR0), (*armcpu().reg_offsets.TTBR1), (*armcpu().reg_offsets.TTBCR), context_id());
+	
 	uint32_t ttbr = (*armcpu().reg_offsets.TTBR0) & ~0xfff;
 	
 	l1_descriptor *ttb = (l1_descriptor *)GPA_TO_HVA((gpa_t)ttbr);

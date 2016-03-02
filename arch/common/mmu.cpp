@@ -5,6 +5,8 @@
 
 using namespace captive::arch;
 
+//#define TRACK_CONTEXT_ID
+
 #define ITLB_SIZE	8192
 
 static struct {
@@ -14,27 +16,6 @@ static struct {
 
 MMU::MMU(CPU& cpu) : _cpu(cpu), _context_id(0)
 {
-	//printf("mmu: allocating guest pdps\n");
-
-	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	page_dir_ptr_t *pdp0 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
-	page_dir_ptr_t *pdp1 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[1].base_address());
-
-	// Lower 4G and emulated 4G
-	for (int i = 0; i < 4; i++) {
-		pdp0->entries[i].base_address(Memory::alloc_pgt());
-		pdp0->entries[i].flags(0);
-		pdp0->entries[i].present(false);
-		pdp0->entries[i].writable(true);
-		pdp0->entries[i].allow_user(true);
-		
-		pdp1->entries[i].base_address(Memory::alloc_pgt());
-		pdp1->entries[i].flags(0);
-		pdp1->entries[i].present(false);
-		pdp1->entries[i].writable(true);
-		pdp1->entries[i].allow_user(true);
-	}
-
 	Memory::flush_tlb();
 	
 	for (int i = 0; i < ITLB_SIZE; i++) {
@@ -46,13 +27,6 @@ MMU::~MMU()
 {
 
 }
-
-void MMU::context_id(uint32_t ctxid)
-{
-	_context_id = ctxid;
-	//printf("mmu: change context id: %x\n", _context_id);
-}
-
 
 void MMU::set_page_device(hva_t va)
 {
@@ -157,19 +131,51 @@ uint32_t MMU::page_checksum(hva_t va)
 	return checksum;
 }
 
+#ifdef USE_CONTEXT_ID
+static uintptr_t context_id_to_pml[256];
+#endif
+
+void MMU::context_id(uint32_t ctxid)
+{
+	_context_id = ctxid;
+	
+#ifdef USE_CONTEXT_ID
+	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
+	pm->entries[0].base_address(context_id_to_pml[ctxid]);
+	pm->entries[0].flags(0);
+#endif
+	
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: change context id: %x\n", _context_id);
+#endif
+}
+
+void MMU::page_table_change()
+{
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: page table change (ctxid=%x)\n", _context_id);
+#endif
+	
+#ifndef USE_CONTEXT_ID
+	invalidate_virtual_mappings();
+#endif
+}
+
 void MMU::invalidate_virtual_mappings()
 {
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: invalidate all (ctxid=%x)\n", _context_id);
+#endif
+	
 	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	page_dir_ptr_t *pdp0 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
-	page_dir_ptr_t *pdp1 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[1].base_address());
-
-	// Clear the present map and re-enable writing on the 4G + E4G mapping.
-	for (int i = 0; i < 4; i++) {
-		pdp0->entries[i].present(false);
-		pdp0->entries[i].writable(true);
-		pdp1->entries[i].present(false);
-		pdp1->entries[i].writable(true);
-	}
+	
+	// Lower 4G
+	pm->entries[0].present(false);
+	pm->entries[0].writable(true);
+	
+	// Emulated 4G
+	pm->entries[1].present(false);
+	pm->entries[1].writable(true);
 
 	// Flush the TLB
 	Memory::flush_tlb();
@@ -184,6 +190,10 @@ void MMU::invalidate_virtual_mappings()
 
 void MMU::invalidate_virtual_mapping(gva_t va)
 {
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: invalidate address %p (ctxid=%x)\n", va, _context_id);
+#endif
+	
 	page_map_entry_t *pm;
 	page_dir_ptr_entry_t *pdp;
 	page_dir_entry_t *pd;
@@ -207,21 +217,37 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 
 void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 {
-	invalidate_virtual_mappings();
-	//printf("mmu: invalidate by context id: %x\n", context_id);
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: invalidate explicit ctxid=%x (ctxid=%x)\n", context_id, _context_id);
+#endif
+	
+	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
+
+	// Lower 4G
+	pm->entries[0].present(false);
+	pm->entries[0].writable(true);
+	
+	// Emulated 4G
+	pm->entries[1].present(false);
+	pm->entries[1].writable(true);
+	
+	// Flush the TLB
+	Memory::flush_tlb();
+
+	// Notify the CPU to invalidate virtual mappings
+	_cpu.invalidate_virtual_mappings();
+	
+	for (int i = 0; i < ITLB_SIZE; i++) {
+		itlb[i].tag = 0;
+	}
 }
 
 void MMU::disable_writes()
 {
 	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	page_dir_ptr_t *pdp0 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[0].base_address());
-	page_dir_ptr_t *pdp1 = (page_dir_ptr_t *)HPA_TO_HVA(pm->entries[1].base_address());
-
-	// Clear the writable flag on the 4G + E4G mapping
-	for (int i = 0; i < 4; i++) {
-		pdp0->entries[i].writable(false);
-		pdp1->entries[i].writable(false);
-	}
+	
+	pm->entries[0].writable(false);	// Lower 4G
+	pm->entries[1].writable(false);	// Emulated 4G
 	
 	// Flush the TLB
 	if (in_kernel_mode()) {
@@ -247,16 +273,18 @@ bool MMU::handle_fault(struct resolution_context& rc)
 	
 	Memory::get_va_table_entries(host_va, pm, pdp, pd, pt);
 
-	/*printf("mmu: handle fault: va=%x hva=%lx ctxid=%x pme(%p)=(%lx) pdpe(%p)=(%lx) pde(%p)=(%lx) pte(%p)=(%lx)\n",
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: handle fault: va=%x hva=%lx ctxid=%x pme(%p)=(%lx) pdpe(%p)=(%lx) pde(%p)=(%lx) pte(%p)=(%lx)\n",
 			rc.va,
 			host_va,
-			*cpu().tagged_registers().CTXID,
+			_context_id,
 			pm, pm->data,
 			pdp, pdp->data,
 			pd, pd->data,
-			pt, pt->data);*/
-
-	if (!pm->present()) {
+			pt, pt->data);
+#endif
+	
+	if (!pm->present() || !pm->writable()) {
 		// The associated Page Directory Pointer Table is not marked as
 		// present, so invalidate the page directory pointer table, and
 		// mark it as present.
@@ -266,11 +294,13 @@ bool MMU::handle_fault(struct resolution_context& rc)
 
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
-			base->entries[i].present(false);
+			if (!pm->present()) base->entries[i].present(false);
+			if (!pm->writable()) base->entries[i].writable(false);
 		}
 
-		// Set the PRESENT flag for the page directory pointer table.
+		// Set the PRESENT and WRITABLE flag for the page directory pointer table.
 		pm->present(true);
+		pm->writable(true);
 	}
 
 	if (!pdp->present() || !pdp->writable()) {
@@ -300,19 +330,9 @@ bool MMU::handle_fault(struct resolution_context& rc)
 		page_table_t *base = (page_table_t *)((uint64_t)pt & ~0xfffULL);
 
 		// Loop over each entry and clear the flags.
-		if (!pd->present()) {
-			for (int i = 0; i < 0x200; i++) {
-				base->entries[i].flags(0);
-				
-				/*present(false);
-				base->entries[i].device(false);
-				base->entries[i].allow_user(false);
-				base->entries[i].executable(false);*/
-			}
-		} else if (!pd->writable()) {
-			for (int i = 0; i < 0x200; i++) {
-				base->entries[i].writable(false);
-			}
+		for (int i = 0; i < 0x200; i++) {
+			if (!pd->present()) base->entries[i].flags(0);
+			else if (!pd->writable()) base->entries[i].writable(false);
 		}
 
 		// Set the PRESENT flag for the page table.

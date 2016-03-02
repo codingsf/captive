@@ -15,6 +15,7 @@ extern void *memcpy(void *, const void *, size_t);
 extern void *memmove(void *, const void *, size_t);
 extern int memcmp(const void *, const void *, size_t);
 extern void *bzero(void *, size_t);
+extern void zero_page(void *);
 
 extern int strlen(const char *);
 extern char *strcpy(char *, const char *);

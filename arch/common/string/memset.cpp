@@ -23,6 +23,16 @@ void *bzero(void *dest, size_t n)
 	return memset(dest, 0, n);
 }
 
+void zero_page(void *page)
+{
+	assert(((uintptr_t)page & 0xfff) == 0);
+	
+	uint64_t *p = (uint64_t *)page;
+	for (int i = 0; i < 0x200; i++) {
+		p[i] = 0;
+	}
+}
+
 int memcmp(const void *s1, const void *s2, size_t size)
 {
 	uint8_t *p1 = (uint8_t *)s1;

@@ -107,6 +107,7 @@ namespace captive {
 			
 			inline uint32_t context_id() const { return _context_id; }
 			void context_id(uint32_t ctxid);
+			void page_table_change();
 
 		protected:
 			inline bool permit_access(const struct resolution_context& context) const
