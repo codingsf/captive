@@ -140,7 +140,7 @@ namespace captive {
 			
 			virtual bool decode_instruction_virt(uint8_t isa, gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(uint8_t isa, gpa_t addr, Decode *insn) = 0;
-			virtual JumpInfo get_instruction_jump_info(Decode *insn) = 0;
+			virtual JumpInfo get_instruction_jump_info(const Decode *insn) = 0;
 
 			virtual bool interrupts_enabled(uint8_t irq_line) const = 0;
 
