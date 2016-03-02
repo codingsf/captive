@@ -3,11 +3,15 @@
 
 #include <captive.h>
 
+#include <map>
+
 DECLARE_CONTEXT(SystemStatusAndControl);
 
 #define LOCK_VALUE 0xa05f
 
 using namespace captive::devices::arm::realview;
+
+std::map<uint64_t, uint64_t> off_reads, off_writes;
 
 SystemStatusAndControl::SystemStatusAndControl(timers::TimerManager& timer_manager) : 
 	_timer_manager(timer_manager),
@@ -19,9 +23,20 @@ SystemStatusAndControl::SystemStatusAndControl(timers::TimerManager& timer_manag
 {
 	
 }
+SystemStatusAndControl::~SystemStatusAndControl() {
+	for (auto off : off_reads) {
+		fprintf(stderr, "rd %03lx: %lu\n", off.first, off.second);
+	}
+	for (auto off : off_writes) {
+		fprintf(stderr, "wr %03lx: %lu\n", off.first, off.second);
+	}
+}
 
+	
 bool SystemStatusAndControl::read(uint64_t off, uint8_t len, uint64_t& data)
 {
+	//off_reads[off]++;
+	
 	switch (off) {
 	case 0x000:
 		data = 0x01780500;		// Cortex A8;
@@ -71,6 +86,8 @@ bool SystemStatusAndControl::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool SystemStatusAndControl::write(uint64_t off, uint8_t len, uint64_t data)
 {
+	//off_writes[off]++;
+	
 	switch (off) {
 	case 0x008:
 		leds = data;

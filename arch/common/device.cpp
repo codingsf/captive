@@ -31,6 +31,8 @@ CoreDevice::~CoreDevice()
 
 void captive::arch::mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value)
 {
+	__local_irq_disable();
+	
 	captive::PerGuestData *pgd = CPU::get_active_cpu_data()->guest_data;
 	
 	pgd->fast_device_address = pa;
@@ -44,10 +46,14 @@ void captive::arch::mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value)
 	captive::lock::barrier_wait_nopause(&pgd->fd_guest_barrier, FAST_DEV_GUEST_TID);
 	
 	value = pgd->fast_device_value;
+	
+	__local_irq_enable();
 }
 
 void captive::arch::mmio_device_write(gpa_t pa, uint8_t size, uint64_t value)
 {
+	__local_irq_disable();
+	
 	captive::PerGuestData *pgd = CPU::get_active_cpu_data()->guest_data;
 	
 	pgd->fast_device_address = pa;
@@ -60,6 +66,8 @@ void captive::arch::mmio_device_write(gpa_t pa, uint8_t size, uint64_t value)
 	
 	captive::lock::barrier_wait_nopause(&pgd->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
 	captive::lock::barrier_wait_nopause(&pgd->fd_guest_barrier, FAST_DEV_GUEST_TID);
+	
+	__local_irq_enable();
 }
 
 #else

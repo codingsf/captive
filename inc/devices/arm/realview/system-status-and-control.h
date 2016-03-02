@@ -23,6 +23,7 @@ namespace captive {
 				{
 				public:
 					SystemStatusAndControl(timers::TimerManager& timer_manager);
+					~SystemStatusAndControl();
 
 					std::string name() const override { return "sysctl"; }
 					uint32_t size() const override { return 0x1000; }

@@ -273,9 +273,8 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 			itlb[i].tag = 0;
 		}
 	}
-#endif
-	
-	/*page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
+#else
+	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
 
 	// Lower 4G
 	pm->entries[0].present(false);
@@ -293,7 +292,8 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 	
 	for (int i = 0; i < ITLB_SIZE; i++) {
 		itlb[i].tag = 0;
-	}*/
+	}
+#endif
 }
 
 void MMU::disable_writes()

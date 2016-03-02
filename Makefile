@@ -14,7 +14,9 @@ src := $(patsubst src/%,$(src-dir)/%,$(shell find src/ | grep -e "\.cpp"))
 obj := $(src:.cpp=.o)
 dep := $(src:.cpp=.d)
 
-common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread -fno-rtti
+export ndebug := -DNDEBUG
+
+common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread -fno-rtti $(ndebug)
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++14
 asflags  := -g

@@ -11,6 +11,7 @@
 #include <platform/platform.h>
 #include <hypervisor/config.h>
 #include <string>
+#include <list>
 
 namespace captive {
 	namespace devices {
@@ -56,6 +57,8 @@ namespace captive {
 			devices::gfx::SDLVirtualScreen *vs;
 #endif
 			devices::io::SocketUART *socket_uart;
+			
+			std::list<devices::Device *> destructor_list;
 		};
 	}
 }

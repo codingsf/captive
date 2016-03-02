@@ -121,23 +121,10 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 #define PF_WRITE		(1 << 1)
 #define PF_USER_MODE	(1 << 2)
 
-/*static const char *info_modes[] = {
-	"user",
-	"kernel"
-};
-
-static const char *info_reasons[] = {
-	"page invalid",
-	"permissions failure"
-};
-
-static const char *info_types[] = {
-	"read",
-	"write",
-	"fetch"
-};*/
-
+#ifndef NDEBUG
 uint64_t page_faults;
+uint64_t page_fault_reasons[8];
+#endif
 
 extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 {
@@ -147,7 +134,55 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
 	
+#ifndef NDEBUG
 	page_faults++;
+	
+	if (code & PF_PRESENT) {
+		if (code & PF_WRITE) {
+			// Protection Violation + Write
+			
+			if (code & PF_USER_MODE) {
+				// Protection Violation + Write + User Mode
+				page_fault_reasons[0]++;
+			} else {
+				// Protection Violation + Write + Kernel Mode
+				page_fault_reasons[1]++;
+			}
+		} else {
+			// Protection Violation + Read
+			
+			if (code & PF_USER_MODE) {
+				// Protection Violation + Read + User Mode
+				page_fault_reasons[2]++;
+			} else {
+				// Protection Violation + Read + Kernel Mode
+				page_fault_reasons[3]++;
+			}
+		}		
+	} else {
+		if (code & PF_WRITE) {
+			// Not Present + Write
+			
+			if (code & PF_USER_MODE) {
+				// Not Present + Write + User Mode
+				page_fault_reasons[4]++;
+			} else {
+				// Not Present + Write + Kernel Mode
+				page_fault_reasons[5]++;
+			}
+		} else {
+			// Not Present + Read
+			
+			if (code & PF_USER_MODE) {
+				// Not Present + Read + User Mode
+				page_fault_reasons[6]++;
+			} else {
+				// Not Present + Read + Kernel Mode
+				page_fault_reasons[7]++;
+			}
+		}	
+	}
+#endif
 	
 	if (va < 0x100000000 || (va >= 0x8000000000 && va < 0x8100000000)) {	// XXX HACK HACK HACK
 		bool emulate_user = false;

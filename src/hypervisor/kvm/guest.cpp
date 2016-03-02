@@ -181,6 +181,10 @@ void KVMGuest::guest_entrypoint(gpa_t entrypoint)
 	per_guest_data->entrypoint = entrypoint;
 }
 
+#ifndef NDEBUG
+std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
+#endif
+
 bool KVMGuest::run()
 {
 	// Create the device thread
@@ -226,6 +230,18 @@ bool KVMGuest::run()
 		if (thread->joinable()) thread->join();
 	}
 	
+#ifndef NDEBUG
+	fprintf(stderr, "device reads:\n");
+	for (auto devread : device_reads) {
+		fprintf(stderr, "  %s: %lu\n", devread.first->name().c_str(), devread.second);
+	}
+	
+	fprintf(stderr, "device writes:\n");
+	for (auto devwrite : device_writes) {
+		fprintf(stderr, "  %s: %lu\n", devwrite.first->name().c_str(), devwrite.second);
+	}
+#endif
+	
 	// Shutdown the device thread
 	per_guest_data->fast_device_operation = FAST_DEV_OP_QUIT;
 	captive::lock::barrier_wait(&per_guest_data->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
@@ -259,8 +275,14 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 		
 		uint64_t offset = pgd->fast_device_address - base_addr;
 		if (pgd->fast_device_operation == FAST_DEV_OP_WRITE) {
+#ifndef NDEBUG
+			device_writes[device]++;
+#endif
 			device->write(offset, pgd->fast_device_size, pgd->fast_device_value);
 		} else if (pgd->fast_device_operation == FAST_DEV_OP_READ) {
+#ifndef NDEBUG
+			device_reads[device]++;
+#endif
 			device->read(offset, pgd->fast_device_size, pgd->fast_device_value);
 		} else {
 			break;

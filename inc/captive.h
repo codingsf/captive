@@ -155,8 +155,12 @@ namespace captive {
 	}
 }
 
+#ifdef NDEBUG
+#define LOG() while (0) captive::LogStream()
+#else
 #define LOG() captive::LogStream()
-//#define LOG() while (0) captive::LogStream()
+#endif
+
 #define DEBUG LOG() << captive::set_level(captive::LogStream::LL_DEBUG)
 #define INFO LOG() << captive::set_level(captive::LogStream::LL_INFO)
 #define ERROR LOG() << captive::set_level(captive::LogStream::LL_ERROR)

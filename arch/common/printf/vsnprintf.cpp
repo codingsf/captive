@@ -38,7 +38,7 @@ static void prepend_to_buffer(char c, char *buffer, int size)
 	*buffer = c;
 }
 
-static int append_num(char *buffer, int size, unsigned long long int value, int base, bool sgn, int pad, char pad_char)
+static int append_num(char *buffer, int size, uint64_t value, int base, bool sgn, int pad, char pad_char)
 {
 	int n = 0;
 
@@ -46,7 +46,7 @@ static int append_num(char *buffer, int size, unsigned long long int value, int 
 		pad = size - 1;
 	}
 
-	if (sgn && (signed long long int)value < 0) {
+	if (sgn && (int64_t)value < 0) {
 		prepend_to_buffer('-', buffer, n++);
 		value = -value;
 	}
@@ -144,15 +144,19 @@ retry_format:
 			case 'd':
 			case 'u':
 			{
-				long long int v;
+				uint64_t v;
 
 				if (number_size == 8) {
-					v = va_arg(args, long long int);
+					if (*fmt == 'u') {
+						v = (uint64_t)va_arg(args, uint64_t);
+					} else {
+						v = (uint64_t)va_arg(args, int64_t);
+					}
 				} else {
 					if (*fmt == 'u') {
-						v = (unsigned long long int)va_arg(args, int);
+						v = (uint64_t)(uint32_t)va_arg(args, uint32_t);
 					} else {
-						v = (long long int)va_arg(args, int);
+						v = (uint64_t)(int64_t)(int32_t)va_arg(args, int32_t);
 					}
 				}
 

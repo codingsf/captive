@@ -17,7 +17,11 @@ using namespace captive::arch::jit;
 using namespace captive::arch::profile;
 
 safepoint_t cpu_safepoint;
+
+#ifndef NDEBUG
 extern uint64_t page_faults;
+extern uint64_t page_fault_reasons[8];
+#endif
 
 CPU *CPU::current_cpu;
 
@@ -65,7 +69,18 @@ bool CPU::handle_pending_action(uint32_t action)
 {
 	switch (action) {
 	case 1:
-		printf("page faults: %lu\n", page_faults);
+#ifndef NDEBUG
+		printf("page faults: %lu, [0]:%lu, [1]:%lu, [2]:%lu, [3]:%lu, [4]:%lu, [5]:%lu, [6]:%lu, [7]:%lu\n",
+				page_faults,
+				page_fault_reasons[0],
+				page_fault_reasons[1],
+				page_fault_reasons[2],
+				page_fault_reasons[3],
+				page_fault_reasons[4],
+				page_fault_reasons[5],
+				page_fault_reasons[6],
+				page_fault_reasons[7]);
+#endif
 		return false;
 
 	case 2:

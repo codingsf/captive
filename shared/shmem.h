@@ -28,7 +28,7 @@ namespace captive {
 			*lock = 0;
 		}
 		
-		typedef struct { uint32_t ctr; volatile bool b[2]; } barrier;
+		typedef struct { uint32_t ctr; volatile uint32_t b[2]; } barrier;
 		
 		inline void barrier_init(barrier *b)
 		{

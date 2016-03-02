@@ -56,6 +56,7 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0xc0000000, 0x40000000));
 	
 	SystemStatusAndControl *statctl = new SystemStatusAndControl(timer_manager);
+	destructor_list.push_back(statctl);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *statctl));
 
 	SystemController *syscon0 = new SystemController(SystemController::SYS_CTRL0);
@@ -200,6 +201,9 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 
 Realview::~Realview()
 {
+	for (auto dev : destructor_list) {
+		delete dev;
+	}
 }
 
 bool Realview::start()

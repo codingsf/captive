@@ -98,6 +98,10 @@ void KVMCpu::acknowledge_guest_interrupt(uint8_t irq)
 	irq_ack.raise();
 }
 
+#ifndef NDEBUG
+extern std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
+#endif
+
 bool KVMCpu::run()
 {
 	KVMGuest& kvm_guest = (KVMGuest &)owner();
@@ -241,9 +245,15 @@ bool KVMCpu::run()
 				if (dev != NULL) {
 					uint64_t offset = regs.rdx - base_addr;
 					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
+#ifndef NDEBUG
+						device_writes[dev]++;
+#endif			
 						// Device Write
 						dev->write(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					} else {
+#ifndef NDEBUG
+						device_reads[dev]++;
+#endif			
 						// Device Read
 						dev->read(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					}
