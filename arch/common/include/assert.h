@@ -16,7 +16,7 @@ extern void dump_code(unsigned long int rip);
 extern void dump_stack(void);
 extern void dump_mcontext(const struct mcontext *mctx);
 
-#define assert(_expr) do { if (!(_expr)) { __assertion_failure(__FILE__, __LINE__, #_expr); } } while(0)
+#define assert(_expr) do { if (!(_expr)) { __assertion_failure(__FILE__, __LINE__, #_expr); __builtin_unreachable(); } } while(0)
 //#define assert(_expr) 0
 
 #endif	/* ASSERT_H */

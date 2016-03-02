@@ -84,6 +84,7 @@ static inline __attribute__((noreturn)) void abort()
 }
 
 #define unreachable() __builtin_unreachable()
+#define should_not_reach() do {  __assertion_failure(__FILE__, __LINE__, "should_not_reach"); __builtin_unreachable(); } while(0);
 
 static inline void __local_irq_enable()
 {

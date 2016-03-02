@@ -169,9 +169,9 @@ bool BlockCompiler::verify()
 		const IROperand& op0 = insn->operands[0];
 		const IROperand& op1 = insn->operands[1];
 		const IROperand& op2 = insn->operands[2];
-		const IROperand& op3 = insn->operands[3];
+		/*const IROperand& op3 = insn->operands[3];
 		const IROperand& op4 = insn->operands[4];
-		const IROperand& op5 = insn->operands[5];
+		const IROperand& op5 = insn->operands[5];*/
 		
 		// Let's see if we've changed block.
 		if (insn->ir_block != current_block) {			

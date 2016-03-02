@@ -34,7 +34,7 @@ bool MPTimer::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 	}
 	
-	fprintf(stderr, "mptimer: invalid register read @ %x\n", off);
+	fprintf(stderr, "mptimer: invalid register read @ %lx\n", off);
 	return false;
 }
 
@@ -74,7 +74,7 @@ bool MPTimer::write(uint64_t off, uint8_t len, uint64_t data)
 		return true;
 	}
 	
-	fprintf(stderr, "mptimer: invalid register write @ %x = %x\n", off, data);
+	fprintf(stderr, "mptimer: invalid register write @ %lx = %lx\n", off, data);
 	return false;
 }
 

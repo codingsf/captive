@@ -284,7 +284,7 @@ void SDLVirtualScreen::draw_palette()
 {
 	uint8_t fb[config().width() * config().height() * 4];
 	
-	for (int pidx = 0; pidx < config().width() * config().height(); pidx++) {
+	for (unsigned int pidx = 0; pidx < config().width() * config().height(); pidx++) {
 		uint32_t pv = ((uint16_t *)palette())[framebuffer()[pidx]];
 		fb[(pidx * 4) + 3] = (pv & 0x1f) << 3;
 		fb[(pidx * 4) + 2] = ((pv >> 5) & 0x1f) << 3;

@@ -85,7 +85,8 @@ namespace captive {
 						case 4: return *register_assignments_4[index];
 						case 8: return *register_assignments_8[index];
 					}
-					assert(false);
+					
+					should_not_reach();
 				}
 
 				inline void assign(uint8_t id, const x86::X86Register& r8, const x86::X86Register& r4, const x86::X86Register& r2, const x86::X86Register& r1)
@@ -107,8 +108,9 @@ namespace captive {
 					case 2:	return *(register_assignments_2.find(oper->alloc_data)->second);
 					case 4:	return *(register_assignments_4.find(oper->alloc_data)->second);
 					case 8:	return *(register_assignments_8.find(oper->alloc_data)->second);
-					default: assert(false);
 					}
+					
+					should_not_reach();
 				}
 
 				inline x86::X86Memory stack_from_operand(const captive::shared::IROperand *oper) const
@@ -128,7 +130,6 @@ namespace captive {
 						case 2:	return x86::REG_CX;
 						case 4:	return x86::REG_ECX;
 						case 8:	return x86::REG_RCX;
-						default: assert(false);
 						}
 
 					case 1:
@@ -137,11 +138,10 @@ namespace captive {
 						case 2:	return x86::REG_R14W;
 						case 4:	return x86::REG_R14D;
 						case 8:	return x86::REG_R14;
-						default: assert(false);
 						}
-
-					default: assert(false);
 					}
+					
+					should_not_reach();
 				}
 
 				inline x86::X86Register& unspill_temp(const captive::shared::IROperand *oper, int id)

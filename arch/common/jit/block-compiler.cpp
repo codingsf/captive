@@ -11,7 +11,7 @@
 #include <maybe-set.h>
 #include <tick-timer.h>
 
-#define NOP_BLOCK 0x7fffffff
+#define NOP_BLOCK (IRBlockId)0x7fffffff
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
@@ -624,7 +624,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 				// If we have already seen this operand, and not in the same block, then we
 				// must globally allocate it.
-				if (seen_in_block != -1 && seen_in_block != insn->ir_block) {
+				if (seen_in_block != -1 && seen_in_block != (int32_t)insn->ir_block) {
 					global_allocation[oper->value] = next_global;
 					next_global += 8;
 					if(next_global > max_stack) max_stack = next_global;
@@ -865,7 +865,7 @@ bool BlockCompiler::thread_jumps()
 	
 	timer.tick("Analysis");
 
-	for(int block_id = 0; block_id < last_instructions.size(); ++block_id) {
+	for(unsigned int block_id = 0; block_id < last_instructions.size(); ++block_id) {
 		IRInstruction *source_instruction = last_instructions[block_id];
 		if(!source_instruction) continue;
 
@@ -1159,7 +1159,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		encoder.ret();
 	}*/
 	
-	uint32_t prologue_offset = encoder.current_offset();
+//	uint32_t prologue_offset = encoder.current_offset();
 	if(max_stack > 0x40)
 		encoder.sub(max_stack-0x40, REG_RSP);
 
@@ -1781,7 +1781,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				uint32_t reloc_offset;
 				encoder.jmp_reloc(reloc_offset);
 
-				block_relocations.push_back({reloc_offset, target->value});
+				block_relocations.push_back({reloc_offset, (IRBlockId)target->value});
 
 				encoder.align_up(8);
 			}
@@ -1809,7 +1809,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					IRBlockId target = cond->value ? tt->value : ft->value;
 					uint32_t reloc_offset;
 					encoder.jmp_reloc(reloc_offset);
-					block_relocations.push_back({reloc_offset, target});
+					block_relocations.push_back({reloc_offset, (IRBlockId)target});
 					
 					encoder.align_up(8);
 					break;
@@ -1824,27 +1824,27 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				{
 					uint32_t reloc_offset;
 					encoder.jz_reloc(reloc_offset);
-					block_relocations.push_back({reloc_offset, ft->value});
+					block_relocations.push_back({reloc_offset, (IRBlockId)ft->value});
 				}
 			} else if (next_insn && next_insn->ir_block == (IRBlockId)ft->value) {
 				// Fallthrough is FALSE block
 				{
 					uint32_t reloc_offset;
 					encoder.jnz_reloc(reloc_offset);
-					block_relocations.push_back({reloc_offset, tt->value});
+					block_relocations.push_back({reloc_offset, (IRBlockId)tt->value});
 				}
 			} else {
 				// Fallthrough is NEITHER
 				{
 					uint32_t reloc_offset;
 					encoder.jnz_reloc(reloc_offset);
-					block_relocations.push_back({reloc_offset, tt->value});
+					block_relocations.push_back({reloc_offset, (IRBlockId)tt->value});
 				}
 
 				{
 					uint32_t reloc_offset;
 					encoder.jmp_reloc(reloc_offset);
-					block_relocations.push_back({reloc_offset, ft->value});
+					block_relocations.push_back({reloc_offset, (IRBlockId)ft->value});
 				}
 
 				encoder.align_up(8);
@@ -2530,14 +2530,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					{
 						uint32_t reloc_offset;
 						encoder.je_reloc(reloc_offset);
-						block_relocations.push_back({reloc_offset, tt->value});
+						block_relocations.push_back({reloc_offset, (IRBlockId)tt->value});
 					}
 
 					{
 						if(ft->value != next_block) {
 							uint32_t reloc_offset;
 							encoder.jmp_reloc(reloc_offset);
-							block_relocations.push_back({reloc_offset, ft->value});
+							block_relocations.push_back({reloc_offset, (IRBlockId)ft->value});
 						}
 					}
 				}
@@ -2558,14 +2558,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					{
 						uint32_t reloc_offset;
 						encoder.jne_reloc(reloc_offset);
-						block_relocations.push_back({reloc_offset, tt->value});
+						block_relocations.push_back({reloc_offset, (IRBlockId)tt->value});
 					}
 
 					{
 						if(ft->value != next_block) {
 							uint32_t reloc_offset;
 							encoder.jmp_reloc(reloc_offset);
-							block_relocations.push_back({reloc_offset, ft->value});
+							block_relocations.push_back({reloc_offset, (IRBlockId)ft->value});
 						}
 					}
 				}
@@ -3039,7 +3039,7 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 
 void BlockCompiler::emit_restore_reg_state(int num_operands, stack_map_t &stack_map)
 {
-	for(int i = 0; i < register_assignments_8.size(); ++i) {
+	for(unsigned int i = 0; i < register_assignments_8.size(); ++i) {
 		if(used_phys_regs.get(i)) {
 			encoder.pop(get_allocable_register(i, 8));
 		}
@@ -3275,11 +3275,11 @@ bool BlockCompiler::reorder_blocks()
 		
 		switch(insn->type) {
 			case IRInstruction::JMP:
-				block_targets[insn->ir_block] = { insn->operands[0].value, NOP_BLOCK };
+				block_targets[insn->ir_block] = { (IRBlockId)insn->operands[0].value, NOP_BLOCK };
 				blocks.insert(insn->operands[0].value);
 				break;
 			case IRInstruction::BRANCH:
-				block_targets[insn->ir_block] = { insn->operands[1].value, insn->operands[2].value };
+				block_targets[insn->ir_block] = { (IRBlockId)insn->operands[1].value, (IRBlockId)insn->operands[2].value };
 				blocks.insert(insn->operands[1].value);
 				blocks.insert(insn->operands[2].value);
 				break;
@@ -3337,7 +3337,7 @@ bool BlockCompiler::reorder_blocks()
 	std::sort(queue.begin(), queue.end(), comp);
 	
 	
-	for(int i = 0; i < queue.size(); ++i) {
+	for(unsigned int i = 0; i < queue.size(); ++i) {
 		reordering[queue[i]] = i;
 	}
 	
@@ -3509,7 +3509,7 @@ bool BlockCompiler::value_merging()
 		
 		// If this is a move of one vreg to another, record this as a candidate for merging
 		if(insn->type == IRInstruction::MOV && insn->operands[0].is_vreg()) {
-			if(merged_vregs[insn->operands[0].value] != -1)
+			if(merged_vregs[insn->operands[0].value] != (IRRegId)-1)
 				merged_vregs[insn->operands[1].value] = merged_vregs[insn->operands[0].value];
 			else
 				merged_vregs[insn->operands[1].value] = insn->operands[0].value;
@@ -3532,7 +3532,7 @@ bool BlockCompiler::value_merging()
 		IRInstruction *insn = ctx.at(ir_idx);
 		for(unsigned int op_idx = 0; op_idx < 6; ++op_idx) {
 			IROperand &op = insn->operands[op_idx];
-			if(op.is_vreg() && merged_vregs[op.value] != -1) op.value = merged_vregs[op.value];
+			if(op.is_vreg() && merged_vregs[op.value] != (IRRegId)-1) op.value = merged_vregs[op.value];
 		}
 		
 		if(insn->type == IRInstruction::MOV) {

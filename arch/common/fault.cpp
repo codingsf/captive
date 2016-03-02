@@ -121,7 +121,7 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 #define PF_WRITE		(1 << 1)
 #define PF_USER_MODE	(1 << 2)
 
-static const char *info_modes[] = {
+/*static const char *info_modes[] = {
 	"user",
 	"kernel"
 };
@@ -135,7 +135,9 @@ static const char *info_types[] = {
 	"read",
 	"write",
 	"fetch"
-};
+};*/
+
+uint64_t page_faults;
 
 extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 {
@@ -144,7 +146,9 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 	
 	// If the virtual address is in the lower 4GB, then is is a guest
 	// instruction (or decode) taking a memory fault.
-		
+	
+	page_faults++;
+	
 	if (va < 0x100000000 || (va >= 0x8000000000 && va < 0x8100000000)) {	// XXX HACK HACK HACK
 		bool emulate_user = false;
 		if (va >= GPM_EMULATED_VIRT_START) {

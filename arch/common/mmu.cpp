@@ -258,6 +258,7 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 	printf("mmu: invalidate explicit ctxid=%x (ctxid=%x)\n", context_id, _context_id);
 #endif
 	
+#ifdef USE_CONTEXT_ID
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(context_id_to_pdp[context_id]);
 	for (int i = 0; i < 0x200; i++) {
 		pdp->entries[i].present(false);
@@ -272,6 +273,7 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 			itlb[i].tag = 0;
 		}
 	}
+#endif
 	
 	/*page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
 

@@ -17,6 +17,7 @@ using namespace captive::arch::jit;
 using namespace captive::arch::profile;
 
 safepoint_t cpu_safepoint;
+extern uint64_t page_faults;
 
 CPU *CPU::current_cpu;
 
@@ -64,6 +65,7 @@ bool CPU::handle_pending_action(uint32_t action)
 {
 	switch (action) {
 	case 1:
+		printf("page faults: %lu\n", page_faults);
 		return false;
 
 	case 2:

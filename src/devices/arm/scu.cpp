@@ -24,7 +24,7 @@ bool SnoopControlUnit::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 	}
 	
-	fprintf(stderr, "scu: unknown register read: %02x\n", off);
+	fprintf(stderr, "scu: unknown register read: %02lx\n", off);
 	return false;
 }
 
@@ -36,6 +36,6 @@ bool SnoopControlUnit::write(uint64_t off, uint8_t len, uint64_t data)
 		return true;
 	}
 	
-	fprintf(stderr, "scu: unknown register write: %02x\n", off);
+	fprintf(stderr, "scu: unknown register write: %02lx\n", off);
 	return false;
 }

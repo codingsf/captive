@@ -121,6 +121,7 @@ bool CPU::run_block_jit_safepoint()
 	} while(step_ok);
 	
 	if (!step_ok) printf("step was not okay\n");
+	
 	return true;
 }
 

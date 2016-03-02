@@ -264,11 +264,13 @@ bool KVMCpu::run()
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa, base_addr);
 				
 				if (dev != NULL) {
+					void *data = (void *)cpu_run_struct->mmio.data;
+					
 					uint64_t offset = converted_pa - base_addr;
 					if (cpu_run_struct->mmio.is_write) {
-						run_cpu = dev->write(offset, cpu_run_struct->mmio.len, *(uint64_t *)&cpu_run_struct->mmio.data[0]);
+						run_cpu = dev->write(offset, cpu_run_struct->mmio.len, *(uint64_t *)data);
 					} else {
-						run_cpu = dev->read(offset, cpu_run_struct->mmio.len, *(uint64_t *)&cpu_run_struct->mmio.data[0]);
+						run_cpu = dev->read(offset, cpu_run_struct->mmio.len, *(uint64_t *)data);
 					}
 					
 					if (!run_cpu) {
@@ -340,10 +342,12 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 	uint64_t offset = pa & (device->size() - 1);
 	DEBUG << CONTEXT(CPU) << "Handling Device Access: pa=" << std::hex << pa << ", name=" << device->name() << ", is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
 
+	void *data = (void *)rs.mmio.data;
+	
 	if (rs.mmio.is_write) {
-		return device->write(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]);
+		return device->write(offset, rs.mmio.len, *(uint64_t *)data);
 	} else {
-		if (!device->read(offset, rs.mmio.len, *(uint64_t *)&rs.mmio.data[0]))
+		if (!device->read(offset, rs.mmio.len, *(uint64_t *)data))
 			return false;
 		return true;
 	}
@@ -352,8 +356,6 @@ bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run&
 
 bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 {
-	KVMGuest& kvm_guest = (KVMGuest &)owner();
-
 	DEBUG << CONTEXT(CPU) << "Hypercall " << data;
 
 	switch(data) {

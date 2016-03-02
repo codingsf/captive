@@ -240,7 +240,16 @@ void GICDistributorInterface::sgi(uint32_t data)
 	owner.update();
 }
 
-GICCPUInterface::GICCPUInterface(GIC& owner, irq::IRQLine& irq, int id) : owner(owner), irq(irq), id(id), ctrl(0), prio_mask(0), binpnt(3), current_pending(1023), running_irq(1023), running_priority(0x100)
+GICCPUInterface::GICCPUInterface(GIC& owner, irq::IRQLine& irq, int id) 
+	: owner(owner),
+		irq(irq),
+		id(id),
+		ctrl(0),
+		prio_mask(0),
+		binpnt(3), 
+		current_pending(1023),
+		running_irq(1023),
+		running_priority(0x100)
 {
 	for (int i = 0; i < 96; i++) {
 		last_active[i] = 1023;
@@ -280,7 +289,7 @@ bool GICCPUInterface::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 	}
 	
-	fprintf(stderr, "gic: cpu: unknown register read %02x\n", off);
+	fprintf(stderr, "gic: cpu: unknown register read %02lx\n", off);
 	return false;
 }
 
@@ -307,7 +316,7 @@ bool GICCPUInterface::write(uint64_t off, uint8_t len, uint64_t data)
 		return true;
 	}
 	
-	fprintf(stderr, "gic: cpu: unknown register write %02x\n", off);
+	fprintf(stderr, "gic: cpu: unknown register write %02lx\n", off);
 	return false;
 }
 

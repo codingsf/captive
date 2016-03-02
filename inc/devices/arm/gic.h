@@ -44,10 +44,10 @@ namespace captive {
 				irq::IRQLine& irq;
 				int id;
 				
-				uint32_t last_active[96], running_irq;
+				uint32_t last_active[96];
 				
 				uint32_t ctrl, prio_mask, binpnt;				
-				uint32_t current_pending, running_priority;
+				uint32_t current_pending, running_irq, running_priority;
 
 				void update();
 				uint32_t acknowledge();

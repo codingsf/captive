@@ -307,6 +307,9 @@ static bool decode_reg(X86InstructionPrefixes pfx, Operand& oper, uint8_t& size,
 	case Operand::R_R15B:
 		size = 1;
 		break;
+		
+	case Operand::R_Z:
+		return false;
 	}
 
 	return true;

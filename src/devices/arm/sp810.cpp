@@ -8,7 +8,7 @@
 
 using namespace captive::devices::arm;
 
-SP810::SP810(timers::TimerManager& timer_manager) : Primecell(0x00041011), leds(0), lockval(0), colour_mode(0x1f00), _timer_manager(timer_manager), cfgdata1(0), cfgdata2(0)
+SP810::SP810(timers::TimerManager& timer_manager) : Primecell(0x00041011), _timer_manager(timer_manager), leds(0), lockval(0), colour_mode(0x1f00), cfgdata1(0), cfgdata2(0)
 {
 }
 

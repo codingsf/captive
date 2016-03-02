@@ -24,6 +24,7 @@ namespace captive {
 				{
 				public:
 					AIO(int fd, BlockDevice& bdev) : _fd(fd), _bdev(bdev), _block_size(bdev.block_size()) { }
+					virtual ~AIO() { }
 					
 					virtual bool init() = 0;
 					virtual bool submit(BlockDeviceRequest *rq, BlockDevice::block_request_cb_t callback) = 0;
