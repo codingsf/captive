@@ -24,7 +24,6 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	: _env(env),
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false),
-	region_txln_cache(new region_txln_cache_t()),
 	block_txln_cache(new block_txln_cache_t())
 {
 	// Zero out the local state.
@@ -57,9 +56,6 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 CPU::~CPU()
 {
-	if (region_txln_cache)
-		delete region_txln_cache;
-
 	if (block_txln_cache)
 		delete block_txln_cache;
 }
@@ -126,20 +122,12 @@ void CPU::invalidate_virtual_mappings()
 	if (block_txln_cache) {
 		block_txln_cache->invalidate_dirty();
 	}
-
-	if (region_txln_cache) {
-		region_txln_cache->invalidate_dirty();
-	}
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
 	if (block_txln_cache) {
 		block_txln_cache->invalidate_entry(va >> 2);
-	}
-
-	if(region_txln_cache) {
-		region_txln_cache->invalidate_entry(va >> 12);
 	}
 }
 

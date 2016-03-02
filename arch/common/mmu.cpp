@@ -6,6 +6,7 @@
 using namespace captive::arch;
 
 //#define TRACK_CONTEXT_ID
+#define USE_CONTEXT_ID
 
 #define ITLB_SIZE	8192
 
@@ -16,6 +17,8 @@ static struct {
 
 MMU::MMU(CPU& cpu) : _cpu(cpu), _context_id(0)
 {
+	context_id(0);
+	
 	Memory::flush_tlb();
 	
 	for (int i = 0; i < ITLB_SIZE; i++) {
@@ -132,7 +135,7 @@ uint32_t MMU::page_checksum(hva_t va)
 }
 
 #ifdef USE_CONTEXT_ID
-static uintptr_t context_id_to_pml[256];
+static uintptr_t context_id_to_pdp[256];
 #endif
 
 void MMU::context_id(uint32_t ctxid)
@@ -140,13 +143,17 @@ void MMU::context_id(uint32_t ctxid)
 	_context_id = ctxid;
 	
 #ifdef USE_CONTEXT_ID
-	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	pm->entries[0].base_address(context_id_to_pml[ctxid]);
-	pm->entries[0].flags(0);
+	if (context_id_to_pdp[ctxid] == 0) {
+		context_id_to_pdp[ctxid] = Memory::alloc_pgt();
+
+#ifdef TRACK_CONTEXT_ID
+		printf("mmu: allocating ctxid=%x to %p\n", ctxid, context_id_to_pdp[ctxid]);
+#endif
+	}
 #endif
 	
 #ifdef TRACK_CONTEXT_ID
-	printf("mmu: change context id: %x\n", _context_id);
+	printf("mmu: change context id: %x (%p)\n", _context_id, context_id_to_pdp[ctxid]);
 #endif
 }
 
@@ -157,8 +164,38 @@ void MMU::page_table_change()
 #endif
 	
 #ifndef USE_CONTEXT_ID
-	invalidate_virtual_mappings();
+	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
+	
+	// Lower 4G
+	pm->entries[0].present(false);
+	pm->entries[0].writable(true);
+	
+	// Emulated 4G
+	pm->entries[1].present(false);
+	pm->entries[1].writable(true);
+#else
+#ifdef TRACK_CONTEXT_ID
+	printf("mmu: using pdp %p\n", context_id_to_pdp[_context_id]);
 #endif
+	
+	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
+	pm->entries[0].base_address(context_id_to_pdp[_context_id]);
+	pm->entries[0].present(true);
+	pm->entries[0].writable(true);
+
+	pm->entries[1].present(false);
+	pm->entries[1].writable(true);
+#endif
+	
+	// Flush the TLB
+	Memory::flush_tlb();
+	
+	// Notify the CPU to invalidate virtual mappings
+	_cpu.invalidate_virtual_mappings();
+	
+	for (int i = 0; i < ITLB_SIZE; i++) {
+		itlb[i].tag = 0;
+	}
 }
 
 void MMU::invalidate_virtual_mappings()
@@ -221,7 +258,22 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 	printf("mmu: invalidate explicit ctxid=%x (ctxid=%x)\n", context_id, _context_id);
 #endif
 	
-	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
+	page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(context_id_to_pdp[context_id]);
+	for (int i = 0; i < 0x200; i++) {
+		pdp->entries[i].present(false);
+	}
+	
+	if (context_id == _context_id) {
+		Memory::flush_tlb();
+		
+		_cpu.invalidate_virtual_mappings();
+	
+		for (int i = 0; i < ITLB_SIZE; i++) {
+			itlb[i].tag = 0;
+		}
+	}
+	
+	/*page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
 
 	// Lower 4G
 	pm->entries[0].present(false);
@@ -239,7 +291,7 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 	
 	for (int i = 0; i < ITLB_SIZE; i++) {
 		itlb[i].tag = 0;
-	}
+	}*/
 }
 
 void MMU::disable_writes()
@@ -274,14 +326,14 @@ bool MMU::handle_fault(struct resolution_context& rc)
 	Memory::get_va_table_entries(host_va, pm, pdp, pd, pt);
 
 #ifdef TRACK_CONTEXT_ID
-	printf("mmu: handle fault: va=%x hva=%lx ctxid=%x pme(%p)=(%lx) pdpe(%p)=(%lx) pde(%p)=(%lx) pte(%p)=(%lx)\n",
+	/*printf("mmu: handle fault: va=%x hva=%lx ctxid=%x pme(%p)=(%lx) pdpe(%p)=(%lx) pde(%p)=(%lx) pte(%p)=(%lx)\n",
 			rc.va,
 			host_va,
 			_context_id,
 			pm, pm->data,
 			pdp, pdp->data,
 			pd, pd->data,
-			pt, pt->data);
+			pt, pt->data);*/
 #endif
 	
 	if (!pm->present() || !pm->writable()) {

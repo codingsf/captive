@@ -213,9 +213,7 @@ namespace captive {
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
 			
-			typedef Cache<struct region_chain_cache_entry, 0x100000> region_txln_cache_t;
 			typedef Cache<struct block_chain_cache_entry, 0x10000> block_txln_cache_t;
-			region_txln_cache_t *region_txln_cache;
 			block_txln_cache_t  *block_txln_cache;
 
 			bool _exec_txl;
