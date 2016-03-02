@@ -187,7 +187,7 @@ namespace captive {
 			}
 
 			static inline void get_va_table_entries(hva_t va, page_map_entry_t*& pm, page_dir_ptr_entry_t*& pdp, page_dir_entry_t*& pd, page_table_entry_t*& pt, bool allocate=true) {
-				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				table_idx_t pm_idx = 0, pdp_idx, pd_idx, pt_idx;
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
 				// L4 read_cr3()
@@ -260,7 +260,7 @@ namespace captive {
 			
 			static inline bool quick_fetch(hva_t va, hpa_t& pa, bool user_mode)
 			{
-				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				table_idx_t pm_idx = 0, pdp_idx, pd_idx, pt_idx;
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
 				page_map_entry_t* pm;
@@ -292,7 +292,7 @@ namespace captive {
 			
 			static inline bool quick_read(hva_t va, hpa_t& pa, bool user_mode)
 			{
-				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				table_idx_t pm_idx = 0, pdp_idx, pd_idx, pt_idx;
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
 				page_map_entry_t* pm;
@@ -324,7 +324,7 @@ namespace captive {
 			
 			static inline bool quick_write(hva_t va, hpa_t& pa, bool user_mode)
 			{
-				table_idx_t pm_idx, pdp_idx, pd_idx, pt_idx;
+				table_idx_t pm_idx = 0, pdp_idx, pd_idx, pt_idx;
 				va_table_indicies(va, pm_idx, pdp_idx, pd_idx, pt_idx);
 
 				page_map_entry_t* pm;

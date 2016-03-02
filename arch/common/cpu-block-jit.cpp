@@ -76,7 +76,7 @@ bool CPU::run_block_jit_safepoint()
 
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
 			hpa_t phys_pc;
-			if (!Memory::quick_fetch(virt_pc, phys_pc, !kernel_mode())) {
+			if (!Memory::quick_fetch((hva_t)virt_pc, phys_pc, !kernel_mode())) {
 				// This will perform a FETCH with side effects, so that we can impose the
 				// correct permissions checking for the block we're about to execute.
 				MMU::resolution_context rc(virt_pc);

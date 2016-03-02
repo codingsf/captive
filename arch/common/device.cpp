@@ -137,7 +137,7 @@ int captive::arch::handle_fast_device_read(struct mcontext *mctx)
 	}
 
 	hpa_t dev_addr;
-	if (!Memory::quick_read(va, dev_addr, !CPU::get_active_cpu()->kernel_mode())) {
+	if (!Memory::quick_read((hva_t)va, dev_addr, !CPU::get_active_cpu()->kernel_mode())) {
 		MMU::resolution_context rc(va);
 		rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_READ : MMU::USER_READ;
 
@@ -199,7 +199,7 @@ int captive::arch::handle_fast_device_write(struct mcontext *mctx)
 	}
 
 	hpa_t dev_addr;
-	if (!Memory::quick_write(va, dev_addr, !CPU::get_active_cpu()->kernel_mode())) {
+	if (!Memory::quick_write((hva_t)va, dev_addr, !CPU::get_active_cpu()->kernel_mode())) {
 		MMU::resolution_context rc(va);
 		rc.requested_permissions = CPU::get_active_cpu()->kernel_mode() ? MMU::KERNEL_WRITE : MMU::USER_WRITE;
 

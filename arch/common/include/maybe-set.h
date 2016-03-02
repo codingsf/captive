@@ -19,7 +19,7 @@ private:
 //	};
 
 #ifndef NDEBUG
-	int expected_count;
+	unsigned int expected_count;
 #endif
 
 	bool is_array;
@@ -27,7 +27,7 @@ private:
 	
 public:
 	
-	maybe_map(int expected_count) : expected_count(expected_count) {
+	maybe_map(unsigned int expected_count) : expected_count(expected_count) {
 		if(expected_count >= threshold) is_array = false;
 		else is_array = true;
 		
