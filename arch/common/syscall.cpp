@@ -42,7 +42,8 @@ extern "C" {
 #ifdef DEBUG_SYSCALLS
 			printf("syscall: invalidate I$\n");
 #endif
-			captive::arch::CPU::get_active_cpu()->invalidate_virtual_mappings();
+			//captive::arch::CPU::get_active_cpu()->invalidate_virtual_mappings();
+			captive::arch::CPU::get_active_cpu()->mmu().disable_writes();
 			return 0;
 
 		case 7: // Invalidate I$ Entry

@@ -572,6 +572,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush itlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush ctxid",	.format = "IXXXXX", .has_side_effects = true },
+	{ .mnemonic = "invd i$",	.format = "XXXXXX", .has_side_effects = true },
 	{ .mnemonic = "set ctxid",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "pgt change",	.format = "XXXXXX", .has_side_effects = true },
 
@@ -2769,6 +2770,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			encoder.mov(8, REG_ECX);
+			encoder.intt(0x85);
+			break;
+		}
+		
+		case IRInstruction::INVALIDATE_ICACHE:
+		{
+			encoder.mov(6, REG_ECX);
 			encoder.intt(0x85);
 			break;
 		}

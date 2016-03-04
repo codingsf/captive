@@ -58,6 +58,7 @@ namespace captive {
 			CoreDevice *devices[16];
 
 			void install_idt();
+			void install_syscall();
 			void setup_interrupts();
 
 		protected:

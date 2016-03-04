@@ -109,7 +109,7 @@ bool CPU::run_block_jit_safepoint()
 		} else {
 			blk->loop_header = true;
 			blk->txln = compile_block(blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
-			mmu().disable_writes();
+			//mmu().disable_writes();
 
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
 		}
@@ -119,7 +119,7 @@ bool CPU::run_block_jit_safepoint()
 			mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
 		}
 	} while(step_ok);
-	
+		
 	if (!step_ok) printf("step was not okay\n");
 	
 	return true;

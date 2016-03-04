@@ -116,6 +116,11 @@ void Environment::install_idt()
 	asm volatile("lidt %0\n" :: "m"(IDTR));
 }
 
+void Environment::install_syscall()
+{
+	//
+}
+
 void Environment::setup_interrupts()
 {
 	// Enable interrupts
@@ -125,6 +130,7 @@ void Environment::setup_interrupts()
 bool Environment::init()
 {
 	install_idt();
+	install_syscall();
 	setup_interrupts();
 	
 	return true;

@@ -6,6 +6,7 @@
 using namespace captive::arch;
 
 //#define TRACK_CONTEXT_ID
+//#define TRACK_SMC
 #define USE_CONTEXT_ID
 
 #define ITLB_SIZE	8192
@@ -462,6 +463,10 @@ bool MMU::handle_fault(struct resolution_context& rc)
 
 	if (pt->present() && rc.is_write() && rc.fault == NONE) {
 		if (clear_if_page_executed(GPA_TO_HVA(pt->base_address()))) {
+#ifdef TRACK_SMC
+			printf("mmu: self modifying code @ va=%08x, pa=%08x\n", rc.va, rc.pa);
+#endif
+			
 			cpu().invalidate_translation(pt->base_address(), (hva_t)rc.va);
 
 			//printf("PC: %08x, VA: %08x\n", _cpu.read_pc(), (uint32_t)va);
