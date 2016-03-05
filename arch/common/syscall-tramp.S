@@ -39,6 +39,18 @@
 	popf
 .endm
 
+.globl call_gate_tramp
+call_gate_tramp:
+	push_regs
+
+	mov %rsp, %rdi
+	mov %r14, %rsi
+	call do_fast_syscall
+
+	pop_regs
+	addq $10, (%rsp)
+	lretq
+
 // Syscall Handler
 .globl int82_handler
 .extern do_syscall

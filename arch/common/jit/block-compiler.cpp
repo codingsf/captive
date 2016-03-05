@@ -13,6 +13,8 @@
 
 #define NOP_BLOCK (IRBlockId)0x7fffffff
 
+#define SYSCALL_CALL_GATE
+
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
@@ -2729,7 +2731,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::FLUSH_DTLB:
 		{
 			encoder.mov(1, REG_ECX);
+
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
 			encoder.intt(0x85);
+#endif
 			break;
 		}
 
@@ -2750,7 +2759,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			encoder.mov(4, REG_ECX);
+
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
 			encoder.intt(0x85);
+#endif
 			break;
 		}
 		
@@ -2770,14 +2786,27 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			encoder.mov(8, REG_ECX);
+
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
 			encoder.intt(0x85);
+#endif
 			break;
 		}
 		
 		case IRInstruction::INVALIDATE_ICACHE:
 		{
 			encoder.mov(6, REG_ECX);
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
 			encoder.intt(0x85);
+#endif
 			break;
 		}
 		
@@ -2797,14 +2826,28 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			encoder.mov(9, REG_ECX);
+
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
 			encoder.intt(0x85);
+#endif
 			break;
 		}
 		
 		case IRInstruction::PGT_CHANGE:
 		{
 			encoder.mov(10, REG_ECX);
+
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
 			encoder.intt(0x85);
+#endif
 			break;
 		}
 		

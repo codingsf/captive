@@ -249,7 +249,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		}
 	} else {
 		// This page-fault happened elsewhere - we can't do anything about it.
-		printf("fatal: internal page-fault: rip=%lx va=%lx, code=%x\n", rip, va, code);
+		printf("fatal: internal page-fault: rip=%lx va=%lx, code=%x, pc=%08x\n", rip, va, code, captive::arch::CPU::get_active_cpu()->read_pc());
 
 		printf("  type:   %s\n", (code & PF_WRITE) ? "write" : "read");
 		printf("  mode:   %s\n", (code & PF_USER_MODE) ? "user" : "kernel");

@@ -946,6 +946,11 @@ void X86Encoder::call(const X86Register& reg)
 	encode_mod_reg_rm(REG_RDX, reg);
 }
 
+void X86Encoder::lcall(const X86Memory& mem)
+{
+	encode_opcode_mod_rm(0xff, 3, 8, mem);
+}
+
 void X86Encoder::jmp(const X86Register& tgt)
 {
 	emit8(0xff);
@@ -1055,6 +1060,12 @@ void X86Encoder::movcs(const X86Register& dst)
 	encode_mod_reg_rm(1, dst);
 }
 
+void X86Encoder::sysenter()
+{
+	emit8(0x0f);
+	emit8(0x34);
+}
+
 void X86Encoder::int3()
 {
 	emit8(0xcc);
@@ -1160,7 +1171,7 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 {
 	uint8_t mod, mrm;
 
-	if (rm.displacement == 0 || (rm.base == REG_RIZ && rm.index == REG_RIZ)) {
+	if (rm.displacement == 0 || (rm.base == REG_RIZ && rm.index == REG_RIZ) || (rm.base == REG_RIP)) {
 		mod = 0;
 	} else if (rm.displacement < 128 && rm.displacement > -127) {
 		mod = 1;
@@ -1173,7 +1184,7 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 	} else if (rm.base == REG_R12) {
 		mrm = 4; // Need a SIB byte
 	} else if (rm.base == REG_RIP) {
-		assert(false); // Need to think about this]
+		mrm = 5;
 	} else if (rm.base == REG_RIZ) {
 		mrm = 4; // Need a SIB byte
 	} else if (rm.scale != 0) {
@@ -1233,7 +1244,7 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 
 	if (mod == 1) {
 		emit8(rm.displacement);
-	} else if (mod == 2 || (rm.base == REG_RIZ && rm.index == REG_RIZ)) {
+	} else if (mod == 2 || (rm.base == REG_RIZ && rm.index == REG_RIZ) || (rm.base == REG_RIP)) {
 		emit32(rm.displacement);
 	}
 }

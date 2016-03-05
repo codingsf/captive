@@ -127,6 +127,7 @@ namespace captive {
 				inline void destroy_buffer() { if (_buffer) allocator.free(_buffer); _buffer = NULL; }
 
 				void call(const X86Register& reg);
+				void lcall(const X86Memory& mem);
 
 				void push(const X86Register& reg);
 				void pop(const X86Register& reg);
@@ -363,6 +364,7 @@ namespace captive {
 
 				void bsr(const X86Register& src, const X86Register& dst);
 
+				void sysenter();
 				void int3();
 				void intt(uint8_t irq);
 				void leave();
@@ -381,6 +383,14 @@ namespace captive {
 					ensure_buffer(1);
 					_buffer[_write_offset++] = b;
 				}
+				
+				inline void emit16(uint16_t v)
+				{
+					ensure_buffer(2);
+
+					*(uint16_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 2;
+				}
 
 				inline void emit32(uint32_t v)
 				{
@@ -390,6 +400,14 @@ namespace captive {
 					_write_offset += 4;
 				}
 				
+				inline void emit64(uint64_t v)
+				{
+					ensure_buffer(8);
+					
+					*(uint64_t*)(&_buffer[_write_offset]) = v;
+					_write_offset += 8;
+				}
+
 				inline void ensure_extra_buffer(int extra)
 				{
 					ensure_buffer(extra);
@@ -409,23 +427,7 @@ namespace captive {
 				}
 
 
-				inline void emit16(uint16_t v)
-				{
-					ensure_buffer(2);
-
-					*(uint16_t*)(&_buffer[_write_offset]) = v;
-					_write_offset += 2;
-				}
-
-
-
-				inline void emit64(uint64_t v)
-				{
-					ensure_buffer(8);
-					
-					*(uint64_t*)(&_buffer[_write_offset]) = v;
-					_write_offset += 8;
-				}
+				
 
 				void encode_arithmetic(uint8_t oper, uint32_t imm, const X86Register& dst);
 				void encode_arithmetic(uint8_t oper, uint32_t imm, uint8_t size, const X86Memory& dst);

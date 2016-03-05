@@ -22,7 +22,7 @@ void dump_code(unsigned long int rip)
 	
 	uint8_t *p = (uint8_t *)rip;
 	for (int i = 0; i < 0x100; i++) {
-		if (i % 16 == 0) printf("\n%03x: ", i);
+		if (i % 16 == 0) printf("\n%p: ", &p[i]);
 		
 		printf("%02x ", p[i]);
 	}

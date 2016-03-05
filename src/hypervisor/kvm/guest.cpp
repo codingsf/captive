@@ -541,13 +541,13 @@ bool KVMGuest::install_gdt()
 	DEBUG << CONTEXT(Guest) << "Installing GDT @ " << std::hex << gdt;
 
 	*gdt++ = 0;							// NULL				 0
-	*gdt++ = 0x0020980000000000;		// KERNEL CS		08	
+	*gdt++ = 0x0020980000000000;		// KERNEL CS		08
 	*gdt++ = 0x0000920000000000;		// KERNEL DS		10
 	*gdt++ = 0x0020f80000000000;		// USER CS			18
 	*gdt++ = 0x0000f20000000000;		// USER DS			20
 	*gdt++ = 0x40408900200000d0;		// TSS				28
-	*gdt = 0x6800;
-
+	*gdt++ = 0x6800;					//					30
+	
 	return true;
 }
 

@@ -117,8 +117,9 @@ extern "C" {
 			}
 		}
 
-		printf("general protection fault: rip=0x%lx, code=0x%x, pc=0x%08x, ir=%08x\n", mctx->rip, mctx->extra, cpu ? cpu->read_pc() : 0, cpu ? *((uint32_t *)(uintptr_t)cpu->read_pc()) : 0);
+		printf("general protection fault: rip=0x%lx, code=0x%lx, pc=0x%08x, ir=%08x\n", mctx->rip, mctx->extra, cpu ? cpu->read_pc() : 0, cpu ? *((uint32_t *)(uintptr_t)cpu->read_pc()) : 0);
 		dump_mcontext(mctx);
+		dump_code(mctx->rip);
 		dump_stack();
 		abort();
 	}
