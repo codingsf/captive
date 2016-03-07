@@ -150,23 +150,11 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 	}
 }
 
-void CPU::handle_irq_raised(uint8_t irq_line)
+void CPU::handle_irq_raised()
 {
-	//printf("*** raised %d %d\n", irq_line, cpu_data().isr);
-	jit_state.exit_chain = 1; //cpu_data().isr;
-	Memory::wbinvd();
+	//printf("*** raised %d\n", irq_line);
+	
+	local_state.isr = cpu_data().isr;
+	__sync_synchronize();
+	jit_state.exit_chain = 1;
 }
-
-void CPU::handle_irq_rescinded(uint8_t irq_line)
-{
-	//printf("*** rescinded %d\n", irq_line);
-	//jit_state.exit_chain = cpu_data().isr;
-}
-
-void CPU::handle_irq_acknowledged(uint8_t irq_line)
-{
-	//printf("*** acked %d\n", irq_line);
-	jit_state.exit_chain = 0;
-	Memory::wbinvd();
-}
-

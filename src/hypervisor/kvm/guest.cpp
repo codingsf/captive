@@ -333,25 +333,15 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return false;
 	}
 			
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.vector = 0x30;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.mask = 0;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 0].fields.dest_id = next_cpu_id;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 16].fields.vector = 0x30;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 16].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 16].fields.mask = 0;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 16].fields.dest_id = next_cpu_id;
 	
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.vector = 0x31;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.mask = 0;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 1].fields.dest_id = next_cpu_id;
-	
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.vector = 0x32;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.mask = 0;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 2].fields.dest_id = next_cpu_id;
-
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.vector = 0x33;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.trig_mode = 1;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.mask = 0;
-	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 4) + 3].fields.dest_id = next_cpu_id;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 17].fields.vector = 0x31;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 17].fields.trig_mode = 1;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 17].fields.mask = 0;
+	irqchip.chip.ioapic.redirtbl[(next_cpu_id * 2) + 17].fields.dest_id = next_cpu_id;
 
 	DEBUG << CONTEXT(Guest) << "Configuring IRQ chip";
 	if (vmioctl(KVM_SET_IRQCHIP, &irqchip)) {
@@ -367,7 +357,6 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->execution_mode = 0;
 	per_cpu_data->insns_executed = 0;
 	per_cpu_data->interrupts_taken = 0;
-	per_cpu_data->isr = 0;
 	per_cpu_data->verbose_enabled = false;
 
 	KVMCpu *cpu = new KVMCpu(next_cpu_id, *this, config, cpu_fd, per_cpu_data);

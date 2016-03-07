@@ -114,9 +114,7 @@ namespace captive {
 
 			void register_region(shared::RegionWorkUnit *rwu);
 
-			void handle_irq_raised(uint8_t irq_line);
-			void handle_irq_rescinded(uint8_t irq_line);
-			void handle_irq_acknowledged(uint8_t irq_line);
+			void handle_irq_raised();
 			
 			// Behaviours
 			virtual bool handle_irq(uint32_t isr) = 0;
@@ -157,8 +155,9 @@ namespace captive {
 			TaggedRegisters tagged_reg_offsets;
 			
 			struct {
-				volatile bool _kernel_mode;
+				bool _kernel_mode;
 				uint32_t last_exception_action;
+				uint32_t isr;
 			} local_state;
 
 			struct block_chain_cache_entry {

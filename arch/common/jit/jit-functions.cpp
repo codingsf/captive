@@ -82,13 +82,6 @@ extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, 
 	}
 }
 
-extern "C" void cpu_check_interrupts(captive::arch::CPU *cpu)
-{
-	if (unlikely(cpu->cpu_data().isr)) {
-		cpu->handle_irq(cpu->cpu_data().isr);
-	}
-}
-
 extern "C" void jit_rum(captive::arch::CPU *cpu)
 {
 	if (in_kernel_mode()) {

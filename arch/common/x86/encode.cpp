@@ -59,6 +59,30 @@ X86Encoder::X86Encoder(malloc::Allocator& allocator) : allocator(allocator), _bu
 {
 }
 
+void X86Encoder::patch8(uint32_t offset, uint8_t val)
+{
+	uint8_t *ptr = (uint8_t *)&_buffer[offset];
+	*ptr = val;
+}
+
+void X86Encoder::patch16(uint32_t offset, uint16_t val)
+{
+	uint16_t *ptr = (uint16_t *)&_buffer[offset];
+	*ptr = val;
+}
+
+void X86Encoder::patch32(uint32_t offset, uint32_t val)
+{
+	uint32_t *ptr = (uint32_t *)&_buffer[offset];
+	*ptr = val;
+}
+
+void X86Encoder::patch64(uint32_t offset, uint64_t val)
+{
+	uint64_t *ptr = (uint64_t *)&_buffer[offset];
+	*ptr = val;
+}
+
 void X86Encoder::incq(const X86Memory& loc)
 {
 	encode_opcode_mod_rm(0xff, 0, 8, loc);

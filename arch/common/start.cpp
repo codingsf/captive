@@ -139,25 +139,7 @@ extern "C" {
 	void handle_trap_irq1(struct mcontext *mctx)
 	{
 		captive::arch::lapic_acknowledge_irq();
-		
-		//printf("*** RAISED\n");
-		captive::arch::CPU::get_active_cpu()->handle_irq_raised(1);
-	}
-	
-	void handle_trap_irq2(struct mcontext *mctx)
-	{
-		captive::arch::lapic_acknowledge_irq();
-		
-		//printf("*** RESCINDED\n");
-		captive::arch::CPU::get_active_cpu()->handle_irq_rescinded(1);
-	}
-
-	void handle_trap_irq3(struct mcontext *mctx)
-	{
-		captive::arch::lapic_acknowledge_irq();
-		
-		//printf("*** ACKED\n");
-		captive::arch::CPU::get_active_cpu()->handle_irq_acknowledged(1);
+		captive::arch::CPU::get_active_cpu()->handle_irq_raised();
 	}
 	
 	int handle_trap_illegal(struct mcontext *mctx)

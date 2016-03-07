@@ -238,6 +238,11 @@ namespace captive {
 				void test(uint64_t val, const X86Register& op2);
 				void test(const X86Register& op1, const X86Register& op2);
 
+				void patch8(uint32_t offset, uint8_t val);
+				void patch16(uint32_t offset, uint16_t val);
+				void patch32(uint32_t offset, uint32_t val);
+				void patch64(uint32_t offset, uint64_t val);
+				
 				void jmp(const X86Register& tgt);
 				void jmp(const X86Memory& tgt);
 				void jmp_offset(int32_t off);

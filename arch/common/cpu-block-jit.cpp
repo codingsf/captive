@@ -57,8 +57,11 @@ bool CPU::run_block_jit_safepoint()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		if (unlikely(cpu_data().isr)) {
-			if (handle_irq(cpu_data().isr)) {
+		if (unlikely(local_state.isr)) {
+			if (handle_irq(local_state.isr)) {
+				local_state.isr = 0;
+				jit_state.exit_chain = 0;
+				
 				cpu_data().interrupts_taken++;
 			}
 		}

@@ -96,7 +96,7 @@ namespace captive {
 				
 		bool halt;
 
-		uint32_t isr;				// Interrupt Status Register
+		uint32_t isr;
 		uint32_t async_action;		// Pending actions
 		uint32_t signal_code;		// Incoming signal code
 		uint64_t insns_executed;	// Number of instructions executed

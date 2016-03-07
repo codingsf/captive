@@ -78,8 +78,6 @@ namespace captive {
 				
 				IRQFD irq_signal;
 				IRQFD irq_raise;
-				IRQFD irq_rescind;
-				IRQFD irq_ack;
 				
 				std::chrono::high_resolution_clock::time_point cpu_start_time;
 				

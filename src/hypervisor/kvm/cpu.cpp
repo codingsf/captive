@@ -27,9 +27,7 @@ KVMCpu::KVMCpu(int id, KVMGuest& owner, const GuestCPUConfiguration& config, int
 	cpu_run_struct(NULL),
 	cpu_run_struct_size(0),
 	irq_signal(owner),
-	irq_raise(owner),
-	irq_rescind(owner),
-	irq_ack(owner)
+	irq_raise(owner)
 {
 
 }
@@ -85,17 +83,17 @@ void KVMCpu::interrupt(uint32_t code)
 
 void KVMCpu::raise_guest_interrupt(uint8_t irq)
 {
+	per_cpu_data().isr = 2;
 	irq_raise.raise();
 }
 
 void KVMCpu::rescind_guest_interrupt(uint8_t irq)
 {
-	irq_rescind.raise();
+	per_cpu_data().isr = 0;
 }
 
 void KVMCpu::acknowledge_guest_interrupt(uint8_t irq)
 {
-	irq_ack.raise();
 }
 
 #ifndef NDEBUG
@@ -493,10 +491,8 @@ void KVMCpu::dump_regs()
 
 bool KVMCpu::setup_interrupts()
 {
-	if (!irq_signal.attach((id() * 4) + 0)) return false;
-	if (!irq_raise.attach((id() * 4) + 1)) return false;
-	if (!irq_rescind.attach((id() * 4) + 2)) return false;
-	if (!irq_ack.attach((id() * 4) + 3)) return false;
+	if (!irq_signal.attach((id() * 2) + 16)) return false;
+	if (!irq_raise.attach((id() * 2) + 17)) return false;
 	
 	return true;
 }
