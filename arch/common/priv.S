@@ -16,11 +16,3 @@ int81_handler:
 	movq $0x23, 32(%rsp)		// SS
 
 	iretq
-
-// Flushing the TLB
-.globl int83_handler
-int83_handler:
-	mov %cr3, %rax
-	mov %rax, %cr3
-
-	iretq

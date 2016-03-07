@@ -305,11 +305,11 @@ void MMU::disable_writes()
 	pm->entries[1].writable(false);	// Emulated 4G
 	
 	// Flush the TLB
-	if (in_kernel_mode()) {
+//	if (in_kernel_mode()) {
 		Memory::flush_tlb();
-	} else {
-		asm volatile("int $0x83\n" ::: "rax");
-	}
+//	} else {
+//		asm volatile("int $0x83\n" ::: "rax");
+//	}
 }
 
 bool MMU::handle_fault(struct resolution_context& rc)
@@ -432,9 +432,9 @@ bool MMU::handle_fault(struct resolution_context& rc)
 			// a page-aligned value.
 			pt->base_address((uint64_t)GPA_TO_HPA(rc.pa));
 			pt->present(true);
-			pt->allow_user(!!(rc.allowed_permissions & (USER_READ | USER_WRITE | USER_FETCH)));
-			pt->writable(!!(rc.allowed_permissions & (USER_WRITE | KERNEL_WRITE)));
-			pt->executable(!!(rc.allowed_permissions & (USER_FETCH | KERNEL_FETCH)));
+			pt->allow_user((rc.allowed_permissions & USER_ALL) != 0);
+			pt->writable((rc.allowed_permissions & (USER_WRITE | KERNEL_WRITE)) != 0);
+			pt->executable((rc.allowed_permissions & (USER_FETCH | KERNEL_FETCH)) != 0);
 
 			if (is_page_device(GPA_TO_HVA(rc.pa))) {
 				pt->device(true);

@@ -17,9 +17,8 @@ extern "C" void trap_illegal(struct mcontext *);
 
 extern "C" void int80_handler(struct mcontext *);
 extern "C" void int81_handler(struct mcontext *);
-extern "C" void int82_handler(struct mcontext *);
-extern "C" void int83_handler(struct mcontext *);
-extern "C" void int85_handler(struct mcontext *);
+
+extern "C" void call_gate_tramp(void);
 
 extern "C" void trap_irq0(struct mcontext *);
 extern "C" void trap_irq1(struct mcontext *);
@@ -109,14 +108,9 @@ void Environment::install_idt()
 	// Software-interrupt handlers
 	set_idt(&idt[0x80], int80_handler, true);
 	set_idt(&idt[0x81], int81_handler, true);
-	set_idt(&idt[0x82], int82_handler, true);
-	set_idt(&idt[0x83], int83_handler, true);
-	set_idt(&idt[0x85], int85_handler, true);
 
 	asm volatile("lidt %0\n" :: "m"(IDTR));
 }
-
-extern "C" void call_gate_tramp(void);
 
 void Environment::install_syscall()
 {
@@ -124,46 +118,19 @@ void Environment::install_syscall()
 		uint16_t limit;
 		uint64_t base;
 	} packed GDTR;
-	
-	struct call_gate_descriptor {
-		uint16_t offset_low;
-		uint16_t segment_selector;
-		uint8_t rsvd0;
-		uint8_t type:4;
-		uint8_t rsvd1:1;
-		uint8_t dpl:2;
-		uint8_t p:1;
-		uint16_t offset_high;
-		uint32_t offset_higher;
-		uint32_t rsvd;
-	} packed;
-	
+		
 	asm volatile("sgdt %0" : "=m"(GDTR));
 	
-	uint32_t *call_gate = (uint32_t *)(GDTR.base + GDTR.limit);
-	GDTR.limit += 16; //sizeof(struct call_gate_descriptor);
+	uint32_t *gdt = (uint32_t *)(GDTR.base + GDTR.limit);
+	GDTR.limit += (16 * 1);
 	
-	uintptr_t gate_addr = (uintptr_t)call_gate_tramp;
-	
-	/*call_gate->offset_low = (gate_addr & 0xffff);
-	call_gate->segment_selector = 0x08;
-	call_gate->rsvd0 = 0;
-	call_gate->type = 0xc;
-	call_gate->rsvd1 = 0;
-	call_gate->dpl = 3;
-	call_gate->p = 1;
-	call_gate->offset_high = ((gate_addr >> 16) & 0xffff);
-	call_gate->offset_higher = ((gate_addr >> 32));
-	*/
-	
-	*call_gate++ = 0x00080000 | (gate_addr & 0xffff);
-	*call_gate++ = (gate_addr & 0xffff0000) | 0xec00;
-	*call_gate++ = (gate_addr >> 32);
-	*call_gate++ = 0;
+	uintptr_t gate_addr = (uintptr_t)call_gate_tramp;	// 0x38
+	*gdt++ = 0x00080000 | (gate_addr & 0xffff);
+	*gdt++ = (gate_addr & 0xffff0000) | 0xec00;
+	*gdt++ = (gate_addr >> 32);
+	*gdt++ = 0;
 	
 	asm volatile("lgdt %0" :: "m"(GDTR));
-	
-	printf("GDT LIMIT=%x, BASE=%lx\n", GDTR.limit, GDTR.base);
 }
 
 void Environment::setup_interrupts()

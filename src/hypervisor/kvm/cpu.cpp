@@ -374,7 +374,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		return false;
 
 	case 3:
-		DEBUG << CONTEXT(CPU) << "Guest Assert Failure";
+		ERROR << CONTEXT(CPU) << "Guest Assert Failure";
 		dump_regs();
 		return false;
 
@@ -440,7 +440,7 @@ void KVMCpu::dump_regs()
 
 #define PREG(rg) << #rg " = " << std::hex << regs.rg << " (" << std::dec << regs.rg << ")" << std::endl
 
-	DEBUG << "Registers:" << std::endl
+	INFO << "Registers:" << std::endl
 
 	PREG(rax)
 	PREG(rbx)

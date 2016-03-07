@@ -38,9 +38,10 @@ bool CPU::run_block_jit()
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
 		// Make sure interrupts are enabled.
-		__local_irq_enable();
+		__local_irq_enable();		
 	}
 
+	ensure_privilege_mode();
 	return run_block_jit_safepoint();
 }
 
@@ -98,6 +99,8 @@ bool CPU::run_block_jit_safepoint()
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 			region_phys_base = PAGE_ADDRESS_OF(phys_pc);
 		}
+		
+		assert_privilege_mode();
 		
 		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
 		if (blk->txln) {

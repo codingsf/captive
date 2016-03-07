@@ -35,6 +35,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	bzero(&local_state, sizeof(local_state));
 	bzero(&tagged_reg_offsets, sizeof(tagged_reg_offsets));
 
+	local_state._kernel_mode = true;
+	
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
 

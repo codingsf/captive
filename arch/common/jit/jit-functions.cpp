@@ -113,7 +113,7 @@ extern "C" void jit_debug2(uint32_t pc)
 	printf("DO DISPATCH: %x\n", pc);
 }
 
-extern "C" void mem_read8(captive::arch::CPU *cpu, uint32_t addr, uint8_t *val)
+/*extern "C" void mem_read8(captive::arch::CPU *cpu, uint32_t addr, uint8_t *val)
 {
 	*val = *((volatile uint8_t *)(uint64_t)addr);
 }
@@ -184,3 +184,4 @@ extern "C" void mem_user_write32(captive::arch::CPU *cpu, uint32_t addr, uint32_
 	*((volatile uint32_t *)(uint64_t)addr) = val;
 	if (cpu->kernel_mode() && !in_kernel_mode()) { switch_to_kernel_mode(); }
 }
+*/
