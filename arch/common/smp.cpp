@@ -1,4 +1,5 @@
 #include <smp.h>
+#include <printf.h>
 
 namespace captive
 {
@@ -17,12 +18,16 @@ namespace captive
 
 		void lapic_init_irqs()
 		{
+			uint64_t lapic_msr_val = __rdmsr(0x1b);
+			printf("lapic msr=%lx, base=%p\n", lapic_msr_val, LAPIC);
+			
 			apic_write(SVR, 0x1ff);
 
+			apic_write(TIMER, MASKED);
 			apic_write(LINT0, MASKED);
 			apic_write(LINT1, MASKED);
 			apic_write(ERROR, MASKED);
-
+			
 			apic_write(ESR, 0);
 			apic_write(ESR, 0);
 
@@ -34,6 +39,7 @@ namespace captive
 			while (apic_read(ICRLO) & DELIVS);
 
 			apic_write(TPR, 0);
+			apic_write(TICR, 1);
 		}
 		
 		void lapic_acknowledge_irq()

@@ -42,6 +42,8 @@
 
 #define GVA_TO_EMULATED_HVA(_gva) ((hva_t)(GPM_EMULATED_VIRT_START | (uint32_t)(_gva)))
 
+#define ALIGN(_addr, _alignment) ((_addr) + ((_alignment) - ((_addr) % (_alignment))))
+
 typedef unsigned long size_t;
 
 typedef unsigned char uint8_t;

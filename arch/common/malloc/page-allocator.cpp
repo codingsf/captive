@@ -61,7 +61,7 @@ void *PageAllocator::alloc_pages(int nr_pages)
 			break;
 		}
 	}
-	
+		
 	if (next_avail_order == MAX_ORDER) fatal("out of memory");
 	
 	for (int i = next_avail_order; i > requested_order; i--) {

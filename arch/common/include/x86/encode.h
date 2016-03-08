@@ -123,6 +123,7 @@ namespace captive {
 
 				inline uint8_t *get_buffer() { return _buffer; }
 				inline uint32_t get_buffer_size() { return _write_offset; }
+				inline void finalise() { if (_buffer) allocator.realloc(_buffer, ALIGN(_write_offset, 16)); }
 
 				inline void destroy_buffer() { if (_buffer) allocator.free(_buffer); _buffer = NULL; }
 

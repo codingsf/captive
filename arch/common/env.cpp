@@ -159,6 +159,8 @@ bool Environment::run(PerCPUData *per_cpu_data)
 		return false;
 	}
 	
+	printf("core: register file @ %p\n", core->reg_state());
+	
 	printf("env: preparing bootloader\n");
 	prepare_bootloader();
 	

@@ -110,11 +110,10 @@ bool CPU::run_block_jit_safepoint()
 			auto ptr = block_txln_cache->entry_ptr(virt_pc >> 2);
 			ptr->tag = virt_pc;
 			ptr->fn = (void *)blk->txln;
-			
+						
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
-			blk->loop_header = true;
-			blk->txln = compile_block(blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc), MODE_BLOCK);
+			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
 			//mmu().disable_writes();
 
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
@@ -131,29 +130,20 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Block *blk, uint8_t isa_mode, gpa_t pa, block_compilation_mode mode)
+captive::shared::block_txln_fn CPU::compile_block(Region *rgn, Block *blk, uint8_t isa_mode, gpa_t pa)
 {
 	TranslationContext ctx(malloc::data_alloc);
 	if (!translate_block(ctx, isa_mode, pa)) {
 		fatal("jit: block translation failed\n");
 	}
-
-	bool emit_interrupt_check = mode == MODE_BLOCK;
-	bool emit_chaining_logic = mode == MODE_BLOCK;
 	
-	BlockCompiler compiler(ctx, isa_mode, pa, tagged_registers(), emit_interrupt_check, emit_chaining_logic);
+	BlockCompiler compiler(ctx, malloc::code_alloc, isa_mode, pa, tagged_registers(), true, true);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		fatal("jit: block compilation failed\n");
 	}
 
-	if (mode == MODE_BLOCK) {
-		malloc::data_alloc.free((void *)ctx.get_ir_buffer());
-	} else {
-		blk->ir_count = ctx.count();
-		blk->ir = ctx.get_ir_buffer();
-	}
-
+	malloc::data_alloc.free((void *)ctx.get_ir_buffer());
 	return fn;
 }
 

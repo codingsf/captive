@@ -28,8 +28,8 @@ CPU *CPU::current_cpu;
 CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	: _env(env),
 	_per_cpu_data(per_cpu_data),
-	_exec_txl(false),
-	block_txln_cache(new block_txln_cache_t())
+	block_txln_cache(new block_txln_cache_t()),
+	_exec_txl(false)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));

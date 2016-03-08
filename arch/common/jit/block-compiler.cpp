@@ -14,6 +14,7 @@
 #define NOP_BLOCK (IRBlockId)0x7fffffff
 
 #define SYSCALL_CALL_GATE
+//#define TIMER
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
@@ -51,9 +52,9 @@ static void dump_insn(IRInstruction *insn);
  * FS	Base Pointer to JIT STATE structure
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check, bool emit_chaining_logic) 
+BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check, bool emit_chaining_logic) 
 	: ctx(ctx),
-		encoder(malloc::code_alloc),
+		encoder(allocator),
 		isa_mode(isa_mode),
 		pa(pa),
 		tagged_regs(tagged_regs),
@@ -83,9 +84,10 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	//printf("*** before:\n");
 	//dump_ir();
 	
+#ifdef TIMER
 	tick_timer timer(0);
-
 	timer.reset();
+#endif
 	
 #ifdef VERIFY_IR
 	if (!verify()) {
@@ -96,35 +98,54 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 #endif
 	
 	if (!reorder_blocks()) return false;
+#ifdef TIMER
 	timer.tick("block-reorder");
+#endif
 	
 	if (!thread_jumps()) return false;
+#ifdef TIMER
 	timer.tick("jump-threading");
+#endif
 	
 	if (!dbe()) return false;
+#ifdef TIMER
 	timer.tick("dead-block-elimination");
+#endif
 	
 	sort_ir();
 	
 	if (!merge_blocks()) return false;
+#ifdef TIMER
 	timer.tick("block-merging");
-
+#endif
+	
 	if (!constant_prop()) return false;
+#ifdef TIMER
 	timer.tick("constant-propagation");
+#endif
 	
 	if (!peephole()) return false;
+#ifdef TIMER
 	timer.tick("peepholer");
-
+#endif
+	
 	//if (!value_merging()) return false;
+#ifdef TIMER
 	timer.tick("value-merging");
-
+#endif
+	
 	sort_ir();
 	if(!reg_value_reuse()) return false;
+
+#ifdef TIMER
 	timer.tick("reg-val-reuse");
-
+#endif
+	
 	if (!sort_ir()) return false;
+#ifdef TIMER
 	timer.tick("sort");
-
+#endif
+	
 #ifdef VERIFY_IR
 	if (!verify()) {
 		printf("**** FAILED IR BEFORE ALLOCATION\n");
@@ -134,16 +155,21 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 #endif
 	
 	if (!analyse(max_stack)) return false;
+#ifdef TIMER
 	timer.tick("reg-allocation");
+#endif
 	
 #ifndef VERIFY_IR
 	if( !post_allocate_peephole()) return false;
+#ifdef TIMER
 	timer.tick("post-alloc-peepholer");
+#endif
 #endif
 	
 	if( !lower_stack_to_reg()) return false;
+#ifdef TIMER
 	timer.tick("mem-2-reg");
-	
+#endif	
 	sort_ir();
 	
 	//printf("*** after:\n");
@@ -166,13 +192,15 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		encoder.destroy_buffer();
 		return false;
 	}*/
-	
-	timer.tick("lower");
 
+#ifdef TIMER	
+	timer.tick("lower");
 	timer.dump("compile ");
+#endif
+	
+	encoder.finalise();
 	
 	fn = (block_txln_fn)encoder.get_buffer();
-	
 	return encoder.get_buffer_size();
 }
 

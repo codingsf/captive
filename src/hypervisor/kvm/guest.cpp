@@ -358,6 +358,7 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->insns_executed = 0;
 	per_cpu_data->interrupts_taken = 0;
 	per_cpu_data->verbose_enabled = false;
+	per_cpu_data->watchpoint = 0;
 
 	KVMCpu *cpu = new KVMCpu(next_cpu_id, *this, config, cpu_fd, per_cpu_data);
 	if (!cpu->init()) {
@@ -616,17 +617,15 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 		assert(false);
 	}
 
-	int mmap_prot = PROT_READ | PROT_WRITE;
-
 	DEBUG << CONTEXT(Guest) << "MMAP @ " << std::hex << fixed_addr;
-	rgn->host_buffer = mmap(fixed_addr, size, mmap_prot, mmap_flags, -1, 0);
+	rgn->host_buffer = mmap(fixed_addr, size, PROT_READ | PROT_WRITE | PROT_EXEC, mmap_flags, -1, 0);
 	if (rgn->host_buffer == MAP_FAILED) {
 		put_mem_slot(rgn);
 
 		ERROR << "Unable to allocate memory";
 		return NULL;
 	}
-	
+		
 	if (fixed_addr && rgn->host_buffer != fixed_addr) {
 		munmap(rgn->host_buffer, rgn->kvm.memory_size);
 		put_mem_slot(rgn);

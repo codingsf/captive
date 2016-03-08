@@ -131,9 +131,7 @@ bool KVMCpu::run()
 	sregs.gdt.base = GUEST_SYS_GDT_VIRT;
 	sregs.gdt.limit = 0x38;
 	
-	sregs.cr0 &= ~4;
-	sregs.cr0 |= 0x80010007;	
-	
+	sregs.cr0 = 0x80010007;	// PG, PE, MP, EM, WP
 	sregs.cr3 = GUEST_SYS_INIT_PGT_PHYS;
 	sregs.cr4 = 0x6b0;
 	

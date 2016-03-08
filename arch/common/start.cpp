@@ -44,7 +44,7 @@ extern "C" {
 		// Run the static constructors.
 		printf("calling static constructors...\n");
 		call_static_constructors();
-
+		
 		// Initialise IRQs.
 		printf("initialising irqs...\n");
 		captive::arch::lapic_init_irqs();
@@ -65,7 +65,7 @@ extern "C" {
 		/*printf("initialising cpu 1...\n");
 		captive::arch::smp_init_cpu(1);
 		captive::arch::smp_cpu_start(1);*/
-
+		
 		printf("creating environment...\n");
 		captive::arch::Environment *env = create_environment_arm(cpu_data->guest_data);
 
@@ -127,11 +127,15 @@ extern "C" {
 	void handle_trap_irq0(struct mcontext *mctx)
 	{
 		captive::arch::lapic_acknowledge_irq();
-
+		
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
 		case 2:
 			cpu->dump_state();
+			break;
+			
+		default:
+			captive::arch::CPU::get_active_cpu()->handle_irq_raised();
 			break;
 		}
 	}
