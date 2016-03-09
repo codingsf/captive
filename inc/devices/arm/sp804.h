@@ -11,6 +11,9 @@
 #include <devices/arm/primecell.h>
 #include <devices/timers/timer-manager.h>
 
+#include <mutex>
+#include <shared_mutex>
+
 namespace captive {
 	namespace devices {
 		namespace irq {
@@ -35,7 +38,7 @@ namespace captive {
 				
 			private:
 				void update_irq();
-
+				
 				class SP804Timer
 				{
 				public:
@@ -51,6 +54,8 @@ namespace captive {
 
 					void tick(uint64_t delta);
 				private:
+					std::shared_timed_mutex lock;
+
 					SP804 *_owner;
 					bool _enabled;
 

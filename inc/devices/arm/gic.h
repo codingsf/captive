@@ -48,6 +48,8 @@ namespace captive {
 				
 				uint32_t ctrl, prio_mask, binpnt;				
 				uint32_t current_pending, running_irq, running_priority;
+				
+				std::mutex update_lock;
 
 				void update();
 				uint32_t acknowledge();

@@ -161,7 +161,6 @@ void CPU::handle_irq_raised()
 {
 	//printf("*** raised %d\n", irq_line);
 	
-	local_state.isr = cpu_data().isr;
-	__sync_synchronize();
+	local_state.isr = 2;
 	jit_state.exit_chain = 1;
 }
