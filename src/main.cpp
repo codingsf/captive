@@ -12,6 +12,7 @@
 #include <hypervisor/kvm/kvm.h>
 
 #include <platform/realview.h>
+#include <platform/gensim-test.h>
 
 #include <util/command-line.h>
 #include <util/thread-pool.h>
@@ -129,6 +130,7 @@ int main(int argc, char **argv)
 
 	// Create the guest platform.
 	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8, std::string(argv[4]));
+	//Platform *pfm = new GensimTest(timer_manager);
 
 	// Create the engine.
 	Engine engine(argv[1]);

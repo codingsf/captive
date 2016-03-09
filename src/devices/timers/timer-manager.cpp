@@ -66,7 +66,7 @@ void TimerManager::timer_thread_proc()
 {
 	struct timespec ts_in;
 	ts_in.tv_sec = 0;
-	ts_in.tv_nsec = 100000;
+	ts_in.tv_nsec = 1000000;
 	
 	for (int i = 0; i < MAX_TIMERS; i++) {
 		if (timers[i].valid) {
