@@ -17,6 +17,8 @@ PL031::~PL031()
 
 void PL031::timer_expired(uint64_t ticks)
 {
+	std::unique_lock<std::mutex> l(lock);
+	
 	dr += ticks;
 	
 	if ((match > (dr - ticks)) && match <= dr) {
@@ -27,6 +29,8 @@ void PL031::timer_expired(uint64_t ticks)
 
 bool PL031::read(uint64_t off, uint8_t len, uint64_t& data)
 {
+	std::unique_lock<std::mutex> l(lock);
+	
 	if (Primecell::read(off, len, data))
 		return true;
 	
@@ -65,6 +69,8 @@ bool PL031::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool PL031::write(uint64_t off, uint8_t len, uint64_t data)
 {
+	std::unique_lock<std::mutex> l(lock);
+	
 	if (Primecell::write(off, len, data))
 		return true;
 	

@@ -215,8 +215,10 @@ std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
 
 bool KVMGuest::run()
 {
+#ifdef FAST_DEVICE_ACCESS
 	// Create the device thread
 	std::thread device_thread(device_thread_proc, (KVMGuest *)this);
+#endif
 	
 	// Create and run each core thread.
 	std::list<std::thread *> core_threads;
@@ -270,6 +272,7 @@ bool KVMGuest::run()
 	}
 #endif
 	
+#ifdef FAST_DEVICE_ACCESS
 	// Shutdown the device thread
 	per_guest_data->fast_device_operation = FAST_DEV_OP_QUIT;
 	captive::lock::barrier_wait(&per_guest_data->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
@@ -277,6 +280,7 @@ bool KVMGuest::run()
 	if (device_thread.joinable()) {
 		device_thread.join();
 	}
+#endif
 	
 	return true;
 }
