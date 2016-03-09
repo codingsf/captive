@@ -12,8 +12,11 @@ block_trampoline:
 	mov %rsp, %rbp
 	sub $0x40, %rsp
 	mov %fs:0x8, %rdi
-	callq *%rsi
 	
+	mov 0x3c(%rdi), %r15d		// Cache the PC
+	callq *%rsi					// Run the Code
+	mov %r15d, 0x3c(%rdi)		// Restore the PC
+
 	leaveq
 	pop %rbx
 	pop %r12

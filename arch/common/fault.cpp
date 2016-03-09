@@ -233,6 +233,9 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				} else if (rc.fault == MMU::NONE) {
 					return 0;
 				} else {
+					//printf("handling mmu fault: r15=%08x\n", (uint32_t)mctx->r15);
+					core->write_pc(mctx->r15);
+					
 					// Invoke the target platform behaviour for the memory fault
 					// Return TRUE if we need to return to the safe-point, i.e. to do a side
 					// exit from the currently executing guest instruction.

@@ -33,6 +33,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 {
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
+	bzero(&jit_state, sizeof(jit_state));
 	bzero(&tagged_reg_offsets, sizeof(tagged_reg_offsets));
 
 	local_state._kernel_mode = true;
@@ -44,9 +45,9 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	image = new profile::Image();
 
 	jit_state.cpu = this;
+	jit_state.execution_mode = 0;
 	
 	jit_state.block_txln_cache = block_txln_cache->ptr();	
-	jit_state.region_txln_cache = NULL;
 	
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.exit_chain = 0;

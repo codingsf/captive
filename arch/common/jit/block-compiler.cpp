@@ -37,7 +37,7 @@ static void dump_insn(IRInstruction *insn);
  *
  * RAX  Allocatable			0
  * RBX  Not used			1
- * RCX  Temporary				t0
+ * RCX  Temporary			t0
  * RDX  Allocatable			2
  * RSI  Allocatable			3
  * RDI  Register File
@@ -47,19 +47,17 @@ static void dump_insn(IRInstruction *insn);
  * R11  Allocatable			7
  * R12  Not used
  * R13  Allocatable			8
- * R14  Temporary				t1
- * R15  Temporary				t2
+ * R14  Temporary			t1
+ * R15  PC
  * FS	Base Pointer to JIT STATE structure
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, bool emit_interrupt_check, bool emit_chaining_logic) 
+BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs) 
 	: ctx(ctx),
 		encoder(allocator),
 		isa_mode(isa_mode),
 		pa(pa),
-		tagged_regs(tagged_regs),
-		emit_interrupt_check(emit_interrupt_check),
-		emit_chaining_logic(emit_chaining_logic)
+		tagged_regs(tagged_regs)
 {
 	int i = 0;
 	assign(i++, REG_RAX, REG_EAX, REG_AX, REG_AL);
@@ -1190,11 +1188,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		encoder.ret();
 	}*/
 	
+	//encoder.mov(0, REG_EAX);
+	//encoder.intt(0x90);
+	
 //	uint32_t prologue_offset = encoder.current_offset();
 	if(max_stack > 0x40)
 		encoder.sub(max_stack-0x40, REG_RSP);
-
-
+	
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -1351,177 +1351,185 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		{
 			IROperand *offset = &insn->operands[0];
 			IROperand *target = &insn->operands[1];
-
-			IRInstruction *mod_insn, *store_insn, *potential_killer;
-			mod_insn = insn+1;
-			store_insn = insn+2;
 			
-			potential_killer = insn+3;
-			bool notfound = true;
-			while(notfound) {
-				switch(potential_killer->type) {
-					case IRInstruction::INCPC:
-					case IRInstruction::BARRIER:
-						potential_killer++;
-						break;
-					default:
-						notfound = false;
-						break;
+			if (offset->is_constant() && offset->value == REG_OFFSET_OF(PC)) {
+				if (target->is_alloc_reg()) {
+					encoder.mov(REG_R15D, register_from_operand(target));
+				} else {
+					fatal("WHOA");
 				}
-			}
-			
-			
-			// If these three instructions are a read-modify-write of the same register, then emit a modification of
-			// the register, and then the normal read (eliminate the store)
-			// e.g.
-			// ldreg $0x0, v0
-			// add $0x10, v0
-			// streg v0, $0x0
-			//  ||
-			//  \/
-			// add $0x10, $0x0(REGSTATE_REG) 
-			// mov $0x0(REGSTATE_REG), [v0]
-			//
-			// We also determine if the final mov can be eliminted. It is only eliminated if the following instruction
-			// kills the value read from the register, e.g.
-			//
-			// add $0x10, $0x0(REGSTATE_REG) 
-			// mov $0x0(REGSTATE_REG), [v0]
-			// mov $0x8(REGSTATE_REG), [v0]
-			//  ||
-			//  \/
-			// add $0x10, $0x0(REGSTATE_REG) 
-			// mov $0x8(REGSTATE_REG), [v0]
-			unsigned reg_offset = insn->operands[0].value;
-			if(mod_insn->ir_block == insn->ir_block && store_insn->ir_block == insn->ir_block && store_insn->type == IRInstruction::WRITE_REG && store_insn->operands[1].value == reg_offset) {
-				
-				IROperand *my_target =     &insn->operands[1];
-				IROperand *modify_source = &mod_insn->operands[0];
-				IROperand *modify_target = &mod_insn->operands[1];
-				IROperand *store_source  = &store_insn->operands[0];
-				
-				if(my_target->is_alloc_reg() && !modify_source->is_alloc_stack() && !modify_target->is_alloc_stack() && store_source->is_alloc_reg()) {
-					
-					unsigned my_target_reg = my_target->alloc_data;
-					unsigned modify_target_reg = modify_target->alloc_data;
-					unsigned store_source_reg = store_source->alloc_data;
-					
-					// TODO: this is hideous
-					bool fused = false;
-					if(my_target_reg == modify_target_reg && modify_target_reg == store_source_reg) {
-						switch(mod_insn->type) {
-							case IRInstruction::ADD: 
-								if(modify_source->is_constant()) {
-									encoder.add(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
-								}
-								else if(modify_source->is_vreg()) {
-									encoder.add(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
-								} else {
-									assert(false);
-								}
-								fused = true;
-								break;
-							case IRInstruction::SUB:
-								if(modify_source->is_constant()) {
-									encoder.sub(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
-								}
-								else if(modify_source->is_vreg()) {
-									encoder.sub(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
-								} else {
-									assert(false);
-								}
-								fused = true;
-								break;
-							case IRInstruction::OR:
-								if(modify_source->is_constant()) {
-									encoder.orr(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
-								}
-								else if(modify_source->is_vreg()) {
-									encoder.orr(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
-								} else {
-									assert(false);
-								}
-								fused = true;
-								break;
-							case IRInstruction::AND:
-								if(modify_source->is_constant()) {
-									encoder.andd(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
-								}
-								else if(modify_source->is_vreg()) {
-									encoder.andd(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
-								} else {
-									assert(false);
-								}
-								fused = true;
-								break;
-							case IRInstruction::XOR:
-								if(modify_source->is_constant()) {
-									encoder.xorr(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
-								}
-								else if(modify_source->is_vreg()) {
-									encoder.xorr(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
-								} else {
-									assert(false);
-								}
-								fused = true;
-								break;
-							default: 
-								break;
-						}
-						
-						if(fused) {
-							ir_idx += 2;
-							
-							// If the IR node after the fused instruction kills the register we would load into, then
-							// we don't need to load the register value
-							auto &descr = insn_descriptors[potential_killer->type];
-							//~ printf("Killer is %s %x\n", descr.mnemonic, pa);
-							bool kills_value = false;
-							for(int i = 0; i < 6; ++i) {
-								IROperand *kop = &potential_killer->operands[i];
-								// If the operand is an input of the register, we need the move
-								if(descr.format[i] == 'I' || descr.format[i] == 'B') {
-									if(kop->is_alloc_reg() && kop->alloc_data == store_source->alloc_data) {
-										kills_value = false;
-										//~ printf("doesn't kill\n");
-										break;
+			} else {
+				IRInstruction *mod_insn, *store_insn, *potential_killer;
+				mod_insn = insn+1;
+				store_insn = insn+2;
+
+				potential_killer = insn+3;
+				bool notfound = true;
+				while(notfound) {
+					switch(potential_killer->type) {
+						case IRInstruction::INCPC:
+						case IRInstruction::BARRIER:
+							potential_killer++;
+							break;
+						default:
+							notfound = false;
+							break;
+					}
+				}
+
+
+				// If these three instructions are a read-modify-write of the same register, then emit a modification of
+				// the register, and then the normal read (eliminate the store)
+				// e.g.
+				// ldreg $0x0, v0
+				// add $0x10, v0
+				// streg v0, $0x0
+				//  ||
+				//  \/
+				// add $0x10, $0x0(REGSTATE_REG) 
+				// mov $0x0(REGSTATE_REG), [v0]
+				//
+				// We also determine if the final mov can be eliminted. It is only eliminated if the following instruction
+				// kills the value read from the register, e.g.
+				//
+				// add $0x10, $0x0(REGSTATE_REG) 
+				// mov $0x0(REGSTATE_REG), [v0]
+				// mov $0x8(REGSTATE_REG), [v0]
+				//  ||
+				//  \/
+				// add $0x10, $0x0(REGSTATE_REG) 
+				// mov $0x8(REGSTATE_REG), [v0]
+				unsigned reg_offset = insn->operands[0].value;
+				if(mod_insn->ir_block == insn->ir_block && store_insn->ir_block == insn->ir_block && store_insn->type == IRInstruction::WRITE_REG && store_insn->operands[1].value == reg_offset) {
+
+					IROperand *my_target =     &insn->operands[1];
+					IROperand *modify_source = &mod_insn->operands[0];
+					IROperand *modify_target = &mod_insn->operands[1];
+					IROperand *store_source  = &store_insn->operands[0];
+
+					if(my_target->is_alloc_reg() && !modify_source->is_alloc_stack() && !modify_target->is_alloc_stack() && store_source->is_alloc_reg()) {
+
+						unsigned my_target_reg = my_target->alloc_data;
+						unsigned modify_target_reg = modify_target->alloc_data;
+						unsigned store_source_reg = store_source->alloc_data;
+
+						// TODO: this is hideous
+						bool fused = false;
+						if(my_target_reg == modify_target_reg && modify_target_reg == store_source_reg) {
+							switch(mod_insn->type) {
+								case IRInstruction::ADD: 
+									if(modify_source->is_constant()) {
+										encoder.add(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
+									}
+									else if(modify_source->is_vreg()) {
+										encoder.add(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
+									} else {
+										assert(false);
+									}
+									fused = true;
+									break;
+								case IRInstruction::SUB:
+									if(modify_source->is_constant()) {
+										encoder.sub(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
+									}
+									else if(modify_source->is_vreg()) {
+										encoder.sub(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
+									} else {
+										assert(false);
+									}
+									fused = true;
+									break;
+								case IRInstruction::OR:
+									if(modify_source->is_constant()) {
+										encoder.orr(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
+									}
+									else if(modify_source->is_vreg()) {
+										encoder.orr(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
+									} else {
+										assert(false);
+									}
+									fused = true;
+									break;
+								case IRInstruction::AND:
+									if(modify_source->is_constant()) {
+										encoder.andd(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
+									}
+									else if(modify_source->is_vreg()) {
+										encoder.andd(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
+									} else {
+										assert(false);
+									}
+									fused = true;
+									break;
+								case IRInstruction::XOR:
+									if(modify_source->is_constant()) {
+										encoder.xorr(modify_source->value, modify_source->size, X86Memory::get(REGSTATE_REG, reg_offset));
+									}
+									else if(modify_source->is_vreg()) {
+										encoder.xorr(register_from_operand(modify_source), X86Memory::get(REGSTATE_REG, reg_offset));
+									} else {
+										assert(false);
+									}
+									fused = true;
+									break;
+								default: 
+									break;
+							}
+
+							if(fused) {
+								ir_idx += 2;
+
+								// If the IR node after the fused instruction kills the register we would load into, then
+								// we don't need to load the register value
+								auto &descr = insn_descriptors[potential_killer->type];
+								//~ printf("Killer is %s %x\n", descr.mnemonic, pa);
+								bool kills_value = false;
+								for(int i = 0; i < 6; ++i) {
+									IROperand *kop = &potential_killer->operands[i];
+									// If the operand is an input of the register, we need the move
+									if(descr.format[i] == 'I' || descr.format[i] == 'B') {
+										if(kop->is_alloc_reg() && kop->alloc_data == store_source->alloc_data) {
+											kills_value = false;
+											//~ printf("doesn't kill\n");
+											break;
+										}
+									}
+
+									if(descr.format[i] == 'O') {
+										if(kop->is_alloc_reg() && kop->alloc_data == store_source->alloc_data) {
+											kills_value = true;
+											//~ printf("kills\n");
+											break;
+										}
 									}
 								}
-								
-								if(descr.format[i] == 'O') {
-									if(kop->is_alloc_reg() && kop->alloc_data == store_source->alloc_data) {
-										kills_value = true;
-										//~ printf("kills\n");
-										break;
-									}
+
+								// If the killer DOES kill the instruction, then we DO NOT need the move
+								if(!kills_value) {
+									encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
 								}
+								continue;
 							}
-							
-							// If the killer DOES kill the instruction, then we DO NOT need the move
-							if(!kills_value) {
-								encoder.mov(X86Memory::get(REGSTATE_REG, reg_offset), register_from_operand(store_source));
-							}
-							continue;
 						}
 					}
 				}
-			}
-			
 
-			if (offset->type == IROperand::CONSTANT) {
-				// Load a constant offset guest register into the storage location
-				if (target->is_alloc_reg()) {
-					encoder.mov(X86Memory::get(guest_regs_reg, offset->value), register_from_operand(target));
-				} else if (target->is_alloc_stack()) {
-					encoder.mov(X86Memory::get(guest_regs_reg, offset->value), get_temp(0, 4));
-					encoder.mov(get_temp(0, 4), stack_from_operand(target));
+
+				if (offset->type == IROperand::CONSTANT) {
+					// Load a constant offset guest register into the storage location
+					if (target->is_alloc_reg()) {
+						encoder.mov(X86Memory::get(guest_regs_reg, offset->value), register_from_operand(target));
+					} else if (target->is_alloc_stack()) {
+						encoder.mov(X86Memory::get(guest_regs_reg, offset->value), get_temp(0, 4));
+						encoder.mov(get_temp(0, 4), stack_from_operand(target));
+					} else {
+						assert(false);
+					}
 				} else {
 					assert(false);
 				}
-			} else {
-				assert(false);
 			}
-
+			
 			break;
 		}
 
@@ -1539,73 +1547,63 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			encoder.ensure_extra_buffer(64);
 			
-			uint8_t *jump_offset = NULL;
-			if (emit_interrupt_check) {
-				assert(emit_chaining_logic);
-				encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
-				encoder.test(REG_EAX, REG_EAX);
-				jump_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset() + 1;
-				
-				encoder.jne((int8_t)0);
-			}
-			
-			if(emit_chaining_logic) {
-				assert(emit_interrupt_check);
-				
-				size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
-				size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+			encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
+			encoder.test(REG_EAX, REG_EAX);
 
-				bool jump_via_offsets = false;
-				if(target_offset < 0x80000000 && (!has_fallthrough || fallthrough_offset < 0x80000000)) jump_via_offsets = true;
-				
-				if(jump_via_offsets) {
-					if(has_fallthrough) {
+			uint8_t *jump_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset() + 1;
+			encoder.jne((int8_t)0);
 
-						//load PC into EAX
-						encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_EBX);
-						
-						//mask page offset of PC (we already know that both targets land in this page)
-						encoder.andd(0xfff, REG_EBX);
-						
-						encoder.mov(insn->operands[2].value, REG_RCX);
-						encoder.mov(insn->operands[3].value, REG_RDX);
-					
-						encoder.cmp(insn->operands[0].value, REG_EBX);
-						encoder.jne((int8_t)2);
-						encoder.jmp(REG_RCX);
-						encoder.jmp(REG_RDX);
-						
-					} else {
-						encoder.mov(insn->operands[2].value, REG_RCX);
-						encoder.jmp(REG_RCX);
-					}
-					
+			size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+			size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+
+			bool jump_via_offsets = false;
+			if(target_offset < 0x80000000 && (!has_fallthrough || fallthrough_offset < 0x80000000)) jump_via_offsets = true;
+
+			if(jump_via_offsets) {
+				if(has_fallthrough) {
+
+					//load PC into EBX
+					encoder.mov(REG_R15D, REG_EBX);
+
+					//mask page offset of PC (we already know that both targets land in this page)
+					encoder.andd(0xfff, REG_EBX);
+
+					encoder.mov(insn->operands[2].value, REG_RCX);
+					encoder.mov(insn->operands[3].value, REG_RDX);
+
+					encoder.cmp(insn->operands[0].value, REG_EBX);
+					encoder.jne((int8_t)2);
+					encoder.jmp(REG_RCX);
+					encoder.jmp(REG_RDX);
+
 				} else {
-					if(has_fallthrough) {
-						//load PC into EAX
-						encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_EBX);
-						
-						//mask page offset of PC (we already know that both targets land in this page)
-						encoder.andd(0xfff, REG_EBX);
-						encoder.cmp(insn->operands[0].value, REG_EBX);
-						
-						target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
-						encoder.je((int32_t)target_offset-6);
-						
-						fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
-						encoder.jmp_offset((int32_t)fallthrough_offset-5);
-					} else {
-						target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
-						encoder.jmp_offset((int32_t)target_offset-5);
-					}
+					encoder.mov(insn->operands[2].value, REG_RCX);
+					encoder.jmp(REG_RCX);
 				}
-				uint8_t *current_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset();
-				*jump_offset = (uint8_t)(uint64_t)(current_offset - jump_offset-1);
-				//printf("Jump offset set to %u\n", *jump_offset);
-				
-				//if something messed up, we fall through to the return
+
+			} else {
+				if(has_fallthrough) {
+					//load PC into EBX
+					encoder.mov(REG_R15D, REG_EBX);
+
+					//mask page offset of PC (we already know that both targets land in this page)
+					encoder.andd(0xfff, REG_EBX);
+					encoder.cmp(insn->operands[0].value, REG_EBX);
+
+					target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+					encoder.je((int32_t)target_offset-6);
+
+					fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+					encoder.jmp_offset((int32_t)fallthrough_offset-5);
+				} else {
+					target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
+					encoder.jmp_offset((int32_t)target_offset-5);
+				}
 			}
-				
+
+			uint8_t *current_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset();
+			*jump_offset = (uint8_t)(uint64_t)(current_offset - jump_offset-1);
+						
 			// jnz above lands here
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();
@@ -1617,39 +1615,36 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			do_ret_instead:
 			if(max_stack > 0x40)
 				encoder.add(max_stack-0x40, REG_RSP);
-			
-			// Function Epilogue
-			if (emit_interrupt_check) {
-				assert(emit_chaining_logic);
-				encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
-				encoder.test(REG_EAX, REG_EAX);
-				encoder.jnz((int8_t)34);
-			}
 
-			if (emit_chaining_logic) {
-				// Each chaining table entry is 16 bytes, arranged
-				// 0	tag (4 bytes)
-				// 8	pointer (8 bytes)
+			// Check to see if we need to stop chaining (e.g. an interrupt)
+			encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
+			encoder.test(REG_EAX, REG_EAX);
+
+			uint8_t *jump_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset() + 1;
+			encoder.jnz((int8_t)0);
+
+			// Each chaining table entry is 16 bytes, arranged
+			// 0	tag (4 bytes)
+			// 8	pointer (8 bytes)
+
+			// Used regs: EAX, EBX, ECX, EDX
 								
-				// Used regs: EAX, EBX, ECX, EDX
-								
-				encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_EAX);		// Load the PC
-				encoder.mov(REG_EAX, REG_EBX);
-				encoder.shr(0x2, REG_EAX);
-				encoder.movzx(REG_AX, REG_EDX);									// Shift/Mask the PC
-				encoder.shl(4, REG_RDX);										// Get cache entry offset (multiply by 16)
-				encoder.mov(X86Memory::get(REG_FS, 32), REG_RCX);
-				encoder.add(REG_RCX, REG_RDX);									// apply offset
+			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
+			encoder.mov(REG_EAX, REG_EBX);
+			encoder.shr(0x2, REG_EAX);
+			encoder.movzx(REG_AX, REG_EDX);									// Shift/Mask the PC
+			encoder.shl(4, REG_RDX);										// Get cache entry offset (multiply by 16)
+			encoder.mov(X86Memory::get(REG_FS, 32), REG_RCX);
+			encoder.add(REG_RCX, REG_RDX);									// apply offset
 
-				encoder.cmp(REG_EBX, X86Memory::get(REG_RDX));					// Compare PC with cache entry tag
-				
-				encoder.jne((int8_t)3);											// Tags match?
-				
-				encoder.jmp(X86Memory::get(REG_RDX, 8));						// Yep, tail call.
-				
-			}
+			encoder.cmp(REG_EBX, X86Memory::get(REG_RDX));					// Compare PC with cache entry tag
 
-			// (jnz above should jump to here)
+			encoder.jne((int8_t)3);											// Tags match?
+			encoder.jmp(X86Memory::get(REG_RDX, 8));						// Yep, tail call.
+
+			uint8_t *current_offset = (uint8_t*)encoder.get_buffer() + encoder.current_offset();
+			*jump_offset = (uint8_t)(uint64_t)(current_offset - jump_offset-1);
+
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();
 			
@@ -1698,10 +1693,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				if (dest->is_alloc_reg()) {
 					switch (insn->type) {
 					case IRInstruction::ADD:
-						encoder.add(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
+						//encoder.add(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
+						encoder.add(REG_R15D, register_from_operand(dest));
 						break;
 					case IRInstruction::SUB:
-						encoder.sub(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
+						//encoder.sub(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
+						encoder.sub(REG_R15D, register_from_operand(dest));
 						break;
 					default:
 						assert(false);
@@ -1757,37 +1754,55 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *value = &insn->operands[0];
 
 			if (offset->type == IROperand::CONSTANT) {
-				if (value->type == IROperand::CONSTANT) {
-					switch (value->size) {
-					case 8:
-						encoder.mov(value->value, get_temp(0, 8));
-						encoder.mov(get_temp(0, 8), X86Memory::get(guest_regs_reg, offset->value));
-						
-						//encoder.mov8(value->value, X86Memory::get(guest_regs_reg, offset->value));
-						break;
-					case 4:
-						encoder.mov4(value->value, X86Memory::get(guest_regs_reg, offset->value));
-						break;
-					case 2:
-						encoder.mov2(value->value, X86Memory::get(guest_regs_reg, offset->value));
-						break;
-					case 1:
-						encoder.mov1(value->value, X86Memory::get(guest_regs_reg, offset->value));
-						break;
-					default: assert(false);
-					}
-				} else if (value->type == IROperand::VREG) {
-					if (value->is_alloc_reg()) {
-						encoder.mov(register_from_operand(value), X86Memory::get(guest_regs_reg, offset->value));
-					} else if (value->is_alloc_stack()) {
-						X86Register& tmp = get_temp(0, value->size);
-						encoder.mov(stack_from_operand(value), tmp);
-						encoder.mov(tmp, X86Memory::get(guest_regs_reg, offset->value));
+				if (offset->value == REG_OFFSET_OF(PC)) {
+					assert(value->size == 4);
+
+					if (value->type == IROperand::CONSTANT) {
+						encoder.mov(value->value, REG_R15D);
+					} else if (value->type == IROperand::VREG) {
+						if (value->is_alloc_reg()) {
+							encoder.mov(register_from_operand(value), REG_R15D);
+						} else if (value->is_alloc_stack()) {
+							encoder.mov(stack_from_operand(value), REG_R15D);
+						} else {
+							assert(false);
+						}
 					} else {
 						assert(false);
 					}
 				} else {
-					assert(false);
+					if (value->type == IROperand::CONSTANT) {
+						switch (value->size) {
+						case 8:
+							encoder.mov(value->value, get_temp(0, 8));
+							encoder.mov(get_temp(0, 8), X86Memory::get(guest_regs_reg, offset->value));
+
+							//encoder.mov8(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							break;
+						case 4:
+							encoder.mov4(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							break;
+						case 2:
+							encoder.mov2(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							break;
+						case 1:
+							encoder.mov1(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							break;
+						default: assert(false);
+						}
+					} else if (value->type == IROperand::VREG) {
+						if (value->is_alloc_reg()) {
+							encoder.mov(register_from_operand(value), X86Memory::get(guest_regs_reg, offset->value));
+						} else if (value->is_alloc_stack()) {
+							X86Register& tmp = get_temp(0, value->size);
+							encoder.mov(stack_from_operand(value), tmp);
+							encoder.mov(tmp, X86Memory::get(guest_regs_reg, offset->value));
+						} else {
+							assert(false);
+						}
+					} else {
+						assert(false);
+					}
 				}
 			} else {
 				assert(false);
@@ -1937,7 +1952,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *target = &insn->operands[0];
 
 			if (target->is_alloc_reg()) {
-				encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(target));
+				//encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(target));
+				encoder.mov(REG_R15D, register_from_operand(target));
 			} else {
 				assert(false);
 			}
@@ -1950,8 +1966,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *amount = &insn->operands[0];
 
 			if (amount->is_constant()) {
+				encoder.add(amount->value, REG_R15D);
+				
 				// TODO: FIXME: XXX: HACK HACK HACK
-				encoder.add4(amount->value, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
+				//encoder.add4(amount->value, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
 			} else {
 				assert(false);
 			}
@@ -3102,7 +3120,8 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 		}
 	}
 	
-	encoder.mov(REGSTATE_REG, REG_R15);
+	encoder.mov(REG_R15D, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
+	encoder.push(REGSTATE_REG);
 	
 	for(int i = register_assignments_8.size()-1; i >= 0; i--) {
 		if(used_phys_regs.get(i)) {
@@ -3123,7 +3142,9 @@ void BlockCompiler::emit_restore_reg_state(int num_operands, stack_map_t &stack_
 			encoder.pop(get_allocable_register(i, 8));
 		}
 	}
-	encoder.mov(REG_R15, REGSTATE_REG);
+	encoder.pop(REGSTATE_REG);
+	
+	encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_R15D);
 }
 
 void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86Register& target_reg, stack_map_t &stack_map)

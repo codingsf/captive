@@ -125,8 +125,15 @@ trap_illegal:
 	jmp interrupt_restore_safepoint
 
 .globl trap_signal
-.extern
+.extern handle_signal
 trap_signal:
 	enter_intr 0
 	call handle_signal
+	exit_intr
+
+.globl int90_handler
+int90_handler:
+	enter_intr 0
+	mov %rsp, %rdi
+	call handle_debug
 	exit_intr

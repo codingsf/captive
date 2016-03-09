@@ -159,4 +159,12 @@ extern "C" {
 	{
 		printf("signal %d\n", captive::arch::CPU::get_active_cpu()->cpu_data().signal_code);
 	}
+	
+	void handle_debug(struct mcontext *mctx)
+	{
+		if (mctx->rax == 0)
+			printf("entry r15=%08x pc=%08x\n", (uint32_t)mctx->r15, captive::arch::CPU::get_active_cpu()->read_pc());
+		else
+			printf("exit r15=%08x pc=%08x\n", (uint32_t)mctx->r15, captive::arch::CPU::get_active_cpu()->read_pc());
+	}
 }

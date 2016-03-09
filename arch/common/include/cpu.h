@@ -178,7 +178,7 @@ namespace captive {
 				void *cpu;													// 0
 				void *registers;											// 8
 				uint64_t registers_size;									// 16
-				const struct region_chain_cache_entry *region_txln_cache;	// 24
+				uint64_t execution_mode;									// 24
 				const struct block_chain_cache_entry *block_txln_cache;		// 32
 				uint64_t *insn_counter;										// 40
 				uint64_t exit_chain;										// 48

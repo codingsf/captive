@@ -263,7 +263,7 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 {
 	pthread_setname_np(pthread_self(), "dev-comm");
 	
-	PerGuestData *pgd = guest->per_guest_data;
+	PerGuestData *pgd = guest->per_guest_data;	
 	while (true) {
 		captive::lock::barrier_wait(&pgd->fd_hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
 		if (pgd->fast_device_operation == FAST_DEV_OP_QUIT) break;

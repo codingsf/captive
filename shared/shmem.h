@@ -76,6 +76,7 @@ namespace captive {
 		unsigned long fast_device_value;
 		unsigned long fast_device_size;
 		unsigned long fast_device_operation;
+		unsigned long fast_device_watchpoint0;
 		
 		captive::lock::barrier fd_hypervisor_barrier;
 		captive::lock::barrier fd_guest_barrier;

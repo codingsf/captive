@@ -26,6 +26,9 @@ using namespace captive::arch::profile;
 
 extern "C" int block_trampoline(void *, void*);
 
+extern "C" void prebuilt_11000(void);
+extern "C" void prebuilt_11010(void);
+
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
@@ -38,7 +41,7 @@ bool CPU::run_block_jit()
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
 		// Make sure interrupts are enabled.
-		__local_irq_enable();		
+		__local_irq_enable();
 	}
 
 	ensure_privilege_mode();
@@ -113,9 +116,14 @@ bool CPU::run_block_jit_safepoint()
 						
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
-			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
-			//mmu().disable_writes();
-
+			/*if (virt_pc == 0x11000) {
+				blk->txln = (captive::shared::block_txln_fn)&prebuilt_11000;
+			} else if (virt_pc == 0x11010) {
+				blk->txln = (captive::shared::block_txln_fn)&prebuilt_11010;
+			} else {*/
+				blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
+			//}
+			
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
 		}
 		
@@ -137,7 +145,7 @@ captive::shared::block_txln_fn CPU::compile_block(Region *rgn, Block *blk, uint8
 		fatal("jit: block translation failed\n");
 	}
 	
-	BlockCompiler compiler(ctx, malloc::code_alloc, isa_mode, pa, tagged_registers(), true, true);
+	BlockCompiler compiler(ctx, malloc::code_alloc, isa_mode, pa, tagged_registers());
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		fatal("jit: block compilation failed\n");
@@ -213,6 +221,8 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 			break;
 		}
 	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 200);
+	
+	assert(insn->end_of_block);
 
 	// Branch optimisation log
 	bool can_dispatch = false;
@@ -263,6 +273,6 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 	} else {
 		ctx.add_instruction(IRInstruction::ret());
 	}
-
+	
 	return true;
 }
