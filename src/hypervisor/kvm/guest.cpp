@@ -114,6 +114,14 @@ static bool stop_callback(int fd, bool is_input, void *p)
 	return false;
 }
 
+bool KVMGuest::intr_callback(int fd, bool is_input, void *p)
+{
+	KVMGuest *g = (KVMGuest *)p;
+	
+	g->kvm_cpus.front()->interrupt(4);
+	return true;
+}
+
 bool KVMGuest::prepare_event_loop()
 {
 	stopfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
@@ -122,14 +130,34 @@ bool KVMGuest::prepare_event_loop()
 		return false;
 	}
 
+	intrfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (intrfd < 0) {
+		ERROR << CONTEXT(Guest) << "Unable to create interrupt eventfd";
+		close(stopfd);
+		return false;
+	}
+
 	epollfd = epoll_create1(0);
 	if (epollfd < 0) {
 		ERROR << CONTEXT(Guest) << "Unable to create epollfd";
+		close(intrfd);
 		close(stopfd);
 		return false;
 	}
 	
-	return attach_event(stopfd, stop_callback, true, false, NULL);
+	if (!attach_event(stopfd, stop_callback, true, false, NULL)) {
+		close(intrfd);
+		close(stopfd);
+		return false;
+	}
+
+	if (!attach_event(intrfd, intr_callback, true, false, this)) {
+		close(intrfd);
+		close(stopfd);
+		return false;
+	}
+	
+	return true;
 }
 
 bool KVMGuest::attach_event(int fd, event_callback_t cb, bool input, bool output, void *data)
@@ -257,6 +285,12 @@ void KVMGuest::stop()
 {
 	uint64_t value = 1;
 	write(stopfd, &value, sizeof(value));
+}
+
+void KVMGuest::debug_interrupt(int code)
+{
+	uint64_t value = 1;
+	write(intrfd, &value, sizeof(value));
 }
 
 void KVMGuest::device_thread_proc(KVMGuest *guest)

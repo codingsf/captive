@@ -63,6 +63,22 @@ static void handle_intr(int sig, siginfo_t *siginfo, void *ucontext)
 	}
 }
 
+static void handle_usr(int sig, siginfo_t *siginfo, void *ucontext)
+{
+	switch (sig) {
+	case SIGUSR1:
+		if (current_guest) {
+			current_guest->debug_interrupt(0);
+		}
+		break;
+	case SIGUSR2:
+		if (current_guest) {
+			current_guest->debug_interrupt(1);
+		}
+		break;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct sigaction segv_action;
@@ -72,9 +88,15 @@ int main(int argc, char **argv)
 	struct sigaction intr_action;
 	intr_action.sa_sigaction = handle_intr;
 	intr_action.sa_flags = SA_SIGINFO;
+
+	struct sigaction usr_action;
+	usr_action.sa_sigaction = handle_usr;
+	usr_action.sa_flags = SA_SIGINFO;
 	
 	sigaction(SIGSEGV, &segv_action, NULL);
 	sigaction(SIGINT, &intr_action, NULL);
+	sigaction(SIGUSR1, &usr_action, NULL);
+	sigaction(SIGUSR2, &usr_action, NULL);
 	
 	const CommandLine *cl = CommandLine::parse(argc, argv);
 

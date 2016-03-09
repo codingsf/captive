@@ -60,6 +60,8 @@ namespace captive {
 			
 			virtual bool run() = 0;
 			virtual void stop() = 0;
+			
+			virtual void debug_interrupt(int code) = 0;
 
 		private:
 			Hypervisor& _owner;

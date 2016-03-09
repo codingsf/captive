@@ -102,6 +102,7 @@ namespace captive {
 				void stop() override;
 				
 				void guest_entrypoint(gpa_t entrypoint) override;
+				void debug_interrupt(int code) override;
 				
 			private:
 				typedef bool (*event_callback_t)(int fd, bool is_input, void *data);
@@ -123,7 +124,7 @@ namespace captive {
 				int fd;
 				int next_cpu_id;
 				int next_slot_idx;
-				int epollfd, stopfd;
+				int epollfd, stopfd, intrfd;
 
 				struct vm_mem_region {
 					struct kvm_userspace_memory_region kvm;
@@ -202,6 +203,8 @@ namespace captive {
 				inline int vmioctl(unsigned long int req, void *arg) const {
 					return ioctl(fd, req, arg);
 				}
+				
+				static bool intr_callback(int fd, bool is_input, void *p);
 			};
 		}
 	}

@@ -445,8 +445,12 @@ void GIC::add_core(irq::IRQLine& irq, int id)
 	cores.push_back(iface);
 }
 
+std::mutex x;
+
 void GIC::irq_raised(irq::IRQLine& line)
 {
+	std::unique_lock<std::mutex> l(x);
+	
 	gic_irq& irq = get_gic_irq(line.index());
 
 	if (!irq.raised) {
@@ -463,6 +467,8 @@ void GIC::irq_raised(irq::IRQLine& line)
 
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
+	std::unique_lock<std::mutex> l(x);
+	
 	gic_irq& irq = get_gic_irq(line.index());
 	
 	if (irq.raised) {
