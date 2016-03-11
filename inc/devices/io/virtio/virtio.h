@@ -11,6 +11,7 @@
 #include <devices/device.h>
 #include <vector>
 #include <atomic>
+#include <mutex>
 #include <util/completion.h>
 
 //#define SYNCHRONOUS

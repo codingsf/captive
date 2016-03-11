@@ -250,7 +250,7 @@ void VirtIO::submit_event(VirtIOQueueEvent *evt)
 	
 	evt->queue->push(evt->descr_idx, evt->response_size);
 	assert_interrupt(0);
-	update_irq();
+	_irq.raise();
 	
 #ifndef SYNCHRONOUS
 	delete evt;

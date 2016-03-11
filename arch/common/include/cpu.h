@@ -157,7 +157,7 @@ namespace captive {
 			struct {
 				bool _kernel_mode;
 				uint32_t last_exception_action;
-				uint32_t isr;
+				volatile uint32_t isr;
 			} local_state;
 
 			struct block_chain_cache_entry {

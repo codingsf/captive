@@ -65,7 +65,6 @@ bool CPU::run_block_jit_safepoint()
 			__local_irq_disable();
 			if (handle_irq(local_state.isr)) {
 				local_state.isr = 0;
-				//__sync_synchronize();
 		
 				jit_state.exit_chain = 0;
 				

@@ -34,7 +34,8 @@ namespace captive {
 				std::mutex lock;
 				
 				irq::IRQLine& irq;
-				uint32_t dr, match, load, ctrl, mask, isr;
+				volatile uint32_t dr;
+				uint32_t match, load, ctrl, mask, isr;
 				
 				void update_irq();
 			};
