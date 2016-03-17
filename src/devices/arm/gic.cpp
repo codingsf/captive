@@ -322,7 +322,7 @@ bool GICCPUInterface::write(uint64_t off, uint8_t len, uint64_t data)
 
 void GICCPUInterface::update()
 {
-	std::unique_lock<std::mutex> l(update_lock);
+	//std::unique_lock<std::mutex> l(update_lock);
 	
 	current_pending = 1023;
 	if (!enabled() || !owner.distributor.enabled()) {
@@ -449,7 +449,7 @@ void GIC::add_core(irq::IRQLine& irq, int id)
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
-	lock.lock();
+	//lock.lock();
 	
 	gic_irq& irq = get_gic_irq(line.index());
 
@@ -460,17 +460,17 @@ void GIC::irq_raised(irq::IRQLine& line)
 		
 		irq.raised = true;
 		if (irq.edge_triggered) irq.pending = true;
-		lock.unlock();
+		//lock.unlock();
 		
 		update();
 	} else {
-		lock.unlock();
+		//lock.unlock();
 	}
 }
 
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
-	lock.lock();
+	//lock.lock();
 	
 	gic_irq& irq = get_gic_irq(line.index());
 	
@@ -480,11 +480,11 @@ void GIC::irq_rescinded(irq::IRQLine& line)
 #endif
 
 		irq.raised = false;
-		lock.unlock();
+		//lock.unlock();
 		
 		update();
 	} else {
-		lock.unlock();
+		//lock.unlock();
 	}
 }
 

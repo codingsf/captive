@@ -61,8 +61,8 @@ bool CPU::run_block_jit_safepoint()
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
 		if (unlikely(local_state.isr)) {
-			switch_to_kernel_mode();
-			__local_irq_disable();
+			/*switch_to_kernel_mode();
+			__local_irq_disable();*/
 			if (handle_irq(local_state.isr)) {
 				local_state.isr = 0;
 		
@@ -70,8 +70,8 @@ bool CPU::run_block_jit_safepoint()
 				
 				//cpu_data().interrupts_taken++;
 			}
-			__local_irq_enable();
-			ensure_privilege_mode();
+			/*__local_irq_enable();
+			ensure_privilege_mode();*/
 		}
 		
 		// Check to see if there are any pending actions coming in from

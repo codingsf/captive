@@ -1449,6 +1449,13 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, uint8_t siz
 	assert(rm.base.size == 4 || rm.base.size == 8);
 
 	// Figure out what prefixes are needed (if any)
+	
+	// Determine if there are any segment override prefixes
+	if (rm.segment == REG_FS) {
+		emit8(SEG_OVERRIDE_FS);
+	} else if (rm.segment == REG_GS) {
+		emit8(SEG_OVERRIDE_GS);
+	}
 
 	// Emit an operand-size override if the reg operand is 16-bits
 	if (size == 2) {

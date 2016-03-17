@@ -80,7 +80,7 @@ SP804::SP804Timer::SP804Timer() : _enabled(false), load_value(0), current_value(
 
 bool SP804::SP804Timer::read(uint64_t off, uint8_t len, uint64_t& data)
 {
-	std::shared_lock<std::shared_timed_mutex> l(lock);
+	//std::shared_lock<std::shared_timed_mutex> l(lock);
 	
 	switch (off) {
 	case 0x00:
@@ -116,7 +116,7 @@ bool SP804::SP804Timer::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool SP804::SP804Timer::write(uint64_t off, uint8_t len, uint64_t data)
 {
-	std::unique_lock<std::shared_timed_mutex> l(lock);
+	//std::unique_lock<std::shared_timed_mutex> l(lock);
 	
 	switch (off) {
 	case 0x00:
@@ -150,7 +150,7 @@ bool SP804::SP804Timer::write(uint64_t off, uint8_t len, uint64_t data)
 
 void SP804::SP804Timer::tick(uint64_t delta)
 {
-	std::unique_lock<std::shared_timed_mutex> l(lock);
+	//std::unique_lock<std::shared_timed_mutex> l(lock);
 	
 	if (!_enabled) return;
 
