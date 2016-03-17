@@ -60,7 +60,7 @@ namespace captive {
 			inner_type_t entries[cache_size];
 			std::bitset<cache_page_count> dirty_pages;
 
-			inner_type_t *entry_ptr_clean(uint64_t entry_idx) { return &entries[entry_idx % cache_size]; }
+			inline inner_type_t *entry_ptr_clean(uint64_t entry_idx) { return &entries[entry_idx % cache_size]; }
 		};
 	}
 }

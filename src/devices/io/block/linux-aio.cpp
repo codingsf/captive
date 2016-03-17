@@ -89,6 +89,8 @@ bool LinuxAIO::submit(BlockDeviceRequest *rq, BlockDevice::block_request_cb_t ca
 
 void LinuxAIO::aio_thread_proc(LinuxAIO *aio)
 {
+	pthread_setname_np(pthread_self(), "aio");
+	
 	struct io_event events[8];
 	while (!aio->_terminate) {		
 		int rc = io_getevents(aio->_aio, 1, 8, events, NULL);

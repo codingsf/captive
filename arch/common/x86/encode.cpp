@@ -105,6 +105,11 @@ void X86Encoder::push(const X86Register& reg)
 	}
 }
 
+void X86Encoder::pushf()
+{
+	emit8(0x9c);
+}
+
 void X86Encoder::push(uint32_t imm)
 {
 	emit8(0x68);

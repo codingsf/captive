@@ -47,7 +47,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	jit_state.cpu = this;
 	jit_state.execution_mode = 0;
 	
-	jit_state.block_txln_cache = block_txln_cache->ptr();	
+	jit_state.block_txln_cache = block_txln_cache->ptr();
+	printf("block-txln-cache: %p\n", jit_state.block_txln_cache);
 	
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.exit_chain = 0;
@@ -145,16 +146,12 @@ void CPU::invalidate_translation(hpa_t phys_addr, hva_t virt_addr)
 
 void CPU::invalidate_virtual_mappings()
 {
-	if (block_txln_cache) {
-		block_txln_cache->invalidate_dirty();
-	}
+	block_txln_cache->invalidate_dirty();
 }
 
 void CPU::invalidate_virtual_mapping(gva_t va)
 {
-	if (block_txln_cache) {
-		block_txln_cache->invalidate_entry(va >> 2);
-	}
+	block_txln_cache->invalidate_entry(va >> 2);
 }
 
 void CPU::handle_irq_raised()

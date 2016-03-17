@@ -128,6 +128,9 @@ extern "C" {
 	{
 		captive::arch::lapic_acknowledge_irq();
 		
+		printf("irq0 @ rip=%p\n", mctx->rip);
+		dump_code(mctx->rip-16);
+		
 		captive::arch::CPU *cpu = captive::arch::CPU::get_active_cpu();
 		switch (cpu->cpu_data().signal_code) {
 		case 2:
@@ -151,7 +154,7 @@ extern "C" {
 		switch (*(uint8_t *)mctx->rip) {
 		case 0xc4: return captive::arch::handle_fast_device_read(mctx);
 		case 0xc5: return captive::arch::handle_fast_device_write(mctx);
-		default: dump_code(mctx->rip-20); fatal("illegal instruction %02x\n", *(uint8_t *)mctx->rip);
+		default: dump_code(mctx->rip-20); fatal("illegal instruction @ %p\n", mctx->rip);
 		}
 	}
 
@@ -162,9 +165,6 @@ extern "C" {
 	
 	void handle_debug(struct mcontext *mctx)
 	{
-		if (mctx->rax == 0)
-			printf("entry r15=%08x pc=%08x\n", (uint32_t)mctx->r15, captive::arch::CPU::get_active_cpu()->read_pc());
-		else
-			printf("exit r15=%08x pc=%08x\n", (uint32_t)mctx->r15, captive::arch::CPU::get_active_cpu()->read_pc());
+		fatal("unhandled debug\n");
 	}
 }

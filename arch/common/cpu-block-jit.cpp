@@ -121,13 +121,7 @@ bool CPU::run_block_jit_safepoint()
 						
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
 		} else {
-			/*if (virt_pc == 0x11000) {
-				blk->txln = (captive::shared::block_txln_fn)&prebuilt_11000;
-			} else if (virt_pc == 0x11010) {
-				blk->txln = (captive::shared::block_txln_fn)&prebuilt_11010;
-			} else {*/
-				blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
-			//}
+			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
 			
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
 		}

@@ -114,6 +114,7 @@ void captive::arch::mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value)
 	case 1:	value = __in8(pa); break;
 	case 2:	value = __in16(pa); break;
 	case 4:	value = __in32(pa); break;
+	default: abort();
 	}
 }
 
@@ -123,6 +124,7 @@ void captive::arch::mmio_device_write(gpa_t pa, uint8_t size, uint64_t value)
 	case 1: __out8(pa, value); break;
 	case 2: __out16(pa, value); break;
 	case 4: __out32(pa, value); break;
+	default: abort();
 	}
 }
 #endif
