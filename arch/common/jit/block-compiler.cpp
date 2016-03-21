@@ -1550,16 +1550,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.ensure_extra_buffer(64);
 			
 			// Check to see if we need to stop chaining (e.g. an interrupt)
-			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
+			encoder.cmp4(0, X86Memory::get(REG_FS, 48));
 
 			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
-			
-			/*encoder.mov(1, REG_EAX);
-			encoder.xorr(REG_EDX, REG_EDX);
-			encoder.cmpxchg(REG_RDX, X86Memory::get(REG_FS, 48));
-			
-			encoder.jz((int8_t)0);*/
 
 			size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 			size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
@@ -1628,18 +1622,18 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.ensure_extra_buffer(64);
 
 			// Check to see if we need to stop chaining (e.g. an interrupt)
-			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
+			encoder.cmp4(0, X86Memory::get(REG_FS, 48));
 			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
-
+			
 			// Each chaining table entry is 16 bytes, arranged
 			// 0	tag (4 bytes)
 			// 8	pointer (8 bytes)
 
+			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
 			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
 			encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
 
-			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
 			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
 
 			uint32_t jump_offset2 = encoder.current_offset() + 1;
@@ -1647,9 +1641,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.jmp(X86Memory::get(REG_RBX, 8, REG_RAX, 4));			// Yep, tail call.
 
 			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset1)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset1-1);
-			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset2-1);
 			
-			encoder.mov1(0, X86Memory::get(REG_FS, 48));
+			encoder.mov4(0, X86Memory::get(REG_FS, 48));
+
+			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset2-1);
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();													// RETURN
 			
