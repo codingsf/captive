@@ -78,8 +78,6 @@ namespace captive
 					
 					inline VirtRingDescr *pop(uint32_t& idx)
 					{
-						std::unique_lock<std::mutex> lock(_pop_mtx);
-						
 						__barrier();
 
 						uint16_t num_heads = _avail_descrs->index - prev_idx;
@@ -100,8 +98,6 @@ namespace captive
 					
 					inline void push(uint32_t elem_idx, uint32_t size)
 					{
-						std::unique_lock<std::mutex> lock(_push_mtx);
-						
 						assert(elem_idx < _queue_num);
 						
 						__barrier();
@@ -134,8 +130,6 @@ namespace captive
 					VirtRingAvail *_avail_descrs;
 					VirtRingUsed *_used_descrs;
 					uint16_t prev_idx;
-					
-					std::mutex _mtx, _push_mtx, _pop_mtx;
 					
 					inline void init_vring()
 					{

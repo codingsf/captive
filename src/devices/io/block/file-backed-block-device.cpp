@@ -1,6 +1,7 @@
 #include <devices/io/block/file-backed-block-device.h>
 #include <devices/io/block/linux-aio.h>
 #include <devices/io/block/posix-aio.h>
+#include <devices/io/block/sync-aio.h>
 #include <captive.h>
 
 #include <stdio.h>
@@ -60,7 +61,8 @@ bool FileBackedBlockDevice::open_file(std::string filename, bool read_only)
 		_block_count++;
 	}
 	
-	_aio_impl = new LinuxAIO(_file_descr, *this);
+	_aio_impl = new SyncAIO(_file_descr, *this);
+	//_aio_impl = new LinuxAIO(_file_descr, *this);
 	//_aio_impl = new POSIXAIO(_file_descr, *this);
 	
 	if (!_aio_impl->init()) {

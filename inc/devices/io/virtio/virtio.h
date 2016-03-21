@@ -115,7 +115,7 @@ namespace captive {
 					irq::IRQLine& _irq;
 
 					std::atomic<uint32_t> _isr;
-
+					
 					uint32_t _host_features, _guest_page_shift;
 
 					uint32_t _version;
