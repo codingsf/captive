@@ -594,6 +594,8 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "stdev",		.format = "IIIXXX", .has_side_effects = true },
 	{ .mnemonic = "lddev",		.format = "IIOXXX", .has_side_effects = false },
 
+	{ .mnemonic = "trigger irq",.format = "XXXXXX", .has_side_effects = true },		// TODO: Does it have side effects?
+	
 	{ .mnemonic = "flush",		.format = "XXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush itlb",	.format = "XXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush dtlb",	.format = "XXXXXX", .has_side_effects = true },
@@ -1547,9 +1549,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			encoder.ensure_extra_buffer(64);
 			
+			// Check to see if we need to stop chaining (e.g. an interrupt)
 			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
-			uint32_t jump_offset = encoder.current_offset() + 1;
+
+			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
+			
+			/*encoder.mov(1, REG_EAX);
+			encoder.xorr(REG_EDX, REG_EDX);
+			encoder.cmpxchg(REG_RDX, X86Memory::get(REG_FS, 48));
+			
+			encoder.jz((int8_t)0);*/
 
 			size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 			size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
@@ -1600,9 +1610,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			}
 
 			uint32_t current_offset = encoder.current_offset();
-			*((uint8_t *)encoder.get_buffer() + jump_offset) = (uint8_t)(current_offset - jump_offset - 1);
+			*((uint8_t *)encoder.get_buffer() + jump_offset1) = (uint8_t)(current_offset - jump_offset1 - 1);
 			
 			// jnz above lands here
+			encoder.mov1(0, X86Memory::get(REG_FS, 48));
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();
 						
@@ -1635,12 +1646,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.jne((int8_t)0);											// Tags match?
 			encoder.jmp(X86Memory::get(REG_RBX, 8, REG_RAX, 4));			// Yep, tail call.
 
-			uint32_t current_offset = encoder.current_offset();
-			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset1)) = (uint8_t)(uint64_t)(current_offset - jump_offset1-1);
-			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(current_offset - jump_offset2-1);
-
+			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset1)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset1-1);
+			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset2-1);
+			
+			encoder.mov1(0, X86Memory::get(REG_FS, 48));
 			encoder.xorr(REG_EAX, REG_EAX);
-			encoder.ret();
+			encoder.ret();													// RETURN
 			
 			break;
 		}
@@ -2763,6 +2774,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			load_state_field(40, tmp);
 			encoder.add8(1, tmp);
 
+			break;
+		}
+		
+		case IRInstruction::TRIGGER_IRQ:
+		{
+			encoder.mov(1, REG_ECX);
+			encoder.mov(REG_RCX, X86Memory::get(REG_FS, 48));
+			
 			break;
 		}
 

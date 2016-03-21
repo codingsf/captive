@@ -141,6 +141,10 @@ namespace captive {
 			virtual JumpInfo get_instruction_jump_info(const Decode *insn) = 0;
 
 			virtual bool interrupts_enabled(uint8_t irq_line) const = 0;
+			
+			inline void trigger_irq() {
+				jit_state.exit_chain = 1;
+			}
 
 			inline void inc_insns_executed() {
 				cpu_data().insns_executed++;
@@ -157,7 +161,6 @@ namespace captive {
 			struct {
 				bool _kernel_mode;
 				uint32_t last_exception_action;
-				uint32_t isr;
 			} local_state;
 
 			struct block_chain_cache_entry {

@@ -344,6 +344,17 @@ void X86Encoder::xchg(const X86Memory& a, const X86Register& b)
 	}
 }
 
+void X86Encoder::cmpxchg(const X86Register& src, const X86Memory& dst)
+{
+	emit8(0xf0);
+	
+	if (src.size == 1) {
+		encode_opcode_mod_rm(0x1b0, src, dst);
+	} else {
+		encode_opcode_mod_rm(0x1b1, src, dst);
+	}
+}
+
 void X86Encoder::cbtw()
 {
 	emit8(0x66);

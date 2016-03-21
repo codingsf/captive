@@ -97,8 +97,7 @@ bool CPU::handle_pending_action(uint32_t action)
 		
 	case 4:
 		printf("*** interrupt debug ***\n");
-		printf("Local  ISR=%u\n", local_state.isr);
-		printf("Remote ISR=%u\n", cpu_data().isr);
+		printf("ISR=%u\n", cpu_data().isr);
 		return true;
 	}
 
@@ -156,8 +155,5 @@ void CPU::invalidate_virtual_mapping(gva_t va)
 
 void CPU::handle_irq_raised()
 {
-	//printf("*** raised %d\n", irq_line);
-	
-	local_state.isr = 2;
 	jit_state.exit_chain = 1;
 }

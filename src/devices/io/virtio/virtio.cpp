@@ -5,6 +5,7 @@
 #include <captive.h>
 
 #include <string.h>
+#include <unistd.h>
 
 DECLARE_CONTEXT(VirtIO);
 
@@ -250,6 +251,7 @@ void VirtIO::submit_event(VirtIOQueueEvent *evt)
 	
 	evt->queue->push(evt->descr_idx, evt->response_size);
 	assert_interrupt(0);
+	
 	_irq.raise();
 	
 #ifndef SYNCHRONOUS

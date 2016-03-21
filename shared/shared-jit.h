@@ -210,6 +210,8 @@ namespace captive {
 				WRITE_DEVICE,
 				READ_DEVICE,
 				
+				TRIGGER_IRQ,			// 48
+				
 				FLUSH,					// 48
 				FLUSH_ITLB,
 				FLUSH_DTLB,
@@ -272,6 +274,8 @@ namespace captive {
 			static IRInstruction ldpc(const IROperand& dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
 			static IRInstruction incpc(const IROperand& amt) { assert(amt.is_constant()); return IRInstruction(INCPC, amt); }
 
+			static IRInstruction trigger_irq() { return IRInstruction(TRIGGER_IRQ); }
+			
 			static IRInstruction flush() { return IRInstruction(FLUSH); }
 			static IRInstruction flush_itlb() { return IRInstruction(FLUSH_ITLB); }
 			static IRInstruction flush_dtlb() { return IRInstruction(FLUSH_DTLB); }

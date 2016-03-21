@@ -164,6 +164,8 @@ namespace captive {
 				void xchg(const X86Register& a, const X86Register& b);
 				void xchg(const X86Memory& a, const X86Register& b);
 				
+				void cmpxchg(const X86Register& src, const X86Memory& dst);
+				
 				void cbtw();
 				void cwtl();
 				void cltq();

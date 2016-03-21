@@ -145,6 +145,7 @@ extern "C" {
 	
 	void handle_trap_irq1(struct mcontext *mctx)
 	{
+		//printf("YOU RANG?\n");
 		captive::arch::lapic_acknowledge_irq();
 		captive::arch::CPU::get_active_cpu()->handle_irq_raised();
 	}

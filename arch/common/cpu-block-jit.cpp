@@ -60,11 +60,9 @@ bool CPU::run_block_jit_safepoint()
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
-		if (unlikely(local_state.isr)) {
-			if (handle_irq(local_state.isr)) {
-				local_state.isr = 0;		
-				jit_state.exit_chain = 0;
-			}
+		if (unlikely(cpu_data().isr)) {
+			// TODO: Edge?
+			handle_irq(cpu_data().isr);
 		}
 		
 		// Check to see if there are any pending actions coming in from
@@ -117,7 +115,7 @@ bool CPU::run_block_jit_safepoint()
 			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
 		}
-		
+				
 		if (should_mark) {
 			should_mark = false;
 			mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
