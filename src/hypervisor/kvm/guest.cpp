@@ -28,6 +28,8 @@ extern "C" {
 
 #include <iomanip>
 
+#define FAST_DEVICE_ACCESS
+
 USE_CONTEXT(Guest);
 
 using namespace captive::engine;

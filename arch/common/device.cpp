@@ -25,7 +25,7 @@ CoreDevice::~CoreDevice()
 
 }
 
-//#define FAST_DEVICE_ACCESS
+#define FAST_DEVICE_ACCESS
 
 #ifdef FAST_DEVICE_ACCESS
 

@@ -13,6 +13,7 @@
 
 #include <mutex>
 #include <shared_mutex>
+#include <atomic>
 
 namespace captive {
 	namespace devices {
@@ -34,8 +35,6 @@ namespace captive {
 
 				std::string name() const override { return "sp804"; }
 
-				const std::vector<RegisterDescriptor> registers() const;
-				
 			private:
 				void update_irq();
 				
@@ -60,8 +59,8 @@ namespace captive {
 					bool _enabled;
 
 					uint32_t load_value;
-					uint32_t current_value;
-					uint32_t _isr;
+					std::atomic<uint32_t> current_value;
+					std::atomic<uint32_t> _isr;
 
 					union {
 						uint32_t value;

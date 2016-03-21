@@ -199,7 +199,7 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 	encoder.finalise();
 	
 	fn = (block_txln_fn)encoder.get_buffer();
-	return encoder.get_buffer_size();
+	return true;
 }
 
 bool BlockCompiler::sort_ir()
@@ -1547,11 +1547,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			encoder.ensure_extra_buffer(64);
 			
-			//encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
-			//encoder.test(REG_EAX, REG_EAX);
-			
 			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
-
 			uint32_t jump_offset = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
 
@@ -1617,10 +1613,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			do_ret_instead:
 			if(max_stack > 0x40)
 				encoder.add(max_stack-0x40, REG_RSP);
+			
+			encoder.ensure_extra_buffer(64);
 
 			// Check to see if we need to stop chaining (e.g. an interrupt)
-			//encoder.mov(X86Memory::get(REG_FS, 48), REG_EAX);
-			//encoder.test(REG_EAX, REG_EAX);
 			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
 			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
@@ -1629,27 +1625,20 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// 0	tag (4 bytes)
 			// 8	pointer (8 bytes)
 
-			// Used regs: EAX, EBX, ECX, EDX
-								
-			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
-			encoder.mov(REG_R15D, REG_EAX);
-			encoder.andd(0xffff0, REG_EAX);									// Mask the PC
-			encoder.lea(X86Memory::get(REG_RBX, 0, REG_RAX, 4), REG_RBX);	// Calculate cache entry offset
+			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
+			encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
 
-			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX));					// Compare PC with cache entry tag
+			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
+			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
 
 			uint32_t jump_offset2 = encoder.current_offset() + 1;
 			encoder.jne((int8_t)0);											// Tags match?
+			encoder.jmp(X86Memory::get(REG_RBX, 8, REG_RAX, 4));			// Yep, tail call.
 
-			//encoder.intt(0x90);
-			encoder.jmp(X86Memory::get(REG_RBX, 8));						// Yep, tail call.
-
-			// Patch Jumps
 			uint32_t current_offset = encoder.current_offset();
 			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset1)) = (uint8_t)(uint64_t)(current_offset - jump_offset1-1);
 			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(current_offset - jump_offset2-1);
 
-			// Nope, return!
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();
 			

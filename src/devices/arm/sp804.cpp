@@ -19,17 +19,6 @@ SP804::~SP804()
 
 }
 
-const std::vector<captive::devices::RegisterDescriptor> SP804::registers() const
-{
-	std::vector<captive::devices::RegisterDescriptor> regs;
-
-	//regs.push_back((captive::devices::RegisterDescriptor) { 0x0c, 4 });
-	//regs.push_back((captive::devices::RegisterDescriptor) { 0x2c, 4 });
-
-	return regs;
-}
-
-
 bool SP804::read(uint64_t off, uint8_t len, uint64_t& data)
 {
 	if (Primecell::read(off, len, data))
@@ -80,8 +69,6 @@ SP804::SP804Timer::SP804Timer() : _enabled(false), load_value(0), current_value(
 
 bool SP804::SP804Timer::read(uint64_t off, uint8_t len, uint64_t& data)
 {
-	//std::shared_lock<std::shared_timed_mutex> l(lock);
-	
 	switch (off) {
 	case 0x00:
 		data = load_value;
@@ -116,8 +103,6 @@ bool SP804::SP804Timer::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool SP804::SP804Timer::write(uint64_t off, uint8_t len, uint64_t data)
 {
-	//std::unique_lock<std::shared_timed_mutex> l(lock);
-	
 	switch (off) {
 	case 0x00:
 		load_value = data;
@@ -150,21 +135,15 @@ bool SP804::SP804Timer::write(uint64_t off, uint8_t len, uint64_t data)
 
 void SP804::SP804Timer::tick(uint64_t delta)
 {
-	//std::unique_lock<std::shared_timed_mutex> l(lock);
-	
 	if (!_enabled) return;
 
-	if (current_value <= delta) {
-		_isr |= 1;
-
-		if (control_reg.bits.int_en) _owner->update_irq();
-
+	if (current_value.fetch_sub(delta) <= delta) {
 		init_period();
-	} else {
-		current_value -= delta;
+
+		_isr |= 1;
+		if (control_reg.bits.int_en) _owner->update_irq();
 	}
 }
-
 
 void SP804::SP804Timer::update()
 {
