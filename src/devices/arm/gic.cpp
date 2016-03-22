@@ -322,8 +322,13 @@ bool GICCPUInterface::write(uint64_t off, uint8_t len, uint64_t data)
 
 void GICCPUInterface::update()
 {
-	//std::unique_lock<std::mutex> l(update_lock);
-	
+	std::unique_lock<std::mutex> l(update_lock);
+	update_unsafe();
+}
+
+
+void GICCPUInterface::update_unsafe()
+{
 	current_pending = 1023;
 	if (!enabled() || !owner.distributor.enabled()) {
 		irq.rescind();
@@ -361,6 +366,8 @@ void GICCPUInterface::update()
 
 uint32_t GICCPUInterface::acknowledge()
 {
+	std::unique_lock<std::mutex> l(update_lock);
+	
 #ifdef DEBUG_IRQ
 	fprintf(stderr, "gic: acknowledge %d\n", current_pending);
 #endif
@@ -382,12 +389,14 @@ uint32_t GICCPUInterface::acknowledge()
 		running_priority = owner.get_gic_irq(irq).priority;
 	}
 		
-	update();
+	update_unsafe();
 	return irq;
 }
 
 void GICCPUInterface::complete(uint32_t irq)
 {
+	std::unique_lock<std::mutex> l(update_lock);
+	
 #ifdef DEBUG_IRQ
 	fprintf(stderr, "gic: complete %d running=%d\n", irq, running_irq);
 #endif
@@ -420,7 +429,7 @@ void GICCPUInterface::complete(uint32_t irq)
 		}
 	}
 	
-	update();
+	update_unsafe();
 }
 
 GIC::GIC() : distributor(GICDistributorInterface(*this))

@@ -13,3 +13,8 @@ Platform::~Platform()
 {
 	
 }
+
+void Platform::dump() const
+{
+	fprintf(stderr, "(no platform info)\n");
+}

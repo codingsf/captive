@@ -120,6 +120,8 @@ bool KVMGuest::intr_callback(int fd, bool is_input, void *p)
 {
 	KVMGuest *g = (KVMGuest *)p;
 	
+	g->platform().dump();
+	
 	g->kvm_cpus.front()->interrupt(4);
 	return true;
 }

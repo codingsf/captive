@@ -36,6 +36,8 @@ namespace captive {
 			
 			devices::timers::TimerManager& timer_manager() const { return _timer_manager; }
 			
+			virtual void dump() const;
+			
 		private:
 			devices::timers::TimerManager& _timer_manager;
 		};

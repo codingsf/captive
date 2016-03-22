@@ -53,6 +53,13 @@ bool IRQController<nr_lines>::have_raised_irqs() const
 	return false;
 }
 
+template<uint32_t nr_lines>
+void IRQController<nr_lines>::dump() const
+{
+	for (int i = 0; i < nr_lines; i++) {
+		fprintf(stderr, "[%02d] = %s\n", i, lines[i].raised() ? "high" : "low");
+	}
+}
 
 template class IRQController<96u>;
 template class IRQController<32u>;

@@ -65,11 +65,11 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	SystemController *syscon1 = new SystemController(SystemController::SYS_CTRL1);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x1001A000, *syscon1));
 
-	ArmCpuIRQController *core0irq = new ArmCpuIRQController();
+	core0irq = new ArmCpuIRQController();
 	GuestCPUConfiguration core0(*core0irq);
 	cfg.cores.push_back(core0);
 	
-	GIC *gic0 = new GIC();
+	gic0 = new GIC();
 	gic0->add_core(*core0irq->get_irq_line(1), 0);
 
 	if (variant == CORTEX_A9) {
@@ -233,4 +233,13 @@ bool Realview::stop()
 const hypervisor::GuestConfiguration& Realview::config() const
 {
 	return cfg;
+}
+
+void Realview::dump() const
+{
+	fprintf(stderr, "gic:\n");
+	gic0->dump();
+	
+	fprintf(stderr, "cpu:\n");
+	core0irq->dump();	
 }

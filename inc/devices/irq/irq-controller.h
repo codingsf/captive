@@ -27,6 +27,7 @@ namespace captive {
 				virtual ~IRQControllerBase();
 
 				virtual bool have_raised_irqs() const = 0;
+				virtual void dump() const = 0;
 
 			protected:
 				virtual void irq_raised(IRQLine& line);
@@ -62,6 +63,7 @@ namespace captive {
 				}
 
 				virtual bool have_raised_irqs() const override;
+				virtual void dump() const override;
 				
 				inline constexpr uint32_t count() const { return nr_lines; }
 

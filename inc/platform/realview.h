@@ -17,6 +17,8 @@ namespace captive {
 	namespace devices {
 		namespace arm {
 			class PL011;
+			class GIC;
+			class ArmCpuIRQController;
 		}
 		
 		namespace gfx {
@@ -47,10 +49,16 @@ namespace captive {
 			bool start() override;
 			bool stop() override;
 			
+			void dump() const override;
+			
 		private:
 			Variant variant;
 			hypervisor::GuestConfiguration cfg;
+			
+			devices::arm::ArmCpuIRQController *core0irq;
+			devices::arm::GIC *gic0;
 			devices::arm::PL011 *uart0, *uart1, *uart2, *uart3;
+			
 #ifdef NULL_VIRTUAL_SCREEN
 			devices::gfx::NullVirtualScreen *vs;
 #else

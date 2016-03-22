@@ -58,33 +58,41 @@ bool LinuxAIO::init()
 
 bool LinuxAIO::submit(BlockDeviceRequest *rq, BlockDevice::block_request_cb_t callback)
 {
-	struct iocb cb;
-	struct iocb *cbs[] = { &cb };
+	struct iocb *cb = (struct iocb *)malloc(sizeof(struct iocb));
 	
-	bzero(&cb, sizeof(cb));
-	cb.aio_fildes = fd();
+	bzero(cb, sizeof(*cb));
+	cb->aio_fildes = fd();
 	
 	if (rq->is_read)
-		cb.aio_lio_opcode = IOCB_CMD_PREAD;
+		cb->aio_lio_opcode = IOCB_CMD_PREAD;
 	else
-		cb.aio_lio_opcode = IOCB_CMD_PWRITE;
+		cb->aio_lio_opcode = IOCB_CMD_PWRITE;
 	
-	cb.aio_buf = (uint64_t)rq->buffer;
-	cb.aio_offset = rq->block_offset * block_size();
-	cb.aio_nbytes = rq->block_count * block_size();
-	cb.aio_data = (uint64_t)new BlockDeviceRequestContext(rq, callback);
+	cb->aio_buf = (uint64_t)rq->buffer;
+	cb->aio_offset = rq->block_offset * block_size();
+	cb->aio_nbytes = rq->block_count * block_size();
+	cb->aio_data = (uint64_t)new BlockDeviceRequestContext(rq, callback);
 	
 	DEBUG << CONTEXT(LinuxAIO) << "Submitting IO request";
-	int rc = io_submit(_aio, 1, cbs);
-	if (rc < 0) {
-		ERROR << CONTEXT(LinuxAIO) << "IO submission error";
-		return false;
-	} else if (rc != 1) {
-		ERROR << CONTEXT(LinuxAIO) << "IO submission rejection";
-		return false;
-	}
 	
-	return true;
+	int rc;
+	do {
+		rc = io_submit(_aio, 1, &cb);
+		if (rc < 0) {
+			if (errno == EAGAIN) {
+				usleep(10);
+				continue;
+			}
+
+			ERROR << CONTEXT(LinuxAIO) << "IO submission error: " << LAST_ERROR_TEXT;
+			return false;
+		} else if (rc != 1) {
+			ERROR << CONTEXT(LinuxAIO) << "IO submission rejection";
+			return false;
+		} else {
+			return true;
+		}
+	} while (true);
 }
 
 void LinuxAIO::aio_thread_proc(LinuxAIO *aio)
@@ -110,6 +118,7 @@ void LinuxAIO::aio_thread_proc(LinuxAIO *aio)
 			}
 		
 			delete ctx;
+			free((void *)events[i].obj);
 		}
 	}
 }

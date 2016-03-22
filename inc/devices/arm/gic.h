@@ -52,6 +52,7 @@ namespace captive {
 				std::mutex update_lock;
 
 				void update();
+				void update_unsafe();
 				uint32_t acknowledge();
 				void complete(uint32_t irq);
 			};

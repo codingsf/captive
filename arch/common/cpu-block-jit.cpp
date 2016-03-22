@@ -56,7 +56,6 @@ bool CPU::run_block_jit_safepoint()
 	uint32_t region_virt_base = 1;
 	uint32_t region_phys_base = 1;
 
-	bool should_mark = false;
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
 		// and if there is, instruct the interpreter to handle it.
@@ -94,12 +93,11 @@ bool CPU::run_block_jit_safepoint()
 				phys_pc = rc.pa;
 			}
 
-			// Mark the physical page corresponding to the PC as executed
-			should_mark = true;
-
 			rgn = image->get_region((gpa_t)phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 			region_phys_base = PAGE_ADDRESS_OF(phys_pc);
+
+			mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
 		}
 		
 		assert_privilege_mode();
@@ -114,11 +112,6 @@ bool CPU::run_block_jit_safepoint()
 		} else {
 			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
-		}
-				
-		if (should_mark) {
-			should_mark = false;
-			mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
 		}
 	} while(step_ok);
 		
