@@ -31,7 +31,7 @@ static void read_event_callback(BlockDeviceRequest *rq, bool success)
 	DEBUG << CONTEXT(VirtIOBlockDevice) << "Read request callback, success=" << std::boolalpha << success;
 	
 	*((uint8_t *)evt->write_buffers.back().data) = success ? 0 : 1;
-	evt->response_size = 1 + success ? evt->write_buffers.front().size : 0;
+	evt->response_size = 1 + (success ? evt->write_buffers.front().size : 0);
 	evt->submit();
 	
 #ifdef SYNCHRONOUS

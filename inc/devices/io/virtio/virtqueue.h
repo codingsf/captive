@@ -78,8 +78,6 @@ namespace captive
 					
 					inline VirtRingDescr *pop(uint32_t& idx)
 					{
-						__barrier();
-
 						uint16_t num_heads = _avail_descrs->index - prev_idx;
 						assert(num_heads < _queue_num);
 						
@@ -87,25 +85,29 @@ namespace captive
 							return NULL;
 						}
 						
-						uint16_t head = _avail_descrs->ring[prev_idx % _queue_num];
+						__barrier();
+						asm volatile("mfence");
+						
+						uint16_t head = _avail_descrs->ring[prev_idx++ % _queue_num];
 						assert(head < _queue_num);
 						
-						idx = head;
-						
-						prev_idx++;
+						idx = head;						
 						return get_descr(head);
 					}
 					
 					inline void push(uint32_t elem_idx, uint32_t size)
 					{
-						assert(elem_idx < _queue_num);
-						
+						assert(elem_idx < _queue_num);						
+
 						__barrier();
+						asm volatile("mfence");
 
 						uint16_t idx = _used_descrs->idx % _queue_num;
+												
 						_used_descrs->ring[idx].id = elem_idx;
 						_used_descrs->ring[idx].len = size;
 						
+						//__sync_fetch_and_add(&_used_descrs->idx, 1);
 						_used_descrs->idx++;
 					}
 					

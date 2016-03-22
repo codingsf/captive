@@ -843,7 +843,10 @@ void* KVMGuest::sys_guest_phys_to_host_virt(uint64_t addr)
 
 bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 {
-	for (auto pmr : gpm) {
+	out_addr = (void *)(HOST_GPM_BASE | (uint64_t)gpa);
+	return true;
+	
+	/*for (auto pmr : gpm) {
 		if (gpa >= pmr.cfg->base_address() && gpa < (pmr.cfg->base_address() + pmr.cfg->size())) {
 			uint64_t offset = (uint64_t)gpa - (uint64_t)pmr.cfg->base_address();
 			out_addr = (void *)((uint64_t)pmr.vmr->host_buffer + offset);
@@ -851,7 +854,7 @@ bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 		}
 	}
 
-	return false;
+	return false;*/
 }
 
 void KVMGuest::do_guest_printf()

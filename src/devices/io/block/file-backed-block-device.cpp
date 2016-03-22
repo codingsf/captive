@@ -37,7 +37,7 @@ bool FileBackedBlockDevice::open_file(std::string filename, bool read_only)
 	
 	_read_only = read_only;
 
-	_file_descr = open(filename.c_str(), (read_only ? O_RDONLY : O_RDWR) | O_EXCL);
+	_file_descr = open(filename.c_str(), (read_only ? O_RDONLY : O_RDWR) | O_EXCL | O_DIRECT);
 	if (_file_descr < 0) {
 		ERROR << CONTEXT(FileBackedBlockDevice) << "Failed to open file";
 		return false;
@@ -61,8 +61,8 @@ bool FileBackedBlockDevice::open_file(std::string filename, bool read_only)
 		_block_count++;
 	}
 	
-	_aio_impl = new SyncAIO(_file_descr, *this);
-	//_aio_impl = new LinuxAIO(_file_descr, *this);
+	//_aio_impl = new SyncAIO(_file_descr, *this);
+	_aio_impl = new LinuxAIO(_file_descr, *this);
 	//_aio_impl = new POSIXAIO(_file_descr, *this);
 	
 	if (!_aio_impl->init()) {
