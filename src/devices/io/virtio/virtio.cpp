@@ -180,6 +180,7 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 
 	case VIRTIO_REG_INTERRUPT_ACK: // int ack
 		_isr &= ~data;
+		update_irq();
 		break;
 
 	case 0x70: //status
@@ -198,7 +199,6 @@ bool VirtIO::write(uint64_t off, uint8_t len, uint64_t data)
 		return false;
 	}
 
-	update_irq();
 	return true;
 }
 
