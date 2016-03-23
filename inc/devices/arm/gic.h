@@ -49,8 +49,6 @@ namespace captive {
 				uint32_t ctrl, prio_mask, binpnt;				
 				uint32_t current_pending, running_irq, running_priority;
 				
-				std::mutex update_lock;
-
 				void update();
 				void update_unsafe();
 				uint32_t acknowledge();
@@ -108,8 +106,6 @@ namespace captive {
 				void irq_rescinded(irq::IRQLine& line) override;
 
 			private:
-				std::mutex lock;
-				
 				std::vector<GICCPUInterface *> cores;
 				GICDistributorInterface distributor;
 				
@@ -122,7 +118,6 @@ namespace captive {
 					bool raised;
 					bool edge_triggered;
 					uint32_t priority;
-					std::mutex lock;
 				} irqs[96];
 				
 				gic_irq& get_gic_irq(int index)

@@ -388,6 +388,7 @@ uint32_t GICCPUInterface::acknowledge()
 
 	uint32_t irq = current_pending;
 	if (irq == 1023 || owner.get_gic_irq(irq).priority >= running_priority) {
+		if (irq == 1023) running_priority = 0x100;
 		return 1023;
 	}
 	
@@ -395,11 +396,7 @@ uint32_t GICCPUInterface::acknowledge()
 	
 	owner.get_gic_irq(irq).pending = false;
 	running_irq = irq;
-	if (irq == 1023) {
-		running_priority = 0x100;
-	} else {
-		running_priority = owner.get_gic_irq(irq).priority;
-	}
+	running_priority = owner.get_gic_irq(irq).priority;
 		
 	update_unsafe();
 	return irq;
@@ -476,9 +473,9 @@ void GIC::irq_raised(irq::IRQLine& line)
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: raise %d\n", irq.index);
 #endif
+		
 		irq.raised = true;
 		if (irq.edge_triggered) irq.pending = true;
-		
 		update();
 	}
 }
@@ -493,9 +490,8 @@ void GIC::irq_rescinded(irq::IRQLine& line)
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: rescind %d\n", irq.index);
 #endif
-				
-		irq.raised = false;
 		
+		irq.raised = false;
 		update();
 	}
 }
