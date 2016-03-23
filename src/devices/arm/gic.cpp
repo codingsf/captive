@@ -463,12 +463,16 @@ void GIC::add_core(irq::IRQLine& irq, int id)
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
-	gic_irq& irq = get_gic_irq(line.index());
+	gic_irq& irq = get_gic_irq(line.index());	
+	std::unique_lock<std::mutex> l(irq.lock);
 	
-	if (__sync_bool_compare_and_swap(&irq.raised, false, true)) {
+	if (!irq.raised) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: raise %d\n", irq.index);
 #endif
+		irq.raised = true;
+		if (irq.edge_triggered) irq.pending = true;
+		
 		update();
 	}
 }
@@ -476,11 +480,19 @@ void GIC::irq_raised(irq::IRQLine& line)
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
 	gic_irq& irq = get_gic_irq(line.index());
+	std::unique_lock<std::mutex> l(irq.lock);
 	
-	if (__sync_bool_compare_and_swap(&irq.raised, true, false)) {
+	if (irq.raised) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: rescind %d\n", irq.index);
 #endif
+		
+		if (irq.pending) {
+			fprintf(stderr, "********* rescinding a pending IRQ.  IS THIS RIGHT!?!?\n");
+		}
+		
+		irq.raised = false;
+		
 		update();
 	}
 }
