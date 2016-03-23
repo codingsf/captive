@@ -122,6 +122,7 @@ namespace captive {
 					bool raised;
 					bool edge_triggered;
 					uint32_t priority;
+					std::mutex lock;
 				} irqs[96];
 				
 				gic_irq& get_gic_irq(int index)

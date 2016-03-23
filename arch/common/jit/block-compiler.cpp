@@ -1929,11 +1929,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					encode_operand_function_argument(&insn->operands[i], *sysv_abi[i], stack_map);
 				}
 			}
-
+			
 			// Load the address of the target function into a temporary, and perform an indirect call.
 			encoder.mov(target->value, get_temp(1, 8));
 			encoder.call(get_temp(1, 8));
-
+			
 			if (next_insn) {
 				if (next_insn->type == IRInstruction::CALL && insn->count_operands() == next_insn->count_operands()) {
 					// Don't restore the state, because the next instruction is a call and it will use it.

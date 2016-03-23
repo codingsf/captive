@@ -192,7 +192,10 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		
 		// Obtain the core that is currently active.
 		captive::arch::CPU *core = captive::arch::CPU::get_active_cpu();
-		core->write_pc(mctx->r15);	// Update the "real" PC from the "cached" PC
+		
+		// If we came from native code...
+		if (core->executing_translation())
+			core->write_pc((uint32_t)mctx->r15);	// Update the "real" PC from the "cached" PC
 
 		if (core) {
 			MMU::resolution_context rc(va);

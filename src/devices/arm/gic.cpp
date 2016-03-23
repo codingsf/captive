@@ -37,22 +37,27 @@ bool GICDistributorInterface::read(uint64_t off, uint8_t len, uint64_t& data)
 		return true;
 		
 	case 0x100 ... 0x108:
+		abort();
 		data = 0; //set_enable[(off & 0xf) >> 2];
 		return true;
 		
 	case 0x180 ... 0x188:
+		abort();
 		data = 0; //clear_enable[(off & 0xf) >> 2];
 		return true;
 		
 	case 0x200 ... 0x208:
+		abort();
 		data = 0; //set_pending[(off & 0xf) >> 2];
 		return true;
 		
 	case 0x280 ... 0x288:
+		abort();
 		data = 0; //clear_pending[(off & 0xf) >> 2];
 		return true;
 		
 	case 0x400 ... 0x45c:
+		abort();
 		data = 0; //prio[(off & 0x7f) >> 2];
 		return true;
 		
@@ -458,42 +463,25 @@ void GIC::add_core(irq::IRQLine& irq, int id)
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
-	//lock.lock();
-	
 	gic_irq& irq = get_gic_irq(line.index());
-
-	if (!irq.raised) {
+	
+	if (__sync_bool_compare_and_swap(&irq.raised, false, true)) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: raise %d\n", irq.index);
 #endif
-		
-		irq.raised = true;
-		if (irq.edge_triggered) irq.pending = true;
-		//lock.unlock();
-		
 		update();
-	} else {
-		//lock.unlock();
 	}
 }
 
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
-	//lock.lock();
-	
 	gic_irq& irq = get_gic_irq(line.index());
 	
-	if (irq.raised) {
+	if (__sync_bool_compare_and_swap(&irq.raised, true, false)) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: rescind %d\n", irq.index);
 #endif
-
-		irq.raised = false;
-		//lock.unlock();
-		
 		update();
-	} else {
-		//lock.unlock();
 	}
 }
 

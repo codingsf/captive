@@ -40,6 +40,9 @@ bool CPU::run_block_jit()
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
+		// We're no longer executing a translation
+		_exec_txl = false;
+		
 		// Make sure interrupts are enabled.
 		__local_irq_enable();
 	}
@@ -107,11 +110,16 @@ bool CPU::run_block_jit_safepoint()
 			auto ptr = block_txln_cache->entry_ptr(virt_pc >> 2);
 			ptr->tag = virt_pc;
 			ptr->fn = (void *)blk->txln;
-						
+			
+			_exec_txl = true;
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
+			_exec_txl = false;
 		} else {
 			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
+			
+			_exec_txl = true;
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
+			_exec_txl = false;
 		}
 	} while(step_ok);
 		

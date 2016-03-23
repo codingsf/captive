@@ -305,11 +305,7 @@ void MMU::disable_writes()
 	pm->entries[1].writable(false);	// Emulated 4G
 	
 	// Flush the TLB
-//	if (in_kernel_mode()) {
-		Memory::flush_tlb();
-//	} else {
-//		asm volatile("int $0x83\n" ::: "rax");
-//	}
+	Memory::flush_tlb();
 }
 
 bool MMU::handle_fault(struct resolution_context& rc)
@@ -346,7 +342,7 @@ bool MMU::handle_fault(struct resolution_context& rc)
 
 		// Determine the base address of the page directory pointer table.
 		page_dir_ptr_t *base = (page_dir_ptr_t *)((uint64_t)pdp & ~0xfffULL);
-
+		
 		// Loop over each entry and clear the PRESENT flag.
 		for (int i = 0; i < 0x200; i++) {
 			if (!pm->present()) base->entries[i].present(false);
@@ -464,13 +460,14 @@ bool MMU::handle_fault(struct resolution_context& rc)
 	if (pt->present() && rc.is_write() && rc.fault == NONE) {
 		if (clear_if_page_executed(GPA_TO_HVA(pt->base_address()))) {
 #ifdef TRACK_SMC
-			printf("mmu: self modifying code @ va=%08x, pa=%08x\n", rc.va, rc.pa);
+			printf("mmu: self modifying code @ va=%08x, pa=%08x, pc=%08x\n", rc.va, rc.pa, _cpu.read_pc());
 #endif
 			
 			cpu().invalidate_translation(pt->base_address(), (hva_t)rc.va);
 
 			//printf("PC: %08x, VA: %08x\n", _cpu.read_pc(), (uint32_t)va);
 			if ((_cpu.read_pc() & ~0xfff) == (uint32_t)(rc.va & ~0xfff)) {
+				printf("mmu: same page\n");
 				rc.fault = SMC_FAULT;
 			}
 		}
