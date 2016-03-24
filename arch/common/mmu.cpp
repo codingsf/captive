@@ -204,12 +204,26 @@ void MMU::invalidate_virtual_mappings()
 #ifdef TRACK_CONTEXT_ID
 	printf("mmu: invalidate all (ctxid=%x)\n", _context_id);
 #endif
-	
+
 	page_map_t *pm = (page_map_t *)HPA_TO_HVA(CR3);
-	
+
+#ifdef USE_CONTEXT_ID
+	for (int i = 0; i < ARRAY_SIZE(context_id_to_pdp); i++) {
+		uintptr_t context_id_pdp = context_id_to_pdp[i];
+		if (context_id_pdp != 0) {
+			page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(context_id_pdp);
+			
+			for (int i = 0; i < 0x200; i++) {
+				pdp->entries[i].present(false);
+				pdp->entries[i].writable(true);
+			}
+		}
+	}
+#else	
 	// Lower 4G
 	pm->entries[0].present(false);
 	pm->entries[0].writable(true);
+#endif
 	
 	// Emulated 4G
 	pm->entries[1].present(false);
@@ -260,6 +274,9 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 #endif
 	
 #ifdef USE_CONTEXT_ID
+	uintptr_t pdp_for_ctxid = context_id_to_pdp[context_id];
+	if (pdp_for_ctxid == 0) fatal("NOPE\n");
+			
 	page_dir_ptr_t *pdp = (page_dir_ptr_t *)HPA_TO_HVA(context_id_to_pdp[context_id]);
 	for (int i = 0; i < 0x200; i++) {
 		pdp->entries[i].present(false);
