@@ -11,6 +11,8 @@ DECLARE_CHILD_CONTEXT(GICCPU, GIC);
 
 using namespace captive::devices::arm;
 
+static std::mutex global_gic_lock;
+
 GICDistributorInterface::GICDistributorInterface(GIC& owner) : owner(owner), ctrl(0)
 {
 	for (int i = 0; i < 24; i++) {
@@ -25,6 +27,8 @@ GICDistributorInterface::~GICDistributorInterface()
 
 bool GICDistributorInterface::read(uint64_t off, uint8_t len, uint64_t& data)
 {
+	std::unique_lock<std::mutex> l(global_gic_lock);
+	
 	DEBUG << CONTEXT(GICDistributor) << "Register Read @ " << std::hex << off;
 	
 	switch (off) {
@@ -130,6 +134,8 @@ void GICDistributorInterface::clear_pending(uint32_t base, uint8_t bits)
 
 bool GICDistributorInterface::write(uint64_t off, uint8_t len, uint64_t data)
 {
+	std::unique_lock<std::mutex> l(global_gic_lock);
+	
 	DEBUG << CONTEXT(GICDistributor) << "Register Write @ " << std::hex << off << " = " << data;
 	
 	switch (off) {
@@ -268,6 +274,8 @@ GICCPUInterface::~GICCPUInterface()
 
 bool GICCPUInterface::read(uint64_t off, uint8_t len, uint64_t& data)
 {
+	std::unique_lock<std::mutex> l(global_gic_lock);
+	
 	switch (off) {
 	case 0x00:
 		data = ctrl;
@@ -300,6 +308,8 @@ bool GICCPUInterface::read(uint64_t off, uint8_t len, uint64_t& data)
 
 bool GICCPUInterface::write(uint64_t off, uint8_t len, uint64_t data)
 {
+	std::unique_lock<std::mutex> l(global_gic_lock);
+	
 	switch (off) {
 	case 0x00:
 		ctrl = data & 1;
@@ -327,8 +337,6 @@ bool GICCPUInterface::write(uint64_t off, uint8_t len, uint64_t data)
 
 void GICCPUInterface::update()
 {
-	std::unique_lock<std::shared_timed_mutex> l(lock);
-	
 	update_unsafe();
 }
 
@@ -372,8 +380,6 @@ void GICCPUInterface::update_unsafe()
 
 uint32_t GICCPUInterface::acknowledge()
 {
-	std::unique_lock<std::shared_timed_mutex> l(lock);
-	
 #ifdef DEBUG_IRQ
 	fprintf(stderr, "gic: acknowledge %d\n", current_pending);
 #endif
@@ -398,8 +404,6 @@ uint32_t GICCPUInterface::acknowledge()
 
 void GICCPUInterface::complete(uint32_t irq)
 {
-	std::unique_lock<std::shared_timed_mutex> l(lock);
-	
 #ifdef DEBUG_IRQ
 	fprintf(stderr, "gic: complete %d running=%d\n", irq, running_irq);
 #endif
@@ -461,9 +465,10 @@ void GIC::add_core(irq::IRQLine& irq, int id)
 
 void GIC::irq_raised(irq::IRQLine& line)
 {
+	std::unique_lock<std::mutex> l(global_gic_lock);
+
 	gic_irq& irq = get_gic_irq(line.index());	
 	
-	std::unique_lock<std::shared_timed_mutex> l(irq.lock);
 	if (!irq.raised) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: raise %d\n", irq.index);
@@ -477,9 +482,10 @@ void GIC::irq_raised(irq::IRQLine& line)
 
 void GIC::irq_rescinded(irq::IRQLine& line)
 {
+	std::unique_lock<std::mutex> l(global_gic_lock);
+
 	gic_irq& irq = get_gic_irq(line.index());
 	
-	std::unique_lock<std::shared_timed_mutex> l(irq.lock);
 	if (irq.raised) {
 #ifdef DEBUG_IRQ
 		fprintf(stderr, "gic: rescind %d\n", irq.index);

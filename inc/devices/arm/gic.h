@@ -13,7 +13,6 @@
 
 #include <set>
 #include <mutex>
-#include <shared_mutex>
 #include <vector>
 
 namespace captive {
@@ -41,8 +40,6 @@ namespace captive {
 				bool enabled() const { return ctrl & 1; }
 				
 			private:
-				std::shared_timed_mutex lock;
-				
 				GIC& owner;
 				irq::IRQLine& irq;
 				int id;
@@ -121,7 +118,6 @@ namespace captive {
 					bool raised;
 					bool edge_triggered;
 					uint32_t priority;
-					std::shared_timed_mutex lock;
 				} irqs[96];
 				
 				gic_irq& get_gic_irq(int index)

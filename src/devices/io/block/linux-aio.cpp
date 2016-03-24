@@ -7,9 +7,6 @@
 USE_CONTEXT(AIO);
 DECLARE_CHILD_CONTEXT(LinuxAIO, AIO);
 
-#define MAX_IO_IN_FLIGHT		128
-#define MAX_IO_PROCESS			16
-
 inline int io_setup(unsigned nr, aio_context_t *ctxp)
 {
 	return syscall(__NR_io_setup, nr, ctxp);
@@ -48,7 +45,7 @@ bool LinuxAIO::init()
 {
 	bzero((void *)&_aio, sizeof(_aio));
 	
-	if (io_setup(MAX_IO_IN_FLIGHT, &_aio)) {
+	if (io_setup(128, &_aio)) {
 		ERROR << CONTEXT(LinuxAIO) << "Unable to setup AIO:" << strerror(errno);
 		return false;
 	}
@@ -102,9 +99,9 @@ void LinuxAIO::aio_thread_proc(LinuxAIO *aio)
 {
 	pthread_setname_np(pthread_self(), "aio");
 	
-	struct io_event events[MAX_IO_PROCESS];
+	struct io_event events[8];
 	while (!aio->_terminate) {		
-		int rc = io_getevents(aio->_aio, 1, MAX_IO_PROCESS, events, NULL);
+		int rc = io_getevents(aio->_aio, 1, 8, events, NULL);
 		if (rc < 0) {
 			if (errno == EINTR) continue;
 			
