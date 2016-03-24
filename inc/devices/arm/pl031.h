@@ -12,7 +12,7 @@
 #include <devices/timers/timer-manager.h>
 #include <devices/irq/irq-line.h>
 
-#include <mutex>
+#include <shared_mutex>
 
 namespace captive {
 	namespace devices {
@@ -31,10 +31,10 @@ namespace captive {
 				void timer_expired(uint64_t ticks) override;
 				
 			private:
-				std::mutex lock;
+				std::shared_timed_mutex lock;
 				
 				irq::IRQLine& irq;
-				uint32_t dr;
+				volatile uint32_t dr;
 				uint32_t match, load, ctrl, mask, isr;
 				
 				void update_irq();
