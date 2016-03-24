@@ -72,15 +72,16 @@ namespace captive {
 #define FAST_DEV_GUEST_TID		1
 
 	struct PerGuestData {
-		unsigned long fast_device_address;
-		unsigned long fast_device_value;
-		unsigned long fast_device_size;
-		unsigned long fast_device_operation;
-		unsigned long fast_device_watchpoint0;
-		
-		captive::lock::barrier fd_hypervisor_barrier;
-		captive::lock::barrier fd_guest_barrier;
+		struct {
+			captive::lock::barrier hypervisor_barrier;
+			captive::lock::barrier guest_barrier;
 
+			volatile uint64_t address;
+			volatile uint64_t value;
+			volatile uint64_t size;
+			volatile uint64_t operation;
+		} fast_device;
+		
 		uint32_t entrypoint;
 		
 		uintptr_t printf_buffer;

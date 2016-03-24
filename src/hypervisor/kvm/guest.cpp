@@ -278,8 +278,8 @@ bool KVMGuest::run()
 	
 #ifdef FAST_DEVICE_ACCESS
 	// Shutdown the device thread
-	per_guest_data->fast_device_operation = FAST_DEV_OP_QUIT;
-	captive::lock::barrier_wait(&per_guest_data->fd_hypervisor_barrier, FAST_DEV_GUEST_TID);
+	per_guest_data->fast_device.operation = FAST_DEV_OP_QUIT;
+	captive::lock::barrier_wait(&per_guest_data->fast_device.hypervisor_barrier, FAST_DEV_GUEST_TID);
 	
 	if (device_thread.joinable()) {
 		device_thread.join();
@@ -305,32 +305,35 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 {
 	pthread_setname_np(pthread_self(), "dev-comm");
 	
-	PerGuestData *pgd = guest->per_guest_data;	
+	PerGuestData *pgd = guest->per_guest_data;
 	while (true) {
-		captive::lock::barrier_wait(&pgd->fd_hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
-		if (pgd->fast_device_operation == FAST_DEV_OP_QUIT) break;
+		captive::lock::barrier_wait(&pgd->fast_device.hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
+		if (pgd->fast_device.operation == FAST_DEV_OP_QUIT) break;
 		
 		uint64_t base_addr;
-		captive::devices::Device *device = guest->lookup_device(pgd->fast_device_address, base_addr);
+		captive::devices::Device *device = guest->lookup_device(pgd->fast_device.address, base_addr);
 		
 		if (!device) exit(0);
 		
-		uint64_t offset = pgd->fast_device_address - base_addr;
-		if (pgd->fast_device_operation == FAST_DEV_OP_WRITE) {
+		uint64_t offset = pgd->fast_device.address - base_addr;
+		if (pgd->fast_device.operation == FAST_DEV_OP_WRITE) {
 #ifndef NDEBUG
 			device_writes[device]++;
 #endif
-			device->write(offset, pgd->fast_device_size, pgd->fast_device_value);
-		} else if (pgd->fast_device_operation == FAST_DEV_OP_READ) {
+			device->write(offset, pgd->fast_device.size, pgd->fast_device.value);
+		} else if (pgd->fast_device.operation == FAST_DEV_OP_READ) {
 #ifndef NDEBUG
 			device_reads[device]++;
 #endif
-			device->read(offset, pgd->fast_device_size, pgd->fast_device_value);
+			uint64_t new_value;
+			device->read(offset, pgd->fast_device.size, new_value);
+			pgd->fast_device.value = new_value;
 		} else {
 			break;
 		}
 		
-		captive::lock::barrier_wait(&pgd->fd_guest_barrier, FAST_DEV_HYPERVISOR_TID);
+		asm volatile ("mfence" ::: "memory");
+		captive::lock::barrier_wait(&pgd->fast_device.guest_barrier, FAST_DEV_HYPERVISOR_TID);
 	}
 }
 
@@ -525,12 +528,12 @@ bool KVMGuest::prepare_guest_memory()
 	per_guest_data = (PerGuestData *)(HOST_SYS_GUEST_DATA);
 
 	DEBUG << CONTEXT(Guest) << "Initialising per-guest data structure @ " << std::hex << per_guest_data;
-	per_guest_data->fast_device_address = 0;
-	per_guest_data->fast_device_value = 0;
-	per_guest_data->fast_device_size = 0;
-	per_guest_data->fast_device_operation = 0;
-	captive::lock::barrier_init(&per_guest_data->fd_hypervisor_barrier);
-	captive::lock::barrier_init(&per_guest_data->fd_guest_barrier);
+	per_guest_data->fast_device.address = 0;
+	per_guest_data->fast_device.value = 0;
+	per_guest_data->fast_device.size = 0;
+	per_guest_data->fast_device.operation = 0;
+	captive::lock::barrier_init(&per_guest_data->fast_device.hypervisor_barrier);
+	captive::lock::barrier_init(&per_guest_data->fast_device.guest_barrier);
 	
 	per_guest_data->printf_buffer = GUEST_SYS_PRINTF_VIRT;
 	per_guest_data->heap_virt_base = GUEST_HEAP_VIRT_BASE;
