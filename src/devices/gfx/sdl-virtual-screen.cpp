@@ -142,15 +142,24 @@ void SDLVirtualScreen::window_thread_proc()
 				break;
 
 			case SDL_MOUSEBUTTONDOWN:
-				mouse().button_down(e.button.button);
+				switch (e.button.button) {
+				case 1: mouse().button_down(0); break;
+				case 2: mouse().button_down(2); break;
+				case 3: mouse().button_down(1); break;
+				}
+				
 				break;
 
 			case SDL_MOUSEBUTTONUP:
-				mouse().button_up(e.button.button);
+				switch (e.button.button) {
+				case 1: mouse().button_up(0); break;
+				case 2: mouse().button_up(2); break;
+				case 3: mouse().button_up(1); break;
+				}
 				break;
 
 			case SDL_MOUSEMOTION:
-				mouse().mouse_move(e.motion.x, e.motion.y);
+				mouse().mouse_move(e.motion.x, -e.motion.y);
 				break;
 
 			case SDL_QUIT:
