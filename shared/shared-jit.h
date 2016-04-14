@@ -264,6 +264,8 @@ namespace captive {
 
 			uint8_t count_operands() const { int count = 0; for(int i = 0; i < 6; ++i) count += operands[i].type == IROperand::NONE; return count; }
 
+			IRInstruction *unsafe_next() const { return (IRInstruction *)(((uint64_t)this) + sizeof(IRInstruction)); }
+			
 			static IRInstruction nop() { return IRInstruction(NOP); }
 			static IRInstruction ret() { return IRInstruction(RET); }
 			static IRInstruction dispatch(const IROperand& target, const IROperand& fallthrough, const IROperand& target_block, const IROperand& fallthrough_block) { assert(target.is_constant() && fallthrough.is_constant()); return IRInstruction(DISPATCH, target, fallthrough, target_block, fallthrough_block); }
