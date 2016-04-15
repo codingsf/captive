@@ -1457,7 +1457,7 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, const X86Re
 void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, uint8_t size, const X86Memory& rm)
 {
 	assert(size == 1 || size == 2 || size == 4 || size == 8);
-	assert(rm.base.size == 4 || rm.base.size == 8);
+	assert(rm.base.size == 4 || rm.base.size == 8 || rm.base == REG_RIP || rm.base == REG_RIZ);
 
 	// Figure out what prefixes are needed (if any)
 	
