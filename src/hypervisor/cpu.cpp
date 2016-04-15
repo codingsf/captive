@@ -27,17 +27,19 @@ bool CPU::init()
 	return config().validate();
 }
 
-static std::unordered_map<uint64_t, uint32_t> fn_histogram;
+static std::unordered_map<uint64_t, uint64_t> fn_histogram;
 
 void CPU::instrument_dump()
 {
-	/*FILE *f = fopen("trace.out", "wt");
+	if (fn_histogram.size() == 0) return;
+	
+	FILE *f = fopen("trace.out", "wt");
 	for (auto fn : fn_histogram) {
 		std::string fname;
-		if (!owner().engine().resolve_symbol(fn.first, fname)) fname = "?";
+		if (!owner().engine().resolve_symbol(fn.first, fname)) fname = std::to_string(fn.first);
 		fprintf(f, "%lu\t%s\n", fn.second, fname.c_str());
 	}
-	fclose(f);*/
+	fclose(f);
 }
 
 void CPU::instrument_fn_enter(uint64_t fnptr, uint64_t callsite)

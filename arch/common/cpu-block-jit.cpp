@@ -212,8 +212,6 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 		}
 	} while (PAGE_ADDRESS_OF(pc) == page && insn_count < 200);
 	
-	assert(insn->end_of_block);
-
 	// Branch optimisation log
 	bool can_dispatch = false;
 	uint32_t target_pc = 0, fallthrough_pc = 0;
