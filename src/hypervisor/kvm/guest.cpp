@@ -332,7 +332,6 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 			break;
 		}
 		
-		asm volatile ("mfence" ::: "memory");
 		captive::lock::barrier_wait(&pgd->fast_device.guest_barrier, FAST_DEV_HYPERVISOR_TID);
 	}
 }

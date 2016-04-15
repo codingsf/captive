@@ -40,8 +40,6 @@ void captive::arch::mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value)
 	
 	pgd->fast_device.operation = FAST_DEV_OP_READ;
 	
-	asm volatile ("sfence" ::: "memory");
-	
 	captive::lock::barrier_wait_nopause(&pgd->fast_device.hypervisor_barrier, FAST_DEV_GUEST_TID);
 	captive::lock::barrier_wait_nopause(&pgd->fast_device.guest_barrier, FAST_DEV_GUEST_TID);
 	
@@ -61,8 +59,6 @@ void captive::arch::mmio_device_write(gpa_t pa, uint8_t size, uint64_t value)
 	pgd->fast_device.value = value;
 	
 	pgd->fast_device.operation = FAST_DEV_OP_WRITE;
-	
-	asm volatile ("sfence" ::: "memory");
 	
 	captive::lock::barrier_wait_nopause(&pgd->fast_device.hypervisor_barrier, FAST_DEV_GUEST_TID);
 	captive::lock::barrier_wait_nopause(&pgd->fast_device.guest_barrier, FAST_DEV_GUEST_TID);
