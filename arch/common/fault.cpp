@@ -8,22 +8,6 @@
 
 using namespace captive::arch;
 
-static void rewrite_device_access(uint64_t rip, uint8_t *code, const captive::arch::x86::MemoryInstruction& inst)
-{
-	if (inst.length < 2) return;
-	
-	bool is_device_read = inst.Dest.type == x86::Operand::TYPE_REGISTER;
-	
-	if (code[0] == 0x67) {
-		code[0] = is_device_read ? 0xc4 : 0xc5;
-	} else if (code[1] == 0x67) {
-		code[1] = code[0];
-		code[0] = is_device_read ? 0xc4 : 0xc5;
-	} else {
-		return;
-	}
-}
-
 static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr)
 {
 	//printf("fault: device fault rip=%lx\n", mctx->rip);
@@ -44,38 +28,38 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		
 		fatal("unable to decode memory instruction\n");
 	}
-
+	
 	if (inst.Source.type == x86::Operand::TYPE_REGISTER && inst.Dest.type == x86::Operand::TYPE_MEMORY) {
 		switch (inst.Source.reg) {
-		case x86::Operand::R_EAX: mmio_device_write(dev_addr, 4, mctx->rax); break;
-		case x86::Operand::R_EBX: mmio_device_write(dev_addr, 4, mctx->rbx); break;
-		case x86::Operand::R_ECX: mmio_device_write(dev_addr, 4, mctx->rcx); break;
-		case x86::Operand::R_EDX: mmio_device_write(dev_addr, 4, mctx->rdx); break;
-		case x86::Operand::R_ESI: mmio_device_write(dev_addr, 4, mctx->rsi); break;
-		case x86::Operand::R_EDI: mmio_device_write(dev_addr, 4, mctx->rdi); break;
+		case x86::Operand::R_EAX: mmio_device_write(dev_addr, 4, mctx->rax & 0xffffffffULL); break;
+		case x86::Operand::R_EBX: mmio_device_write(dev_addr, 4, mctx->rbx & 0xffffffffULL); break;
+		case x86::Operand::R_ECX: mmio_device_write(dev_addr, 4, mctx->rcx & 0xffffffffULL); break;
+		case x86::Operand::R_EDX: mmio_device_write(dev_addr, 4, mctx->rdx & 0xffffffffULL); break;
+		case x86::Operand::R_ESI: mmio_device_write(dev_addr, 4, mctx->rsi & 0xffffffffULL); break;
+		case x86::Operand::R_EDI: mmio_device_write(dev_addr, 4, mctx->rdi & 0xffffffffULL); break;
 
-		case x86::Operand::R_AX: mmio_device_write(dev_addr, 2, mctx->rax); break;
-		case x86::Operand::R_BX: mmio_device_write(dev_addr, 2, mctx->rbx); break;
-		case x86::Operand::R_CX: mmio_device_write(dev_addr, 2, mctx->rcx); break;
-		case x86::Operand::R_DX: mmio_device_write(dev_addr, 2, mctx->rdx); break;
-		case x86::Operand::R_SI: mmio_device_write(dev_addr, 2, mctx->rsi); break;
-		case x86::Operand::R_DI: mmio_device_write(dev_addr, 2, mctx->rdi); break;
+		case x86::Operand::R_AX: mmio_device_write(dev_addr, 2, mctx->rax & 0xffffULL); break;
+		case x86::Operand::R_BX: mmio_device_write(dev_addr, 2, mctx->rbx & 0xffffULL); break;
+		case x86::Operand::R_CX: mmio_device_write(dev_addr, 2, mctx->rcx & 0xffffULL); break;
+		case x86::Operand::R_DX: mmio_device_write(dev_addr, 2, mctx->rdx & 0xffffULL); break;
+		case x86::Operand::R_SI: mmio_device_write(dev_addr, 2, mctx->rsi & 0xffffULL); break;
+		case x86::Operand::R_DI: mmio_device_write(dev_addr, 2, mctx->rdi & 0xffffULL); break;
 
-		case x86::Operand::R_AL: mmio_device_write(dev_addr, 1, mctx->rax); break;
-		case x86::Operand::R_BL: mmio_device_write(dev_addr, 1, mctx->rbx); break;
-		case x86::Operand::R_CL: mmio_device_write(dev_addr, 1, mctx->rcx); break;
-		case x86::Operand::R_DL: mmio_device_write(dev_addr, 1, mctx->rdx); break;
-		case x86::Operand::R_SIL: mmio_device_write(dev_addr, 1, mctx->rsi); break;
-		case x86::Operand::R_DIL: mmio_device_write(dev_addr, 1, mctx->rdi); break;
+		case x86::Operand::R_AL: mmio_device_write(dev_addr, 1, mctx->rax & 0xffULL); break;
+		case x86::Operand::R_BL: mmio_device_write(dev_addr, 1, mctx->rbx & 0xffULL); break;
+		case x86::Operand::R_CL: mmio_device_write(dev_addr, 1, mctx->rcx & 0xffULL); break;
+		case x86::Operand::R_DL: mmio_device_write(dev_addr, 1, mctx->rdx & 0xffULL); break;
+		case x86::Operand::R_SIL: mmio_device_write(dev_addr, 1, mctx->rsi & 0xffULL); break;
+		case x86::Operand::R_DIL: mmio_device_write(dev_addr, 1, mctx->rdi & 0xffULL); break;
 		
-		case x86::Operand::R_R8B: mmio_device_write(dev_addr, 1, mctx->r8); break;
-		case x86::Operand::R_R9B: mmio_device_write(dev_addr, 1, mctx->r9); break;
-		case x86::Operand::R_R10B: mmio_device_write(dev_addr, 1, mctx->r10); break;
-		case x86::Operand::R_R11B: mmio_device_write(dev_addr, 1, mctx->r11); break;
-		case x86::Operand::R_R12B: mmio_device_write(dev_addr, 1, mctx->r12); break;
-		case x86::Operand::R_R13B: mmio_device_write(dev_addr, 1, mctx->r13); break;
-		case x86::Operand::R_R14B: mmio_device_write(dev_addr, 1, mctx->r14); break;
-		case x86::Operand::R_R15B: mmio_device_write(dev_addr, 1, mctx->r15); break;
+		case x86::Operand::R_R8B: mmio_device_write(dev_addr, 1, mctx->r8 & 0xffULL); break;
+		case x86::Operand::R_R9B: mmio_device_write(dev_addr, 1, mctx->r9 & 0xffULL); break;
+		case x86::Operand::R_R10B: mmio_device_write(dev_addr, 1, mctx->r10 & 0xffULL); break;
+		case x86::Operand::R_R11B: mmio_device_write(dev_addr, 1, mctx->r11 & 0xffULL); break;
+		case x86::Operand::R_R12B: mmio_device_write(dev_addr, 1, mctx->r12 & 0xffULL); break;
+		case x86::Operand::R_R13B: mmio_device_write(dev_addr, 1, mctx->r13 & 0xffULL); break;
+		case x86::Operand::R_R14B: mmio_device_write(dev_addr, 1, mctx->r14 & 0xffULL); break;
+		case x86::Operand::R_R15B: mmio_device_write(dev_addr, 1, mctx->r15 & 0xffULL); break;
 
 		default: fatal("unhandled source register %s\n", x86::x86_register_names[inst.Source.reg]);
 		}
@@ -107,10 +91,6 @@ static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx,
 		}
 	} else {
 		fatal("illegal combination of operands for memory instruction\n");
-	}
-
-	if ((int64_t)mctx->rip > 0) {
-		//rewrite_device_access(mctx->rip, (uint8_t *)mctx->rip, inst);
 	}
 	
 	// Skip over the instruction
