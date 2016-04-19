@@ -322,7 +322,11 @@ void MMU::disable_writes()
 	pm->entries[1].writable(false);	// Emulated 4G
 	
 	// Flush the TLB
-	Memory::flush_tlb();
+	if (in_user_mode()) {
+		asm volatile("int $0x82" ::: "rax");
+	} else {
+		Memory::flush_tlb();
+	}
 }
 
 bool MMU::handle_fault(struct resolution_context& rc)
@@ -480,12 +484,14 @@ bool MMU::handle_fault(struct resolution_context& rc)
 			printf("mmu: self modifying code @ va=%08x, pa=%08x, pc=%08x\n", rc.va, rc.pa, _cpu.read_pc());
 #endif
 			
-			cpu().invalidate_translation(pt->base_address(), (hva_t)rc.va);
+			cpu().invalidate_translation_phys((gpa_t)(pt->base_address() & 0xfffff000ULL));
 
 			//printf("PC: %08x, VA: %08x\n", _cpu.read_pc(), (uint32_t)va);
 			if ((_cpu.read_pc() & ~0xfff) == (uint32_t)(rc.va & ~0xfff)) {
-				printf("mmu: same page\n");
+				//printf("mmu: smc: same page %08x\n", rc.va);
 				rc.fault = SMC_FAULT;
+			} else {
+				//printf("mmu: smc: other page %08x\n", rc.va);
 			}
 		}
 	}

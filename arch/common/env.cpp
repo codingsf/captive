@@ -17,6 +17,7 @@ extern "C" void trap_illegal(struct mcontext *);
 
 extern "C" void int80_handler(struct mcontext *);
 extern "C" void int81_handler(struct mcontext *);
+extern "C" void int82_handler(struct mcontext *);
 extern "C" void int90_handler(struct mcontext *);
 
 extern "C" void call_gate_tramp(void);
@@ -105,6 +106,7 @@ void Environment::install_idt()
 	// Software-interrupt handlers
 	set_idt(&idt[0x80], int80_handler, true);
 	set_idt(&idt[0x81], int81_handler, true);
+	set_idt(&idt[0x82], int82_handler, true);
 
 	set_idt(&idt[0x90], int90_handler, true);
 

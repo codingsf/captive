@@ -603,6 +603,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "flush dtlb",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "flush ctxid",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "invd i$",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "invd i$",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "set ctxid",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "pgt change",	.format = "XXXXXX", .has_side_effects = true },
 
@@ -2882,6 +2883,33 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::INVALIDATE_ICACHE:
 		{
 			encoder.mov(6, REG_ECX);
+#ifdef SYSCALL_CALL_GATE
+			encoder.lcall(X86Memory(REG_RIP));
+			encoder.emit64(0xdeadbeefbabecafe);
+			encoder.emit16(0x38);
+#else
+			encoder.intt(0x85);
+#endif
+			break;
+		}
+		
+		case IRInstruction::INVALIDATE_ICACHE_ENTRY:
+		{
+			if (insn->operands[0].is_constant()) {
+				encoder.mov(insn->operands[0].value, REG_R14);
+			} else if (insn->operands[0].is_vreg()) {
+				if (insn->operands[0].is_alloc_reg()) {
+					const X86Register& addr = register_from_operand(&insn->operands[0], 4);
+					encoder.mov(addr, REG_R14D);
+				} else {
+					assert(false);
+				}
+			} else {
+				assert(false);
+			}
+			
+			encoder.mov(7, REG_ECX);
+			
 #ifdef SYSCALL_CALL_GATE
 			encoder.lcall(X86Memory(REG_RIP));
 			encoder.emit64(0xdeadbeefbabecafe);

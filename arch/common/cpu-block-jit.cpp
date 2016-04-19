@@ -116,6 +116,7 @@ bool CPU::run_block_jit_safepoint()
 			_exec_txl = false;
 		} else {
 			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
+			mmu().disable_writes();
 			
 			_exec_txl = true;
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;

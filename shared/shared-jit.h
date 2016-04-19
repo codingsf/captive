@@ -219,6 +219,7 @@ namespace captive {
 				FLUSH_DTLB_ENTRY,
 				FLUSH_CONTEXT_ID,
 				INVALIDATE_ICACHE,
+				INVALIDATE_ICACHE_ENTRY,
 				SET_CONTEXT_ID,
 				PGT_CHANGE,
 				
@@ -286,6 +287,7 @@ namespace captive {
 			static IRInstruction flush_context_id(const IROperand& ctxid) { return IRInstruction(FLUSH_CONTEXT_ID, ctxid); }
 			
 			static IRInstruction invalidate_icache() { return IRInstruction(INVALIDATE_ICACHE); }
+			static IRInstruction invalidate_icache_entry(const IROperand& addr) { return IRInstruction(INVALIDATE_ICACHE_ENTRY, addr); }
 			
 			static IRInstruction set_context_id(const IROperand& ctxid) { return IRInstruction(SET_CONTEXT_ID, ctxid); }
 			static IRInstruction pgt_change() { return IRInstruction(PGT_CHANGE); }

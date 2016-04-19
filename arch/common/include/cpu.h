@@ -110,7 +110,9 @@ namespace captive {
 			void invalidate_virtual_mappings();
 			void invalidate_virtual_mapping(gva_t va);
 			void invalidate_translations();
-			void invalidate_translation(hpa_t phys_page_base_addr, hva_t virt_page_base_addr);
+			
+			void invalidate_translation_virt(gva_t virt_page_base_addr);
+			void invalidate_translation_phys(gpa_t phys_page_base_addr);
 
 			void register_region(shared::RegionWorkUnit *rwu);
 

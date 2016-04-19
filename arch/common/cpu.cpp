@@ -130,14 +130,22 @@ void CPU::invalidate_translations()
 	invalidate_virtual_mappings();
 }
 
-void CPU::invalidate_translation(hpa_t phys_addr, hva_t virt_addr)
+void CPU::invalidate_translation_phys(gpa_t phys_addr)
 {
-	if (virt_addr >= (hva_t)0x100000000ULL) return;
-	
-	Region *rgn = image->get_region((uint32_t)(uint64_t)phys_addr);
+	Region *rgn = image->get_region((uint32_t)phys_addr & 0xfffff000);
 
 	if (rgn) {
 		rgn->invalidate();
+	}
+}
+
+void CPU::invalidate_translation_virt(gva_t virt_addr)
+{
+	hpa_t phys_addr;
+	if (Memory::quick_txl((virt_addr & 0xfffff000), phys_addr)) {
+		invalidate_translation_phys((gpa_t)phys_addr);
+	} else {
+		image->invalidate();
 	}
 	
 	invalidate_virtual_mappings();
