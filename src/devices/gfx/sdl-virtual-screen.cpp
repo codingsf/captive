@@ -111,6 +111,22 @@ void SDLVirtualScreen::window_thread_proc_tramp(SDLVirtualScreen *o)
 	o->window_thread_proc();
 }
 
+void SDLVirtualScreen::check_grab()
+{
+	if (!SDL_GetWindowGrab(window)) {
+		SDL_SetWindowGrab(window, SDL_TRUE);
+		SDL_SetWindowTitle(window, "LCD (press right-control to release)");
+		SDL_ShowCursor(0);
+	}
+}
+
+void SDLVirtualScreen::release_grab()
+{
+	SDL_SetWindowGrab(window, SDL_FALSE);
+	SDL_SetWindowTitle(window, "LCD");
+	SDL_ShowCursor(1);
+}
+
 void SDLVirtualScreen::window_thread_proc()
 {
 	DEBUG << CONTEXT(SDLVirtualScreen) << "Welp.  Here we go!";
@@ -122,26 +138,30 @@ void SDLVirtualScreen::window_thread_proc()
 		while (SDL_PollEvent(&e)) {
 			switch (e.type)	{
 			case SDL_KEYDOWN:
-				if (e.key.keysym.scancode >= SDL_SCANCODE_F1 && e.key.keysym.scancode <= SDL_SCANCODE_F12) {
-					keyboard().key_down(sdl_scancode_map[SDL_SCANCODE_LCTRL]);
-					keyboard().key_down(sdl_scancode_map[SDL_SCANCODE_LALT]);
+				check_grab();
+				
+				if (e.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
+					// Only release grab on KEY-UP
+				} else {
+					keyboard().key_down(sdl_scancode_map[e.key.keysym.scancode]);
 				}
-
-				keyboard().key_down(sdl_scancode_map[e.key.keysym.scancode]);
-
+				
 				break;
 
 			case SDL_KEYUP:
-				keyboard().key_up(sdl_scancode_map[e.key.keysym.scancode]);
-
-				if (e.key.keysym.scancode >= SDL_SCANCODE_F1 && e.key.keysym.scancode <= SDL_SCANCODE_F12) {
-					keyboard().key_up(sdl_scancode_map[SDL_SCANCODE_LCTRL]);
-					keyboard().key_up(sdl_scancode_map[SDL_SCANCODE_LALT]);
+				check_grab();
+				
+				if (e.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
+					release_grab();
+				} else {
+					keyboard().key_up(sdl_scancode_map[e.key.keysym.scancode]);
 				}
 
 				break;
 
 			case SDL_MOUSEBUTTONDOWN:
+				check_grab();
+				
 				switch (e.button.button) {
 				case 1: mouse().button_down(0); break;
 				case 2: mouse().button_down(2); break;
@@ -151,6 +171,8 @@ void SDLVirtualScreen::window_thread_proc()
 				break;
 
 			case SDL_MOUSEBUTTONUP:
+				check_grab();
+				
 				switch (e.button.button) {
 				case 1: mouse().button_up(0); break;
 				case 2: mouse().button_up(2); break;

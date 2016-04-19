@@ -41,6 +41,9 @@ namespace captive {
 				static std::mutex _sdl_lock;
 				static bool _sdl_initialised;
 
+				void check_grab();
+				void release_grab();
+				
 				static void window_thread_proc_tramp(SDLVirtualScreen *o);
 				void window_thread_proc();
 				void draw_frame();
