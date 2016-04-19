@@ -185,6 +185,9 @@ namespace captive {
 				const struct block_chain_cache_entry *block_txln_cache;		// 32			20
 				uint64_t *insn_counter;										// 40			28
 				uint64_t exit_chain;										// 48			30
+				
+				uint64_t mem_reads;
+				uint64_t mem_writes;
 			} packed jit_state;
 			
 			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }

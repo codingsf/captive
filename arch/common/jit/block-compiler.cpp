@@ -1950,10 +1950,28 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		case IRInstruction::LDPC:
 		{
 			IROperand *target = &insn->operands[0];
-
+			
 			if (target->is_alloc_reg()) {
-				//encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(target));
-				encoder.mov(REG_R15D, register_from_operand(target));
+				if ((insn->unsafe_next()->type == IRInstruction::SUB || insn->unsafe_next()->type == IRInstruction::ADD) && 
+						insn->unsafe_next()->operands[0].is_constant() && 
+						insn->unsafe_next()->operands[0].value < 0x7fffffff &&
+						insn->unsafe_next()->operands[1].is_alloc_reg() && 
+						insn->unsafe_next()->operands[1].alloc_data == target->alloc_data) {
+					
+					int32_t amt;
+					if (insn->unsafe_next()->type == IRInstruction::SUB) {
+						amt = (int32_t)(~((uint32_t)insn->unsafe_next()->operands[0].value)) + 1;
+					} else {
+						amt = (int32_t)(uint32_t)insn->unsafe_next()->operands[0].value;
+					}
+					
+					//printf("LDPC BY %d %d @ %08x\n", amt, insn->unsafe_next()->operands[0].value, pa);
+					
+					encoder.lea(X86Memory::get(REG_R15D, amt), register_from_operand(target));
+					ir_idx++;
+				} else {
+					encoder.mov(REG_R15D, register_from_operand(target));
+				}
 			} else {
 				assert(false);
 			}
@@ -1966,7 +1984,8 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *amount = &insn->operands[0];
 
 			if (amount->is_constant()) {
-				encoder.add(amount->value, REG_R15D);
+				//encoder.add(amount->value, REG_R15D);
+				encoder.lea(X86Memory::get(REG_R15D, amount->value), REG_R15D);
 				
 				// TODO: FIXME: XXX: HACK HACK HACK
 				//encoder.add4(amount->value, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
@@ -1985,6 +2004,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			assert(disp->is_constant());
 
+#ifdef TRACE_MEM_INSNS
+			encoder.incq(X86Memory::get(REG_FS, 56));
+#endif
+
+			
 			if (offset->is_vreg()) {
 				if (offset->is_alloc_reg() && dest->is_alloc_reg()) {
 					// mov const(reg), reg
@@ -1997,7 +2021,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				assert(false);
 			}
-
+			
 			break;
 		}
 
@@ -2008,6 +2032,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *offset = &insn->operands[2];
 
 			assert(disp->is_constant());
+
+#ifdef TRACE_MEM_INSNS
+			encoder.incq(X86Memory::get(REG_FS, 64));
+#endif
 
 			if (offset->is_vreg()) {
 				if (value->is_vreg()) {
