@@ -41,9 +41,6 @@ namespace captive
 		
 		extern void mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value);
 		extern void mmio_device_write(gpa_t pa, uint8_t size, uint64_t value);
-
-		extern int handle_fast_device_read(struct mcontext *mctx);
-		extern int handle_fast_device_write(struct mcontext *mctx);
 	}
 }
 

@@ -152,11 +152,7 @@ extern "C" {
 	
 	int handle_trap_illegal(struct mcontext *mctx)
 	{
-		switch (*(uint8_t *)mctx->rip) {
-		case 0xc4: return captive::arch::handle_fast_device_read(mctx);
-		case 0xc5: return captive::arch::handle_fast_device_write(mctx);
-		default: dump_code(mctx->rip-20); fatal("illegal instruction @ %p\n", mctx->rip);
-		}
+		dump_code(mctx->rip-20); fatal("illegal instruction @ %p\n", mctx->rip);
 	}
 
 	void handle_signal(struct mcontext *mctx)
