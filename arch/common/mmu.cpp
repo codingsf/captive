@@ -252,12 +252,12 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 	page_table_entry_t *pt;
 	
 	Memory::get_va_table_entries((hva_t)va, pm, pdp, pd, pt);
-	pt->present(false);
+	pt->flags(0);
 
 	Memory::flush_page((hva_t)va);
 	
 	Memory::get_va_table_entries(GVA_TO_EMULATED_HVA(va), pm, pdp, pd, pt);
-	pt->present(false);
+	pt->flags(0);
 
 	Memory::flush_page(GVA_TO_EMULATED_HVA(va));
 	
