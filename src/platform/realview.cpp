@@ -36,6 +36,8 @@
 #include <devices/io/block/file-backed-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
 
+#include <devices/net/lan9118.h>
+
 using namespace captive;
 using namespace captive::hypervisor;
 using namespace captive::platform;
@@ -46,12 +48,14 @@ using namespace captive::devices::gfx;
 using namespace captive::devices::io;
 using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
+using namespace captive::devices::net;
 
 Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant, std::string block_device_file) : Platform(timer_manager), variant(variant), socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
-	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x20000000));	// ???
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x0e000000));	// ???
+	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x4f000000, 0x11000000));	// ???
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x70000000, 0x20000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0xc0000000, 0x40000000));
 	
@@ -197,6 +201,9 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 
 	VirtIOBlockDevice *vbd = new VirtIOBlockDevice(*gic0->get_irq_line(35), *bdev);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *vbd));
+	
+	LAN9118 *net = new LAN9118(*gic0->get_irq_line(28));
+	cfg.devices.push_back(GuestDeviceConfiguration(0x4e000000, *net));
 }
 
 Realview::~Realview()
