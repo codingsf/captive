@@ -14,15 +14,26 @@
 #ifndef NETWORK_INTERFACE_H
 #define NETWORK_INTERFACE_H
 
+#include <define.h>
+
 namespace captive
 {
 	namespace devices
 	{
 		namespace net
 		{
+			class NetworkDevice;
+			
 			class NetworkInterface
 			{
+			public:
+				NetworkInterface() : attached_device(NULL) { }
+				virtual ~NetworkInterface();
 				
+				void attach(NetworkDevice *device) { attached_device = device; }
+				
+			private:
+				NetworkDevice *attached_device;
 			};
 		}
 	}

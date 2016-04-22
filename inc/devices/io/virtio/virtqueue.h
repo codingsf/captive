@@ -85,9 +85,6 @@ namespace captive
 							return NULL;
 						}
 						
-						__barrier();
-						asm volatile("mfence");
-						
 						uint16_t head = _avail_descrs->ring[prev_idx++ % _queue_num];
 						assert(head < _queue_num);
 						
@@ -99,15 +96,11 @@ namespace captive
 					{
 						assert(elem_idx < _queue_num);						
 
-						__barrier();
-						asm volatile("mfence");
-
 						uint16_t idx = _used_descrs->idx % _queue_num;
 												
 						_used_descrs->ring[idx].id = elem_idx;
 						_used_descrs->ring[idx].len = size;
 						
-						//__sync_fetch_and_add(&_used_descrs->idx, 1);
 						_used_descrs->idx++;
 					}
 					

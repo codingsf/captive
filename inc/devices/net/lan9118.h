@@ -14,8 +14,8 @@
 #ifndef LAN9118_H
 #define LAN9118_H
 
-#include <devices/device.h>
-#include <devices/net/network-interface.h>
+#include <devices/net/network-device.h>
+#include <devices/net/fifo.h>
 #include <devices/irq/irq-line.h>
 
 namespace captive
@@ -24,7 +24,7 @@ namespace captive
 	{
 		namespace net
 		{
-			class LAN9118 : public Device, public NetworkInterface
+			class LAN9118 : public NetworkDevice
 			{
 			public:
 				LAN9118(irq::IRQLine& irq);
@@ -37,13 +37,72 @@ namespace captive
 
 				std::string name() const { return "lan9118"; }
 				
+				bool receive_packet(const uint8_t *buffer, uint32_t length) override;
+				
 			private:
 				irq::IRQLine& irq;
 				
-				uint32_t pmt_ctrl, irq_cfg, int_sts, int_en, fifo_int;
+				uint32_t pmt_ctrl, irq_cfg, irq_status, irq_en, fifo_int;
 				uint32_t rx_cfg, tx_cfg, hw_cfg, gpio_cfg, gpt_cfg, word_swap, afc_cfg;
-				uint32_t mac_cmd, mac_data;
-				uint32_t e2p_cmd, e2p_data;
+				
+				struct {
+					uint32_t cmd, data;
+					uint8_t rom[128];
+				} eeprom;
+				
+				struct {
+					uint32_t status;
+					uint32_t control;
+					uint32_t advertise;
+					uint32_t mode;
+					uint32_t special;
+					uint32_t irq_mask;
+					uint32_t irq;
+				} phy;
+				
+				uint32_t phy_read(uint8_t reg);
+				void phy_write(uint8_t reg, uint32_t data);
+				void phy_reset();
+				void phy_update();
+				void phy_update_irq();
+
+				struct {
+					uint32_t cmd;
+					uint32_t data;
+					
+					uint32_t cr;
+					uint32_t hashh, hashl;
+					uint32_t mii_acc, mii_data;
+					uint32_t flow;
+					
+					uint8_t addr[6];
+				} mac;
+				
+				uint32_t mac_read(uint8_t reg);
+				void mac_write(uint8_t reg, uint32_t data);
+
+				void reset();
+				
+				struct {
+					FIFO<uint32_t> tx_status;
+					FIFO<uint32_t> rx_status;
+					FIFO<uint32_t> tx_data;
+					FIFO<uint32_t> rx_data;
+				} fifos;
+						
+				void reconfigure_fifos();
+				void update();
+				
+				struct {
+					uint8_t state;
+					uint32_t cmd_a, cmd_b;
+					uint32_t buffer_size, offset, pad, len;
+					uint8_t data[1024];
+				} txp;
+				
+				void handle_tx_data_push(uint32_t data);
+				void tx_packet(const uint8_t *buffer, uint32_t length);
+				void rx_packet(const uint8_t *buffer, uint32_t length);
 			};
 		}
 	}

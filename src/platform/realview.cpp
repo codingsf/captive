@@ -202,7 +202,7 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	VirtIOBlockDevice *vbd = new VirtIOBlockDevice(*gic0->get_irq_line(35), *bdev);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *vbd));
 	
-	LAN9118 *net = new LAN9118(*gic0->get_irq_line(28));
+	LAN9118 *net = new LAN9118(*gic0->get_irq_line(60));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x4e000000, *net));
 }
 
