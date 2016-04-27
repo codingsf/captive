@@ -37,6 +37,7 @@
 #include <devices/io/virtio/virtio-block-device.h>
 
 #include <devices/net/lan9118.h>
+#include <devices/net/user/user-interface.h>
 
 using namespace captive;
 using namespace captive::hypervisor;
@@ -49,6 +50,7 @@ using namespace captive::devices::io;
 using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
 using namespace captive::devices::net;
+using namespace captive::devices::net::user;
 
 Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant, std::string block_device_file) : Platform(timer_manager), variant(variant), socket_uart(NULL)
 {
@@ -204,6 +206,9 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	
 	LAN9118 *net = new LAN9118(*gic0->get_irq_line(60));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x4e000000, *net));
+	
+	UserInterface *net_iface = new UserInterface();
+	net_iface->attach(net);
 }
 
 Realview::~Realview()

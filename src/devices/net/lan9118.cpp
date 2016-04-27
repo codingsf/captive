@@ -1,4 +1,5 @@
 #include <devices/net/lan9118.h>
+#include <devices/net/network-interface.h>
 #include <string.h>
 
 //#define DEBUG_NET
@@ -713,14 +714,16 @@ void LAN9118::tx_packet(const uint8_t *buffer, uint32_t length)
 	//fprintf(stderr, "net: lan9118: transmitting packet\n");
 
 	//fprintf(stderr, "data: ");
-	for (int i = 0; i < length; i++) {
+	//for (int i = 0; i < length; i++) {
 		//fprintf(stderr, "%02x ", buffer[i]);
-	}
+	//}
 	//fprintf(stderr, "\n");
 	
 	if (phy.control & 0x4000) {
 		//fprintf(stderr, "net: lan9118: test packet\n");
 		rx_packet(buffer, length);
+	} else {
+		interface()->transmit_packet(buffer, length);
 	}
 }
 

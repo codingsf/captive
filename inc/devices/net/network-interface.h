@@ -28,9 +28,14 @@ namespace captive
 			{
 			public:
 				NetworkInterface() : attached_device(NULL) { }
-				virtual ~NetworkInterface();
+				virtual ~NetworkInterface() { }
 				
-				void attach(NetworkDevice *device) { attached_device = device; }
+				void attach(NetworkDevice *device);
+				
+				virtual bool transmit_packet(const uint8_t *buffer, uint32_t length) = 0;
+				
+			protected:
+				NetworkDevice *device() const { return attached_device; }
 				
 			private:
 				NetworkDevice *attached_device;
