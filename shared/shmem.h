@@ -107,6 +107,7 @@ namespace captive {
 		uint32_t execution_mode;	// Mode of execution
 		
 		uint64_t watchpoint;
+		uint8_t *interrupt_pending;
 
 		bool verbose_enabled;
 	};

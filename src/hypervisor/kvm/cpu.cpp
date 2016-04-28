@@ -84,7 +84,8 @@ void KVMCpu::interrupt(uint32_t code)
 void KVMCpu::raise_guest_interrupt(uint8_t irq)
 {
 	if (__sync_val_compare_and_swap(&per_cpu_data().isr, 0, 2) == 0) {
-		irq_raise.raise();
+		//irq_raise.raise();
+		*per_cpu_data().interrupt_pending = 1;
 	}
 }
 

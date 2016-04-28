@@ -45,6 +45,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	image = new profile::Image();
 
 	jit_state.cpu = this;
+	jit_state.per_cpu_data = per_cpu_data;
 	jit_state.execution_mode = 0;
 	
 	jit_state.block_txln_cache = block_txln_cache->ptr();
@@ -52,6 +53,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
 	jit_state.exit_chain = 0;
+	
+	per_cpu_data->interrupt_pending = (uint8_t *)&jit_state.exit_chain;
 	
 	// Populate the FS register with the address of the JIT state structure.
 	__wrmsr(0xc0000100, (uint64_t)&jit_state);

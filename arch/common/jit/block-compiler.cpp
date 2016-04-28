@@ -1555,7 +1555,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
-
+			
 			size_t target_offset = insn->operands[2].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 			size_t fallthrough_offset = insn->operands[3].value - ((size_t)encoder.get_buffer() + (size_t)encoder.current_offset());
 
@@ -1564,7 +1564,6 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			if(jump_via_offsets) {
 				if(has_fallthrough) {
-
 					//load PC into EBX
 					encoder.mov(REG_R15D, REG_EBX);
 
@@ -1623,7 +1622,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.ensure_extra_buffer(64);
 
 			// Check to see if we need to stop chaining (e.g. an interrupt)
-			encoder.cmp4(0, X86Memory::get(REG_FS, 48));
+			//encoder.mov(X86Memory::get(REG_FS, 0x48), REG_RAX);
+			//encoder.cmp1(0, X86Memory::get(REG_RAX, __builtin_offsetof(PerCPUData, interrupt_pending)));
+			
+			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
 			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
 			
@@ -1634,7 +1636,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
 			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
 			encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
-
+			
 			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
 
 			uint32_t jump_offset2 = encoder.current_offset() + 1;

@@ -403,6 +403,7 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	per_cpu_data->interrupts_taken = 0;
 	per_cpu_data->verbose_enabled = false;
 	per_cpu_data->watchpoint = 0;
+	per_cpu_data->interrupt_pending = NULL;
 
 	KVMCpu *cpu = new KVMCpu(next_cpu_id, *this, config, cpu_fd, per_cpu_data);
 	if (!cpu->init()) {

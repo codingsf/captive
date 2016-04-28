@@ -181,15 +181,17 @@ namespace captive {
 
 			struct {
 				void *cpu;													// 0			00
-				void *registers;											// 8			08
+				void *registers;											// 8				08
 				uint64_t registers_size;									// 16			10
 				uint64_t execution_mode;									// 24			18
 				const struct block_chain_cache_entry *block_txln_cache;		// 32			20
 				uint64_t *insn_counter;										// 40			28
 				uint64_t exit_chain;										// 48			30
 				
-				uint64_t mem_reads;
-				uint64_t mem_writes;
+				uint64_t mem_reads;											// 56			38
+				uint64_t mem_writes;										// 64			40
+				
+				void *per_cpu_data;											// 72			48
 			} packed jit_state;
 			
 			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }
