@@ -3195,7 +3195,10 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 	}
 	
 	encoder.mov(REG_R15D, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
+	
+#ifdef CALLER_SAVE_REGSTATE
 	encoder.push(REGSTATE_REG);
+#endif
 	
 	for(int i = register_assignments_8.size()-1; i >= 0; i--) {
 		if(used_phys_regs.get(i)) {
@@ -3216,7 +3219,10 @@ void BlockCompiler::emit_restore_reg_state(int num_operands, stack_map_t &stack_
 			encoder.pop(get_allocable_register(i, 8));
 		}
 	}
+
+#ifdef CALLER_SAVE_REGSTATE
 	encoder.pop(REGSTATE_REG);
+#endif
 	
 	encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_R15D);
 }
