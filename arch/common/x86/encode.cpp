@@ -1,4 +1,5 @@
 #include <x86/encode.h>
+#include <printf.h>
 
 using namespace captive::arch::x86;
 
@@ -1221,7 +1222,7 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 
 	if (rm.base == REG_RSP) {
 		mrm = 4; // Need a SIB byte
-	} else if (rm.base == REG_R12) {
+	} else if (rm.base == REG_R12 || rm.base == REG_R12D) {
 		mrm = 4; // Need a SIB byte
 	} else if (rm.base == REG_RIP) {
 		mrm = 5;
@@ -1233,9 +1234,9 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 		mrm = rm.base.raw_index;
 	}
 
-	if (mod == 0 && rm.base == REG_RBP) {
+	if (mod == 0 && (rm.base == REG_RBP || rm.base == REG_EBP)) {
 		mod = 1;
-	} else if (mod == 0 && rm.base == REG_R13) {
+	} else if (mod == 0 && (rm.base == REG_R13 || rm.base == REG_R13D)) {
 		mod = 1;
 	}
 
@@ -1251,8 +1252,9 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 				s = 0;
 				i = 4;
 				b = 5;
+			} else if (rm.base.raw_index == 5) {
+				fatal("invalid encoding\n");
 			} else {
-				assert(rm.base.raw_index != 5);
 				s = 0;
 				i = 4;
 				b = rm.base.raw_index;
@@ -1274,6 +1276,9 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 			
 			if (rm.base == REG_RIZ) {
 				b = 5;
+			} else if (rm.base.raw_index == 5) {
+				printf("********\n");
+				fatal("unsupported encoding\n");
 			} else {
 				b = rm.base.raw_index;
 			}
@@ -1281,7 +1286,11 @@ void X86Encoder::encode_mod_reg_rm(uint8_t mreg, const X86Memory& rm)
 
 		emit8((s & 3) << 6 | (i & 7) << 3 | (b & 7));
 	}
-
+	
+	if (mod == 0 && (rm.base == REG_RBP || rm.base == REG_R13)) {
+		fatal("XXX");
+	}
+	
 	if (mod == 1) {
 		emit8(rm.displacement);
 	} else if (mod == 2 || (rm.base == REG_RIZ && rm.index == REG_RIZ) || (rm.base == REG_RIP)) {

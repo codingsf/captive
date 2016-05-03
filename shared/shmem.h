@@ -63,7 +63,7 @@ namespace captive {
 			br->ctr = !ctr;
 		}
 	}
-
+	
 #define FAST_DEV_OP_WRITE	(1)
 #define FAST_DEV_OP_READ	(2)
 #define FAST_DEV_OP_QUIT	((unsigned long)-1)
@@ -95,6 +95,7 @@ namespace captive {
 		uint64_t id;
 		
 		PerGuestData *guest_data;
+		void *event_ring;
 				
 		bool halt;
 
@@ -108,7 +109,7 @@ namespace captive {
 		
 		uint64_t watchpoint;
 		uint8_t *interrupt_pending;
-
+		
 		bool verbose_enabled;
 	};
 }

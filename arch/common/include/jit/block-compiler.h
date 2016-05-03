@@ -19,7 +19,8 @@
 #include <map>
 #include <vector>
 
-#define REGSTATE_REG REG_RDI
+#define REGSTATE_REG		REG_RBP
+#define FRAMEPOINTER_REG	REG_R13
 
 namespace captive {
 	namespace arch {
@@ -116,7 +117,7 @@ namespace captive {
 					assert(oper->alloc_mode == captive::shared::IROperand::ALLOCATED_STACK);
 					assert(oper->size < 8);
 
-					return x86::X86Memory(x86::REG_RBP, (oper->alloc_data * -1) - 8);
+					return x86::X86Memory(x86::FRAMEPOINTER_REG, (oper->alloc_data * -1) - 8);
 				}
 
 				inline x86::X86Register& get_temp(int id, int width)

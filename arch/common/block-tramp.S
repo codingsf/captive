@@ -9,15 +9,20 @@ block_trampoline:
 	push %rbx
 	push %rbp
 	
-	mov %rsp, %rbp
+	// Store the frame pointer, and allocate temporary stack storage
+	mov %rsp, %r13
 	sub $0x40, %rsp
-	mov %fs:0x8, %rdi
-	
-	mov 0x3c(%rdi), %r15d		// Cache the PC
-	callq *%rsi					// Run the Code
-	mov %r15d, 0x3c(%rdi)		// Restore the PC
 
-	leaveq
+	// Load the register file base address
+	mov %fs:0x8, %rbp
+	
+	mov 0x3c(%rbp), %r15d		// Cache the PC
+	callq *%rsi					// Run the Code
+	mov %r15d, 0x3c(%rbp)		// Restore the PC
+
+	// Restore the stack pointer
+	mov %r13, %rsp
+	pop %rbp
 	pop %rbx
 	pop %r12
 	pop %r13

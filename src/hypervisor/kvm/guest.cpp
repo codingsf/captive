@@ -397,6 +397,7 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	PerCPUData *per_cpu_data = (PerCPUData *)(HOST_SYS_GUEST_DATA + (0x100 * (next_cpu_id + 1)));
 	per_cpu_data->id = next_cpu_id;
 	per_cpu_data->guest_data = (PerGuestData *)GUEST_SYS_GUEST_DATA_VIRT;
+	per_cpu_data->event_ring = (void *)GUEST_SYS_EVENT_RING_VIRT;
 	per_cpu_data->async_action = 0;
 	per_cpu_data->execution_mode = 0;
 	per_cpu_data->insns_executed = 0;

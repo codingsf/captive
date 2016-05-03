@@ -16,6 +16,8 @@
 #define SYSCALL_CALL_GATE
 //#define TIMER
 
+//#define EMIT_MEM_EVENT
+
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
@@ -36,17 +38,18 @@ static void dump_insn(IRInstruction *insn);
 /* Register Mapping
  *
  * RAX  Allocatable			0
- * RBX  Not used			1
+ * RBX  Allocatable			1
  * RCX  Temporary			t0
  * RDX  Allocatable			2
  * RSI  Allocatable			3
- * RDI  Register File
+ * RDI  Not Used
+ * RBP	Register File
  * R8   Allocatable			4
  * R9   Allocatable			5
  * R10  Allocatable			6
  * R11  Allocatable			7
- * R12  Not used
- * R13  Allocatable			8
+ * R12  Allocatable			8
+ * R13  Frame Pointer
  * R14  Temporary			t1
  * R15  PC
  * FS	Base Pointer to JIT STATE structure
@@ -68,7 +71,7 @@ BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocat
 	assign(i++, REG_R9, REG_R9D, REG_R9W, REG_R9B);
 	assign(i++, REG_R10, REG_R10D, REG_R10W, REG_R10B);
 	assign(i++, REG_R11, REG_R11D, REG_R11W, REG_R11B);
-	assign(i++, REG_R13, REG_R13D, REG_R13W, REG_R13B);
+	assign(i++, REG_R12, REG_R12D, REG_R12W, REG_R12B);
 }
 
 //#define VERIFY_IR
@@ -1165,7 +1168,6 @@ bool BlockCompiler::lower_to_interpreter()
 bool BlockCompiler::lower(uint32_t max_stack)
 {
 	bool success = true, dump_this_shit = false;
-	X86Register& guest_regs_reg = REGSTATE_REG;
 		
 	std::vector<std::pair<uint32_t, IRBlockId> > block_relocations;
 	block_relocations.reserve(ctx.block_count());
@@ -1521,9 +1523,9 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				if (offset->type == IROperand::CONSTANT) {
 					// Load a constant offset guest register into the storage location
 					if (target->is_alloc_reg()) {
-						encoder.mov(X86Memory::get(guest_regs_reg, offset->value), register_from_operand(target));
+						encoder.mov(X86Memory::get(REGSTATE_REG, offset->value), register_from_operand(target));
 					} else if (target->is_alloc_stack()) {
-						encoder.mov(X86Memory::get(guest_regs_reg, offset->value), get_temp(0, 4));
+						encoder.mov(X86Memory::get(REGSTATE_REG, offset->value), get_temp(0, 4));
 						encoder.mov(get_temp(0, 4), stack_from_operand(target));
 					} else {
 						assert(false);
@@ -1778,28 +1780,28 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						switch (value->size) {
 						case 8:
 							encoder.mov(value->value, get_temp(0, 8));
-							encoder.mov(get_temp(0, 8), X86Memory::get(guest_regs_reg, offset->value));
+							encoder.mov(get_temp(0, 8), X86Memory::get(REGSTATE_REG, offset->value));
 
-							//encoder.mov8(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							//encoder.mov8(value->value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 4:
-							encoder.mov4(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							encoder.mov4(value->value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 2:
-							encoder.mov2(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							encoder.mov2(value->value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 1:
-							encoder.mov1(value->value, X86Memory::get(guest_regs_reg, offset->value));
+							encoder.mov1(value->value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						default: assert(false);
 						}
 					} else if (value->type == IROperand::VREG) {
 						if (value->is_alloc_reg()) {
-							encoder.mov(register_from_operand(value), X86Memory::get(guest_regs_reg, offset->value));
+							encoder.mov(register_from_operand(value), X86Memory::get(REGSTATE_REG, offset->value));
 						} else if (value->is_alloc_stack()) {
 							X86Register& tmp = get_temp(0, value->size);
 							encoder.mov(stack_from_operand(value), tmp);
-							encoder.mov(tmp, X86Memory::get(guest_regs_reg, offset->value));
+							encoder.mov(tmp, X86Memory::get(REGSTATE_REG, offset->value));
 						} else {
 							assert(false);
 						}
@@ -2015,7 +2017,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if (offset->is_vreg()) {
 				if (offset->is_alloc_reg() && dest->is_alloc_reg()) {
 					// mov const(reg), reg
+#ifdef EMIT_MEM_EVENT
+					encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_ECX);
+					//encoder.mov(REG_RCX, )
+					encoder.mov(X86Memory::get(REG_RCX), register_from_operand(dest));
+#else
 					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
+#endif
 				} else {
 					// Destination is sometimes not allocated, e.g. if an ldrd loads to a location, then only one
 					// of the loaded registers is used but the other is killed
@@ -3226,7 +3234,7 @@ void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86R
 			assert(stack_map.count(&reg));
 			encoder.mov(X86Memory::get(REG_RSP, stack_map[&reg]), target_reg);
 		} else {
-			encoder.mov(X86Memory::get(REG_RBP, (oper->alloc_data * -1) - 8), target_reg);
+			encoder.mov(X86Memory::get(FRAMEPOINTER_REG, (oper->alloc_data * -1) - 8), target_reg);
 		}
 	} else {
 		assert(false);
