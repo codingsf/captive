@@ -148,6 +148,8 @@ namespace captive {
 
 				void incq(const X86Memory& loc);
 				void incl(const X86Memory& loc);
+				void incw(const X86Memory& loc);
+				void incb(const X86Memory& loc);
 
 				void movcs(const X86Register& dst);
 				void mov(const X86SegmentRegister& src, const X86Register& dst);

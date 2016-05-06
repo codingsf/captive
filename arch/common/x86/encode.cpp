@@ -89,6 +89,16 @@ void X86Encoder::incq(const X86Memory& loc)
 	encode_opcode_mod_rm(0xff, 0, 8, loc);
 }
 
+void X86Encoder::incb(const X86Memory& loc)
+{
+	encode_opcode_mod_rm(0xfe, 0, 1, loc);
+}
+
+void X86Encoder::incw(const X86Memory& loc)
+{
+	encode_opcode_mod_rm(0xff, 0, 2, loc);
+}
+
 void X86Encoder::push(const X86Register& reg)
 {
 	if (reg.size == 2 || reg.size == 8) {
@@ -1497,6 +1507,11 @@ void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, uint8_t oper, uint8_t siz
 	// If the base operand is a high register, emit a REX_B
 	if (rm.base.hireg) {
 		rex |= REX_B;
+	}
+	
+	// If the index operand is a high register, emit a REX_X
+	if (rm.index.hireg) {
+		rex |= REX_X;
 	}
 
 	// If we are to emit a REX prefix, do that now.

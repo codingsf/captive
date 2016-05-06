@@ -123,7 +123,7 @@ namespace captive {
 
 		typedef uint16_t table_idx_t;
 		
-#define CR3 (hpa_t)0x40010000
+#define CR3 (hpa_t)0x40090000
 
 		class Memory {
 			friend class MMU;

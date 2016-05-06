@@ -29,6 +29,7 @@ extern "C" {
 #include <iomanip>
 
 #define FAST_DEVICE_ACCESS
+//#define GUEST_EVENTS
 
 USE_CONTEXT(Guest);
 
@@ -336,8 +337,37 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 	}
 }
 
+void KVMGuest::event_thread_proc(KVMCpu *core)
+{
+	pthread_setname_np(pthread_self(), "events");
+		
+	FILE *f = fopen("./core.events", "wt");
+	
+	volatile uint64_t *ring = (volatile uint64_t *)core->per_cpu_data().event_ring;
+	
+	uint64_t last = ring[0];
+	while (true) {
+		uint64_t next = ring[0];
+		
+		if (next != last) {
+			for (; last != next; last++, last &= 0xff) {
+				uint64_t entry = ring[last];
+				fprintf(f, "[%s] pc=%08x, addr=%08x\n", !!(entry & 1) ? "W" : "R", entry & 0xfffffffe, (entry >> 32));
+			}
+		}
+	}
+	
+	fflush(f);
+	fclose(f);
+}
+
 void KVMGuest::core_thread_proc(KVMCpu *core)
 {
+#ifdef GUEST_EVENTS
+	// Create the device thread
+	std::thread event_thread(event_thread_proc, (KVMCpu *)core);
+#endif
+	
 	std::string thread_name = "core-" + std::to_string(core->id());
 	pthread_setname_np(pthread_self(), thread_name.c_str());
 	

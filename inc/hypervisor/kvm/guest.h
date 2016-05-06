@@ -50,8 +50,8 @@
 #define SYS_TSS_OFFSET			0x2000
 #define SYS_PRINTF_OFFSET		0x3000
 #define SYS_GUEST_DATA_OFFSET	0x4000
-#define SYS_EVENT_RING_OFFSET	0x5000
-#define SYS_INIT_PGT_OFFSET		0x10000
+#define SYS_EVENT_RING_OFFSET	0x10000
+#define SYS_INIT_PGT_OFFSET		0x90000
 
 #define HOST_SYS_GDT				(HOST_SYS_BASE + SYS_GDT_OFFSET)
 #define HOST_SYS_IDT				(HOST_SYS_BASE + SYS_IDT_OFFSET)
@@ -119,8 +119,9 @@ namespace captive {
 				
 				std::vector<KVMCpu *> kvm_cpus;
 				static void core_thread_proc(KVMCpu *core);
+				static void event_thread_proc(KVMCpu *core);
 				static void device_thread_proc(KVMGuest *guest);
-				
+								
 				bool create_cpu(const GuestCPUConfiguration& config);
 
 				bool _initialised;

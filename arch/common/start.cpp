@@ -150,9 +150,20 @@ extern "C" {
 		captive::arch::CPU::get_active_cpu()->handle_irq_raised();
 	}
 	
+	static int handle_illegal(struct mcontext *mctx)
+	{
+		switch (*(uint8_t *)(mctx->rip + 1)) {
+		case 0: mctx->rip += 2; return 0;
+		default: fatal("unhandled illegal instruction @ %p\n", mctx->rip);
+		}
+	}
+	
 	int handle_trap_illegal(struct mcontext *mctx)
 	{
-		dump_code(mctx->rip-20); fatal("illegal instruction @ %p\n", mctx->rip);
+		switch (*(uint8_t *)mctx->rip) {
+		case 0xc4: return handle_illegal(mctx);
+		default: dump_code(mctx->rip-20); fatal("illegal instruction @ %p\n", mctx->rip);
+		}
 	}
 
 	void handle_signal(struct mcontext *mctx)

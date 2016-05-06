@@ -42,13 +42,13 @@ static void dump_insn(IRInstruction *insn);
  * RCX  Temporary			t0
  * RDX  Allocatable			2
  * RSI  Allocatable			3
- * RDI  Not Used
+ * RDI  Allocatable
  * RBP	Register File
  * R8   Allocatable			4
  * R9   Allocatable			5
  * R10  Allocatable			6
  * R11  Allocatable			7
- * R12  Allocatable			8
+ * R12  Ring Buffer
  * R13  Frame Pointer
  * R14  Temporary			t1
  * R15  PC
@@ -64,14 +64,17 @@ BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocat
 {
 	int i = 0;
 	assign(i++, REG_RAX, REG_EAX, REG_AX, REG_AL);
-	assign(i++, REG_RBX, REG_EBX, REG_BX, REG_BL);
 	assign(i++, REG_RDX, REG_EDX, REG_DX, REG_DL);
 	assign(i++, REG_RSI, REG_ESI, REG_SI, REG_SIL);
+	assign(i++, REG_RDI, REG_EDI, REG_DI, REG_DIL);
+	assign(i++, REG_RBX, REG_EBX, REG_BX, REG_BL);
 	assign(i++, REG_R8, REG_R8D, REG_R8W, REG_R8B);
 	assign(i++, REG_R9, REG_R9D, REG_R9W, REG_R9B);
 	assign(i++, REG_R10, REG_R10D, REG_R10W, REG_R10B);
 	assign(i++, REG_R11, REG_R11D, REG_R11W, REG_R11B);
+#ifndef EMIT_MEM_EVENT
 	assign(i++, REG_R12, REG_R12D, REG_R12W, REG_R12B);
+#endif
 }
 
 //#define VERIFY_IR
@@ -2018,12 +2021,20 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				if (offset->is_alloc_reg() && dest->is_alloc_reg()) {
 					// mov const(reg), reg
 #ifdef EMIT_MEM_EVENT
+					// Load memory address
 					encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_ECX);
-					//encoder.mov(REG_RCX, )
-					encoder.mov(X86Memory::get(REG_RCX), register_from_operand(dest));
-#else
-					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
+						
+					encoder.shl(32, REG_RCX);
+					encoder.orr(REG_R15, REG_RCX);
+
+					// Load ring head, and store data into ring
+					encoder.mov(X86Memory::get(REG_R12), REG_R14);
+					encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 8));
+						
+					// Increment ring head
+					encoder.incb(X86Memory::get(REG_R12));
 #endif
+					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
 				} else {
 					// Destination is sometimes not allocated, e.g. if an ldrd loads to a location, then only one
 					// of the loaded registers is used but the other is killed
@@ -2053,6 +2064,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					if (offset->is_alloc_reg() && value->is_alloc_reg()) {
 						// mov reg, const(reg)
 
+#ifdef EMIT_MEM_EVENT
+						// Load memory address
+						encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_ECX);
+						
+						encoder.shl(32, REG_RCX);
+						encoder.orr(REG_R15, REG_RCX);
+
+						// Load ring head, and store data into ring
+						encoder.mov(X86Memory::get(REG_R12), REG_R14);
+						encoder.orr(1, REG_RCX);
+						encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 8));
+						
+						// Increment ring head
+						encoder.incb(X86Memory::get(REG_R12));
+#endif					
+						// Perform memory access
 						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset), disp->value));
 					} else {
 						assert(false);
