@@ -8,6 +8,7 @@ bin-dir := $(top-dir)/bin
 arch-dir := $(top-dir)/arch
 
 export shared-dir := $(top-dir)/shared
+export ext-dir := $(top-dir)/external
 
 out := $(bin-dir)/captive
 src := $(patsubst src/%,$(src-dir)/%,$(shell find src/ | grep -e "\.cpp"))
@@ -16,7 +17,7 @@ dep := $(src:.cpp=.d)
 
 export ndebug := -DNDEBUG
 
-common-cflags := -I$(inc-dir) -I$(shared-dir) -g -Wall -O3 -pthread -fno-rtti $(ndebug)
+common-cflags := -I$(inc-dir) -I$(shared-dir) -I$(ext-dir) -g -Wall -O3 -pthread -fno-rtti $(ndebug)
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++14
 asflags  := -g
@@ -40,7 +41,7 @@ clean: .FORCE
 
 $(out): $(dep) $(obj)
 	@echo "  LD      $(patsubst $(bin-dir)/%,%,$@)"
-	$(q)$(cxx) -o $@ $(ldflags) $(obj)
+	$(q)$(cxx) -o $@ $(ldflags) $(obj) $(ext-dir)/libd4.a
 
 %.o: %.cpp
 	@echo "  C++     $(patsubst $(src-dir)/%,%,$@)"

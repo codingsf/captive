@@ -53,6 +53,7 @@ static void dump_insn(IRInstruction *insn);
  * R14  Temporary			t1
  * R15  PC
  * FS	Base Pointer to JIT STATE structure
+ * GS	Base Pointer to emulated VMEM
  */
 
 BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs) 
@@ -2023,18 +2024,34 @@ bool BlockCompiler::lower(uint32_t max_stack)
 #ifdef EMIT_MEM_EVENT
 					// Load memory address
 					encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_ECX);
-						
-					encoder.shl(32, REG_RCX);
-					encoder.orr(REG_R15, REG_RCX);
+					
+					// Do Load
+					encoder.mov(X86Memory::get(REG_ECX), register_from_operand(dest));
 
-					// Load ring head, and store data into ring
+					// Load ring buffer head
 					encoder.mov(X86Memory::get(REG_R12), REG_R14);
+
+					// Compose ring buffer packet
+					encoder.shl(32, REG_RCX);
+					switch (dest->size) {
+					case 1: encoder.orr(0x1, REG_RCX); break;
+					case 2: encoder.orr(0x2, REG_RCX); break;
+					case 4: encoder.orr(0x4, REG_RCX); break;
+					case 8: encoder.orr(0x8, REG_RCX); break;
+					default: assert(false);
+					}
+
+					// Store data into ring
 					encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 8));
 						
 					// Increment ring head
-					encoder.incb(X86Memory::get(REG_R12));
-#endif
+					encoder.add(1, REG_R14B);
+					encoder.mov(REG_R14, X86Memory::get(REG_R12));
+					
+					//encoder.incb(X86Memory::get(REG_R12));
+#else
 					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
+#endif
 				} else {
 					// Destination is sometimes not allocated, e.g. if an ldrd loads to a location, then only one
 					// of the loaded registers is used but the other is killed
@@ -2068,19 +2085,33 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						// Load memory address
 						encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_ECX);
 						
-						encoder.shl(32, REG_RCX);
-						encoder.orr(REG_R15, REG_RCX);
-
-						// Load ring head, and store data into ring
+						// Perform store
+						encoder.mov(register_from_operand(value), X86Memory::get(REG_ECX));
+						
+						// Load ring buffer head
 						encoder.mov(X86Memory::get(REG_R12), REG_R14);
-						encoder.orr(1, REG_RCX);
+						
+						encoder.shl(32, REG_RCX);
+						
+						switch (value->size) {
+						case 1: encoder.orr(0x11, REG_RCX); break;
+						case 2: encoder.orr(0x12, REG_RCX); break;
+						case 4: encoder.orr(0x14, REG_RCX); break;
+						case 8: encoder.orr(0x18, REG_RCX); break;
+						default: assert(false);
+						}
+						
+						// Store data into ring
 						encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 8));
 						
 						// Increment ring head
-						encoder.incb(X86Memory::get(REG_R12));
-#endif					
+						encoder.add(1, REG_R14B);
+						encoder.mov(REG_R14, X86Memory::get(REG_R12));
+						//encoder.incb(X86Memory::get(REG_R12));
+#else
 						// Perform memory access
 						encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset), disp->value));
+#endif					
 					} else {
 						assert(false);
 					}
