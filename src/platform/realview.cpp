@@ -58,16 +58,17 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
+
 #ifdef NETWORK_DEVICE
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x0e000000));	// ???
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x4f000000, 0x11000000));	// ???
 #else
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x40000000, 0x20000000));	// ???
 #endif
-	
+
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x70000000, 0x20000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0xc0000000, 0x40000000));
-	
+
 	SystemStatusAndControl *statctl = new SystemStatusAndControl(timer_manager);
 	destructor_list.push_back(statctl);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10000000, *statctl));
@@ -210,11 +211,11 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 
 	VirtIOBlockDevice *vbd = new VirtIOBlockDevice(*gic0->get_irq_line(35), *bdev);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *vbd));
-	
+
 #ifdef NETWORK_DEVICE
 	LAN9118 *net = new LAN9118(*gic0->get_irq_line(60));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x4e000000, *net));
-	
+
 	UserInterface *net_iface = new UserInterface();
 	net_iface->attach(net);
 #endif

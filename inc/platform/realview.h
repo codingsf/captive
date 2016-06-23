@@ -13,6 +13,8 @@
 #include <string>
 #include <list>
 
+#define NULL_VIRTUAL_SCREEN
+
 namespace captive {
 	namespace devices {
 		namespace arm {
