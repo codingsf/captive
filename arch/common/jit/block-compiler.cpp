@@ -18,6 +18,8 @@
 
 //#define EMIT_MEM_EVENT
 
+//#define BLOCK_ENTRY_TRACKING
+
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
 extern "C" void cpu_write_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t val);
 extern "C" void cpu_read_device(void *cpu, uint32_t devid, uint32_t reg, uint32_t& val);
@@ -595,6 +597,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "jmp",		.format = "NXXXXX", .has_side_effects = true },
 	{ .mnemonic = "branch",		.format = "INNXXX", .has_side_effects = true },
 	{ .mnemonic = "ret",		.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "loop",		.format = "XXXXXX", .has_side_effects = true },
 	{ .mnemonic = "dispatch",	.format = "NNNNXX", .has_side_effects = true },
 
 	{ .mnemonic = "scm",		.format = "IXXXXX", .has_side_effects = true },
@@ -1207,6 +1210,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 	if(max_stack > 0x40)
 		encoder.sub(max_stack-0x40, REG_RSP);
 	
+#ifdef BLOCK_ENTRY_TRACKING
+	encoder.mov(REG_R15D, X86Memory::get(REG_FS, 0x58));
+#endif
+	
+	uint32_t block_start_offset = encoder.current_offset();
+	
 	IRBlockId current_block_id = INVALID_BLOCK_ID;
 	for (uint32_t ir_idx = 0; ir_idx < ctx.count(); ir_idx++) {
 		IRInstruction *insn = ctx.at(ir_idx);
@@ -1631,12 +1640,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.ensure_extra_buffer(64);
 
 			// Check to see if we need to stop chaining (e.g. an interrupt)
-			//encoder.mov(X86Memory::get(REG_FS, 0x48), REG_RAX);
-			//encoder.cmp1(0, X86Memory::get(REG_RAX, __builtin_offsetof(PerCPUData, interrupt_pending)));
-			
 			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
 			uint32_t jump_offset1 = encoder.current_offset() + 1;
 			encoder.jnz((int8_t)0);
+			
+#ifdef BLOCK_ENTRY_TRACKING
+			encoder.cmp(REG_R15D, X86Memory::get(REG_FS, 0x58));
+			encoder.jne(9);
+			encoder.incq(X86Memory::get(REG_FS, 0x60));
+//			encoder.intt(0x90);
+#endif
 			
 			// Each chaining table entry is 16 bytes, arranged
 			// 0	tag (4 bytes)
@@ -1657,6 +1670,54 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.mov4(0, X86Memory::get(REG_FS, 48));
 
 			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset2-1);
+			encoder.xorr(REG_EAX, REG_EAX);
+			encoder.ret();													// RETURN
+			
+			break;
+		}
+		
+		case IRInstruction::LOOP:
+		{
+			encoder.ensure_extra_buffer(64);
+
+			// Check to see if we need to stop chaining (e.g. an interrupt)
+			encoder.cmp1(0, X86Memory::get(REG_FS, 48));
+			uint32_t jump_offset1 = encoder.current_offset() + 1;
+			encoder.jnz((int8_t)0);
+
+			// Check to see if this is a self-loop
+			encoder.mov(REG_R15D, REG_EAX);
+			encoder.andd(0xfff, REG_EAX);
+			encoder.cmp((pa & 0xfff), REG_EAX);
+			encoder.je((int32_t)(block_start_offset - encoder.current_offset() - 6));
+
+			// Each chaining table entry is 16 bytes, arranged
+			// 0	tag (4 bytes)
+			// 8	pointer (8 bytes)
+
+			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
+			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
+			encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
+
+			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
+
+			uint32_t jump_offset2 = encoder.current_offset() + 1;
+			encoder.jne((int8_t)0);											// Tags match?
+			
+			if(max_stack > 0x40)
+				encoder.add(max_stack-0x40, REG_RSP);
+
+			encoder.jmp(X86Memory::get(REG_RBX, 8, REG_RAX, 4));			// Yep, tail call.
+
+			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset1)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset1-1);
+			
+			encoder.mov4(0, X86Memory::get(REG_FS, 48));
+
+			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset2)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset2-1);
+			
+			if(max_stack > 0x40)
+				encoder.add(max_stack-0x40, REG_RSP);
+
 			encoder.xorr(REG_EAX, REG_EAX);
 			encoder.ret();													// RETURN
 			

@@ -192,7 +192,9 @@ namespace captive {
 				uint64_t mem_writes;										// 64			40
 				
 				void *per_cpu_data;											// 72			48
-				bool *kernel_mode_var;
+				bool *kernel_mode_var;										// 80			50
+				uint64_t entry_address;										// 88			58
+				uint64_t self_loop_count;
 			} packed jit_state;
 			
 			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }
