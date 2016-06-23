@@ -204,6 +204,7 @@ namespace captive {
 				JMP,
 				BRANCH,
 				RET,
+				LOOP,
 				DISPATCH,
 
 				SET_CPU_MODE,			// 45
@@ -272,6 +273,7 @@ namespace captive {
 			
 			static IRInstruction nop() { return IRInstruction(NOP); }
 			static IRInstruction ret() { return IRInstruction(RET); }
+			static IRInstruction loop() { return IRInstruction(LOOP); }
 			static IRInstruction dispatch(const IROperand& target, const IROperand& fallthrough, const IROperand& target_block, const IROperand& fallthrough_block) { assert(target.is_constant() && fallthrough.is_constant()); return IRInstruction(DISPATCH, target, fallthrough, target_block, fallthrough_block); }
 			static IRInstruction trap() { return IRInstruction(TRAP); }
 			static IRInstruction verify(const IROperand& pc) { return IRInstruction(VERIFY, pc); }

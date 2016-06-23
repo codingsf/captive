@@ -122,6 +122,8 @@ bool CPU::run_block_jit_safepoint()
 			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
 			_exec_txl = false;
 		}
+		
+		//printf("slc: f=%x, t=%x, %lx\n", virt_pc, read_pc(), jit_state.self_loop_count);
 	} while(step_ok);
 		
 	if (!step_ok) printf("step was not okay\n");
@@ -233,7 +235,12 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 				// Can only dispatch if both jump targets land on the same page as the jump source.
 				if((target_page == page) && (ft_page == page)) {
 					can_dispatch = true;
-				}
+				} /*else {
+					printf("**** source=%x, target=%x, ft=%x\n", pa, target_pc, fallthrough_pc);
+				}*/
+				
+				/*if (target_page == page && target_pc == pa)
+					printf("**** self loop\n");*/
 					
 				if(!insn->is_predicated) {
 					if((target_page == page)) can_dispatch = true;
@@ -254,10 +261,14 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 			ft_block = (void*)rgn->get_block(PAGE_OFFSET_OF(fallthrough_pc))->txln;
 		}
 		
-		if(target_block) {
-			ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
+		if (target_pc == pa) {
+			ctx.add_instruction(IRInstruction::loop());
 		} else {
-			ctx.add_instruction(IRInstruction::ret());
+			if (target_block) {
+				ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
+			} else {
+				ctx.add_instruction(IRInstruction::ret());
+			}
 		}
 	} else {
 		ctx.add_instruction(IRInstruction::ret());
