@@ -1,19 +1,23 @@
 .code64
 .text
 
-// Switching to ring3 from ring0
+// Switch to KERNEL MODE
 .globl int80_handler
 int80_handler:
-	movq $0x08,  8(%rsp)		// CS
-	movq $0x10, 32(%rsp)		// SS
+	mov %fs:0x50, %rcx		// Load pointer to _kernel_mode
+	movb $1, (%rcx)			// Store 1
+	movq $0x08,  8(%rsp)	// CS
+	movq $0x10, 32(%rsp)	// SS
 
 	iretq
 
-// Switching to ring0 from ring3
+// Switch to USER MODE
 .globl int81_handler
 int81_handler:
-	movq $0x1b,  8(%rsp)		// CS
-	movq $0x23, 32(%rsp)		// SS
+	mov %fs:0x50, %rcx		// Load pointer to _kernel_mode
+	movb $0, (%rcx)			// Store 1
+	movq $0x1b,  8(%rsp)	// CS
+	movq $0x23, 32(%rsp)	// SS
 
 	iretq
 

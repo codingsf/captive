@@ -48,7 +48,7 @@ namespace captive {
 			struct TaggedRegisters {
 				void *base;
 				uint32_t *PC, *SP;
-				uint8_t *C, *Z, *N, *V, *ISA;
+				uint8_t *C, *Z, *N, *V, *Q, *ISA;
 			};
 			
 			CPU(Environment& env, PerCPUData *per_cpu_data);
@@ -83,7 +83,7 @@ namespace captive {
 
 			inline void kernel_mode(bool km) {
 				if (local_state._kernel_mode != km) {
-					local_state._kernel_mode = km;
+					//local_state._kernel_mode = km;
 					if (km) switch_to_kernel_mode(); else switch_to_user_mode();
 				}
 			}
@@ -192,6 +192,7 @@ namespace captive {
 				uint64_t mem_writes;										// 64			40
 				
 				void *per_cpu_data;											// 72			48
+				bool *kernel_mode_var;
 			} packed jit_state;
 			
 			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }

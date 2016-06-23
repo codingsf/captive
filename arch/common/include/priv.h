@@ -24,14 +24,12 @@ static inline bool in_user_mode()
 
 static inline void switch_to_kernel_mode(void)
 {
-	if (!in_kernel_mode())
-		asm volatile("int $0x80\n");
+	asm volatile("int $0x80\n" ::: "rcx");
 }
 
 static inline void switch_to_user_mode(void)
 {
-	if (!in_user_mode())
-		asm volatile("int $0x81\n");
+	asm volatile("int $0x81\n" ::: "rcx");
 }
 
 #endif	/* PRIV_H */

@@ -223,6 +223,9 @@ namespace captive {
 				SET_CONTEXT_ID,
 				PGT_CHANGE,
 				
+				SWITCH_TO_KERNEL_MODE,
+				SWITCH_TO_USER_MODE,
+				
 				ADC_WITH_FLAGS,			// 53
 				SBC_WITH_FLAGS,
 				SET_ZN_FLAGS,
@@ -291,6 +294,9 @@ namespace captive {
 			
 			static IRInstruction set_context_id(const IROperand& ctxid) { return IRInstruction(SET_CONTEXT_ID, ctxid); }
 			static IRInstruction pgt_change() { return IRInstruction(PGT_CHANGE); }
+
+			static IRInstruction switch_to_kernel_mode() { return IRInstruction(SWITCH_TO_KERNEL_MODE); }
+			static IRInstruction switch_to_user_mode() { return IRInstruction(SWITCH_TO_USER_MODE); }
 			
 			static IRInstruction barrier(const IROperand& pc, const IROperand& ir) { assert(pc.is_pc()); return IRInstruction(BARRIER, pc, ir); }
 			

@@ -70,9 +70,7 @@ void VirtIOBlockDevice::handle_read_event(uint64_t sector, VirtIOQueueEvent* evt
 	rq->opaque = evt;
 
 	DEBUG << CONTEXT(VirtIOBlockDevice) << "Submitting read request, offset=" << rq->block_offset << ", count=" << rq->block_count << ", buffer=" << std::hex << (uint64_t)rq->buffer;
-	
-	fprintf(stderr, "READ offset=%lu, count=%lu\n", rq->block_offset, rq->block_count);
-	
+		
 	if (!_bdev.submit_request(rq, read_event_callback)) {
 		*(uint8_t *)evt->write_buffers.back().data = 1;
 		evt->response_size = 1;

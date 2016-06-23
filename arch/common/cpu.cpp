@@ -46,6 +46,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 	jit_state.cpu = this;
 	jit_state.per_cpu_data = per_cpu_data;
+	jit_state.kernel_mode_var = &local_state._kernel_mode;
 	jit_state.execution_mode = 0;
 	
 	jit_state.block_txln_cache = block_txln_cache->ptr();

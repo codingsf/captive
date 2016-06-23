@@ -614,6 +614,9 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "set ctxid",	.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "pgt change",	.format = "XXXXXX", .has_side_effects = true },
 
+	{ .mnemonic = "chmd kernel",	.format = "XXXXXX", .has_side_effects = true },
+	{ .mnemonic = "chmd user",		.format = "XXXXXX", .has_side_effects = true },
+
 	{ .mnemonic = "adc flags",	.format = "IBIXXX", .has_side_effects = true },
 	{ .mnemonic = "sbc flags",	.format = "IBIXXX", .has_side_effects = true },
 	
@@ -3029,6 +3032,18 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			break;
 		}
 		
+		case IRInstruction::SWITCH_TO_KERNEL_MODE:
+		{
+			encoder.intt(0x80);
+			break;
+		}
+
+		case IRInstruction::SWITCH_TO_USER_MODE:
+		{
+			encoder.intt(0x81);
+			break;
+		}
+		
 		case IRInstruction::SET_ZN_FLAGS:
 		{
 			IROperand *val = &insn->operands[0];
@@ -3179,6 +3194,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				encoder.sets(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(N)));		// Negative
 			}
 			
+			break;
+		}
+		
+		case IRInstruction::TRAP:
+		{
+			encoder.int3();
 			break;
 		}
 		
