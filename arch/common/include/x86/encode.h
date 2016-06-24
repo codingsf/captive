@@ -135,6 +135,7 @@ namespace captive {
 
 				void push(uint32_t imm);
 				void pushf();
+				void popf();
 
 				void wbinvd();
 				void invlpg(const X86Memory& addr);
@@ -376,6 +377,8 @@ namespace captive {
 				void bsr(const X86Register& src, const X86Register& dst);
 
 				void sysenter();
+				void syscall();
+				void sysret();
 				void int3();
 				void intt(uint8_t irq);
 				void leave();

@@ -173,6 +173,8 @@ extern "C" {
 	
 	void handle_debug(struct mcontext *mctx)
 	{
-		fatal("unhandled debug\n");
+		//fatal("unhandled debug\n");
+		
+		printf("r14=%lu, rcx=%lx, r11=%lx\n", mctx->r14, mctx->rcx, mctx->r11);
 	}
 }

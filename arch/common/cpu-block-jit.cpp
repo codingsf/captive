@@ -123,6 +123,10 @@ bool CPU::run_block_jit_safepoint()
 			_exec_txl = false;
 		}
 		
+		/*if (PAGE_ADDRESS_OF(read_pc()) == PAGE_ADDRESS_OF(virt_pc)) {
+			printf("*** Intra-page dispatch\n");
+		}*/
+		
 		//printf("slc: f=%x, t=%x, %lx\n", virt_pc, read_pc(), jit_state.self_loop_count);
 	} while(step_ok);
 		
@@ -223,10 +227,8 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 		JumpInfo ji = get_instruction_jump_info(insn);
 		
 		if (ji.type == JumpInfo::DIRECT) {
-			//~ if (insn->is_predicated) {
-				// Direct Predicated
-				
 				target_pc = ji.target;
+								
 				fallthrough_pc = insn->pc + insn->length;
 			
 				uint32_t target_page = target_pc &  0xfffff000;
@@ -235,29 +237,25 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 				// Can only dispatch if both jump targets land on the same page as the jump source.
 				if((target_page == page) && (ft_page == page)) {
 					can_dispatch = true;
-				} /*else {
-					printf("**** source=%x, target=%x, ft=%x\n", pa, target_pc, fallthrough_pc);
-				}*/
-				
-				/*if (target_page == page && target_pc == pa)
-					printf("**** self loop\n");*/
+				}
 					
-				if(!insn->is_predicated) {
-					if((target_page == page)) can_dispatch = true;
+				if (!insn->is_predicated) {
+					if ((target_page == page)) can_dispatch = true;
 					fallthrough_pc = 0;
 				}
 		}
 	}
 	
-	if(can_dispatch) {
+	if (can_dispatch) {
 		Region *rgn = image->get_region(page);
 		
 		void *target_block = NULL, *ft_block = NULL;
 		
-		if(target_pc) {
+		if (target_pc) {
 			target_block = (void*)rgn->get_block(PAGE_OFFSET_OF(target_pc))->txln;
 		}
-		if(fallthrough_pc) {
+		
+		if (fallthrough_pc) {
 			ft_block = (void*)rgn->get_block(PAGE_OFFSET_OF(fallthrough_pc))->txln;
 		}
 		

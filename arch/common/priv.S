@@ -15,7 +15,7 @@ int80_handler:
 .globl int81_handler
 int81_handler:
 	mov %fs:0x50, %rcx		// Load pointer to _kernel_mode
-	movb $0, (%rcx)			// Store 1
+	movb $0, (%rcx)			// Store 0
 	movq $0x1b,  8(%rsp)	// CS
 	movq $0x23, 32(%rsp)	// SS
 
@@ -27,3 +27,7 @@ int82_handler:
 	mov $0x40090000, %eax
 	mov %rax, %cr3
 	iretq
+
+.globl syscall_handler
+syscall_handler:
+	jmp *%rcx

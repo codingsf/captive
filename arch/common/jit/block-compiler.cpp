@@ -15,9 +15,7 @@
 
 #define SYSCALL_CALL_GATE
 //#define TIMER
-
 //#define EMIT_MEM_EVENT
-
 //#define BLOCK_ENTRY_TRACKING
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);
@@ -3095,13 +3093,35 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		
 		case IRInstruction::SWITCH_TO_KERNEL_MODE:
 		{
-			encoder.intt(0x80);
+			if (used_phys_regs.get(8))
+				encoder.push(REG_R11);
+			
+			encoder.mov(X86Memory::get(REG_FS, 0x50), REG_R14);
+			encoder.mov1(1, X86Memory::get(REG_R14));
+			encoder.syscall();
+			
+			if (used_phys_regs.get(8))
+				encoder.pop(REG_R11);
 			break;
 		}
 
 		case IRInstruction::SWITCH_TO_USER_MODE:
 		{
-			encoder.intt(0x81);
+			if (used_phys_regs.get(8))
+				encoder.push(REG_R11);
+			
+			encoder.pushf();
+						
+			encoder.mov(X86Memory::get(REG_FS, 0x50), REG_R14);
+			encoder.mov1(0, X86Memory::get(REG_R14));
+
+			encoder.pop(REG_R11);
+			
+			encoder.lea(X86Memory::get(REG_RIP, 2), REG_RCX);
+			encoder.sysret();
+			
+			if (used_phys_regs.get(8))
+				encoder.pop(REG_R11);
 			break;
 		}
 		

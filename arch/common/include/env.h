@@ -59,6 +59,7 @@ namespace captive {
 
 			void install_idt();
 			void install_syscall();
+			void prepare_fast_syscall();
 			void setup_interrupts();
 
 		protected:

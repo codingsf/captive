@@ -134,6 +134,15 @@ void Environment::install_syscall()
 	asm volatile("lgdt %0" :: "m"(GDTR));
 }
 
+extern "C" void syscall_handler(void);
+
+void Environment::prepare_fast_syscall()
+{
+	wrmsr(0xC0000081, 0x18000800000000ULL);			// ucs/kcs
+	wrmsr(0xC0000082, (uint64_t)syscall_handler);	// rip
+	wrmsr(0xC0000084, 0);
+}
+
 void Environment::setup_interrupts()
 {
 	// Enable interrupts
@@ -144,6 +153,7 @@ bool Environment::init()
 {
 	install_idt();
 	install_syscall();
+	prepare_fast_syscall();
 	setup_interrupts();
 	
 	return true;

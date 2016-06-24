@@ -121,6 +121,11 @@ void X86Encoder::pushf()
 	emit8(0x9c);
 }
 
+void X86Encoder::popf()
+{
+	emit8(0x9d);
+}
+
 void X86Encoder::push(uint32_t imm)
 {
 	emit8(0x68);
@@ -1115,6 +1120,18 @@ void X86Encoder::sysenter()
 {
 	emit8(0x0f);
 	emit8(0x34);
+}
+
+void X86Encoder::syscall()
+{
+	emit8(0x0f);
+	emit8(0x05);
+}
+
+void X86Encoder::sysret()
+{
+	emit8(0x0f);
+	emit8(0x07);
 }
 
 void X86Encoder::int3()
