@@ -318,9 +318,9 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 		captive::lock::barrier_wait(&pgd->fast_device.hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
 		if (pgd->fast_device.operation == FAST_DEV_OP_QUIT) break;
 		
-		uint64_t base_addr;
+		uint64_t base_addr = 0;
 		captive::devices::Device *device = guest->lookup_device(pgd->fast_device.address, base_addr);
-		
+				
 		if (!device) exit(0);
 		
 		uint64_t offset = pgd->fast_device.address - base_addr;
@@ -550,7 +550,7 @@ bool KVMGuest::attach_guest_devices()
 		desc.cfg = &device;
 		desc.dev = &device.device();
 
-		devices[device.base_address()] = desc;
+		devices[util::range<uint64_t>(device.base_address(), device.base_address() + device.device().size())] = desc;
 	}
 
 	return true;
@@ -558,12 +558,20 @@ bool KVMGuest::attach_guest_devices()
 
 captive::devices::Device *KVMGuest::lookup_device(uint64_t addr, uint64_t& base_addr)
 {
-	for (auto desc : devices) {
+	/*for (auto desc : devices) {
 		if (addr >= desc.first && addr < desc.first + desc.second.dev->size()) {
 			base_addr = desc.first;
 			return desc.second.dev;
 		}
-	}
+	}*/
+	
+	auto dev = devices.find(util::range<uint64_t>(addr));
+	
+	if (dev == devices.end())
+		return NULL;
+	
+	base_addr = dev->first.min();
+	return dev->second.dev;
 	
 	/*auto candidate = devices.lower_bound(addr);
 	if (candidate->first != addr) candidate--;

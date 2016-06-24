@@ -22,6 +22,8 @@
 
 #include <linux/kvm.h>
 
+#include <util/range.h>
+
 #define HOST_GPM_BASE			(uintptr_t)0x680100000000ULL
 #define GUEST_GPM_VIRT_BASE		(uintptr_t)0x680100000000ULL
 #define GUEST_GPM_PHYS_BASE		(uintptr_t)0x100000000ULL
@@ -151,8 +153,9 @@ namespace captive {
 					devices::Device *dev;
 					const GuestDeviceConfiguration *cfg;
 				};
-
-				std::map<uint64_t, dev_desc> devices;
+				
+				typedef std::map<util::range<uint64_t>, dev_desc, util::left_of_range<uint64_t>> devices_type;
+				devices_type devices;
 
 				bool prepare_event_loop();
 				bool attach_event(int fd, event_callback_t cb, bool input, bool output, void *data);
