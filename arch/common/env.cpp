@@ -22,6 +22,7 @@ extern "C" void int90_handler(struct mcontext *);
 
 extern "C" void call_gate_tramp(void);
 
+extern "C" void trap_timer(struct mcontext *);
 extern "C" void trap_irq0(struct mcontext *);
 extern "C" void trap_irq1(struct mcontext *);
 
@@ -98,6 +99,8 @@ void Environment::install_idt()
 	set_idt(&idt[0x06], trap_illegal);
 	set_idt(&idt[0x0d], trap_gpf);
 	set_idt(&idt[0x0e], trap_pf);
+	
+	set_idt(&idt[0x20], trap_timer);
 
 	// IRQ Handler
 	set_idt(&idt[0x30], trap_irq0);

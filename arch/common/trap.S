@@ -88,6 +88,7 @@ trap_\name:
 trap_macro unk,0
 trap_macro unk_arg,1
 trap_macro gpf,1
+trap_macro timer,0
 trap_macro irq0,0
 trap_macro irq1,0
 

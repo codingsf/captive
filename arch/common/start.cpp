@@ -10,6 +10,8 @@
 #include <device.h>
 #include <malloc/malloc.h>
 #include <malloc/page-allocator.h>
+#include <x86/lapic.h>
+#include <x86/pit.h>
 
 extern captive::arch::Environment *create_environment_arm(captive::PerGuestData *per_guest_data);
 
@@ -46,9 +48,13 @@ extern "C" {
 		call_static_constructors();
 		
 		// Initialise IRQs.
-		printf("initialising irqs...\n");
-		captive::arch::lapic_init_irqs();
-
+		printf("initialising lapic...\n");
+		captive::arch::x86::lapic.initialise();
+		
+		printf("calibrating lapic...\n");
+		captive::arch::x86::lapic.calibrate(captive::arch::x86::pit);
+		printf("lapic frequency=%u\n", captive::arch::x86::lapic.frequency());
+		
 		// Initialise the printf() system.
 		printf("initialising printf @ %p\n", cpu_data->guest_data->printf_buffer);
 		printf_init(cpu_data->guest_data->printf_buffer, 0x1000);
@@ -126,7 +132,7 @@ extern "C" {
 	
 	void handle_trap_irq0(struct mcontext *mctx)
 	{
-		captive::arch::lapic_acknowledge_irq();
+		captive::arch::x86::lapic.acknowledge_irq();
 		
 		printf("irq0 @ rip=%p\n", mctx->rip);
 		dump_code(mctx->rip-16);
@@ -145,8 +151,7 @@ extern "C" {
 	
 	void handle_trap_irq1(struct mcontext *mctx)
 	{
-		//printf("YOU RANG?\n");
-		captive::arch::lapic_acknowledge_irq();
+		captive::arch::x86::lapic.acknowledge_irq();
 		captive::arch::CPU::get_active_cpu()->handle_irq_raised();
 	}
 	

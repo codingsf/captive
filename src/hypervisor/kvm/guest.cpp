@@ -579,6 +579,15 @@ bool KVMGuest::prepare_guest_irq()
 		ERROR << "Unable to create IRQCHIP";
 		return false;
 	}
+	
+	DEBUG << CONTEXT(Guest) << "Creating PIT";
+	struct kvm_pit_config cfg;
+	cfg.flags = KVM_PIT_SPEAKER_DUMMY;
+	
+	if (vmioctl(KVM_CREATE_PIT2, &cfg)) {
+		ERROR << "Unable to create IRQCHIP";
+		return false;
+	}
 
 	return true;
 }
