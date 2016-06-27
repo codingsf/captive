@@ -47,7 +47,18 @@ bool CPU::run_block_jit()
 		__local_irq_enable();
 	}
 
-	ensure_privilege_mode();
+	//ensure_privilege_mode();
+	
+	if (kernel_mode()) {
+		if (!in_kernel_mode()) {
+			switch_to_kernel_mode();
+		}
+	} else {
+		if (!in_user_mode()) {
+			switch_to_user_mode();
+		}
+	}
+	
 	return run_block_jit_safepoint();
 }
 

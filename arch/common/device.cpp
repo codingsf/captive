@@ -66,6 +66,11 @@ void captive::arch::mmio_device_write(gpa_t pa, uint8_t size, uint64_t value)
 	__local_irq_enable();
 }
 
+void captive::arch::mmio_device_dummy(gpa_t pa, uint8_t size, uint64_t value)
+{
+	fatal("XXX");
+}
+
 #else
 static inline void __out32(uint32_t address, uint32_t value)
 {

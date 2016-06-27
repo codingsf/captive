@@ -8,6 +8,8 @@ void IRSorter::perform_sort()
 {
 	insn_idxs = (uint32_t *)ctx.allocator().alloc(count() * sizeof(uint32_t));
 	
+	printf("COUNT: %lu\n", ctx.count() * sizeof(IRInstruction));
+	
 	for (uint32_t i = 0; i < ctx.count(); ++i) {
 		insn_idxs[i] = i;
 	}

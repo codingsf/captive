@@ -25,16 +25,11 @@ static inline bool in_user_mode()
 static inline void switch_to_kernel_mode(void)
 {
 	asm volatile("int $0x80\n" ::: "rcx");
-	
-	/*register uint8_t mode asm("r14") = 1;
-	asm volatile("syscall\n\t" ::"r"(mode): "memory", "rcx", "r11");*/
 }
 
 static inline void switch_to_user_mode(void)
 {
 	asm volatile("int $0x81\n" ::: "rcx");
-	/*register uint8_t mode asm("r14") = 0;
-	asm volatile("syscall\n\t" ::"r"(mode): "memory", "rcx", "r11");*/
 }
 
 #endif	/* PRIV_H */

@@ -41,6 +41,7 @@ namespace captive
 		
 		extern void mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value);
 		extern void mmio_device_write(gpa_t pa, uint8_t size, uint64_t value);
+		extern void mmio_device_dummy(gpa_t pa, uint8_t size, uint64_t value);
 	}
 }
 
