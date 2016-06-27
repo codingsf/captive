@@ -1,6 +1,7 @@
 #include <x86/lapic.h>
 #include <x86/pit.h>
 #include <printf.h>
+#include <map>
 
 using namespace captive::arch;
 using namespace captive::arch::x86;
@@ -28,6 +29,7 @@ void LAPIC::initialise()
 	while (lapic_read(ICRLO) & DELIVS);
 
 	lapic_write(TPR, 0);
+	lapic_write(TIMER, 0x20 | MASKED);
 	
 	timer_reset();
 }
@@ -39,6 +41,7 @@ void LAPIC::calibrate(PIT& pit)
 
 	uint32_t period = (PIT_FREQUENCY / CALIBRATION_FREQUENCY);
 	timer_reset();
+	timer_set_periodic(false);
 
 	pit.initialise_oneshot(period);
 	pit.start();
@@ -57,26 +60,40 @@ void LAPIC::calibrate(PIT& pit)
 
 void LAPIC::timer_start()
 {
-	lapic_write(TIMER, 32);
+	lapic_clear(TIMER, MASKED);
 }
 
 void LAPIC::timer_stop()
 {
-	lapic_write(TIMER, MASKED);
+	lapic_set(TIMER, MASKED);
 }
 
-void LAPIC::timer_reset()
+void LAPIC::timer_reset(uint32_t init_val)
 {
-	lapic_write(TIMER, MASKED);
+	lapic_set(TIMER, MASKED);
 	lapic_write(TDCR, 3);
-	lapic_write(TICR, 0xffffffff);
+	lapic_write(TICR, init_val);
+}
+
+void LAPIC::timer_set_periodic(bool periodic)
+{
+	if (periodic) {
+		lapic_set(TIMER, PERIODIC);
+	} else {
+		lapic_clear(TIMER, PERIODIC);
+	}
 }
 
 extern "C"
 {
 	void handle_trap_timer(struct mcontext *mc)
 	{
-		captive::arch::x86::lapic.acknowledge_irq();
+		if (mc->rip > 0xffffffff00000000)
+			printf("Q: %016lx\n", mc->rip);
+		
+		lapic.acknowledge_irq();
+		lapic.timer_reset(0x1000);
+		lapic.timer_start();
 	}
 }
 

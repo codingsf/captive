@@ -66,7 +66,9 @@ namespace captive
 				
 				void timer_start();
 				void timer_stop();
-				void timer_reset();
+				void timer_reset(uint32_t init_val=0xffffffff);
+				void timer_set_periodic(bool periodic);
+				
 				uint32_t timer_read() const { return (uint32_t)lapic_read(TCCR); }
 				
 				uint32_t frequency() const { return _frequency; }
@@ -76,15 +78,30 @@ namespace captive
 				
 				#define LAPIC_MEM_BASE ((volatile uint32_t *)0x67fffee00000ULL)
 
-				void lapic_write(uint32_t reg, uint32_t value)
+				inline void lapic_write(uint32_t reg, uint32_t value)
 				{
 					LAPIC_MEM_BASE[reg >> 2] = value;
 					LAPIC_MEM_BASE[1];
+					__sync_synchronize();
+				}
+				
+				inline void lapic_set(uint32_t reg, uint32_t value)
+				{
+					uint32_t oldval = lapic_read(reg);
+					lapic_write(reg, oldval | value);
+				}
+				
+				inline void lapic_clear(uint32_t reg, uint32_t value)
+				{
+					uint32_t oldval = lapic_read(reg);
+					lapic_write(reg, oldval & (~value));
 				}
 
-				uint32_t lapic_read(uint32_t reg) const
+				inline uint32_t lapic_read(uint32_t reg) const
 				{
-					return LAPIC_MEM_BASE[reg >> 2];
+					uint32_t x = LAPIC_MEM_BASE[reg >> 2];
+					__sync_synchronize();
+					return x;
 				}
 			};
 			

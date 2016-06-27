@@ -72,6 +72,14 @@ extern "C" {
 		captive::arch::smp_init_cpu(1);
 		captive::arch::smp_cpu_start(1);*/
 		
+//#define INTERNAL_PERF
+#ifdef INTERNAL_PERF
+		printf("starting perf...\n");
+		captive::arch::x86::lapic.timer_reset(0x1000);
+		captive::arch::x86::lapic.timer_set_periodic(true);
+		captive::arch::x86::lapic.timer_start();
+#endif
+		
 		printf("creating environment...\n");
 		captive::arch::Environment *env = create_environment_arm(cpu_data->guest_data);
 
@@ -86,7 +94,10 @@ extern "C" {
 
 			delete env;
 		}
-
+#ifdef INTERNAL_PERF
+		captive::arch::x86::lapic.timer_stop();
+#endif
+		
 		printf("done\n");
 		abort();
 	}
