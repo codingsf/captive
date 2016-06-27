@@ -24,11 +24,12 @@ namespace captive
 		public:
 			typedef T value_type;
 
-			range( T const & center ) : min_( center ), max_( center ) {}
-			range( T const & min, T const & max )
-				: min_( min ), max_( max ) {}
-			T min() const { return min_; }
-			T max() const { return max_; }
+			range( T const & center ) : min_( center ), max_( center ) { }
+			range( T const & min, T const & max ) : min_( min ), max_( max ) { }
+
+			inline T min() const { return min_; }
+			inline T max() const { return max_; }
+			
 		private:
 			T min_;
 			T max_;
@@ -37,7 +38,7 @@ namespace captive
 		template <typename T>
 		struct left_of_range : public std::binary_function< range<T>, range<T>, bool >
 		{
-			bool operator()( range<T> const & lhs, range<T> const & rhs ) const
+			inline bool operator()( range<T> const & lhs, range<T> const & rhs ) const
 			{
 				return lhs.min() < rhs.min()
 					&& lhs.max() <= rhs.min();

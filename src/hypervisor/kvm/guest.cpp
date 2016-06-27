@@ -318,12 +318,18 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 		captive::lock::barrier_wait(&pgd->fast_device.hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
 		if (pgd->fast_device.operation == FAST_DEV_OP_QUIT) break;
 		
-		uint64_t base_addr = 0;
-		captive::devices::Device *device = guest->lookup_device(pgd->fast_device.address, base_addr);
-				
-		if (!device) exit(0);
+//		uint64_t base_addr = 0;
+//		captive::devices::Device *device = NULL; //guest->lookup_device(pgd->fast_device.address, base_addr);
 		
-		uint64_t offset = pgd->fast_device.address - base_addr;
+		auto devices = guest->devices;
+		uint64_t addr = pgd->fast_device.address;
+		auto dev = devices.find(devices_range_type(addr));
+		if (dev == devices.end())
+			exit(0);
+
+		captive::devices::Device *device = dev->second.dev;
+		uint64_t offset = pgd->fast_device.address - dev->first.min();
+		
 		if (pgd->fast_device.operation == FAST_DEV_OP_WRITE) {
 #ifndef NDEBUG
 			device_writes[device]++;
@@ -550,7 +556,7 @@ bool KVMGuest::attach_guest_devices()
 		desc.cfg = &device;
 		desc.dev = &device.device();
 
-		devices[util::range<uint64_t>(device.base_address(), device.base_address() + device.device().size())] = desc;
+		devices[devices_range_type(device.base_address(), device.base_address() + device.device().size())] = desc;
 	}
 
 	return true;
@@ -558,35 +564,12 @@ bool KVMGuest::attach_guest_devices()
 
 captive::devices::Device *KVMGuest::lookup_device(uint64_t addr, uint64_t& base_addr)
 {
-	/*for (auto desc : devices) {
-		if (addr >= desc.first && addr < desc.first + desc.second.dev->size()) {
-			base_addr = desc.first;
-			return desc.second.dev;
-		}
-	}*/
-	
 	auto dev = devices.find(util::range<uint64_t>(addr));
-	
 	if (dev == devices.end())
 		return NULL;
 	
 	base_addr = dev->first.min();
 	return dev->second.dev;
-	
-	/*auto candidate = devices.lower_bound(addr);
-	if (candidate->first != addr) candidate--;
-	if (candidate == devices.end()) return NULL;
-	
-	//fprintf(stderr, "*** CANDIDATE %lx for %lx\n", candidate->first, addr);
-
-	if ((addr >= candidate->first) && (addr < (candidate->first + candidate->second.dev->size()))) {
-		base_addr = candidate->first;
-		
-		return candidate->second.dev;
-	}
-
-	//fprintf(stderr, "*** NO SUCH DEVICE\n");*/
-	return NULL;
 }
 
 bool KVMGuest::prepare_guest_irq()

@@ -154,7 +154,9 @@ namespace captive {
 					const GuestDeviceConfiguration *cfg;
 				};
 				
-				typedef std::map<util::range<uint64_t>, dev_desc, util::left_of_range<uint64_t>> devices_type;
+				typedef util::range<uint64_t> devices_range_type;
+				typedef util::left_of_range<uint64_t> devices_left_range_type;
+				typedef std::map<devices_range_type, dev_desc, devices_left_range_type> devices_type;
 				devices_type devices;
 
 				bool prepare_event_loop();
