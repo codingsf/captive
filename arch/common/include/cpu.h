@@ -107,9 +107,14 @@ namespace captive {
 			
 			inline TaggedRegisters& tagged_registers() { return tagged_reg_offsets; }
 
-			void invalidate_virtual_mappings();
-			void invalidate_virtual_mapping(gva_t va);
+			void invalidate_virtual_mappings_all();
+			void invalidate_virtual_mappings_current();
+			void invalidate_virtual_mapping_current(gva_t va);
+			void invalidate_virtual_mappings(int context);
+			void invalidate_virtual_mapping(int context, gva_t va);
 			void invalidate_translations();
+			
+			void switch_virtual_mappings(int context);
 			
 			void invalidate_translation_virt(gva_t virt_page_base_addr);
 			void invalidate_translation_phys(gpa_t phys_page_base_addr);
@@ -225,8 +230,9 @@ namespace captive {
 			Environment& _env;
 			PerCPUData *_per_cpu_data;
 			
-			typedef Cache<struct block_chain_cache_entry, 0x10000> block_txln_cache_t;
-			block_txln_cache_t  *block_txln_cache;
+			typedef Cache<struct block_chain_cache_entry, 0x2000> block_txln_cache_t;
+			block_txln_cache_t block_txln_cache[256];
+			block_txln_cache_t *current_txln_cache;
 
 			bool _exec_txl;
 
@@ -249,8 +255,10 @@ namespace captive {
 			void analyse_blocks();
 			void compile_region(profile::Region *rgn, uint32_t region_index);
 			
-			captive::shared::block_txln_fn compile_block(profile::Region *rgn, profile::Block *blk, uint8_t isa_mode, gpa_t pa);
+			captive::shared::block_txln_fn compile_block(profile::Region *rgn, uint8_t isa_mode, gpa_t pa);
 			bool translate_block(jit::TranslationContext& ctx, uint8_t isa, gpa_t pa);
+			
+			void *ir_buffer_a, *ir_buffer_b;
 		};
 	}
 }

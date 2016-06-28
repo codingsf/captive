@@ -1,6 +1,8 @@
 #include <jit/block-compiler.h>
 #include <jit/ir-sorter.h>
 
+#include <profile/region.h>
+
 #include <algorithm>
 #include <set>
 #include <list>
@@ -56,9 +58,10 @@ static void dump_insn(IRInstruction *insn);
  * GS	Base Pointer to emulated VMEM
  */
 
-BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs) 
+BlockCompiler::BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, profile::Region *rgn, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs) 
 	: ctx(ctx),
 		encoder(allocator),
+		region(rgn),
 		isa_mode(isa_mode),
 		pa(pa),
 		tagged_regs(tagged_regs)
@@ -1725,14 +1728,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
 			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
-			encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
+
+			//encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
+			//encoder.andd(0x3ffc, REG_EAX);
+			encoder.andd(0x7ffc, REG_EAX);
 			
 			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
-
+			
 			uint32_t jump_offset2 = encoder.current_offset() + 1;
-			encoder.jne((int8_t)0);											// Tags match?
+			encoder.jne((int8_t)0);											// Tags match?			
 			encoder.jmp(X86Memory::get(REG_RBX, 8, REG_RAX, 4));			// Yep, tail call.
-
+			
 			*((uint8_t *)((uint8_t*)encoder.get_buffer() + jump_offset1)) = (uint8_t)(uint64_t)(encoder.current_offset() - jump_offset1-1);
 			
 			encoder.mov4(0, X86Memory::get(REG_FS, 48));
@@ -1765,7 +1771,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
 			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
-			encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
+			encoder.andd(0x7ffc, REG_EAX);									// Mask the PC
 
 			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
 
@@ -3082,20 +3088,20 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		
 		case IRInstruction::INVALIDATE_ICACHE:
 		{
-			encoder.mov(6, REG_ECX);
+			/*encoder.mov(6, REG_ECX);
 #ifdef SYSCALL_CALL_GATE
 			encoder.lcall(X86Memory(REG_RIP));
 			encoder.emit64(0xdeadbeefbabecafe);
 			encoder.emit16(0x38);
 #else
 			encoder.intt(0x85);
-#endif
+#endif*/
 			break;
 		}
 		
 		case IRInstruction::INVALIDATE_ICACHE_ENTRY:
 		{
-			if (insn->operands[0].is_constant()) {
+			/*if (insn->operands[0].is_constant()) {
 				encoder.mov(insn->operands[0].value, REG_R14);
 			} else if (insn->operands[0].is_vreg()) {
 				if (insn->operands[0].is_alloc_reg()) {
@@ -3116,7 +3122,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.emit16(0x38);
 #else
 			encoder.intt(0x85);
-#endif
+#endif*/
 			break;
 		}
 		

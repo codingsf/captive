@@ -1333,7 +1333,7 @@ void X86Encoder::encode_mod_reg_rm(const X86Register& reg, const X86Memory& rm)
 void X86Encoder::encode_opcode_mod_rm(uint16_t opcode, const X86Register& reg, const X86Memory& rm)
 {
 	assert(reg.size == 1 || reg.size == 2 || reg.size == 4 || reg.size == 8);
-	assert(rm.base.size == 4 || rm.base.size == 8 || rm.base == REG_RIZ);
+	assert(rm.base.size == 4 || rm.base.size == 8 || rm.base == REG_RIZ || rm.base == REG_RIP);
 
 	// Figure out what prefixes are needed (if any)
 	

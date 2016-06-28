@@ -20,7 +20,7 @@ namespace captive {
 			class TranslationContext
 			{
 			public:
-				TranslationContext(malloc::Allocator& allocator);
+				TranslationContext(void *buffer_a, void *buffer_b);
 				~TranslationContext();
 
 				inline void add_instruction(const shared::IRInstruction& instruction) {
@@ -28,8 +28,12 @@ namespace captive {
 				}
 
 				inline void add_instruction(shared::IRBlockId block_id, const shared::IRInstruction& instruction) {
-					ensure_buffer(_ir_insn_count + 1);
+					//ensure_buffer(_ir_insn_count + 1);
 
+					if (_ir_insn_count > 1048576/sizeof(shared::IRInstruction)) {
+						fatal("NOPE\n");
+					}
+					
 					_ir_insns[_ir_insn_count] = instruction;
 					_ir_insns[_ir_insn_count].ir_block = block_id;
 					_ir_insn_count++;
@@ -69,16 +73,30 @@ namespace captive {
 				
 				inline const shared::IRInstruction *get_ir_buffer() const { return _ir_insns; }
 				inline shared::IRInstruction *get_ir_buffer() { return _ir_insns; }
+
+				inline shared::IRInstruction *get_other_ir_buffer() { return (uintptr_t)_ir_insns == (uintptr_t)_buffer_a ? (shared::IRInstruction *)_buffer_b : (shared::IRInstruction *)_buffer_a; }
 				
-				inline void set_ir_buffer(shared::IRInstruction *new_buffer) { _ir_insns = new_buffer; }
+				//inline void set_ir_buffer(shared::IRInstruction *new_buffer) { _ir_insns = new_buffer; }
 				
+				inline void set_buffer_a() { _ir_insns = (shared::IRInstruction *)_buffer_a; }
+				inline void set_buffer_b() { _ir_insns = (shared::IRInstruction *)_buffer_b; }
+				
+				inline void swap_buffer() 
+				{
+					if ((uintptr_t)_ir_insns == (uintptr_t)_buffer_a) {
+						set_buffer_b();
+					} else {
+						set_buffer_a();
+					}
+				}
+								
 				// TODO: if !NDEBUG, check that max block is actually the max block number
 				void recount_blocks(uint32_t max_block) { _ir_block_count = max_block; }
 				
-				inline malloc::Allocator& allocator() const { return _allocator; }
+				//inline malloc::Allocator& allocator() const { return _allocator; }
 				
 			private:
-				malloc::Allocator& _allocator;
+				void *_buffer_a, *_buffer_b;
 				shared::IRBlockId _current_block_id;
 				
 				uint32_t _ir_block_count;
@@ -89,7 +107,7 @@ namespace captive {
 				uint32_t _ir_insn_count;
 				uint32_t _ir_insn_buffer_size;
 
-				inline void ensure_buffer(uint32_t elem_capacity)
+				/*inline void ensure_buffer(uint32_t elem_capacity)
 				{
 					uint32_t required_size = (sizeof(shared::IRInstruction) * elem_capacity);
 
@@ -98,7 +116,7 @@ namespace captive {
 						_ir_insns = (shared::IRInstruction *)_allocator.realloc(_ir_insns, _ir_insn_buffer_size);
 						assert(_ir_insns);
 					}
-				}
+				}*/
 			};
 		}
 	}

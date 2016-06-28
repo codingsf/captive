@@ -16,13 +16,17 @@ namespace captive {
 	namespace arch {
 		namespace profile {
 			struct Region;
-			struct Block;
 			
 			struct Image
 			{
 				Image() { bzero(regions, sizeof(regions)); }
 				
 				Region *regions[0x100000];
+				
+				inline bool have_region(uint32_t addr) const
+				{
+					return regions[addr >> 12] != NULL;
+				}
 				
 				inline Region *get_region(uint32_t addr)
 				{

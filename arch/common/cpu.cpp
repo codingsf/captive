@@ -10,7 +10,7 @@
 #include <jit/translation-context.h>
 #include <profile/image.h>
 #include <profile/region.h>
-#include <profile/block.h>
+#include <malloc/page-allocator.h>
 
 using namespace captive::arch;
 using namespace captive::arch::jit;
@@ -28,7 +28,6 @@ CPU *CPU::current_cpu;
 CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	: _env(env),
 	_per_cpu_data(per_cpu_data),
-	block_txln_cache(new block_txln_cache_t()),
 	_exec_txl(false)
 {
 	// Zero out the local state.
@@ -37,6 +36,9 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	bzero(&tagged_reg_offsets, sizeof(tagged_reg_offsets));
 
 	local_state._kernel_mode = true;
+	
+	ir_buffer_a = malloc::page_alloc.alloc_pages(256);	// 1MB
+	ir_buffer_b = malloc::page_alloc.alloc_pages(256);	// 1MB
 	
 	// Initialise the decode cache
 	memset(decode_cache, 0xff, sizeof(decode_cache));
@@ -50,7 +52,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	jit_state.execution_mode = 0;
 	jit_state.self_loop_count = 0;
 	
-	jit_state.block_txln_cache = block_txln_cache->ptr();
+	current_txln_cache = &block_txln_cache[0];
+	jit_state.block_txln_cache = current_txln_cache->ptr();
 	printf("block-txln-cache: %p\n", jit_state.block_txln_cache);
 	
 	jit_state.insn_counter = &(per_cpu_data->insns_executed);
@@ -65,7 +68,7 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	__wrmsr(0xc0000101, (uint64_t)GPM_EMULATED_VIRT_START);	// GS Base
 	__wrmsr(0xc0000102, (uint64_t)GPM_EMULATED_VIRT_START);	// Kernel GS Base
 
-	invalidate_virtual_mappings();
+	invalidate_virtual_mappings_all();
 }
 
 CPU::~CPU()
@@ -132,7 +135,7 @@ bool CPU::run_test()
 void CPU::invalidate_translations()
 {
 	image->invalidate();
-	invalidate_virtual_mappings();
+	invalidate_virtual_mappings_all();
 }
 
 void CPU::invalidate_translation_phys(gpa_t phys_addr)
@@ -153,17 +156,40 @@ void CPU::invalidate_translation_virt(gva_t virt_addr)
 		image->invalidate();
 	}
 	
-	invalidate_virtual_mappings();
+	invalidate_virtual_mappings_current();
 }
 
-void CPU::invalidate_virtual_mappings()
+void CPU::invalidate_virtual_mappings_all()
 {
-	block_txln_cache->invalidate_dirty();
+	for (int i = 0; i < 0x100; i++) {
+		block_txln_cache[i].invalidate_dirty();
+	}
 }
 
-void CPU::invalidate_virtual_mapping(gva_t va)
+void CPU::invalidate_virtual_mappings(int context)
 {
-	block_txln_cache->invalidate_entry(va >> 2);
+	block_txln_cache[context & 0xff].invalidate_dirty();
+}
+
+void CPU::invalidate_virtual_mappings_current()
+{
+	current_txln_cache->invalidate_dirty();
+}
+
+void CPU::invalidate_virtual_mapping(int context, gva_t va)
+{
+	block_txln_cache[context & 0xff].invalidate_entry(va >> 2);
+}
+
+void CPU::invalidate_virtual_mapping_current(gva_t va)
+{
+	current_txln_cache->invalidate_entry(va >> 2);
+}
+
+void CPU::switch_virtual_mappings(int context)
+{
+	current_txln_cache = &block_txln_cache[context & 0xff];
+	jit_state.block_txln_cache = current_txln_cache->ptr();
 }
 
 void CPU::handle_irq_raised()

@@ -191,6 +191,7 @@ extern "C" {
 	{
 		//fatal("unhandled debug\n");
 		
-		printf("r14=%lu, rcx=%lx, r11=%lx\n", mctx->r14, mctx->rcx, mctx->r11);
+		dump_mcontext(mctx);
+		fatal("XXX");
 	}
 }

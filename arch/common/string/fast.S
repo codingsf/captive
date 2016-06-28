@@ -1,3 +1,6 @@
+.text
+
+.align 16
 .globl __fast_zero_page
 __fast_zero_page:
 	xor %eax, %eax
@@ -6,6 +9,7 @@ __fast_zero_page:
 	rep stosq %rax, %es:(%rdi)
 	ret
 
+.align 16
 .globl memset
 memset:
 	test %rsi, %rsi
@@ -19,6 +23,7 @@ memset:
 1:
 	mov %rdx, %rsi
 
+.align 16
 .globl bzero
 bzero:
 	cld
@@ -33,8 +38,28 @@ bzero:
 	movq %rsi, %rcx
 	and $3, %rcx
 
+.align 16
 2:
 	rep stosb %al, %es:(%rdi)
 
 	mov %rdi, %rax
+	ret
+
+.align 16
+.globl memcpy
+memcpy:
+	mov %rdi, %rax
+
+	cld
+
+	mov %rdx, %rcx
+	shr $3, %rcx
+	
+	rep movsq %ds:(%rsi), %es:(%rdi)
+
+	movq %rdx, %rcx
+	and $3, %rcx
+
+	rep movsb %ds:(%rsi), %es:(%rdi)
+	
 	ret

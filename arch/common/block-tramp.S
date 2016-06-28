@@ -1,5 +1,5 @@
 .text
-
+.align 16
 .globl block_trampoline
 block_trampoline:
 	push %r15
@@ -17,8 +17,8 @@ block_trampoline:
 	mov %fs:0x8, %rbp
 
 	// Load the memory event ring buffer
-	mov %fs:0x48, %r12
-	mov 0x10(%r12), %r12
+	/*mov %fs:0x48, %r12
+	mov 0x10(%r12), %r12*/
 	
 	mov 0x3c(%rbp), %r15d		// Cache the PC
 	callq *%rsi					// Run the Code

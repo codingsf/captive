@@ -86,25 +86,37 @@ void LAPIC::timer_set_periodic(bool periodic)
 
 #include <device.h>
 
+namespace captive
+{
+	namespace arch
+	{
+		uint64_t __page_fault;
+	}
+}
+
 extern "C"
 {
 	void handle_trap_timer(struct mcontext *mc)
 	{
-		if (mc->rip > 0xffffffff00000000) {
+		/*if (mc->rip > 0xffffffff00000000) {
 			printf("Q: %016lx\n", mc->rip);
 			
 			/*if (mc->rip >= (uintptr_t)&captive::arch::mmio_device_read && mc->rip < (uintptr_t)&captive::arch::mmio_device_dummy) {
 				//printf("SAMPLE: BARRIER\n");
 			} else {
 				printf("SAMPLE: INFRASTRUCTURE\n");
-			}*/
+			}* /
 			
 		} else {
 			//printf("SAMPLE: NATIVE\n");
-		}
+		}*/
+				
+		printf("PAGE FAULT: %lu\n", __page_fault);
+		__page_fault = 0;
 		
 		lapic.acknowledge_irq();
-		lapic.timer_reset(0xf00);
+		
+		lapic.timer_reset(lapic.frequency()*100);
 		lapic.timer_start();
 	}
 }

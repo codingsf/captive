@@ -1,14 +1,22 @@
 #include <jit/ir-sorter.h>
+#include <malloc/data-memory-allocator.h>
 
 using namespace captive::arch::jit;
 using namespace captive::arch::jit::algo;
 using namespace captive::shared;
 
+static uint32_t _insn_idxs[8192];
+
+IRSorter::IRSorter(TranslationContext& _ctx) : ctx(_ctx), insn_idxs(_insn_idxs) {
+
+}
+
+
 void IRSorter::perform_sort()
 {
-	insn_idxs = (uint32_t *)ctx.allocator().alloc(count() * sizeof(uint32_t));
+	//insn_idxs = (uint32_t *)malloc::data_alloc.alloc(count() * sizeof(uint32_t));
 	
-	printf("COUNT: %lu\n", ctx.count() * sizeof(IRInstruction));
+//	printf("COUNT: %lu\n", ctx.count() * sizeof(IRInstruction));
 	
 	for (uint32_t i = 0; i < ctx.count(); ++i) {
 		insn_idxs[i] = i;
@@ -17,16 +25,18 @@ void IRSorter::perform_sort()
 	do_sort();
 	
 	IRInstruction *old_buffer = ctx.get_ir_buffer();
-	IRInstruction *new_buffer = (IRInstruction *)ctx.allocator().calloc(ctx.count(), sizeof(IRInstruction));
+	IRInstruction *new_buffer = ctx.get_other_ir_buffer();
+	
+//	printf("OLD: %p, NEW: %p\n", old_buffer, new_buffer);
+	
 	for (uint32_t i = 0; i < ctx.count(); ++i) {
 		new_buffer[i] = old_buffer[insn_idxs[i]];
 	}
 
-	ctx.set_ir_buffer(new_buffer);
-	ctx.allocator().free(old_buffer);
+	ctx.swap_buffer();
 	
-	ctx.allocator().free(insn_idxs);
-	insn_idxs = NULL;
+	/*malloc::data_alloc.free(insn_idxs);
+	insn_idxs = NULL;*/
 }
 
 bool GnomeSort::do_sort()

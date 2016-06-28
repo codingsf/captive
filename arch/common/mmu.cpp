@@ -192,7 +192,11 @@ void MMU::page_table_change()
 	Memory::flush_tlb();
 	
 	// Notify the CPU to invalidate virtual mappings
-	_cpu.invalidate_virtual_mappings();
+#ifdef USE_CONTEXT_ID
+	_cpu.switch_virtual_mappings(_context_id);
+#else
+	_cpu.invalidate_virtual_mappings_current();
+#endif
 	
 	for (int i = 0; i < ITLB_SIZE; i++) {
 		itlb[i].tag = 0;
@@ -233,7 +237,7 @@ void MMU::invalidate_virtual_mappings()
 	Memory::flush_tlb();
 
 	// Notify the CPU to invalidate virtual mappings
-	_cpu.invalidate_virtual_mappings();
+	_cpu.invalidate_virtual_mappings_all();
 	
 	for (int i = 0; i < ITLB_SIZE; i++) {
 		itlb[i].tag = 0;
@@ -262,7 +266,7 @@ void MMU::invalidate_virtual_mapping(gva_t va)
 	Memory::flush_page(GVA_TO_EMULATED_HVA(va));
 	
 	// Notify the CPU to invalidate this virtual mapping
-	_cpu.invalidate_virtual_mapping(va);
+	_cpu.invalidate_virtual_mapping_current(va);
 	
 	itlb[(va >> 12) % ITLB_SIZE].tag = 0;
 }
@@ -282,11 +286,11 @@ void MMU::invalidate_virtual_mapping_by_context_id(uint32_t context_id)
 		pdp->entries[i].present(false);
 	}
 	
+	_cpu.invalidate_virtual_mappings(context_id);
+	
 	if (context_id == _context_id) {
 		Memory::flush_tlb();
-		
-		_cpu.invalidate_virtual_mappings();
-	
+			
 		for (int i = 0; i < ITLB_SIZE; i++) {
 			itlb[i].tag = 0;
 		}
@@ -394,6 +398,7 @@ bool MMU::handle_fault(struct resolution_context& rc)
 		pdp->writable(true);
 	}
 
+	bool maybe_smc;
 	if (!pd->present() || !pd->writable()) {
 		// The associated Page Table is not marked as present, so
 		// invalidate the page table and mark it as present.
@@ -411,7 +416,7 @@ bool MMU::handle_fault(struct resolution_context& rc)
 		pd->present(true);
 		pd->writable(true);
 	}
-
+	
 	// If the fault happened because of a device access, catch this early
 	// before we go over the lookup rigmaroll.
 	if (pt->device()) {

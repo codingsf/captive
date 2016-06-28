@@ -9,7 +9,6 @@
 
 #include <profile/image.h>
 #include <profile/region.h>
-#include <profile/block.h>
 
 #include <set>
 #include <map>
@@ -116,26 +115,30 @@ bool CPU::run_block_jit_safepoint()
 		
 		assert_privilege_mode();
 		
-		Block *blk = rgn->get_block(PAGE_OFFSET_OF(virt_pc));
-		if (blk->txln) {
-			auto ptr = block_txln_cache->entry_ptr(virt_pc >> 2);
-			ptr->tag = virt_pc;
-			ptr->fn = (void *)blk->txln;
-			
-			_exec_txl = true;
-			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;	
-			_exec_txl = false;
-		} else {
-			blk->txln = compile_block(rgn, blk, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
+		auto txln = rgn->get_txln(virt_pc);
+		if (!txln) {
+			txln = compile_block(rgn, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
+			rgn->set_txln(virt_pc, txln);
 			mmu().disable_writes();
-			
-			_exec_txl = true;
-			step_ok = block_trampoline(&jit_state, (void*)blk->txln) == 0;
-			_exec_txl = false;
 		}
 		
-		/*if (PAGE_ADDRESS_OF(read_pc()) == PAGE_ADDRESS_OF(virt_pc)) {
-			printf("*** Intra-page dispatch\n");
+		auto ptr = current_txln_cache->entry_ptr(virt_pc >> 2);
+		ptr->tag = virt_pc;
+		ptr->fn = (void *)txln;
+
+		_exec_txl = true;
+		step_ok = block_trampoline(&jit_state, (void*)txln) == 0;	
+		_exec_txl = false;
+
+		/*extern uint64_t __intra_pd, __inter_pd, __isr;
+		if (PAGE_ADDRESS_OF(read_pc()) == PAGE_ADDRESS_OF(virt_pc)) {
+			__intra_pd++;
+		} else {
+			__inter_pd++;
+		}
+
+		if (unlikely(cpu_data().isr)) {
+			__isr++;
 		}*/
 		
 		//printf("slc: f=%x, t=%x, %lx\n", virt_pc, read_pc(), jit_state.self_loop_count);
@@ -146,20 +149,20 @@ bool CPU::run_block_jit_safepoint()
 	return true;
 }
 
-captive::shared::block_txln_fn CPU::compile_block(Region *rgn, Block *blk, uint8_t isa_mode, gpa_t pa)
+captive::shared::block_txln_fn CPU::compile_block(Region *rgn, uint8_t isa_mode, gpa_t pa)
 {
-	TranslationContext ctx(malloc::data_alloc);
+	TranslationContext ctx(ir_buffer_a, ir_buffer_b);
 	if (!translate_block(ctx, isa_mode, pa)) {
 		fatal("jit: block translation failed\n");
 	}
 	
-	BlockCompiler compiler(ctx, malloc::code_alloc, isa_mode, pa, tagged_registers());
+	BlockCompiler compiler(ctx, malloc::code_alloc, rgn, isa_mode, pa, tagged_registers());
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		fatal("jit: block compilation failed\n");
 	}
 
-	malloc::data_alloc.free((void *)ctx.get_ir_buffer());
+	//malloc::data_alloc.free((void *)ctx.get_ir_buffer());
 	return fn;
 }
 
@@ -263,18 +266,19 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 		void *target_block = NULL, *ft_block = NULL;
 		
 		if (target_pc) {
-			target_block = (void*)rgn->get_block(PAGE_OFFSET_OF(target_pc))->txln;
+			target_block = (void *)rgn->get_txln(target_pc); // (void*)rgn->get_block(PAGE_OFFSET_OF(target_pc))->txln;
 		}
 		
 		if (fallthrough_pc) {
-			ft_block = (void*)rgn->get_block(PAGE_OFFSET_OF(fallthrough_pc))->txln;
+			ft_block = (void *)rgn->get_txln(fallthrough_pc); //(void*)rgn->get_block(PAGE_OFFSET_OF(fallthrough_pc))->txln;
 		}
 		
 		if (target_pc == pa) {
 			ctx.add_instruction(IRInstruction::loop());
 		} else {
 			if (target_block) {
-				ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
+				//ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
+				ctx.add_instruction(IRInstruction::ret());
 			} else {
 				ctx.add_instruction(IRInstruction::ret());
 			}

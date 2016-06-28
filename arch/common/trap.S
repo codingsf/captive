@@ -20,6 +20,11 @@ start:
 	movq $0xdeadbabecafef00d, %rax
 	push %rax
 
+	// Enable IO ports in R3
+	pushf
+	orl $0x3000, (%rsp)
+	popf
+
 	// Go!
 	jmp start_environment
 

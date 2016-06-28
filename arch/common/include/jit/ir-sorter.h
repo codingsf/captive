@@ -20,7 +20,7 @@ namespace captive {
 			class IRSorter
 			{
 			public:
-				IRSorter(TranslationContext& _ctx) : ctx(_ctx) { }
+				IRSorter(TranslationContext& _ctx);
 				void perform_sort();
 				
 			protected:

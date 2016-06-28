@@ -10,8 +10,8 @@
 
 #include <define.h>
 #include <string.h>
-#include <profile/block.h>
 #include <malloc/allocator.h>
+#include <shared-jit.h>
 
 namespace captive {
 	namespace shared {
@@ -20,31 +20,44 @@ namespace captive {
 
 	namespace arch {
 		namespace profile {
-			struct Block;
-
 			struct Region
 			{
-				Region() { bzero(blocks, sizeof(blocks)); }
-
-				Block *blocks[0x1000];
-				
-				inline Block *get_block(uint32_t addr)
+				enum region_addr_flags
 				{
-					Block **block_ptr = &blocks[addr & 0xfff];
-					if (*block_ptr == NULL) {
-						*block_ptr = new Block();
-					}
+					RGN_ADDR_NONE = 0,
+					RGN_ADDR_START = 1,
+					RGN_ADDR_CODE = 2,
+					RGN_ADDR_END = 3
+				};
+				
+				Region() { invalidate(); }
 
-					return *block_ptr;
+				captive::shared::block_txln_fn txlns[0x1000];
+				
+				inline captive::shared::block_txln_fn get_txln(uint32_t addr) const
+				{
+					return txlns[addr & 0xfff];
 				}
+				
+				inline void set_txln(uint32_t addr, captive::shared::block_txln_fn txln)
+				{
+					txlns[addr & 0xfff] = txln;
+				}
+				
+				/*inline void set_addr(uint32_t addr, region_addr_flags flags)
+				{
+					uint16_t bit = (addr & 0xfff) << 1;
+					
+					uint8_t mask = 3 << (bit % 8);
+					uint8_t val = (flags & 3) << (bit % 8);
+					
+					bitmap[bit / 8] &= ~mask;
+					bitmap[bit / 8] |= val;
+				}*/
 
 				inline void invalidate()
 				{
-					for (int i = 0; i < 0x1000; i++) {
-						if (blocks[i]) {
-							blocks[i]->invalidate();
-						}
-					}
+					bzero(txlns, sizeof(txlns));
 				}
 			};
 		}
@@ -52,4 +65,3 @@ namespace captive {
 }
 
 #endif	/* REGION_H */
-

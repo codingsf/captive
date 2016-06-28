@@ -45,6 +45,7 @@ void CPU::instrument_dump()
 void CPU::instrument_fn_enter(uint64_t fnptr, uint64_t callsite)
 {
 	fn_histogram[fnptr]++;
+	fprintf(stderr, "XXX\n");
 }
 
 void CPU::instrument_fn_exit(uint64_t fnptr, uint64_t callsite)

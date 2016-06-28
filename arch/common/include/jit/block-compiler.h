@@ -30,12 +30,13 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs);
+				BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, profile::Region *rgn, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs);
 				bool compile(shared::block_txln_fn& fn);
 
 			private:
 				TranslationContext& ctx;
 				x86::X86Encoder encoder;
+				profile::Region *region;
 				uint8_t isa_mode;
 				gpa_t pa;
 				const CPU::TaggedRegisters& tagged_regs;
