@@ -283,8 +283,7 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 			ctx.add_instruction(IRInstruction::loop());
 		} else {
 			if (target_block) {
-				//ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
-				ctx.add_instruction(IRInstruction::ret());
+				ctx.add_instruction(IRInstruction::dispatch(IROperand::const32(target_pc & 0xfff), IROperand::const32(fallthrough_pc & 0xfff), IROperand::const64((uint64_t)target_block), IROperand::const64((uint64_t)ft_block)));
 			} else {
 				ctx.add_instruction(IRInstruction::ret());
 			}

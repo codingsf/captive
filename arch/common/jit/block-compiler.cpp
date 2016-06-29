@@ -1385,11 +1385,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				IRInstruction *next = insn + 1;
 				
-				if (0 && target->is_alloc_reg() &&
+				if (target->is_alloc_reg() &&
 						offset->is_constant() &&
 						next->type == IRInstruction::CMPEQ && 
 						next->operands[0].is_constant() &&
-						next->operands[0].value == 0 &&
 						next->operands[1].is_alloc_reg() &&
 						next->operands[1].alloc_data == target->alloc_data &&
 						next->operands[2].is_alloc_reg() &&
@@ -1401,13 +1400,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						switch (target->size)
 						{
 						case 1:
-							encoder.cmp1(0, X86Memory::get(REGSTATE_REG, offset->value));
+							encoder.cmp1(next->operands[0].value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 2:
-							encoder.cmp2(0, X86Memory::get(REGSTATE_REG, offset->value));
+							encoder.cmp2(next->operands[0].value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 4:
-							encoder.cmp4(0, X86Memory::get(REGSTATE_REG, offset->value));
+							encoder.cmp4(next->operands[0].value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						default:
 							assert(false);
@@ -1418,7 +1417,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 
 						{
 							uint32_t reloc_offset;
-							encoder.jnz_reloc(reloc_offset);
+							encoder.jz_reloc(reloc_offset);
 							block_relocations.push_back({reloc_offset, (IRBlockId)tt->value});
 						}
 
@@ -1428,19 +1427,19 @@ bool BlockCompiler::lower(uint32_t max_stack)
 							block_relocations.push_back({reloc_offset, (IRBlockId)ft->value});
 						}
 						
-						dump_this_shit = true;
+						//dump_this_shit = true;
 						insn++;
 					} else {
 						switch (target->size)
 						{
 						case 1:
-							encoder.cmp1(0, X86Memory::get(REGSTATE_REG, offset->value));
+							encoder.cmp1(next->operands[0].value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 2:
-							encoder.cmp2(0, X86Memory::get(REGSTATE_REG, offset->value));
+							encoder.cmp2(next->operands[0].value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						case 4:
-							encoder.cmp4(0, X86Memory::get(REGSTATE_REG, offset->value));
+							encoder.cmp4(next->operands[0].value, X86Memory::get(REGSTATE_REG, offset->value));
 							break;
 						default:
 							assert(false);
