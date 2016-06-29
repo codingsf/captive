@@ -8,8 +8,17 @@
 
 using namespace captive::arch;
 
+namespace captive{
+	namespace arch{
+extern uint64_t __page_faults;		
+	}
+}
+
+
 static void handle_device_fault(captive::arch::CPU *core, struct mcontext *mctx, gpa_t dev_addr)
 {
+	__page_faults++;
+	
 	//printf("fault: device fault rip=%lx\n", mctx->rip);
 
 	/*printf("code: ");

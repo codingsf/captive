@@ -28,6 +28,8 @@ extern "C" int block_trampoline(void *, void*);
 extern "C" void prebuilt_11000(void);
 extern "C" void prebuilt_11010(void);
 
+static uint64_t __native_start;
+
 bool CPU::run_block_jit()
 {
 	printf("cpu: starting block-jit cpu execution\n");
@@ -39,6 +41,8 @@ bool CPU::run_block_jit()
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
 	if (rc > 0) {
+		//printf("TIME: %lu\n", __rdtsc() - __native_start);
+		
 		// We're no longer executing a translation
 		_exec_txl = false;
 		
@@ -127,7 +131,9 @@ bool CPU::run_block_jit_safepoint()
 		ptr->fn = (void *)txln;
 
 		_exec_txl = true;
-		step_ok = block_trampoline(&jit_state, (void*)txln) == 0;	
+		//__native_start = __rdtsc();
+		step_ok = block_trampoline(&jit_state, (void*)txln) == 0;
+		//printf("TIME: %lu\n", __rdtsc() - __native_start);
 		_exec_txl = false;
 
 		/*extern uint64_t __intra_pd, __inter_pd, __isr;

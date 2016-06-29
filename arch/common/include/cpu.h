@@ -102,8 +102,7 @@ namespace captive {
 				return current_cpu->_per_cpu_data;
 			}
 
-			virtual void *reg_state() = 0;
-			virtual size_t reg_state_size() = 0;
+			inline void *reg_state() const { return _reg_state; }
 			
 			inline TaggedRegisters& tagged_registers() { return tagged_reg_offsets; }
 
@@ -142,6 +141,7 @@ namespace captive {
 			MMU *_mmu;
 			JIT *_jit;
 			std::map<uint32_t, const char *> _reg_names;
+			void *_reg_state;
 			
 			virtual bool decode_instruction_virt(uint8_t isa, gva_t addr, Decode *insn) = 0;
 			virtual bool decode_instruction_phys(uint8_t isa, gpa_t addr, Decode *insn) = 0;

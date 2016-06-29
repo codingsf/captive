@@ -53,7 +53,6 @@ extern "C" {
 		
 		printf("calibrating lapic...\n");
 		captive::arch::x86::lapic.calibrate(captive::arch::x86::pit);
-		printf("lapic frequency=%u\n", captive::arch::x86::lapic.frequency());
 		
 		// Initialise the printf() system.
 		printf("initialising printf @ %p\n", cpu_data->guest_data->printf_buffer);
@@ -75,7 +74,7 @@ extern "C" {
 //#define INTERNAL_PERF
 #ifdef INTERNAL_PERF
 		printf("starting perf...\n");
-		captive::arch::x86::lapic.timer_reset(0x1000);
+		captive::arch::x86::lapic.timer_reset(captive::arch::x86::lapic.frequency() >> 4);
 		captive::arch::x86::lapic.timer_set_periodic(true);
 		captive::arch::x86::lapic.timer_start();
 #endif

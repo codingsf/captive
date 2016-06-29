@@ -159,6 +159,8 @@ namespace captive {
 			static uintptr_t alloc_pgt();
 
 		public:
+			static void disable_caching(hva_t addr);
+			
 			static inline void flush_page(hva_t addr) {
 				asm volatile("invlpg (%0)\n" :: "r"((uint64_t)addr) : "memory");
 			}

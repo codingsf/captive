@@ -31,12 +31,4 @@ void PIT::stop() {
 
 }
 
-unsigned int PIT::expired()
-{
-	uint8_t expired;
-	asm volatile("inb $0x61, %0" : "=a"(expired));
-
-	return !(expired & 0x20);
-}
-
 PIT captive::arch::x86::pit;

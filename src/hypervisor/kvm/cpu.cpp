@@ -51,7 +51,7 @@ bool KVMCpu::init()
 
 	if (!CPU::init())
 		return false;
-
+	
 	if (!setup_interrupts())
 		return false;
 
@@ -70,6 +70,23 @@ bool KVMCpu::init()
 		ERROR << CONTEXT(CPU) << "Unable to mmap CPU run struct";
 		return false;
 	}
+	
+	/*struct kvm_cpuid2 *cpuid = (struct kvm_cpuid2 *)malloc(sizeof(struct kvm_cpuid2) + (sizeof(struct kvm_cpuid_entry2) * 16));
+	cpuid->nent = 1;
+	
+	if (vmioctl(KVM_GET_CPUID2, cpuid)) {
+		free(cpuid);
+		ERROR << "Unable to read CPUID";
+		return false;
+	}
+	
+	if (vmioctl(KVM_SET_CPUID2, cpuid)) {
+		free(cpuid);
+		ERROR << "Unable to update CPUID";
+		return false;
+	}
+	
+	free(cpuid);*/
 
 	_initialised = true;
 	return true;

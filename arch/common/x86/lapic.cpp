@@ -1,5 +1,6 @@
 #include <x86/lapic.h>
 #include <x86/pit.h>
+#include <mm.h>
 #include <printf.h>
 #include <map>
 
@@ -8,8 +9,10 @@ using namespace captive::arch::x86;
 
 void LAPIC::initialise()
 {
+	Memory::disable_caching((hva_t)LAPIC_MEM_BASE);
+	
 	uint64_t lapic_msr_val = __rdmsr(0x1b);
-	printf("lapic msr=%lx, base=%p\n", lapic_msr_val, LAPIC_MEM_BASE);
+	printf("lapic: msr=%lx, base=%p\n", lapic_msr_val, LAPIC_MEM_BASE);
 
 	lapic_write(SVR, 0x1ff);
 
@@ -17,6 +20,9 @@ void LAPIC::initialise()
 	lapic_write(LINT0, MASKED);
 	lapic_write(LINT1, MASKED);
 	lapic_write(ERROR, MASKED);
+	
+	if (((lapic_read(VER) >> 16) & 0xFF) >= 4)
+		lapic_write(PCINT, MASKED);
 
 	lapic_write(ESR, 0);
 	lapic_write(ESR, 0);
@@ -28,22 +34,29 @@ void LAPIC::initialise()
 
 	while (lapic_read(ICRLO) & DELIVS);
 
+	lapic_write(TDCR, 3);
+	lapic_write(TIMER, 0x20 | MASKED | PERIODIC);
+	lapic_write(TICR, 1);
+
 	lapic_write(TPR, 0);
-	lapic_write(TIMER, 0x20 | MASKED);
+	
+	printf("lapic: id=%d, timer=%08x\n", lapic_read(ID), lapic_read(TIMER));
 	
 	timer_reset();
 }
 
 void LAPIC::calibrate(PIT& pit)
 {
-	#define PIT_FREQUENCY 		1193180
-	#define CALIBRATION_FREQUENCY	100
+	#define FACTOR					1000
+	#define PIT_FREQUENCY			(1193180)
+	#define CALIBRATION_PERIOD		(10)
+	#define CALIBRATION_TICKS		(uint16_t)((PIT_FREQUENCY * CALIBRATION_PERIOD) / FACTOR)
 
-	uint32_t period = (PIT_FREQUENCY / CALIBRATION_FREQUENCY);
 	timer_reset();
 	timer_set_periodic(false);
 
-	pit.initialise_oneshot(period);
+	printf("pit: ticks=%d\n", (uint32_t)CALIBRATION_TICKS);
+	pit.initialise_oneshot(CALIBRATION_TICKS);		// 10ms
 	pit.start();
 
 	timer_start();
@@ -54,13 +67,19 @@ void LAPIC::calibrate(PIT& pit)
 
 	uint32_t ticks_per_period = (0xffffffff - timer_read());
 	ticks_per_period <<= 4;
+	
+	printf("lapic: ticks-per-period=%d\n", ticks_per_period);
 
-	_frequency = ticks_per_period / 100;
+	_frequency = (ticks_per_period * (FACTOR/CALIBRATION_PERIOD));
+
+	printf("lapic: frequency=%lu\n", _frequency);
 }
 
 void LAPIC::timer_start()
 {
+	printf("before:%08x\n", lapic_read(TIMER));
 	lapic_clear(TIMER, MASKED);
+	printf("after:%08x\n", lapic_read(TIMER));
 }
 
 void LAPIC::timer_stop()
@@ -71,7 +90,6 @@ void LAPIC::timer_stop()
 void LAPIC::timer_reset(uint32_t init_val)
 {
 	lapic_set(TIMER, MASKED);
-	lapic_write(TDCR, 3);
 	lapic_write(TICR, init_val);
 }
 
@@ -84,13 +102,21 @@ void LAPIC::timer_set_periodic(bool periodic)
 	}
 }
 
+void LAPIC::timer_oneshot(uint32_t milliseconds)
+{
+	lapic_set(TIMER, MASKED);
+	lapic_clear(TIMER, PERIODIC);
+	lapic_write(TICR, ((_frequency >> 4) * milliseconds) / 1000);
+	lapic_clear(TIMER, MASKED);
+}
+
 #include <device.h>
 
 namespace captive
 {
 	namespace arch
 	{
-		uint64_t __page_fault;
+		uint64_t __page_faults;
 	}
 }
 
@@ -111,13 +137,12 @@ extern "C"
 			//printf("SAMPLE: NATIVE\n");
 		}*/
 				
-		printf("PAGE FAULT: %lu\n", __page_fault);
-		__page_fault = 0;
+		/*printf("PAGE FAULTS: %lu\n", __page_faults);
+		__page_faults = 0;*/
 		
+		//printf("XXXXX\n");
 		lapic.acknowledge_irq();
-		
-		lapic.timer_reset(lapic.frequency()*100);
-		lapic.timer_start();
+		//lapic.timer_oneshot(1000);
 	}
 }
 

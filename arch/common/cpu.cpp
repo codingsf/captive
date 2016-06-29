@@ -30,6 +30,9 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	_per_cpu_data(per_cpu_data),
 	_exec_txl(false)
 {
+	// Allocate the register state.
+	_reg_state = malloc::page_alloc.alloc_pages(2);
+	
 	// Zero out the local state.
 	bzero(&local_state, sizeof(local_state));
 	bzero(&jit_state, sizeof(jit_state));

@@ -31,7 +31,14 @@ namespace captive
 				
 				void start();
 				void stop();
-				unsigned int expired();
+				
+				inline unsigned int expired() const
+				{
+					uint8_t expired;
+					asm volatile("inb $0x61, %0" : "=a"(expired));
+
+					return !(expired & 0x20);
+				}
 			};
 			
 			extern PIT pit;

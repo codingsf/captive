@@ -20,8 +20,9 @@ archs := arm
 arch-outs := $(patsubst %,$(top-dir)/%.arch,$(archs))
 arch-cleans := $(patsubst %,$(top-dir)/%.arch.clean,$(archs))
 
-export common-cflags := -I$(shared-dir) -nostdlib -nostdinc -g -fno-builtin -fno-omit-frame-pointer -mno-sse -Wall $(ndebug)
-export common-cflags += -mno-mmx -mno-sse2 -O3 -mcmodel=kernel -fno-rtti -fno-exceptions -std=gnu++14
+export common-cflags := -I$(shared-dir) -nostdlib -nostdinc -g -fno-builtin -fno-omit-frame-pointer -Wall $(ndebug)
+export common-cflags += -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-ssse3 -mno-sse4.1 -mno-sse4.2 -mno-sse4 -mno-avx -mno-aes -mno-sse4a -mno-fma4
+export common-cflags += -O3 -mcmodel=kernel -fno-rtti -fno-exceptions -std=gnu++14
 export common-cflags += -fno-delete-null-pointer-checks -mno-red-zone
 #export common-cflags += -finstrument-functions
 

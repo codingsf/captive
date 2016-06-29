@@ -25,3 +25,18 @@ uintptr_t Memory::alloc_pgt()
 	//zero_page((void *)va);
 	return pa;
 }
+
+void Memory::disable_caching(hva_t va)
+{
+	page_map_entry_t* pm;
+	page_dir_ptr_entry_t* pdp;
+	page_dir_entry_t* pd;
+	page_table_entry_t* pt;
+
+	get_va_table_entries(va, pm, pdp, pd, pt);
+	
+	pt->cache_disabled(true);
+	pt->write_through(true);
+
+	flush_page(va);
+}
