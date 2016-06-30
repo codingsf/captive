@@ -87,15 +87,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 {
 	uint32_t max_stack = 0;
 
-	//~ printf("*** %x\n", pa);
-
-	//printf("*** before:\n");
-	//dump_ir();
-	
-#ifdef TIMER
-	tick_timer timer(0);
+	tick_timer<false> timer;
 	timer.reset();
-#endif
 	
 #ifdef VERIFY_IR
 	if (!verify()) {
@@ -106,53 +99,36 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 #endif
 	
 	if (!reorder_blocks()) return false;
-#ifdef TIMER
 	timer.tick("block-reorder");
-#endif
 	
 	if (!thread_jumps()) return false;
-#ifdef TIMER
 	timer.tick("jump-threading");
-#endif
 	
 	if (!dbe()) return false;
-#ifdef TIMER
 	timer.tick("dead-block-elimination");
-#endif
 	
 	sort_ir();
 	
 	if (!merge_blocks()) return false;
-#ifdef TIMER
 	timer.tick("block-merging");
-#endif
 	
 	if (!constant_prop()) return false;
-#ifdef TIMER
 	timer.tick("constant-propagation");
-#endif
 	
 	if (!peephole()) return false;
-#ifdef TIMER
 	timer.tick("peepholer");
-#endif
 	
 	//if (!value_merging()) return false;
-#ifdef TIMER
+
 	timer.tick("value-merging");
-#endif
 	
 	sort_ir();
 	if(!reg_value_reuse()) return false;
 
-#ifdef TIMER
 	timer.tick("reg-val-reuse");
-#endif
 	
 	if (!sort_ir()) return false;
-#ifdef TIMER
 	timer.tick("sort");
-#endif
 	
 #ifdef VERIFY_IR
 	if (!verify()) {
@@ -163,27 +139,17 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 #endif
 	
 	if (!analyse(max_stack)) return false;
-#ifdef TIMER
 	timer.tick("reg-allocation");
-#endif
 	
 #ifndef VERIFY_IR
 	if( !post_allocate_peephole()) return false;
-#ifdef TIMER
 	timer.tick("post-alloc-peepholer");
-#endif
 #endif
 	
 	if( !lower_stack_to_reg()) return false;
-#ifdef TIMER
 	timer.tick("mem-2-reg");
-#endif	
+
 	sort_ir();
-	
-	//printf("*** after:\n");
-	
-	//printf("XXXXX: %08x", pa);
-	//dump_ir();
 	
 #ifdef VERIFY_IR
 	if (!verify()) {
@@ -203,10 +169,8 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}*/
 
-#ifdef TIMER	
 	timer.tick("lower");
 	timer.dump("compile ");
-#endif
 	
 	encoder.finalise();
 	
@@ -634,7 +598,7 @@ static struct insn_descriptor insn_descriptors[] = {
 
 bool BlockCompiler::analyse(uint32_t& max_stack)
 {
-	tick_timer timer(0);
+	tick_timer<false> timer;
 	timer.reset();
 	
 	IRBlockId latest_block_id = INVALID_BLOCK_ID;
@@ -888,7 +852,7 @@ bool BlockCompiler::analyse(uint32_t& max_stack)
 
 bool BlockCompiler::thread_jumps()
 {
-	tick_timer timer(0);
+	tick_timer<false> timer;
 	timer.reset();
 	
 	std::vector<IRInstruction*> first_instructions(ctx.block_count(), NULL);
@@ -977,7 +941,7 @@ bool BlockCompiler::thread_jumps()
 
 bool BlockCompiler::dbe()
 {
-	tick_timer timer(0);
+	tick_timer<false> timer;
 	timer.reset();
 	
 	std::vector<bool> live_blocks (ctx.block_count(), false);
@@ -1016,7 +980,7 @@ bool BlockCompiler::dbe()
 
 bool BlockCompiler::merge_blocks()
 {
-	tick_timer timer (0);
+	tick_timer<false> timer;
 	timer.reset();
 	std::vector<IRBlockId> succs (ctx.block_count(), -1);
 	std::vector<int> pred_count (ctx.block_count(), 0);
@@ -3674,7 +3638,7 @@ bool BlockCompiler::constant_prop()
 
 bool BlockCompiler::reorder_blocks()
 {
-	tick_timer timer(0);
+	tick_timer<false> timer;
 	timer.reset();
 	
 	std::vector<IRBlockId> reordering (ctx.block_count(), NOP_BLOCK);

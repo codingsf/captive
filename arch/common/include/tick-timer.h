@@ -6,19 +6,34 @@
 #include <malloc/malloc.h>
 #include <string.h>
 
+template<bool enabled>
 class tick_timer
 {
+
+};
+
+template<>
+class tick_timer<false>
+{
+public:
+	inline void reset() { }
+	inline void tick(const char *tickname = NULL) { }
+	inline void dump(const char *prefix=NULL) { }
+};
+
+template<>
+class tick_timer<true>
+{
 	public:
-		tick_timer(bool enabled = 1) : enabled(enabled) {}
+		tick_timer() {}
 		~tick_timer() {
 			for(auto i : names) {
 				if(i) captive::arch::malloc::data_alloc.free(i);
 			}
 		}
 	
-		void reset() { if(!enabled) return; ticks.clear(); tick("Start"); }
+		void reset() { ticks.clear(); tick("Start"); }
 		void tick(const char *tickname = NULL) { 
-			if(!enabled) return; 
 			ticks.push_back(__rdtsc()); 
 			if(tickname)names.push_back(strdup(tickname));
 			else names.push_back(NULL);
@@ -26,7 +41,6 @@ class tick_timer
 		
 		void dump(const char *prefix=NULL) 
 		{
-			if(!enabled) return;
 			if(prefix) printf(prefix);
 			uint64_t last = ticks[0];
 			for(uint32_t i = 1; i < ticks.size(); ++i) {
@@ -41,7 +55,6 @@ class tick_timer
 	private:
 		std::vector<uint64_t> ticks;
 		std::vector<char *> names;
-		bool enabled;
 };
 
 #endif
