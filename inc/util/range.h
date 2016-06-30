@@ -19,7 +19,7 @@ namespace captive
 	namespace util
 	{
 		template< typename T >
-		class range
+		struct range
 		{
 		public:
 			typedef T value_type;

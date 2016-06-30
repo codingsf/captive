@@ -318,7 +318,7 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 		captive::lock::barrier_wait(&pgd->fast_device.hypervisor_barrier, FAST_DEV_HYPERVISOR_TID);
 		if (pgd->fast_device.operation == FAST_DEV_OP_QUIT) break;
 		
-		auto devices = guest->devices;
+		auto& devices = guest->devices;
 		uint64_t addr = pgd->fast_device.address;
 		auto dev = devices.find(devices_range_type(addr));
 		if (dev == devices.end())

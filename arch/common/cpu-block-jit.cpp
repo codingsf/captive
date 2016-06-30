@@ -119,14 +119,14 @@ bool CPU::run_block_jit_safepoint()
 		
 		assert_privilege_mode();
 		
-		auto txln = rgn->get_txln(virt_pc);
+		captive::shared::block_txln_fn txln = rgn->get_txln(virt_pc);
 		if (!txln) {
 			txln = compile_block(rgn, *tagged_registers().ISA, region_phys_base | PAGE_OFFSET_OF(virt_pc));
 			rgn->set_txln(virt_pc, txln);
 			mmu().disable_writes();
 		}
 		
-		auto ptr = current_txln_cache->entry_ptr(virt_pc >> 2);
+		block_chain_cache_entry *ptr = current_txln_cache->entry_ptr(virt_pc >> 2);
 		ptr->tag = virt_pc;
 		ptr->fn = (void *)txln;
 

@@ -1297,7 +1297,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					}
 				} else if (dest->is_alloc_stack()) {
 					if(source->value == 0) {
-						auto temp_reg = get_temp(0, dest->size);
+						x86::X86Register& temp_reg = get_temp(0, dest->size);
 						encoder.xorr(temp_reg, temp_reg);
 						encoder.mov(temp_reg, stack_from_operand(dest));
 					} else {				
@@ -2939,7 +2939,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						break;
 					}
 				} else {
-					auto operand = stack_from_operand(dest);
+					X86Memory operand = stack_from_operand(dest);
 
 					switch (insn->type) {
 					case IRInstruction::SHL:
@@ -3401,7 +3401,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		}
 	}
 
-	for (auto reloc : block_relocations) {
+	for (auto& reloc : block_relocations) {
 		int32_t value = native_block_offsets[reloc.second];
 		value -= reloc.first;
 		value -= 4;
