@@ -158,11 +158,16 @@ bool BlockCompiler::compile(block_txln_fn& fn)
 		return false;
 	}
 #endif
-		
+	
 	if (!lower(max_stack)) {
 		encoder.destroy_buffer();
 		return false;
 	}
+	
+	/*if (!peeplower(max_stack)) {
+		encoder.destroy_buffer();
+		return false;
+	}*/
 	
 	/*if (!lower_to_interpreter()) {
 		encoder.destroy_buffer();
@@ -1342,7 +1347,14 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			
 			if (offset->is_constant() && offset->value == REG_OFFSET_OF(PC)) {
 				if (target->is_alloc_reg()) {
-					encoder.mov(REG_R15D, register_from_operand(target));
+					IRInstruction *next = insn+1;
+					
+					if (next->type == IRInstruction::ADD && next->operands[0].is_constant() && next->operands[1].is_alloc_reg() && next->operands[1].alloc_data == target->alloc_data) {
+						encoder.lea(X86Memory::get(REG_R15D, next->operands[0].value), register_from_operand(target));
+						ir_idx++;
+					} else {
+						encoder.mov(REG_R15D, register_from_operand(target));
+					}
 				} else {
 					fatal("WHOA");
 				}
@@ -1392,7 +1404,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 						}
 						
 						//dump_this_shit = true;
-						insn++;
+						ir_idx += 2;
 					} else {
 						switch (target->size)
 						{
@@ -1409,10 +1421,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 							assert(false);
 						}
 
-						encoder.setne(register_from_operand(&next->operands[2], 1));
+						encoder.sete(register_from_operand(&next->operands[2], 1));
+						
+						ir_idx++;
 					}
-					
-					insn++;
 				} else {
 					IRInstruction *mod_insn, *store_insn, *potential_killer;
 					mod_insn = insn+1;
@@ -1882,6 +1894,17 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					}
 				} else {
 					if (value->type == IROperand::CONSTANT) {
+						IRInstruction *next = insn+1;
+						
+						/*if (next->type == IRInstruction::WRITE_REG && 
+								next->operands[0].is_constant() && 
+								next->operands[1].is_constant() &&
+								(next->operands[1].value == offset->value-1 || next->operands[1].value == offset->value+1)) {
+							
+							dump_this_shit = true;
+						}*/
+						
+						
 						switch (value->size) {
 						case 8:
 							encoder.mov(value->value, get_temp(0, 8));
