@@ -48,7 +48,7 @@ namespace captive {
 			struct TaggedRegisters {
 				void *base;
 				uint32_t *PC, *SP;
-				uint8_t *C, *Z, *N, *V, *Q, *ISA;
+				uint8_t *C, *Z, *N, *V, *Q, *I, *ISA;
 			};
 			
 			CPU(Environment& env, PerCPUData *per_cpu_data);

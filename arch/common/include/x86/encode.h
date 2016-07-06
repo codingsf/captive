@@ -321,6 +321,8 @@ namespace captive {
 				void clc();
 				void stc();
 				void cmc();
+				void cli();
+				void sti();
 
 				void setcc(uint8_t v, const X86Register& dst);
 				void setcc(uint8_t v, const X86Memory& dst);

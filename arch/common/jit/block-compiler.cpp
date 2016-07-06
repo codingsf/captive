@@ -1895,16 +1895,16 @@ bool BlockCompiler::lower(uint32_t max_stack)
 				} else {
 					if (value->type == IROperand::CONSTANT) {
 						IRInstruction *next = insn+1;
-						
+
 						/*if (next->type == IRInstruction::WRITE_REG && 
 								next->operands[0].is_constant() && 
 								next->operands[1].is_constant() &&
 								(next->operands[1].value == offset->value-1 || next->operands[1].value == offset->value+1)) {
-							
+
 							dump_this_shit = true;
 						}*/
-						
-						
+
+
 						switch (value->size) {
 						case 8:
 							encoder.mov(value->value, get_temp(0, 8));

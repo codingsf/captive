@@ -1096,6 +1096,16 @@ void X86Encoder::cmc()
 	emit8(0xf5);
 }
 
+void X86Encoder::cli()
+{
+	emit8(0xfa);
+}
+
+void X86Encoder::sti()
+{
+	emit8(0xfb);
+}
+
 void X86Encoder::bsr(const X86Register& src, const X86Register& dst)
 {
 	assert(src.size == dst.size);
