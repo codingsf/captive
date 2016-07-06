@@ -515,6 +515,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "mov",		.format = "IOXXXX", .has_side_effects = false },
 	{ .mnemonic = "cmov",		.format = "XXXXXX", .has_side_effects = false },
 	{ .mnemonic = "ldpc",		.format = "OXXXXX", .has_side_effects = false },
+	{ .mnemonic = "stpc",		.format = "IXXXXX", .has_side_effects = true },
 	{ .mnemonic = "inc-pc",		.format = "IXXXXX", .has_side_effects = true },
 	
 	{ .mnemonic = "vector insert",	.format = "IIIXXX", .has_side_effects = false },
@@ -1183,7 +1184,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 		encoder.sub(max_stack-0x40, REG_RSP);
 	
 #ifdef BLOCK_ENTRY_TRACKING
-	encoder.mov(REG_R15D, X86Memory::get(REG_FS, 0x58));
+	encoder.mov(PC_REG, X86Memory::get(REG_FS, 0x58));
 #endif
 	
 	uint32_t block_start_offset = encoder.current_offset();
@@ -1350,10 +1351,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					IRInstruction *next = insn+1;
 					
 					if (next->type == IRInstruction::ADD && next->operands[0].is_constant() && next->operands[1].is_alloc_reg() && next->operands[1].alloc_data == target->alloc_data) {
-						encoder.lea(X86Memory::get(REG_R15D, next->operands[0].value), register_from_operand(target));
+						encoder.lea(X86Memory::get(PC_REG, next->operands[0].value), register_from_operand(target));
 						ir_idx++;
 					} else {
-						encoder.mov(REG_R15D, register_from_operand(target));
+						encoder.mov(PC_REG, register_from_operand(target));
 					}
 				} else {
 					fatal("WHOA");
@@ -1629,7 +1630,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			if(jump_via_offsets) {
 				if(has_fallthrough) {
 					//load PC into EBX
-					encoder.mov(REG_R15D, REG_EBX);
+					encoder.mov(PC_REG, REG_EBX);
 
 					//mask page offset of PC (we already know that both targets land in this page)
 					encoder.andd(0xfff, REG_EBX);
@@ -1650,7 +1651,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			} else {
 				if(has_fallthrough) {
 					//load PC into EBX
-					encoder.mov(REG_R15D, REG_EBX);
+					encoder.mov(PC_REG, REG_EBX);
 
 					//mask page offset of PC (we already know that both targets land in this page)
 					encoder.andd(0xfff, REG_EBX);
@@ -1691,7 +1692,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.jnz((int8_t)0);
 			
 #ifdef BLOCK_ENTRY_TRACKING
-			encoder.cmp(REG_R15D, X86Memory::get(REG_FS, 0x58));
+			encoder.cmp(PC_REG, X86Memory::get(REG_FS, 0x58));
 			encoder.jne(9);
 			encoder.incq(X86Memory::get(REG_FS, 0x60));
 //			encoder.intt(0x90);
@@ -1702,13 +1703,13 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// 8	pointer (8 bytes)
 
 			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
-			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
+			encoder.mov(PC_REG, REG_EAX);									// Load the PC
 
 			//encoder.andd(0x3fffc, REG_EAX);									// Mask the PC
 			//encoder.andd(0x3ffc, REG_EAX);
 			encoder.andd(0x7ffc, REG_EAX);
 			
-			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
+			encoder.cmp(PC_REG, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
 			
 			uint32_t jump_offset2 = encoder.current_offset() + 1;
 			encoder.jne((int8_t)0);											// Tags match?			
@@ -1735,7 +1736,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			encoder.jnz((int8_t)0);
 
 			// Check to see if this is a self-loop
-			encoder.mov(REG_R15D, REG_EAX);
+			encoder.mov(PC_REG, REG_EAX);
 			encoder.andd(0xfff, REG_EAX);
 			encoder.cmp((pa & 0xfff), REG_EAX);
 			encoder.je((int32_t)(block_start_offset - encoder.current_offset() - 6));
@@ -1745,10 +1746,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			// 8	pointer (8 bytes)
 
 			encoder.mov(X86Memory::get(REG_FS, 32), REG_RBX);				// Load the cache base address
-			encoder.mov(REG_R15D, REG_EAX);									// Load the PC
+			encoder.mov(PC_REG, REG_EAX);									// Load the PC
 			encoder.andd(0x7ffc, REG_EAX);									// Mask the PC
 
-			encoder.cmp(REG_R15D, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
+			encoder.cmp(PC_REG, X86Memory::get(REG_RBX, 0, REG_RAX, 4));	// Compare PC with cache entry tag
 
 			uint32_t jump_offset2 = encoder.current_offset() + 1;
 			encoder.jne((int8_t)0);											// Tags match?
@@ -1816,11 +1817,11 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					switch (insn->type) {
 					case IRInstruction::ADD:
 						//encoder.add(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
-						encoder.add(REG_R15D, register_from_operand(dest));
+						encoder.add(PC_REG, register_from_operand(dest));
 						break;
 					case IRInstruction::SUB:
 						//encoder.sub(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), register_from_operand(dest));
-						encoder.sub(REG_R15D, register_from_operand(dest));
+						encoder.sub(PC_REG, register_from_operand(dest));
 						break;
 					default:
 						assert(false);
@@ -1880,12 +1881,12 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					assert(value->size == 4);
 
 					if (value->type == IROperand::CONSTANT) {
-						encoder.mov(value->value, REG_R15D);
+						encoder.mov(value->value, PC_REG);
 					} else if (value->type == IROperand::VREG) {
 						if (value->is_alloc_reg()) {
-							encoder.mov(register_from_operand(value), REG_R15D);
+							encoder.mov(register_from_operand(value), PC_REG);
 						} else if (value->is_alloc_stack()) {
-							encoder.mov(stack_from_operand(value), REG_R15D);
+							encoder.mov(stack_from_operand(value), PC_REG);
 						} else {
 							assert(false);
 						}
@@ -2100,10 +2101,10 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					
 					//printf("LDPC BY %d %d @ %08x\n", amt, insn->unsafe_next()->operands[0].value, pa);
 					
-					encoder.lea(X86Memory::get(REG_R15D, amt), register_from_operand(target));
+					encoder.lea(X86Memory::get(PC_REG, amt), register_from_operand(target));
 					ir_idx++;
 				} else {
-					encoder.mov(REG_R15D, register_from_operand(target));
+					encoder.mov(PC_REG, register_from_operand(target));
 				}
 			} else {
 				assert(false);
@@ -2117,11 +2118,22 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *amount = &insn->operands[0];
 
 			if (amount->is_constant()) {
-				//encoder.add(amount->value, REG_R15D);
-				encoder.lea(X86Memory::get(REG_R15D, amount->value), REG_R15D);
-				
-				// TODO: FIXME: XXX: HACK HACK HACK
-				//encoder.add4(amount->value, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
+				encoder.lea(X86Memory::get(PC_REG, amount->value), PC_REG);
+			} else {
+				assert(false);
+			}
+
+			break;
+		}
+		
+		case IRInstruction::STPC:
+		{
+			IROperand *value = &insn->operands[0];
+
+			if (value->is_constant()) {
+				encoder.mov(value->value, PC_REG);
+			} else if (value->is_alloc_reg()) {
+				encoder.mov(register_from_operand(value), PC_REG);
 			} else {
 				assert(false);
 			}
@@ -3415,9 +3427,7 @@ void BlockCompiler::emit_save_reg_state(int num_operands, stack_map_t &stack_map
 			stack_offset += 8;
 		}
 	}
-	
-	encoder.mov(REG_R15D, X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)));
-	
+		
 #ifdef CALLER_SAVE_REGSTATE
 	encoder.push(REGSTATE_REG);
 #endif
@@ -3445,8 +3455,6 @@ void BlockCompiler::emit_restore_reg_state(int num_operands, stack_map_t &stack_
 #ifdef CALLER_SAVE_REGSTATE
 	encoder.pop(REGSTATE_REG);
 #endif
-	
-	encoder.mov(X86Memory::get(REGSTATE_REG, REG_OFFSET_OF(PC)), REG_R15D);
 }
 
 void BlockCompiler::encode_operand_function_argument(IROperand *oper, const X86Register& target_reg, stack_map_t &stack_map)

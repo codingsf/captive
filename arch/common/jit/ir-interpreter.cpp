@@ -221,11 +221,12 @@ static bool execute_ir(CPU *cpu, IRInstruction *ir, uint32_t count)
 			break;
 
 		case IRInstruction::INCPC:
-			cpu->inc_pc(load_value(ctx, oper0));
+			//cpu->inc_pc(load_value(ctx, oper0));
+			__PC += load_value(ctx, oper0);
 			break;
 			
 		case IRInstruction::LDPC:
-			store_value(ctx, oper0, cpu->read_pc());
+			store_value(ctx, oper0, __PC); //cpu->read_pc());
 			break;
 			
 		case IRInstruction::CALL:

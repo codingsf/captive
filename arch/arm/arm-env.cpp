@@ -44,7 +44,7 @@ bool arm_environment::prepare_boot_cpu(CPU* core)
 	
 	arm_core->reg_offsets.RB[2]  = 0x100;	// Device Tree / ATAGs
 	arm_core->reg_offsets.RB[12] = per_guest_data->entrypoint;		// Kernel Entry Point
-	arm_core->reg_offsets.RB[15] = 0;		// Start Address
+	write_pc(0);
 	
 	return true;
 }

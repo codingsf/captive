@@ -30,8 +30,7 @@ extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, 
 	switch (opcode) {
 	case 0:	// START
 	{
-		uint32_t pc = cpu->read_pc();
-		printf("[%08x] %25s ", pc, cpu->disassemble_address(*cpu->tagged_registers().ISA, pc));
+		printf("[%08x] %25s ", __PC, cpu->disassemble_address(*cpu->tagged_registers().ISA, __PC));
 		break;
 	}
 	

@@ -2,7 +2,6 @@
 .align 16
 .globl block_trampoline
 block_trampoline:
-	push %r15
 	push %r14
 	push %r13
 	push %r12
@@ -20,9 +19,7 @@ block_trampoline:
 	/*mov %fs:0x48, %r12
 	mov 0x10(%r12), %r12*/
 	
-	mov 0x3c(%rbp), %r15d		// Cache the PC
 	callq *%rsi					// Run the Code
-	mov %r15d, 0x3c(%rbp)		// Restore the PC
 
 	// Restore the stack pointer
 	mov %r13, %rsp
@@ -31,7 +28,6 @@ block_trampoline:
 	pop %r12
 	pop %r13
 	pop %r14
-	pop %r15
 	retq
 .size block_trampoline, .-block_trampoline
 

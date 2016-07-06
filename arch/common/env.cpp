@@ -228,7 +228,7 @@ bool Environment::run(PerCPUData *per_cpu_data)
 bool Environment::read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data)
 {
 	if (id > 15 || devices[id] == NULL) {
-		printf("attempted read of invalid device %d @ %08x (%08x)\n", id, cpu.read_pc(), *(uint32_t *)cpu.read_pc());
+		printf("attempted read of invalid device %d @ %08x (%08x)\n", id, read_pc(), *(uint32_t *)pc_mem_ptr());
 		return false;
 	}
 
@@ -238,7 +238,7 @@ bool Environment::read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t
 bool Environment::write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t data)
 {
 	if (id > 15 || devices[id] == NULL) {
-		printf("attempted write of invalid device %d @ %08x (%08x)\n", id, cpu.read_pc(), *(uint32_t *)cpu.read_pc());
+		printf("attempted write of invalid device %d @ %08x (%08x)\n", id, read_pc(), *(uint32_t *)pc_mem_ptr());
 		return false;
 	}
 

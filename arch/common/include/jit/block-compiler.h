@@ -23,6 +23,7 @@
 //#define CALLER_SAVE_REGSTATE
 
 #define FRAMEPOINTER_REG	REG_R13
+#define PC_REG				REG_R15D
 
 namespace captive {
 	namespace arch {

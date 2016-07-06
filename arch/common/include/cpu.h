@@ -71,10 +71,6 @@ namespace captive {
 				return trace().disasm().disassemble(va, (const uint8_t *)decode_data);
 			}
 
-			inline uint32_t read_pc() const { return *tagged_reg_offsets.PC; }
-			inline uint32_t write_pc(uint32_t new_pc_val) { uint32_t tmp = *tagged_reg_offsets.PC; *tagged_reg_offsets.PC = new_pc_val; return tmp; }
-			inline uint32_t inc_pc(uint32_t delta) { uint32_t tmp = *tagged_reg_offsets.PC; *tagged_reg_offsets.PC += delta; return tmp; }
-
 			virtual void dump_state(bool dump_hidden = false) const = 0;
 
 			inline uint64_t get_insns_executed() const { return cpu_data().insns_executed; }

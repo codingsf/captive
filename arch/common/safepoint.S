@@ -28,7 +28,8 @@ restore_safepoint:
 	movq 24(%rdi), %r12
 	movq 32(%rdi), %r13
 	movq 40(%rdi), %r14
-	movq 48(%rdi), %r15
+
+	// Do NOT restore r15
 
 	push 64(%rdi)
 	popf
@@ -48,7 +49,8 @@ interrupt_restore_safepoint:
 	movq 24(%rdi), %r12
 	movq 32(%rdi), %r13
 	movq 40(%rdi), %r14
-	movq 48(%rdi), %r15
+	
+	// Do NOT restore r15
 
 	// We should return into ring0
 	push $0x10		// SS

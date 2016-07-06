@@ -492,7 +492,7 @@ bool MMU::handle_fault(struct resolution_context& rc)
 			cpu().invalidate_translation_phys((gpa_t)(pt->base_address() & 0xfffff000ULL));
 
 			//printf("PC: %08x, VA: %08x\n", _cpu.read_pc(), (uint32_t)va);
-			if ((_cpu.read_pc() & ~0xfff) == (uint32_t)(rc.va & ~0xfff)) {
+			if ((read_pc() & ~0xfff) == (uint32_t)(rc.va & ~0xfff)) {
 				//printf("mmu: smc: same page %08x\n", rc.va);
 				rc.fault = SMC_FAULT;
 			} else {

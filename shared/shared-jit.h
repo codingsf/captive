@@ -150,6 +150,7 @@ namespace captive {
 				MOV,					// 5
 				CMOV,
 				LDPC,
+				STPC,
 				INCPC,
 				
 				VECTOR_INSERT,
@@ -280,6 +281,7 @@ namespace captive {
 			static IRInstruction count(const IROperand& pc, const IROperand& ir) { return IRInstruction(COUNT, pc, ir); }
 
 			static IRInstruction ldpc(const IROperand& dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
+			static IRInstruction stpc(const IROperand& val) { assert(val.size == 4); return IRInstruction(STPC, val); }
 			static IRInstruction incpc(const IROperand& amt) { assert(amt.is_constant()); return IRInstruction(INCPC, amt); }
 
 			static IRInstruction trigger_irq() { return IRInstruction(TRIGGER_IRQ); }

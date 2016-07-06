@@ -32,7 +32,7 @@ static uint64_t __native_start;
 
 bool CPU::run_block_jit()
 {
-	printf("cpu: starting block-jit cpu execution\n");
+	printf("cpu: starting block-jit cpu execution, PC=%08x\n", read_pc());
 	printf("--------------------------------------------------------------------\n");
 	
 	//trace().enable();

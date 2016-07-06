@@ -77,8 +77,6 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 
 CPU::~CPU()
 {
-	if (block_txln_cache)
-		delete block_txln_cache;
 }
 
 bool CPU::handle_pending_action(uint32_t action)

@@ -182,10 +182,6 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		// Obtain the core that is currently active.
 		captive::arch::CPU *core = captive::arch::CPU::get_active_cpu();
 		
-		// If we came from native code...
-		if (core->executing_translation())
-			core->write_pc((uint32_t)mctx->r15);	// Update the "real" PC from the "cached" PC
-
 		if (core) {
 			MMU::resolution_context rc(va);
 			
@@ -201,7 +197,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				user_mode = !!(code & PF_USER_MODE);
 			}
 
-			if ((uint32_t)va == core->read_pc() && !(code & PF_WRITE)) {
+			if ((uint32_t)va == read_pc() && !(code & PF_WRITE)) {
 				// Detect a fetch
 				rc.requested_permissions = user_mode ? MMU::USER_FETCH : MMU::KERNEL_FETCH;
 			} else {
@@ -234,7 +230,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 				}
 			} else {
 				// If the core couldn't handle the fault, then we've got a serious problem.
-				fatal("unhandled page-fault: va=%lx, code=%x, pc=%x\n", va, code, core->read_pc());
+				fatal("unhandled page-fault: va=%lx, code=%x, pc=%x\n", va, code, read_pc());
 			}
 		} else {
 			// We can't handle this page fault if we haven't got an active core.
@@ -242,7 +238,7 @@ extern "C" int handle_pagefault(struct mcontext *mctx, uint64_t va)
 		}
 	} else {
 		// This page-fault happened elsewhere - we can't do anything about it.
-		printf("fatal: internal page-fault: rip=%lx va=%lx, code=%x, pc=%08x\n", rip, va, code, captive::arch::CPU::get_active_cpu()->read_pc());
+		printf("fatal: internal page-fault: rip=%lx va=%lx, code=%x, pc=%08x\n", rip, va, code, read_pc());
 
 		printf("  type:   %s\n", (code & PF_WRITE) ? "write" : "read");
 		printf("  mode:   %s\n", (code & PF_USER_MODE) ? "user" : "kernel");

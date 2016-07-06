@@ -48,7 +48,7 @@ start:
 .endm
 
 .macro pop_regs
-	pop %r15
+	add $8, %rsp	// Skip restoring R15
 	pop %r14
 	pop %r13
 	pop %r12
