@@ -1351,7 +1351,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					IRInstruction *next = insn+1;
 					
 					if (next->type == IRInstruction::ADD && next->operands[0].is_constant() && next->operands[1].is_alloc_reg() && next->operands[1].alloc_data == target->alloc_data) {
-						encoder.lea(X86Memory::get(PC_REG, next->operands[0].value), register_from_operand(target));
+						encoder.lea(X86Memory::get(PC_REG64, next->operands[0].value), register_from_operand(target));
 						ir_idx++;
 					} else {
 						encoder.mov(PC_REG, register_from_operand(target));
@@ -2101,7 +2101,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 					
 					//printf("LDPC BY %d %d @ %08x\n", amt, insn->unsafe_next()->operands[0].value, pa);
 					
-					encoder.lea(X86Memory::get(PC_REG, amt), register_from_operand(target));
+					encoder.lea(X86Memory::get(PC_REG64, amt), register_from_operand(target));
 					ir_idx++;
 				} else {
 					encoder.mov(PC_REG, register_from_operand(target));
@@ -2118,7 +2118,7 @@ bool BlockCompiler::lower(uint32_t max_stack)
 			IROperand *amount = &insn->operands[0];
 
 			if (amount->is_constant()) {
-				encoder.lea(X86Memory::get(PC_REG, amount->value), PC_REG);
+				encoder.lea(X86Memory::get(PC_REG64, amount->value), PC_REG);
 			} else {
 				assert(false);
 			}

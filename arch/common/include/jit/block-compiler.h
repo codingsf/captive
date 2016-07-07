@@ -24,6 +24,7 @@
 
 #define FRAMEPOINTER_REG	REG_R13
 #define PC_REG				REG_R15D
+#define PC_REG64			REG_R15
 
 namespace captive {
 	namespace arch {
