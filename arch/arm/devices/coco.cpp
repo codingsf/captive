@@ -499,6 +499,17 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				break;
 			}
 			break;
+		case 12:
+			switch (op1) {
+			case 0:
+				switch (op2) {
+				case 0:
+					data = 0;
+					return true;
+				}
+				break;
+			}
+			break;
 		}
 		break;
 		

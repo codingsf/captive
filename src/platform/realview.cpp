@@ -35,9 +35,11 @@
 #include <devices/io/ps2.h>
 #include <devices/io/block/file-backed-block-device.h>
 #include <devices/io/virtio/virtio-block-device.h>
+#include <devices/io/virtio/virtio-net-device.h>
 
 #include <devices/net/lan9118.h>
 #include <devices/net/user/user-interface.h>
+#include <devices/net/tap/tap-interface.h>
 
 using namespace captive;
 using namespace captive::hypervisor;
@@ -51,8 +53,10 @@ using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
 using namespace captive::devices::net;
 using namespace captive::devices::net::user;
+using namespace captive::devices::net::tap;
 
 //#define NETWORK_DEVICE
+#define VIRTIO_NETWORK_DEVICE
 
 Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant, std::string block_device_file) : Platform(timer_manager), variant(variant), socket_uart(NULL)
 {
@@ -211,14 +215,28 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 
 	VirtIOBlockDevice *vbd = new VirtIOBlockDevice(*gic0->get_irq_line(35), *bdev);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10100000, *vbd));
-
+	
+#if defined(NETWORK_DEVICE) || defined(VIRTIO_NETWORK_DEVICE)
+	//UserInterface *net_iface = new UserInterface();
+	TapInterface *net_iface = new TapInterface("tap0");
+	if (!net_iface->start()) {
+        	ERROR << "Unable to start TAP interface";
+        	throw 0;
+        }
+    
+	//net_iface->attach(net);
+#endif
+	
 #ifdef NETWORK_DEVICE
 	LAN9118 *net = new LAN9118(*gic0->get_irq_line(60));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x4e000000, *net));
-
-	UserInterface *net_iface = new UserInterface();
-	net_iface->attach(net);
 #endif
+	
+#ifdef VIRTIO_NETWORK_DEVICE
+	VirtIONetworkDevice *net = new VirtIONetworkDevice(*gic0->get_irq_line(34), *net_iface);
+	cfg.devices.push_back(GuestDeviceConfiguration(0x10101000, *net));
+#endif
+	
 }
 
 Realview::~Realview()

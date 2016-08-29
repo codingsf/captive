@@ -1,16 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
-/* 
- * File:   user-interface.h
- * Author: s0457958
- *
- * Created on 26 April 2016, 14:32
- */
-
 #ifndef USER_INTERFACE_H
 #define USER_INTERFACE_H
 
@@ -29,6 +16,9 @@ namespace captive
 				public:
 					UserInterface();
 					virtual ~UserInterface();
+                    
+                    virtual bool start() override;
+                    virtual void stop() override;
 				
 				private:
 					bool transmit_packet(const uint8_t* buffer, uint32_t length) override;

@@ -62,7 +62,9 @@ namespace captive
 				class VirtQueue
 				{
 				public:
-					VirtQueue(VirtIO& owner) : _owner(owner), _queue_num(0), _queue_align(0), _guest_phys_addr(0), _queue_host_addr(NULL) { }
+					VirtQueue(VirtIO& owner, int index) : _owner(owner), _index(index), _queue_num(0), _queue_align(0), _guest_phys_addr(0), _queue_host_addr(NULL) { }
+					
+					inline int index() const { return _index; }
 					
 					inline uint32_t guest_phys_addr() const { return _guest_phys_addr; }
 					inline void guest_phys_addr(uint32_t gpa) { _guest_phys_addr = gpa; }
@@ -116,6 +118,7 @@ namespace captive
 					
 				private:
 					VirtIO& _owner;
+					int _index;
 					uint32_t _queue_num;
 					uint32_t _queue_align;
 					uint32_t _guest_phys_addr;

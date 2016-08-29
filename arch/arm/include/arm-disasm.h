@@ -1,1 +1,1 @@
-/disk/scratch/spink/gensim/arm/output_captive/arm-disasm.h
+/home/spink/src/gensim/arm/output_captive/arm-disasm.h

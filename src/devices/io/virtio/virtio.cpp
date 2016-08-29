@@ -47,7 +47,7 @@ VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t 
 	_status(0)
 {
 	for (uint8_t i = 0; i < nr_queues; i++) {
-		queues.push_back(new VirtQueue(*this));
+		queues.push_back(new VirtQueue(*this, i));
 	}
 }
 

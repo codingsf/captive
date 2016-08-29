@@ -16,27 +16,33 @@
 
 #include <define.h>
 
-namespace captive
-{
-	namespace devices
-	{
-		namespace net
-		{
+namespace captive {
+	namespace devices {
+		namespace net {
 			class NetworkDevice;
-			
-			class NetworkInterface
-			{
+
+			class NetworkInterface {
 			public:
-				NetworkInterface() : attached_device(NULL) { }
-				virtual ~NetworkInterface() { }
-				
+
+				NetworkInterface() : attached_device(NULL) {
+				}
+
+				virtual ~NetworkInterface() {
+				}
+
 				void attach(NetworkDevice *device);
-				
+
 				virtual bool transmit_packet(const uint8_t *buffer, uint32_t length) = 0;
-				
+
+				virtual bool start() = 0;
+				virtual void stop() = 0;
+
 			protected:
-				NetworkDevice *device() const { return attached_device; }
-				
+
+				NetworkDevice *device() const {
+					return attached_device;
+				}
+
 			private:
 				NetworkDevice *attached_device;
 			};
