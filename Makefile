@@ -21,7 +21,7 @@ common-cflags := -I$(inc-dir) -I$(shared-dir) -I$(ext-dir) -g -Wall -O3 -pthread
 cflags   := $(common-cflags)
 cxxflags := $(common-cflags) -std=gnu++14
 asflags  := -g
-ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lz -lncurses -ltinfo -lrt
+ldflags  := -pthread -Wl,--no-as-needed -lSDL2 -ldl -lrt
 
 cc  := gcc
 cxx := g++

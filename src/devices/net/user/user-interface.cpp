@@ -3,11 +3,23 @@
 using namespace captive::devices::net;
 using namespace captive::devices::net::user;
 
-UserInterface::UserInterface() {
+UserInterface::UserInterface()
+{
 
 }
 
-UserInterface::~UserInterface() {
+UserInterface::~UserInterface()
+{
+
+}
+
+bool UserInterface::start()
+{
+	return true;
+}
+
+void UserInterface::stop()
+{
 
 }
 
@@ -20,6 +32,6 @@ bool UserInterface::transmit_packet(const uint8_t* buffer, uint32_t length)
 	}
 	
 	fprintf(stderr, "\n");*/
-	
+
 	return false;
 }

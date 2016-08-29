@@ -1,1 +1,1 @@
-/disk/scratch/spink/gensim/arm/output_captive/arm-jit-chunk-7.cpp
+/home/spink/src/gensim/arm/output_captive/arm-jit-chunk-7.cpp
