@@ -29,7 +29,7 @@ extern "C" {
 #include <iomanip>
 
 #define FAST_DEVICE_ACCESS
-//#define GUEST_EVENTS
+#define GUEST_EVENTS
 
 #ifdef GUEST_EVENTS
 extern "C"
