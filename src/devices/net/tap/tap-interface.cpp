@@ -59,7 +59,7 @@ bool TapInterface::start()
 
 void TapInterface::stop()
 {
-	DEBUG << "Stopping TAP Interface..." << ENABLE;
+	DEBUG << "Stopping TAP Interface...";
 
 	_terminate = true;
 	close(_tap_fd);
@@ -71,7 +71,7 @@ void TapInterface::stop()
 
 bool TapInterface::transmit_packet(const uint8_t* buffer, uint32_t length)
 {
-	DEBUG << CONTEXT(TapInterface) << "Transmitting Packet" << ENABLE;
+	DEBUG << CONTEXT(TapInterface) << "Transmitting Packet";
 	
 	write(_tap_fd, buffer, length);	
 	return true;
@@ -83,23 +83,23 @@ void TapInterface::receive_thread_trampoline(TapInterface* obj)
 	obj->receive_thread_proc();
 }
 
-#define MTU	1500
+#define MTU	1600
 
 void TapInterface::receive_thread_proc()
 {
-	DEBUG << "Starting TAP receive thread..." << ENABLE;
+	DEBUG << "Starting TAP receive thread...";
 	
 	while (!_terminate) {
 		uint8_t buffer[MTU];
 		
-		DEBUG << CONTEXT(TapInterface) << "Waiting for packet" << ENABLE;
+		DEBUG << CONTEXT(TapInterface) << "Waiting for packet";
 		int bytes = read(_tap_fd, buffer, sizeof(buffer));
 		
 		if (bytes <= 0) break;
 
-		DEBUG << CONTEXT(TapInterface) << "Receiving Packet" << ENABLE;
+		DEBUG << CONTEXT(TapInterface) << "Receiving Packet";
 		invoke_receive((const uint8_t *)buffer, bytes);
 	}
 	
-	DEBUG << CONTEXT(TapInterface) << "Exiting TAP receive thread" << ENABLE;
+	DEBUG << CONTEXT(TapInterface) << "Exiting TAP receive thread";
 }
