@@ -69,6 +69,8 @@ void VirtIONetworkDevice::receive_packet(const uint8_t* buffer, uint32_t length)
 		return;
 	}
 	
+	fprintf(stderr, "buffer length:%d\n", length);
+	
 	VirtIOQueueEventBuffer& hdr_buffer = evt->write_buffers.front();
 	fprintf(stderr, "net_hdr size:%d\n", hdr_buffer.size);
 
@@ -78,11 +80,9 @@ void VirtIONetworkDevice::receive_packet(const uint8_t* buffer, uint32_t length)
 	VirtIOQueueEventBuffer& io_buffer = evt->write_buffers.back();
 	fprintf(stderr, "io_buffer size:%d\n", io_buffer.size);
 	
-	if (length > io_buffer.size) {
-		memcpy(io_buffer.data, buffer, io_buffer.size);
-	} else {
-		memcpy(io_buffer.data, buffer, length);
-	}
+	unsigned int used_length = (length > io_buffer.size) ? io_buffer.size : length;
+	memcpy(io_buffer.data, buffer, used_length);
 	
+	evt->response_size = hdr_buffer.size + used_length;
 	submit_event(evt);
 }
