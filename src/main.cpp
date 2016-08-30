@@ -15,7 +15,6 @@
 #include <platform/gensim-test.h>
 
 #include <util/command-line.h>
-#include <util/thread-pool.h>
 #include <util/cl/options.h>
 
 #include <devices/timers/timer-manager.h>
