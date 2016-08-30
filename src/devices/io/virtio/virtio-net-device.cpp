@@ -44,20 +44,27 @@ void VirtIONetworkDevice::process_event(VirtIOQueueEvent* evt)
 		std::unique_lock<std::mutex> l(_receive_buffer_lock);
 		_receive_buffers.push_back(evt);
 	} else if (evt->queue->index() == 1) {
-		VirtIOQueueEventBuffer buffer = evt->read_buffers.back();
+		VirtIOQueueEventBuffer& buffer = evt->read_buffers.back();
 		_iface.transmit_packet((const uint8_t *)buffer.data, buffer.size);
-		evt->submit();
+		submit_event(evt);
 	}
 }
 
 void VirtIONetworkDevice::receive_packet(const uint8_t* buffer, uint32_t length)
 {
-	std::unique_lock<std::mutex> l(_receive_buffer_lock);
+	_receive_buffer_lock.lock();
 	
-	auto evt = _receive_buffers.front();
+	if (_receive_buffers.size() == 0) {
+		_receive_buffer_lock.unlock();
+		return;
+	}
+	
+	VirtIOQueueEvent *evt = _receive_buffers.front();
 	_receive_buffers.pop_front();
 	
-	VirtIOQueueEventBuffer io_buffer = evt->write_buffers.back();
+	_receive_buffer_lock.unlock();
+	
+	VirtIOQueueEventBuffer& io_buffer = evt->write_buffers.back();
 	
 	if (length > io_buffer.size) {
 		memcpy(io_buffer.data, buffer, io_buffer.size);
@@ -65,5 +72,5 @@ void VirtIONetworkDevice::receive_packet(const uint8_t* buffer, uint32_t length)
 		memcpy(io_buffer.data, buffer, length);
 	}
 	
-	evt->submit();
+	submit_event(evt);
 }
