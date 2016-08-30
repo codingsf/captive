@@ -39,7 +39,7 @@ bool TapInterface::start()
 	struct ifreq ifr;
 	bzero(&ifr, sizeof(ifr));
 	
-	ifr.ifr_flags = IFF_TAP;
+	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 	strncpy(ifr.ifr_name, _tap_device.c_str(), IFNAMSIZ);
 	
 	DEBUG << CONTEXT(TapInterface) << "Attaching to: " << _tap_device;

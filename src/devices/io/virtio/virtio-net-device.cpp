@@ -52,5 +52,18 @@ void VirtIONetworkDevice::process_event(VirtIOQueueEvent* evt)
 
 void VirtIONetworkDevice::receive_packet(const uint8_t* buffer, uint32_t length)
 {
-	fprintf(stderr, "************ virtio receive packet\n");
+	std::unique_lock<std::mutex> l(_receive_buffer_lock);
+	
+	auto evt = _receive_buffers.front();
+	_receive_buffers.pop_front();
+	
+	VirtIOQueueEventBuffer io_buffer = evt->write_buffers.back();
+	
+	if (length > io_buffer.size) {
+		memcpy(io_buffer.data, buffer, io_buffer.size);
+	} else {
+		memcpy(io_buffer.data, buffer, length);
+	}
+	
+	evt->submit();
 }
