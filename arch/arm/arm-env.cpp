@@ -2,6 +2,7 @@
 #include <arm-cpu.h>
 #include <devices/coco.h>
 #include <devices/debug-coprocessor.h>
+#include <devices/captive-coprocessor.h>
 
 #include <printf.h>
 
@@ -17,6 +18,7 @@ Environment *create_environment_arm(PerGuestData *per_guest_data)
 arm_environment::arm_environment(enum arch_variant _arch_variant, enum core_variant _core_variant, PerGuestData *per_guest_data) : Environment(per_guest_data), _arch_variant(_arch_variant), _core_variant(_core_variant)
 {
 	// TODO: Abstract into platform-specific setup
+	install_core_device(6, new devices::CaptiveCoprocessor(*this));
 	install_core_device(14, new devices::DebugCoprocessor(*this));
 	install_core_device(15, new devices::CoCo(*this));
 }

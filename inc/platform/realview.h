@@ -31,6 +31,10 @@ namespace captive {
 		namespace io {
 			class SocketUART;
 		}
+		
+		namespace net {
+			class NetworkInterface;
+		}
 	}
 	
 	namespace platform {
@@ -60,6 +64,8 @@ namespace captive {
 			devices::arm::ArmCpuIRQController *core0irq;
 			devices::arm::GIC *gic0;
 			devices::arm::PL011 *uart0, *uart1, *uart2, *uart3;
+			
+			devices::net::NetworkInterface *net_iface;
 			
 #ifdef NULL_VIRTUAL_SCREEN
 			devices::gfx::NullVirtualScreen *vs;

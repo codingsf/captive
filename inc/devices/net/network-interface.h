@@ -20,17 +20,25 @@ namespace captive {
 	namespace devices {
 		namespace net {
 			class NetworkDevice;
+			
+			class NetworkInterfaceReceiveCallback
+			{
+			public:
+				virtual void receive_packet(const uint8_t *buffer, uint32_t length) = 0;
+			};
 
 			class NetworkInterface {
 			public:
 
-				NetworkInterface() : attached_device(NULL) {
+				NetworkInterface() : _receive_callback(NULL) {
 				}
 
 				virtual ~NetworkInterface() {
 				}
 
-				void attach(NetworkDevice *device);
+				void attach(NetworkInterfaceReceiveCallback& callback) {
+					_receive_callback = &callback;
+				}
 
 				virtual bool transmit_packet(const uint8_t *buffer, uint32_t length) = 0;
 
@@ -38,13 +46,10 @@ namespace captive {
 				virtual void stop() = 0;
 
 			protected:
-
-				NetworkDevice *device() const {
-					return attached_device;
-				}
-
+				void invoke_receive(const uint8_t *buffer, uint32_t length);
+				
 			private:
-				NetworkDevice *attached_device;
+				NetworkInterfaceReceiveCallback *_receive_callback;
 			};
 		}
 	}

@@ -16,8 +16,8 @@ block_trampoline:
 	mov %fs:0x8, %rbp
 
 	// Load the memory event ring buffer
-	mov %fs:0x48, %r12
-	mov 0x10(%r12), %r12
+	//mov %fs:0x48, %r12
+	//mov 0x10(%r12), %r12
 	
 	callq *%rsi					// Run the Code
 

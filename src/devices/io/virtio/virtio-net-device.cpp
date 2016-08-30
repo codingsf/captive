@@ -24,6 +24,8 @@ VirtIONetworkDevice::VirtIONetworkDevice(irq::IRQLine& irq, net::NetworkInterfac
 
 	set_host_feature(5);	// MAC
 	set_host_feature(16);	// STATUS
+	
+	iface.attach(*this);
 }
 
 VirtIONetworkDevice::~VirtIONetworkDevice()
@@ -42,20 +44,13 @@ void VirtIONetworkDevice::process_event(VirtIOQueueEvent* evt)
 		std::unique_lock<std::mutex> l(_receive_buffer_lock);
 		_receive_buffers.push_back(evt);
 	} else if (evt->queue->index() == 1) {
-		fprintf(stderr, "*** TRANSMIT rd=%d, wr=%d\n", evt->read_buffers.size(), evt->write_buffers.size());
-		
-		fprintf(stderr, "[0] ");
-		VirtIOQueueEventBuffer buffer = evt->read_buffers.front();
-		for (unsigned i = 0; i < buffer.size; i++) {
-			fprintf(stderr, "%02x ", ((uint8_t *)buffer.data)[i]);
-		}
-		fprintf(stderr, "\n");
-
-		fprintf(stderr, "[1] ");
-		buffer = evt->read_buffers.back();
-		for (unsigned i = 0; i < buffer.size; i++) {
-			fprintf(stderr, "%02x ", ((uint8_t *)buffer.data)[i]);
-		}
-		fprintf(stderr, "\n");
+		VirtIOQueueEventBuffer buffer = evt->read_buffers.back();
+		_iface.transmit_packet((const uint8_t *)buffer.data, buffer.size);
+		evt->submit();
 	}
+}
+
+void VirtIONetworkDevice::receive_packet(const uint8_t* buffer, uint32_t length)
+{
+	fprintf(stderr, "************ virtio receive packet\n");
 }

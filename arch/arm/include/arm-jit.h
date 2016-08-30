@@ -1,1 +1,1 @@
-/home/spink/src/gensim/arm/output_captive/arm-jit.h
+/disk/scratch/spink/gensim/arm/output_captive/arm-jit.h

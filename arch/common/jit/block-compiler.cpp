@@ -17,7 +17,7 @@
 
 #define SYSCALL_CALL_GATE
 //#define TIMER
-#define EMIT_MEM_EVENT
+//#define EMIT_MEM_EVENT
 //#define BLOCK_ENTRY_TRACKING
 
 extern "C" void cpu_set_mode(void *cpu, uint8_t mode);

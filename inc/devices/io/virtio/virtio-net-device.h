@@ -18,11 +18,13 @@ namespace captive {
 	namespace devices {
 		namespace io {		
 			namespace virtio {
-				class VirtIONetworkDevice : public VirtIO
+				class VirtIONetworkDevice : public VirtIO, public net::NetworkInterfaceReceiveCallback
 				{
 				public:
 					VirtIONetworkDevice(irq::IRQLine& irq, net::NetworkInterface& iface);
 					virtual ~VirtIONetworkDevice();
+					
+					void receive_packet(const uint8_t *buffer, uint32_t length) override;
 					
 				protected:
 					void reset() override;

@@ -1,10 +1,14 @@
 #include <devices/net/network-interface.h>
 #include <devices/net/network-device.h>
+#include <captive.h>
+
+DECLARE_CONTEXT(Network);
 
 using namespace captive::devices::net;
 
-void NetworkInterface::attach(NetworkDevice* device)
+void NetworkInterface::invoke_receive(const uint8_t *buffer, uint32_t length)
 {
-	attached_device = device;
-	attached_device->attach_interface(this);
+	if (_receive_callback) {
+		_receive_callback->receive_packet(buffer, length);
+	}
 }

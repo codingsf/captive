@@ -218,7 +218,7 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	
 #if defined(NETWORK_DEVICE) || defined(VIRTIO_NETWORK_DEVICE)
 	//UserInterface *net_iface = new UserInterface();
-	TapInterface *net_iface = new TapInterface("tap0");
+	net_iface = new TapInterface("virbr0-nic");
 	if (!net_iface->start()) {
         	ERROR << "Unable to start TAP interface";
         	throw 0;
@@ -250,7 +250,7 @@ bool Realview::start()
 {
 	uart0->start_reading();
 	uart1->start_reading();
-
+	
 #ifndef NULL_VIRTUAL_SCREEN
 	//vs->cpu(*cores().front());
 #endif
@@ -261,6 +261,8 @@ bool Realview::start()
 bool Realview::stop()
 {
 	delete vs;
+	
+	net_iface->stop();
 	
 	uart1->stop_reading();
 	uart0->stop_reading();

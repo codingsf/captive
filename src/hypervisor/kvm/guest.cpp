@@ -29,7 +29,7 @@ extern "C" {
 #include <iomanip>
 
 #define FAST_DEVICE_ACCESS
-#define GUEST_EVENTS
+//#define GUEST_EVENTS
 
 #ifdef GUEST_EVENTS
 extern "C"
@@ -422,14 +422,24 @@ void KVMGuest::event_thread_proc(KVMCpu *core)
 			for (; last != next; last++, last &= 0xff) {
 				uint64_t entry = ring[last];
 				
-				d4memref memref;
-				memref.address = (d4addr)(entry >> 32);
-				memref.size = (entry & 0xf);
-				memref.accesstype = !!(entry & 0x10) ? D4XWRITE : D4XREAD;
-				
-				d4ref(l1d, memref);
-				
-				//fprintf(stderr, "[%s] pc=%08x, addr=%08x\n", !!(entry & 1) ? "W" : "R", entry & 0xfffffffe, (entry >> 32));
+				if ((entry & 0x80000000)) {
+					fprintf(stderr, "*** CACHE STATISTICS ***\n");
+					fprintf(stderr, "l1d: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XREAD], (uint64_t)l1d->fetch[D4XREAD] - (uint64_t)l1d->miss[D4XREAD], (uint64_t)l1d->miss[D4XREAD]);
+					fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XWRITE], (uint64_t)l1d->fetch[D4XWRITE] - (uint64_t)l1d->miss[D4XWRITE], (uint64_t)l1d->miss[D4XWRITE]);
+
+					fprintf(stderr, "l2:  read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l2->fetch[D4XREAD], (uint64_t)l2->fetch[D4XREAD] - (uint64_t)l2->miss[D4XREAD], (uint64_t)l2->miss[D4XREAD]);
+					fprintf(stderr, "l2:  write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l2->fetch[D4XWRITE], (uint64_t)l2->fetch[D4XWRITE] - (uint64_t)l2->miss[D4XWRITE], (uint64_t)l2->miss[D4XWRITE]);
+
+					fprintf(stderr, "mem: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XREAD], (uint64_t)mm->fetch[D4XREAD] - (uint64_t)mm->miss[D4XREAD], (uint64_t)mm->miss[D4XREAD]);
+					fprintf(stderr, "mem: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XWRITE], (uint64_t)mm->fetch[D4XWRITE] - (uint64_t)mm->miss[D4XWRITE], (uint64_t)mm->miss[D4XWRITE]);
+				} else {
+					d4memref memref;
+					memref.address = (d4addr)(entry >> 32);
+					memref.size = (entry & 0xf);
+					memref.accesstype = !!(entry & 0x10) ? D4XWRITE : D4XREAD;
+
+					d4ref(l1d, memref);
+				}
 			}
 		}
 	}
