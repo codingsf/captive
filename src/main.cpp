@@ -105,12 +105,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-	captive::logging::configure_logging_contexts();
-
-	if (argc < 5) {
-		ERROR << "usage: " << argv[0] << " <engine lib> <zimage> <device tree> <root fs>";
+	if (cl->have_errors()) {
+		cl->print_usage();
 		return 1;
 	}
+	
+	captive::logging::configure_logging_contexts();
 
 	// Check that KVM is supported
 	if (!KVM::supported()) {
@@ -129,11 +129,21 @@ int main(int argc, char **argv)
 	TimerManager timer_manager;
 
 	// Create the guest platform.
-	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8, std::string(argv[4]));
+	if (!cl::BlockDeviceFile) {
+		ERROR << "Block Device File must be specified";
+		return 1;
+	}
+	
+	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8, cl::BlockDeviceFile.get());
 	//Platform *pfm = new GensimTest(timer_manager);
 
 	// Create the engine.
-	Engine engine(argv[1]);
+	if (!cl::Engine) {
+		ERROR << "Execution engine must be specified";
+		return 1;
+	}
+	
+	Engine engine(cl::Engine.get());
 	if (!engine.init()) {
 		delete pfm;
 		delete hv;
@@ -143,7 +153,12 @@ int main(int argc, char **argv)
 	}
 	
 	// Load the kernel
-	auto kernel = KernelLoader::create_from_file(argv[2]);
+	if (!cl::Kernel) {
+		ERROR << "Guest kernel must be specified";
+		return 1;
+	}
+	
+	auto kernel = KernelLoader::create_from_file(cl::Kernel.get());
 	if (!kernel) {
 		delete pfm;
 		delete hv;

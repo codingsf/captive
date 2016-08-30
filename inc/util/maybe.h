@@ -19,7 +19,7 @@ namespace captive {
 
 			inline bool has_value() const { return _has_value; }
 
-			inline T& value() const { return _value; }
+			inline const T& value() const { return _value; }
 
 			bool operator==(const T& check) const {
 				if (!_has_value) {

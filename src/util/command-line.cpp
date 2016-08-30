@@ -9,7 +9,7 @@ using namespace captive::util;
 
 #define NR_COMMAND_LINE_OPTIONS (sizeof(cl::command_line_options) / sizeof(cl::command_line_options[0]))
 
-CommandLine::CommandLine() : have_unknown(false)
+CommandLine::CommandLine() : _have_unknown(false), _have_missing(false)
 {
 
 }
@@ -31,8 +31,31 @@ const CommandLine *CommandLine::parse(int argc, char** argv)
 						CommandLineOption *opt = lookup_long_option(std::string(&argv[i][2]));
 						if (opt) {
 							opt->present = true;
+							
+							if (opt->option_value == CommandLineOption::Optional) {
+								if (i == (argc - 1)) {
+									continue;
+								} else {
+									if (argv[i+1][0] == '-')
+										continue;
+									
+									i++;
+									opt->value = std::string(argv[i]);
+								}
+							} else if (opt->option_value == CommandLineOption::Required) {
+								if (i == (argc - 1)) {
+									cl->_have_missing = true;
+								} else {
+									if (argv[i+1][0] == '-')
+										cl->_have_missing = true;
+									
+									i++;
+									opt->value = std::string(argv[i]);
+								}
+							}
+							
 						} else {
-							cl->have_unknown = true;
+							cl->_have_unknown = true;
 						}
 					}
 				} else {
@@ -41,7 +64,7 @@ const CommandLine *CommandLine::parse(int argc, char** argv)
 						if (opt) {
 							opt->present = true;
 						} else {
-							cl->have_unknown = true;
+							cl->_have_unknown = true;
 						}
 					}
 				}
@@ -79,4 +102,29 @@ CommandLineOption *CommandLine::lookup_long_option(std::string l)
 void CommandLine::dump() const
 {
 
+}
+
+void CommandLine::print_usage() const
+{
+	fprintf(stderr, "command-line options:\n");
+	
+	for (unsigned int i = 0; i < NR_COMMAND_LINE_OPTIONS; i++) {
+		auto opt = cl::command_line_options[i];
+		
+		if (opt->short_name.has_value()) {
+			fprintf(stderr, " -%c  ", opt->short_name.value());
+		} else {
+			fprintf(stderr, "      ");
+		}
+		
+		fprintf(stderr, "--%s", opt->long_name.c_str());
+		
+		if (opt->option_value == CommandLineOption::Optional) {
+			fprintf(stderr, " [value]\n");
+		} else if (opt->option_value == CommandLineOption::Required) {
+			fprintf(stderr, " <value>\n");
+		} else {
+			fprintf(stderr, "\n");
+		}
+	}
 }

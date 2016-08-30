@@ -41,6 +41,10 @@ namespace captive {
 			inline operator bool() {
 				return present;
 			}
+			
+			inline std::string get() const {
+				return value.value();
+			}
 		};
 
 		class CommandLine
@@ -49,6 +53,11 @@ namespace captive {
 			static const CommandLine *parse(int argc, char **argv);
 
 			void dump() const;
+			void print_usage() const;
+			
+			inline bool have_unknown() const { return _have_unknown; }
+			inline bool have_missing() const { return _have_missing; }
+			inline bool have_errors() const { return have_unknown() || have_missing(); }
 
 		private:
 			CommandLine();
@@ -56,7 +65,9 @@ namespace captive {
 			static CommandLineOption *lookup_short_option(char c);
 			static CommandLineOption *lookup_long_option(std::string l);
 
-			bool have_unknown;
+			bool _have_unknown;
+			bool _have_missing;
+			
 			std::list<std::string> args;
 			std::list<std::string> guest_command_line;
 		};
