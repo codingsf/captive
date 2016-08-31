@@ -52,6 +52,8 @@ namespace captive {
 
 			protected:
 				void clear_queue() {
+					_irq.rescind();
+					
 					while (!data_queue.empty()) {
 						data_queue.pop();
 					}
@@ -111,7 +113,7 @@ namespace captive {
 				
 				int32_t dx, dy;
 				
-				bool enable_data_reporting;
+				bool wrapping_mode;
 			};
 		}
 	}

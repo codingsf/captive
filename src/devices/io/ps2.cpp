@@ -22,10 +22,10 @@
 /* Mouse Commands */
 #define AUX_SET_SCALE11		0xE6	/* Set 1:1 scaling */
 #define AUX_SET_SCALE21		0xE7	/* Set 2:1 scaling */
-#define AUX_SET_RES		0xE8	/* Set resolution */
-#define AUX_GET_SCALE		0xE9	/* Get scaling factor */
+#define AUX_SET_RES			0xE8	/* Set resolution */
+#define AUX_GET_STATUS		0xE9	/* Get status */
 #define AUX_SET_STREAM		0xEA	/* Set stream mode */
-#define AUX_POLL		0xEB	/* Poll */
+#define AUX_POLL			0xEB	/* Poll */
 #define AUX_RESET_WRAP		0xEC	/* Reset wrap mode */
 #define AUX_SET_WRAP		0xEE	/* Set wrap mode */
 #define AUX_SET_REMOTE		0xF0	/* Set remote mode */
@@ -34,8 +34,8 @@
 #define AUX_ENABLE_DEV		0xF4	/* Enable aux device */
 #define AUX_DISABLE_DEV		0xF5	/* Disable aux device */
 #define AUX_SET_DEFAULT		0xF6
-#define AUX_RESET		0xFF	/* Reset aux device */
-#define AUX_ACK			0xFA	/* Command byte ACK. */
+#define AUX_RESET			0xFF	/* Reset aux device */
+#define AUX_ACK				0xFA	/* Command byte ACK. */
 
 using namespace captive::devices::io;
 
@@ -49,7 +49,7 @@ PS2KeyboardDevice::PS2KeyboardDevice(irq::IRQLine& irq) : PS2Device(irq), last_c
 
 }
 
-PS2MouseDevice::PS2MouseDevice(irq::IRQLine& irq) : PS2Device(irq), last_command(0), status(0), resolution(0), sample_rate(0), last_x(0), last_y(0), button_state(0), enable_data_reporting(false)
+PS2MouseDevice::PS2MouseDevice(irq::IRQLine& irq) : PS2Device(irq), last_command(0), status(0), resolution(0), sample_rate(0), last_x(0), last_y(0), button_state(0), wrapping_mode(false)
 {
 
 }
@@ -81,7 +81,7 @@ void PS2KeyboardDevice::send_command(uint32_t command)
 			break;
 
 		default:
-			queue_data(KBD_REPLY_RESEND);
+			queue_data(KBD_REPLY_ACK);
 			break;
 		}
 		break;
@@ -108,8 +108,8 @@ void PS2KeyboardDevice::send_command(uint32_t command)
 		break;
 
 	default:
-		//last_command = 0;
-		queue_data(KBD_REPLY_RESEND);
+		last_command = 0;
+		queue_data(KBD_REPLY_ACK);
 		break;
 	}
 
@@ -134,12 +134,14 @@ void PS2KeyboardDevice::key_up(uint32_t keycode)
 	queue_data(keycode & 0xff);
 }
 
+#define STATUS_SCALE21		(1 << 4)
+#define STATUS_REPORTING	(1 << 5)
+#define STATUS_REMOTE		(1 << 6)
+
 void PS2MouseDevice::send_command(uint32_t command)
 {
 	std::unique_lock<std::mutex> l(process_lock);
 	
-	//fprintf(stderr, "**** CMD: %08x\n", command);
-
 	switch (last_command) {
 	case 0:
 	case AUX_RESET:
@@ -150,15 +152,13 @@ void PS2MouseDevice::send_command(uint32_t command)
 			status = 0;
 			resolution = 2;
 			sample_rate = 100;
-			enable_data_reporting = false;
 
-			queue_data(AUX_ACK);
-			queue_data(0xaa);
-			queue_data(0x00);
+			queue_data(AUX_ACK);		// Acknowledge
+			queue_data(0xaa);			// Self-test OK
+			queue_data(0x00);			// Device ID
 			break;
 
 		case AUX_GET_TYPE:
-			fprintf(stderr, "***** TYPE TYPE\n");
 			queue_data(AUX_ACK);
 			queue_data(0x00);
 			break;
@@ -167,7 +167,6 @@ void PS2MouseDevice::send_command(uint32_t command)
 			status = 0;
 			resolution = 2;
 			sample_rate = 100;
-			enable_data_reporting = false;
 
 			queue_data(AUX_ACK);
 			break;
@@ -179,39 +178,49 @@ void PS2MouseDevice::send_command(uint32_t command)
 			break;
 
 		case AUX_SET_SCALE11:
+			status &= ~STATUS_SCALE21;
+			queue_data(AUX_ACK);
+			break;
+			
 		case AUX_SET_SCALE21:
+			status |= STATUS_SCALE21;
 			queue_data(AUX_ACK);
 			break;
 
-		case AUX_GET_SCALE:
+		case AUX_GET_STATUS:
 			queue_data(AUX_ACK);
 			queue_data(status);
 			queue_data(resolution);
 			queue_data(sample_rate);
 			break;
 
-		case AUX_RESET_WRAP:
+		case AUX_SET_WRAP:
+			throw 0;
+			
+		case AUX_SET_STREAM:
+			status &= ~STATUS_REMOTE;
 			queue_data(AUX_ACK);
 			break;
 
-		case AUX_SET_STREAM:
+		case AUX_SET_REMOTE:
+			status |= STATUS_REMOTE;
 			queue_data(AUX_ACK);
 			break;
 
 		case AUX_ENABLE_DEV:
-			status |= 1 << 5;
-			enable_data_reporting = true;
+			status |= STATUS_REPORTING;
 			queue_data(AUX_ACK);
 			break;
 
 		case AUX_DISABLE_DEV:
-			status &= ~(1 << 5);
-			enable_data_reporting = false;
+			status &= ~STATUS_REPORTING;
 			queue_data(AUX_ACK);
 			break;
+			
+		case AUX_POLL:
+			throw 0;
 
 		default:
-			queue_data(AUX_ACK);
 			break;
 		}
 		break;
@@ -230,7 +239,6 @@ void PS2MouseDevice::send_command(uint32_t command)
 
 	default:
 		last_command = 0;
-		queue_data(AUX_ACK);
 		break;
 	}
 }
@@ -264,7 +272,8 @@ void PS2MouseDevice::send_update()
 {
 	std::unique_lock<std::mutex> l(process_lock);
 	
-	if (!enable_data_reporting) return;
+	if (!(status & STATUS_REPORTING)) return;
+	if (!(status & STATUS_REMOTE)) return;
 
 	if (dx > 127)
 		dx = 127;
@@ -279,5 +288,4 @@ void PS2MouseDevice::send_update()
 	queue_data(0x08 | ((dx < 0) << 4) | ((dy < 0) << 5) | (button_state & 0x07) );
 	queue_data(dx & 0xff);
 	queue_data(dy & 0xff);
-	queue_data(0);
 }
