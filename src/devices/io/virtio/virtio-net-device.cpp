@@ -2,29 +2,32 @@
 #include <devices/io/virtio/virtqueue.h>
 #include <captive.h>
 
+#include <util/cl/options.h>
+
 USE_CONTEXT(VirtIO);
 DECLARE_CHILD_CONTEXT(VirtIONetworkDevice, VirtIO);
 
 using namespace captive::devices::io::virtio;
+using namespace captive::util;
 
-VirtIONetworkDevice::VirtIONetworkDevice(irq::IRQLineBase& irq, net::NetworkInterface& iface) 
+VirtIONetworkDevice::VirtIONetworkDevice(irq::IRQLineBase& irq, net::NetworkInterface& iface, uint64_t mac_address)
 	: VirtIO(irq, 1, 1, 2),
 	_iface(iface)
 {
 	bzero(&config, sizeof(config));
-	
-	config.mac[0] = 0x80;
-	config.mac[1] = 0x81;
-	config.mac[2] = 0x82;
-	config.mac[3] = 0x83;
-	config.mac[4] = 0x84;
-	config.mac[5] = 0x85;
-	
+
+	config.mac[0] = (mac_address >> 40) & 0xff;
+	config.mac[1] = (mac_address >> 32) & 0xff;
+	config.mac[2] = (mac_address >> 24) & 0xff;
+	config.mac[3] = (mac_address >> 16) & 0xff;
+	config.mac[4] = (mac_address >>  8) & 0xff;
+	config.mac[5] = (mac_address >>  0) & 0xff;
+
 	config.status = 1;
 
 	set_host_feature(5);	// MAC
 	set_host_feature(16);	// STATUS
-	
+
 	iface.attach(*this);
 }
 

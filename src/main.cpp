@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8, cl::BlockDeviceFile.get());
+	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8);
 	//Platform *pfm = new GensimTest(timer_manager);
 
 	// Create the engine.
