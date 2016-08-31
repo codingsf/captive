@@ -1,5 +1,6 @@
 #include <devices/io/ps2.h>
 #include <captive.h>
+#include <unistd.h>
 
 /* Keyboard Commands */
 #define KBD_CMD_SET_LEDS	0xED	/* Set keyboard leds */
@@ -48,17 +49,20 @@ PS2KeyboardDevice::PS2KeyboardDevice(irq::IRQLine& irq) : PS2Device(irq), last_c
 
 }
 
-PS2MouseDevice::PS2MouseDevice(irq::IRQLine& irq) : PS2Device(irq), last_command(0), status(0), resolution(0), sample_rate(0), last_x(0), last_y(0), button_state(0)
+PS2MouseDevice::PS2MouseDevice(irq::IRQLine& irq) : PS2Device(irq), last_command(0), status(0), resolution(0), sample_rate(0), last_x(0), last_y(0), button_state(0), enable_data_reporting(false)
 {
 
 }
 
 void PS2KeyboardDevice::send_command(uint32_t command)
 {
+	std::unique_lock<std::mutex> l(process_lock);
+
 	switch (last_command) {
 	case 0:
 		switch (command) {
 		case KBD_CMD_RESET:
+			clear_queue();
 			queue_data(KBD_REPLY_ACK);
 			queue_data(KBD_REPLY_POR);
 			break;
@@ -77,7 +81,7 @@ void PS2KeyboardDevice::send_command(uint32_t command)
 			break;
 
 		default:
-			queue_data(KBD_REPLY_ACK);
+			queue_data(KBD_REPLY_RESEND);
 			break;
 		}
 		break;
@@ -104,8 +108,8 @@ void PS2KeyboardDevice::send_command(uint32_t command)
 		break;
 
 	default:
-		last_command = 0;
-		queue_data(KBD_REPLY_ACK);
+		//last_command = 0;
+		queue_data(KBD_REPLY_RESEND);
 		break;
 	}
 
@@ -113,6 +117,8 @@ void PS2KeyboardDevice::send_command(uint32_t command)
 
 void PS2KeyboardDevice::key_down(uint32_t keycode)
 {
+	std::unique_lock<std::mutex> l(process_lock);
+
 	if ((keycode & 0xff00) == 0xe0)
 		queue_data(0xe0);
 	queue_data(keycode & 0xff);
@@ -120,6 +126,8 @@ void PS2KeyboardDevice::key_down(uint32_t keycode)
 
 void PS2KeyboardDevice::key_up(uint32_t keycode)
 {
+	std::unique_lock<std::mutex> l(process_lock);
+
 	if ((keycode & 0xff00) == 0xe0)
 		queue_data(0xe0);
 	queue_data(0xf0);
@@ -128,13 +136,21 @@ void PS2KeyboardDevice::key_up(uint32_t keycode)
 
 void PS2MouseDevice::send_command(uint32_t command)
 {
+	std::unique_lock<std::mutex> l(process_lock);
+	
+	//fprintf(stderr, "**** CMD: %08x\n", command);
+
 	switch (last_command) {
 	case 0:
+	case AUX_RESET:
 		switch (command) {
 		case AUX_RESET:
+			clear_queue();
+
 			status = 0;
 			resolution = 2;
 			sample_rate = 100;
+			enable_data_reporting = false;
 
 			queue_data(AUX_ACK);
 			queue_data(0xaa);
@@ -142,6 +158,7 @@ void PS2MouseDevice::send_command(uint32_t command)
 			break;
 
 		case AUX_GET_TYPE:
+			fprintf(stderr, "***** TYPE TYPE\n");
 			queue_data(AUX_ACK);
 			queue_data(0x00);
 			break;
@@ -150,6 +167,7 @@ void PS2MouseDevice::send_command(uint32_t command)
 			status = 0;
 			resolution = 2;
 			sample_rate = 100;
+			enable_data_reporting = false;
 
 			queue_data(AUX_ACK);
 			break;
@@ -160,11 +178,37 @@ void PS2MouseDevice::send_command(uint32_t command)
 			queue_data(AUX_ACK);
 			break;
 
+		case AUX_SET_SCALE11:
+		case AUX_SET_SCALE21:
+			queue_data(AUX_ACK);
+			break;
+
 		case AUX_GET_SCALE:
 			queue_data(AUX_ACK);
 			queue_data(status);
 			queue_data(resolution);
 			queue_data(sample_rate);
+			break;
+
+		case AUX_RESET_WRAP:
+			queue_data(AUX_ACK);
+			break;
+
+		case AUX_SET_STREAM:
+			queue_data(AUX_ACK);
+			break;
+
+		case AUX_ENABLE_DEV:
+			status |= 1 << 5;
+			enable_data_reporting = true;
+			queue_data(AUX_ACK);
+			break;
+
+		case AUX_DISABLE_DEV:
+			status &= ~(1 << 5);
+			enable_data_reporting = false;
+			queue_data(AUX_ACK);
+			break;
 
 		default:
 			queue_data(AUX_ACK);
@@ -218,6 +262,10 @@ void PS2MouseDevice::mouse_move(uint32_t x, uint32_t y)
 
 void PS2MouseDevice::send_update()
 {
+	std::unique_lock<std::mutex> l(process_lock);
+	
+	if (!enable_data_reporting) return;
+
 	if (dx > 127)
 		dx = 127;
 	else if (dx < -127)
@@ -231,4 +279,5 @@ void PS2MouseDevice::send_update()
 	queue_data(0x08 | ((dx < 0) << 4) | ((dy < 0) << 5) | (button_state & 0x07) );
 	queue_data(dx & 0xff);
 	queue_data(dy & 0xff);
+	queue_data(0);
 }

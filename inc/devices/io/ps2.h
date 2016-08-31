@@ -14,6 +14,7 @@
 #include <captive.h>
 
 #include <queue>
+#include <mutex>
 
 namespace captive {
 	namespace devices {
@@ -29,12 +30,15 @@ namespace captive {
 				};
 
 				inline uint32_t read() const {
+					std::unique_lock<std::mutex> l(process_lock);
+
 					uint32_t v = data_queue.front();
 					data_queue.pop();
 					if (data_queue.empty()) {
 						_irq.rescind();
 					}
 
+					//fprintf(stderr, "**** RSP: %08x\n", v);
 					return v;
 				}
 
@@ -47,12 +51,20 @@ namespace captive {
 				inline void disable_irq() { irq_enabled = false; }
 
 			protected:
+				void clear_queue() {
+					while (!data_queue.empty()) {
+						data_queue.pop();
+					}
+				}
+
 				inline void queue_data(uint32_t data) {
 					data_queue.push(data);
 					if (irq_enabled) {
 						_irq.raise();
 					}
 				}
+
+				mutable std::mutex process_lock;
 
 			private:
 				irq::IRQLine& _irq;
@@ -98,6 +110,8 @@ namespace captive {
 				uint32_t button_state;
 				
 				int32_t dx, dy;
+				
+				bool enable_data_reporting;
 			};
 		}
 	}
