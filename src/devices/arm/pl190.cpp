@@ -3,7 +3,7 @@
 
 using namespace captive::devices::arm;
 
-PL190::PL190(irq::IRQLine& irq, irq::IRQLine& fiq) : Primecell(0x00041190), irq(irq), fiq(fiq)
+PL190::PL190(irq::IRQLineBase& irq, irq::IRQLineBase& fiq) : Primecell(0x00041190), irq(irq), fiq(fiq)
 {
 	for(int i = 0; i < 16; ++i) {
 		vector_addrs[i] = 0;
@@ -158,7 +158,7 @@ bool PL190::write(uint64_t off, uint8_t len, uint64_t data)
 	return true;
 }
 
-void PL190::irq_raised(irq::IRQLine& line)
+void PL190::irq_raised(irq::IRQLineBase& line)
 {
 	//DEBUG << CONTEXT(PL190) << "IRQ Raised: " << line.index();
 
@@ -166,7 +166,7 @@ void PL190::irq_raised(irq::IRQLine& line)
 	update_lines();
 }
 
-void PL190::irq_rescinded(irq::IRQLine& line)
+void PL190::irq_rescinded(irq::IRQLineBase& line)
 {
 	//DEBUG << CONTEXT(PL190) << "IRQ Rescinded: " << line.index();
 

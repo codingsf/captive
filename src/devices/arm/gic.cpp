@@ -95,11 +95,11 @@ void GICDistributorInterface::set_enabled(uint32_t base, uint8_t bits)
 {
 	for (int i = 0; i < 8; i++) {
 		if (bits & (1 << i)) {
-			GIC::gic_irq& irq = owner.get_gic_irq(base + i);
+			GICIRQLine *irq_line = owner.get_irq_line(base + i);
 			
-			irq.enabled = true;
-			if (irq.raised && !irq.edge_triggered) {
-				irq.pending = true;
+			irq_line->enabled = true;
+			if (irq_line->raised() && !irq_line->edge_triggered) {
+				irq_line->pending = true;
 			}
 		}
 	}
@@ -109,7 +109,7 @@ void GICDistributorInterface::clear_enabled(uint32_t base, uint8_t bits)
 {
 	for (int i = 0; i < 8; i++) {
 		if (bits & (1 << i)) {
-			owner.get_gic_irq(base + i).enabled = false;
+			owner.get_irq_line(base + i)->enabled = false;
 		}
 	}
 }
@@ -118,7 +118,7 @@ void GICDistributorInterface::set_pending(uint32_t base, uint8_t bits)
 {
 	for (int i = 0; i < 8; i++) {
 		if (bits & (1 << i)) {
-			owner.get_gic_irq(base + i).pending = true;
+			owner.get_irq_line(base + i)->pending = true;
 		}
 	}
 }
@@ -127,7 +127,7 @@ void GICDistributorInterface::clear_pending(uint32_t base, uint8_t bits)
 {
 	for (int i = 0; i < 8; i++) {
 		if (bits & (1 << i)) {
-			owner.get_gic_irq(base + i).pending = false;
+			owner.get_irq_line(base + i)->pending = false;
 		}
 	}
 }
@@ -193,7 +193,7 @@ bool GICDistributorInterface::write(uint64_t off, uint8_t len, uint64_t data)
 		uint32_t irqi = (off - 0x400);
 		
 		for (int i = 0; i < len; i++, data >>= 8) {
-			owner.get_gic_irq(irqi + i).priority = data & 0xff;
+			owner.get_irq_line(irqi + i)->priority = data & 0xff;
 		}
 		
 		owner.update();
@@ -247,11 +247,11 @@ void GICDistributorInterface::sgi(uint32_t data)
 		return;
 	}
 	
-	owner.get_gic_irq(irq).pending = true;
+	owner.get_irq_line(irq)->pending = true;
 	owner.update();
 }
 
-GICCPUInterface::GICCPUInterface(GIC& owner, irq::IRQLine& irq, int id) 
+GICCPUInterface::GICCPUInterface(GIC& owner, irq::IRQLineBase& irq, int id) 
 	: owner(owner),
 		irq(irq),
 		id(id),
@@ -353,11 +353,11 @@ void GICCPUInterface::update_unsafe()
 	uint32_t best_irq = 1023;
 	
 	for (int irqi = 0; irqi < 96; irqi++) {
-		GIC::gic_irq& irq = owner.get_gic_irq(irqi);
+		GICIRQLine *irq_line = owner.get_irq_line(irqi);
 		
-		if (irq.enabled && (irq.pending || (!irq.edge_triggered && irq.raised))) {
-			if (irq.priority < best_prio) {
-				best_prio = irq.priority;
+		if (irq_line->enabled && (irq_line->pending || (!irq_line->edge_triggered && irq_line->raised()))) {
+			if (irq_line->priority < best_prio) {
+				best_prio = irq_line->priority;
 				best_irq = irqi;
 			}
 		}
@@ -387,16 +387,16 @@ uint32_t GICCPUInterface::acknowledge()
 	this->irq.acknowledge();
 
 	uint32_t irq = current_pending;
-	if (irq == 1023 || owner.get_gic_irq(irq).priority >= running_priority) {
+	if (irq == 1023 || owner.get_irq_line(irq)->priority >= running_priority) {
 		if (irq == 1023) running_priority = 0x100;
 		return 1023;
 	}
 	
 	last_active[irq] = running_irq;
 	
-	owner.get_gic_irq(irq).pending = false;
+	owner.get_irq_line(irq)->pending = false;
 	running_irq = irq;
-	running_priority = owner.get_gic_irq(irq).priority;
+	running_priority = owner.get_irq_line(irq)->priority;
 		
 	update_unsafe();
 	return irq;
@@ -432,7 +432,7 @@ void GICCPUInterface::complete(uint32_t irq)
 		if (running_irq == 1023) {
 			running_priority = 0x100;
 		} else {
-			running_priority = owner.get_gic_irq(running_irq).priority;
+			running_priority = owner.get_irq_line(running_irq)->priority;
 		}
 	}
 	
@@ -441,11 +441,6 @@ void GICCPUInterface::complete(uint32_t irq)
 
 GIC::GIC() : distributor(GICDistributorInterface(*this))
 {
-	bzero(&irqs, sizeof(irqs));
-	
-	for (int i = 0; i < 96; i++) {
-		irqs[i].index = i;
-	}
 }
 
 GIC::~GIC()
@@ -457,62 +452,50 @@ GIC::~GIC()
 	cores.clear();
 }
 
-void GIC::add_core(irq::IRQLine& irq, int id)
+void GIC::add_core(irq::IRQLineBase& irq, int id)
 {
 	GICCPUInterface *iface = new GICCPUInterface(*this, irq, id);
 	cores.push_back(iface);
 }
 
-void GIC::irq_raised(irq::IRQLine& line)
+void GIC::irq_raised(irq::IRQLineBase& line)
 {
 	std::unique_lock<std::mutex> l(global_gic_lock);
 
-	gic_irq& irq = get_gic_irq(line.index());	
-	
-	if (!irq.raised) {
-#ifdef DEBUG_IRQ
-		fprintf(stderr, "gic: raise %d\n", irq.index);
-#endif
-		
-		irq.raised = true;
-		if (irq.edge_triggered) irq.pending = true;
-		update();
-	}
+	GICIRQLine& irq_line = (GICIRQLine&)line;
+
+	if (irq_line.edge_triggered) irq_line.pending = true;
+	update();	
 }
 
-void GIC::irq_rescinded(irq::IRQLine& line)
+void GIC::irq_rescinded(irq::IRQLineBase& line)
 {
 	std::unique_lock<std::mutex> l(global_gic_lock);
 
-	gic_irq& irq = get_gic_irq(line.index());
-	
-	if (irq.raised) {
-#ifdef DEBUG_IRQ
-		fprintf(stderr, "gic: rescind %d\n", irq.index);
-#endif
-		
-		irq.raised = false;
-		update();
-	}
+	update();
 }
 
 void GIC::update()
 {
-	for (auto core : cores)
+	for (auto core : cores) {
 		core->update();
+	}
 }
 
 void GIC::dump() const
 {
 	for (int i = 0; i < 96; i++) {
-		fprintf(stderr, "[%02d]: (raised=%3s) active=%3s, level=%4s, pending=%3s, trigger=%5s, enabled=%3s, priority=%d\n", 
+		const GICIRQLine *irq_line = get_irq_line(i);
+		
+		fprintf(stderr, "[%02d]: raised=%3s, active=%3s, level=%4s, pending=%3s, trigger=%5s, enabled=%3s, priority=%d\n", 
 				i,
-				get_irq_line(i)->raised() ? "yes" : "no",
-				irqs[i].active ? "yes" : "no",
-				irqs[i].raised ? "high" : "low",
-				irqs[i].pending ? "yes" : "no",
-				irqs[i].edge_triggered ? "edge" : "level",
-				irqs[i].enabled ? "yes" : "no",
-				irqs[i].priority);
+				irq_line->raised() ? "yes" : "no",
+				irq_line->active ? "yes" : "no",
+				irq_line->pending ? "yes" : "no",
+				irq_line->edge_triggered ? "edge" : "level",
+				irq_line->enabled ? "yes" : "no",
+				irq_line->priority);
 	}
 }
+
+//template class captive::devices::irq::IRQController<GICIRQLine, 96u>;

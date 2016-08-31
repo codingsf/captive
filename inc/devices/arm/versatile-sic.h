@@ -15,10 +15,10 @@
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class VersatileSIC : public Device, public irq::IRQController<32u>
+			class VersatileSIC : public Device, public irq::IRQController<irq::IRQLineBase, 32u>
 			{
 			public:
-				VersatileSIC(irq::IRQLine& irq);
+				VersatileSIC(irq::IRQLineBase& irq);
 				virtual ~VersatileSIC();
 
 				virtual bool read(uint64_t off, uint8_t len, uint64_t& data);
@@ -28,11 +28,11 @@ namespace captive {
 
 				virtual std::string name() const { return "sic"; }
 
-				void irq_raised(irq::IRQLine& line) override;
-				void irq_rescinded(irq::IRQLine& line) override;
+				void irq_raised(irq::IRQLineBase& line) override;
+				void irq_rescinded(irq::IRQLineBase& line) override;
 
 			private:
-				irq::IRQLine& _irq;
+				irq::IRQLineBase& _irq;
 
 				std::atomic<uint32_t> status;
 				uint32_t enable_mask;

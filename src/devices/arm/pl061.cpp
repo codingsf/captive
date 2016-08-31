@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-PL061::PL061(irq::IRQLine& irq) : Primecell(0x00041061), _irq(irq)
+PL061::PL061(irq::IRQLineBase& irq) : Primecell(0x00041061), _irq(irq)
 {
 
 }

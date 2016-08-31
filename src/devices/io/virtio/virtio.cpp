@@ -33,7 +33,7 @@ using namespace captive::devices::io::virtio;
 #define VIRTIO_REG_INTERRUPT_ACK	0x64		// WO
 #define VIRTIO_REG_STATUS		0x70		// RW
 
-VirtIO::VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues)
+VirtIO::VirtIO(irq::IRQLineBase& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues)
 	: _irq(irq),
 	_isr(0),
 	_host_features(0),

@@ -17,7 +17,7 @@ namespace captive {
 		}
 
 		namespace irq {
-			class IRQLine;
+			class IRQLineBase;
 		}
 
 		namespace arm {
@@ -29,7 +29,7 @@ namespace captive {
 					V_PL111,
 				};
 				
-				PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq, DeviceVariant v = V_PL110);
+				PL110(gfx::VirtualScreen& screen, irq::IRQLineBase& irq, DeviceVariant v = V_PL110);
 				virtual ~PL110();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -44,7 +44,7 @@ namespace captive {
 				void update_irq();
 
 				gfx::VirtualScreen& _screen;
-				irq::IRQLine& _irq;
+				irq::IRQLineBase& _irq;
 
 				union {
 					uint32_t data;

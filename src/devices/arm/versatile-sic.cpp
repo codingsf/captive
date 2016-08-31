@@ -3,7 +3,7 @@
 
 using namespace captive::devices::arm;
 
-VersatileSIC::VersatileSIC(irq::IRQLine& irq) : _irq(irq)
+VersatileSIC::VersatileSIC(irq::IRQLineBase& irq) : _irq(irq)
 {
 }
 
@@ -46,7 +46,7 @@ bool VersatileSIC::write(uint64_t off, uint8_t len, uint64_t data)
 	return true;
 }
 
-void VersatileSIC::irq_raised(irq::IRQLine& line)
+void VersatileSIC::irq_raised(irq::IRQLineBase& line)
 {
 	// DEBUG << CONTEXT(VersatileSIC) << "IRQ Raised: " << line.index();
 
@@ -54,7 +54,7 @@ void VersatileSIC::irq_raised(irq::IRQLine& line)
 	_irq.raise();
 }
 
-void VersatileSIC::irq_rescinded(irq::IRQLine& line)
+void VersatileSIC::irq_rescinded(irq::IRQLineBase& line)
 {
 	// DEBUG << CONTEXT(VersatileSIC) << "IRQ Rescinded: " << line.index();
 

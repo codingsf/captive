@@ -19,7 +19,7 @@
 namespace captive {
 	namespace devices {
 		namespace irq {
-			class IRQLine;
+			class IRQLineBase;
 		}
 		
 		namespace io {
@@ -30,7 +30,7 @@ namespace captive {
 			class PL011 : public Primecell
 			{
 			public:
-				PL011(irq::IRQLine& irq, io::UART& uart);
+				PL011(irq::IRQLineBase& irq, io::UART& uart);
 				virtual ~PL011();
 
 				void start_reading();
@@ -44,7 +44,7 @@ namespace captive {
 				void enqueue(uint8_t ch);
 				
 			private:
-				irq::IRQLine& _irq;
+				irq::IRQLineBase& _irq;
 				io::UART& _uart;
 
 				uint32_t control_word;

@@ -18,7 +18,7 @@ using namespace captive::devices::arm;
 #define IRQ_TXINTR (1 << 5)
 #define IRQ_RXINTR (1 << 4)
 
-PL011::PL011(irq::IRQLine& irq, io::UART& uart) 
+PL011::PL011(irq::IRQLineBase& irq, io::UART& uart) 
 	: Primecell(0x00141011),
 	_irq(irq),
 	_uart(uart),

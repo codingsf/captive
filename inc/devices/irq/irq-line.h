@@ -15,10 +15,10 @@ namespace captive {
 		namespace irq {
 			class IRQControllerBase;
 
-			class IRQLine
+			class IRQLineBase
 			{
 			public:
-				IRQLine();
+				IRQLineBase() : _raised(false), _index(0), _controller(NULL) { }
 
 				void raise();
 				void rescind();

@@ -20,7 +20,7 @@ namespace captive {
 			class PL031 : public Primecell, public timers::TimerSink
 			{
 			public:
-				PL031(timers::TimerManager& timer_manager, irq::IRQLine& irq);
+				PL031(timers::TimerManager& timer_manager, irq::IRQLineBase& irq);
 				virtual ~PL031();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -33,7 +33,7 @@ namespace captive {
 			private:
 				std::shared_timed_mutex lock;
 				
-				irq::IRQLine& irq;
+				irq::IRQLineBase& irq;
 				volatile uint32_t dr;
 				uint32_t match, load, ctrl, mask, isr;
 				

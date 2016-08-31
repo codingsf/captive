@@ -2,7 +2,7 @@
 
 using namespace captive::devices::arm;
 
-PL390::PL390(irq::IRQLine& irq, irq::IRQLine& fiq) : Primecell(0), irq(irq), fiq(fiq)
+PL390::PL390(irq::IRQLineBase& irq, irq::IRQLineBase& fiq) : Primecell(0), irq(irq), fiq(fiq)
 {
 	
 }
@@ -12,12 +12,12 @@ PL390::~PL390()
 
 }
 
-void PL390::irq_raised(irq::IRQLine& line)
+void PL390::irq_raised(irq::IRQLineBase& line)
 {
 	fprintf(stderr, "IRQ RAISED\n");
 }
 
-void PL390::irq_rescinded(irq::IRQLine& line)
+void PL390::irq_rescinded(irq::IRQLineBase& line)
 {
 	fprintf(stderr, "IRQ RESCINDED\n");
 }

@@ -9,7 +9,7 @@ DECLARE_CHILD_CONTEXT(PL110, Primecell);
 
 using namespace captive::devices::arm;
 
-PL110::PL110(gfx::VirtualScreen& screen, irq::IRQLine& irq, DeviceVariant v)
+PL110::PL110(gfx::VirtualScreen& screen, irq::IRQLineBase& irq, DeviceVariant v)
 	: Primecell(v == V_PL110 ? 0x00041110 : 0x00041111, 0x10000), _screen(screen), _irq(irq), lcd_timing { 0, 0, 0, 0 }, upper_fbbase(0), lower_fbbase(0), isr(0), irq_mask(0)
 {
 	control.data = 0;

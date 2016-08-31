@@ -20,14 +20,14 @@
 namespace captive {
 	namespace devices {
 		namespace irq {
-			class IRQLine;
+			class IRQLineBase;
 		}
 		
 		namespace arm {
 			class MPTimer : public Device, public timers::TimerSink
 			{
 			public:
-				MPTimer(timers::TimerManager& timer_manager, irq::IRQLine& irq);
+				MPTimer(timers::TimerManager& timer_manager, irq::IRQLineBase& irq);
 				virtual ~MPTimer();
 				
 				std::string name() const override { return "mptimer"; }
@@ -41,7 +41,7 @@ namespace captive {
 
 			private:
 				timers::TimerManager& timer_manager;
-				irq::IRQLine& irq;
+				irq::IRQLineBase& irq;
 				
 				bool enabled, auto_reload, irq_enabled;
 				uint8_t prescale;

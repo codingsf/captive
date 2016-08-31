@@ -18,14 +18,14 @@
 namespace captive {
 	namespace devices {
 		namespace irq {
-			class IRQLine;
+			class IRQLineBase;
 		}
 
 		namespace arm {
 			class SP804 : public Primecell, public timers::TimerSink
 			{
 			public:
-				SP804(timers::TimerManager& timer_manager, irq::IRQLine& irq);
+				SP804(timers::TimerManager& timer_manager, irq::IRQLineBase& irq);
 				virtual ~SP804();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -80,7 +80,7 @@ namespace captive {
 				};
 
 				SP804Timer timers[2];
-				irq::IRQLine& irq;
+				irq::IRQLineBase& irq;
 			};
 		}
 	}

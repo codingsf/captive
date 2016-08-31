@@ -27,7 +27,7 @@ namespace captive
 			class LAN9118 : public NetworkDevice
 			{
 			public:
-				LAN9118(irq::IRQLine& irq);
+				LAN9118(irq::IRQLineBase& irq);
 				virtual ~LAN9118();
 				
 				uint32_t size() const override { return 0x1000; }
@@ -40,7 +40,7 @@ namespace captive
 				bool receive_packet(const uint8_t *buffer, uint32_t length) override;
 				
 			private:
-				irq::IRQLine& irq;
+				irq::IRQLineBase& irq;
 				
 				uint32_t pmt_ctrl, irq_cfg, irq_status, irq_en, fifo_int;
 				uint32_t rx_cfg, tx_cfg, hw_cfg, gpio_cfg, gpt_cfg, word_swap, afc_cfg;

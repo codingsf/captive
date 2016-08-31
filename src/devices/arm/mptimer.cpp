@@ -4,7 +4,7 @@
 
 using namespace captive::devices::arm;
 
-MPTimer::MPTimer(timers::TimerManager& timer_manager, irq::IRQLine& irq) : timer_manager(timer_manager), irq(irq), enabled(false), auto_reload(false), irq_enabled(false), prescale(0), load(0), val(0), isr(0), start(0)
+MPTimer::MPTimer(timers::TimerManager& timer_manager, irq::IRQLineBase& irq) : timer_manager(timer_manager), irq(irq), enabled(false), auto_reload(false), irq_enabled(false), prescale(0), load(0), val(0), isr(0), start(0)
 {
 	timer_manager.add_timer(RATE_MHZ, *this);
 }

@@ -3,13 +3,7 @@
 
 using namespace captive::devices::irq;
 
-IRQLine::IRQLine() : _raised(false), _index(0)
-{
-
-}
-
-
-void IRQLine::raise()
+void IRQLineBase::raise()
 {
 	bool is_raised = false;
 	if (_raised.compare_exchange_strong(is_raised, true)) {
@@ -17,7 +11,7 @@ void IRQLine::raise()
 	}
 }
 
-void IRQLine::rescind()
+void IRQLineBase::rescind()
 {
 	bool is_raised = true;
 	if (_raised.compare_exchange_strong(is_raised, false)) {
@@ -25,7 +19,7 @@ void IRQLine::rescind()
 	}
 }
 
-void IRQLine::acknowledge()
+void IRQLineBase::acknowledge()
 {
 	_controller->irq_acknowledged(*this);
 }

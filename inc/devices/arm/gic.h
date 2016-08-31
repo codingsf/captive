@@ -28,7 +28,7 @@ namespace captive {
 				friend class GICDistributorInterface;
 				
 			public:
-				GICCPUInterface(GIC& owner, irq::IRQLine& irq, int id);
+				GICCPUInterface(GIC& owner, irq::IRQLineBase& irq, int id);
 				virtual ~GICCPUInterface();
 				
 				std::string name() const override { return "gic-cpu"; }
@@ -41,7 +41,7 @@ namespace captive {
 				
 			private:
 				GIC& owner;
-				irq::IRQLine& irq;
+				irq::IRQLineBase& irq;
 				int id;
 				
 				uint32_t last_active[96];
@@ -87,7 +87,18 @@ namespace captive {
 				void sgi(uint32_t data);
 			};
 
-			class GIC : public irq::IRQController<96u>
+			class GICIRQLine : public irq::IRQLineBase
+			{
+			public:
+				bool enabled;
+				bool pending;
+				bool active;
+				bool model;
+				bool edge_triggered;
+				uint32_t priority;
+			};
+			
+			class GIC : public irq::IRQController<GICIRQLine, 96u>
 			{
 				friend class GICCPUInterface;
 				friend class GICDistributorInterface;
@@ -96,7 +107,7 @@ namespace captive {
 				GIC();
 				virtual ~GIC();
 				
-				void add_core(irq::IRQLine& irq, int id);
+				void add_core(irq::IRQLineBase& irq, int id);
 				
 				GICCPUInterface& get_core(int id) { return *cores[id]; }
 				GICDistributorInterface& get_distributor() { return distributor; }
@@ -104,30 +115,13 @@ namespace captive {
 				void dump() const override;
 
 			protected:
-				void irq_raised(irq::IRQLine& line) override;
-				void irq_rescinded(irq::IRQLine& line) override;
+				void irq_raised(irq::IRQLineBase& line) override;
+				void irq_rescinded(irq::IRQLineBase& line) override;
 
 			private:
 				std::vector<GICCPUInterface *> cores;
 				GICDistributorInterface distributor;
-				
-				struct gic_irq {
-					int index;
-					bool enabled;
-					bool pending;
-					bool active;
-					bool model;
-					bool raised;
-					bool edge_triggered;
-					uint32_t priority;
-				} irqs[96];
-				
-				gic_irq& get_gic_irq(int index)
-				{
-					assert(index < 96);
-					return irqs[index];
-				}
-							
+
 				void update();
 			};
 		}

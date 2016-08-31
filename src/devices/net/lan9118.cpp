@@ -107,7 +107,7 @@
 
 using namespace captive::devices::net;
 
-LAN9118::LAN9118(irq::IRQLine& irq) 
+LAN9118::LAN9118(irq::IRQLineBase& irq) 
 	: irq(irq),
 		pmt_ctrl(1),
 		irq_cfg(0), irq_status(0), irq_en(0), fifo_int(0),

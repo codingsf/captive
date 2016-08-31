@@ -7,7 +7,7 @@ DECLARE_CHILD_CONTEXT(VirtIONetworkDevice, VirtIO);
 
 using namespace captive::devices::io::virtio;
 
-VirtIONetworkDevice::VirtIONetworkDevice(irq::IRQLine& irq, net::NetworkInterface& iface) 
+VirtIONetworkDevice::VirtIONetworkDevice(irq::IRQLineBase& irq, net::NetworkInterface& iface) 
 	: VirtIO(irq, 1, 1, 2),
 	_iface(iface)
 {

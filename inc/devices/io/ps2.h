@@ -22,7 +22,7 @@ namespace captive {
 			class PS2Device
 			{
 			public:
-				PS2Device(irq::IRQLine& irq);
+				PS2Device(irq::IRQLineBase& irq);
 
 				enum device_type {
 					PS2_KEYBOARD,
@@ -69,7 +69,7 @@ namespace captive {
 				mutable std::mutex process_lock;
 
 			private:
-				irq::IRQLine& _irq;
+				irq::IRQLineBase& _irq;
 				bool irq_enabled;
 				mutable std::queue<uint32_t> data_queue;
 			};
@@ -77,7 +77,7 @@ namespace captive {
 			class PS2KeyboardDevice : public PS2Device, public Keyboard
 			{
 			public:
-				PS2KeyboardDevice(irq::IRQLine& irq);
+				PS2KeyboardDevice(irq::IRQLineBase& irq);
 
 				void send_command(uint32_t command) override;
 				device_type type() const override { return PS2_KEYBOARD; }
@@ -92,7 +92,7 @@ namespace captive {
 			class PS2MouseDevice : public PS2Device, public Mouse
 			{
 			public:
-				PS2MouseDevice(irq::IRQLine& irq);
+				PS2MouseDevice(irq::IRQLineBase& irq);
 
 				void send_command(uint32_t command) override;
 				device_type type() const override { return PS2_MOUSE; }

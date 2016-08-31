@@ -15,10 +15,10 @@
 namespace captive {
 	namespace devices {
 		namespace arm {
-			class PL190 : public Primecell, public irq::IRQController<32u>
+			class PL190 : public Primecell, public irq::IRQController<irq::IRQLineBase, 32u>
 			{
 			public:
-				PL190(irq::IRQLine& irq, irq::IRQLine& fiq);
+				PL190(irq::IRQLineBase& irq, irq::IRQLineBase& fiq);
 				virtual ~PL190();
 
 				bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -27,12 +27,12 @@ namespace captive {
 				virtual std::string name() const { return "pl190"; }
 
 			protected:
-				void irq_raised(irq::IRQLine& line) override;
-				void irq_rescinded(irq::IRQLine& line) override;
+				void irq_raised(irq::IRQLineBase& line) override;
+				void irq_rescinded(irq::IRQLineBase& line) override;
 
 			private:
-				irq::IRQLine& irq;
-				irq::IRQLine& fiq;
+				irq::IRQLineBase& irq;
+				irq::IRQLineBase& fiq;
 
 				std::atomic<uint32_t> irq_status, soft_status;
 				uint32_t mask, fiq_select;

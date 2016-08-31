@@ -10,7 +10,7 @@ DECLARE_CHILD_CONTEXT(VirtIOBlockDevice, VirtIO);
 using namespace captive::devices::io::block;
 using namespace captive::devices::io::virtio;
 
-VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLine& irq, BlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
+VirtIOBlockDevice::VirtIOBlockDevice(irq::IRQLineBase& irq, BlockDevice& bdev) : VirtIO(irq, 1, 2, 1), _bdev(bdev)
 {
 	bzero(&config, sizeof(config));
 	config.capacity = bdev.blocks();

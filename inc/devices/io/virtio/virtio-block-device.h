@@ -21,7 +21,7 @@ namespace captive {
 				class VirtIOBlockDevice : public VirtIO
 				{
 				public:
-					VirtIOBlockDevice(irq::IRQLine& irq, block::BlockDevice& bdev);
+					VirtIOBlockDevice(irq::IRQLineBase& irq, block::BlockDevice& bdev);
 					virtual ~VirtIOBlockDevice();
 
 				protected:

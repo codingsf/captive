@@ -4,7 +4,7 @@
 
 using namespace captive::devices::arm;
 
-PL031::PL031(timers::TimerManager& timer_manager, irq::IRQLine& irq) : Primecell(0x00041031), irq(irq), dr(0), match(0), load(0), ctrl(0), mask(0), isr(0)
+PL031::PL031(timers::TimerManager& timer_manager, irq::IRQLineBase& irq) : Primecell(0x00041031), irq(irq), dr(0), match(0), load(0), ctrl(0), mask(0), isr(0)
 {
 	dr = (uint32_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 	timer_manager.add_timer(RATE_HZ, *this);

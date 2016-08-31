@@ -19,7 +19,7 @@
 namespace captive {
 	namespace devices {
 		namespace irq {
-			class IRQLine;
+			class IRQLineBase;
 		}
 
 		namespace io {
@@ -71,7 +71,7 @@ namespace captive {
 					friend class VirtQueue;
 					
 				public:
-					VirtIO(irq::IRQLine& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues);
+					VirtIO(irq::IRQLineBase& irq, uint32_t version, uint32_t device_id, uint8_t nr_queues);
 					virtual ~VirtIO();
 
 					bool read(uint64_t off, uint8_t len, uint64_t& data) override;
@@ -112,7 +112,7 @@ namespace captive {
 					void update_irq();
 
 					std::vector<VirtQueue *> queues;
-					irq::IRQLine& _irq;
+					irq::IRQLineBase& _irq;
 
 					std::atomic<uint32_t> _isr;
 					

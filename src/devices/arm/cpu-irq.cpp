@@ -11,19 +11,19 @@ DECLARE_CONTEXT(ArmCpuIRQController);
 using namespace captive::devices::irq;
 using namespace captive::devices::arm;
 
-void ArmCpuIRQController::irq_raised(IRQLine& line)
+void ArmCpuIRQController::irq_raised(IRQLineBase& line)
 {
 	DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Raised: " << line.index();
 	cpu().raise_guest_interrupt(line.index());
 }
 
-void ArmCpuIRQController::irq_rescinded(IRQLine& line)
+void ArmCpuIRQController::irq_rescinded(IRQLineBase& line)
 {
 	DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Rescinded: " << line.index();
 	cpu().rescind_guest_interrupt(line.index());
 }
 
-void ArmCpuIRQController::irq_acknowledged(IRQLine& line)
+void ArmCpuIRQController::irq_acknowledged(IRQLineBase& line)
 {
 	DEBUG << CONTEXT(ArmCpuIRQController) << "IRQ Acknowledged: " << line.index();
 	cpu().acknowledge_guest_interrupt(line.index());
