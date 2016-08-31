@@ -61,6 +61,14 @@ namespace captive {
 						return NULL;
 					}
 				}
+				
+				inline const IRQLine *get_irq_line(uint32_t idx) const {
+					if (idx < nr_lines) {
+						return &lines[idx];
+					} else {
+						return NULL;
+					}
+				}
 
 				virtual bool have_raised_irqs() const override;
 				virtual void dump() const override;

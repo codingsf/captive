@@ -100,6 +100,8 @@ namespace captive {
 				
 				GICCPUInterface& get_core(int id) { return *cores[id]; }
 				GICDistributorInterface& get_distributor() { return distributor; }
+				
+				void dump() const override;
 
 			protected:
 				void irq_raised(irq::IRQLine& line) override;

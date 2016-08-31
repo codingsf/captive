@@ -501,3 +501,18 @@ void GIC::update()
 	for (auto core : cores)
 		core->update();
 }
+
+void GIC::dump() const
+{
+	for (int i = 0; i < 96; i++) {
+		fprintf(stderr, "[%02d]: (raised=%3s) active=%3s, level=%4s, pending=%3s, trigger=%5s, enabled=%3s, priority=%d\n", 
+				i,
+				get_irq_line(i)->raised() ? "yes" : "no",
+				irqs[i].active ? "yes" : "no",
+				irqs[i].raised ? "high" : "low",
+				irqs[i].pending ? "yes" : "no",
+				irqs[i].edge_triggered ? "edge" : "level",
+				irqs[i].enabled ? "yes" : "no",
+				irqs[i].priority);
+	}
+}
