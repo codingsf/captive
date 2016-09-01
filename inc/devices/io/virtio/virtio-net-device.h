@@ -21,7 +21,7 @@ namespace captive {
 				class VirtIONetworkDevice : public VirtIO, public net::NetworkInterfaceReceiveCallback
 				{
 				public:
-					VirtIONetworkDevice(irq::IRQLineBase& irq, net::NetworkInterface& iface);
+					VirtIONetworkDevice(irq::IRQLineBase& irq, net::NetworkInterface& iface, uint64_t mac_address);
 					virtual ~VirtIONetworkDevice();
 					
 					void receive_packet(const uint8_t *buffer, uint32_t length) override;

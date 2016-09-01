@@ -1,4 +1,5 @@
 #include <platform/realview.h>
+#include <util/cl/options.h>
 
 #include <devices/arm/cpu-irq.h>
 #include <devices/arm/gic.h>
@@ -54,11 +55,12 @@ using namespace captive::devices::io::virtio;
 using namespace captive::devices::net;
 using namespace captive::devices::net::user;
 using namespace captive::devices::net::tap;
+using namespace captive::util;
 
 //#define NETWORK_DEVICE
 #define VIRTIO_NETWORK_DEVICE
 
-Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant, std::string block_device_file) : Platform(timer_manager), variant(variant), socket_uart(NULL)
+Realview::Realview(devices::timers::TimerManager& timer_manager, Variant variant) : Platform(timer_manager), variant(variant), socket_uart(NULL)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0x20000000, 0x20000000));
@@ -205,11 +207,16 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	
 	PL110 *lcd = new PL110(*vs, *gic0->get_irq_line(55), PL110::V_PL111);
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10020000, *lcd));
-	
+
+	if (!cl::BlockDeviceFile) {
+		ERROR << "You must specify a block device file";
+		throw 0;
+	}
+
 	FileBackedBlockDevice *bdev = new FileBackedBlockDevice();
 
-	if (!bdev->open_file(block_device_file)) {
-		ERROR << "Unable to open block device file '" << block_device_file << "'";
+	if (!bdev->open_file(cl::BlockDeviceFile.get())) {
+		ERROR << "Unable to open block device file '" << cl::BlockDeviceFile.get() << "'";
 		throw 0;
 	}
 
@@ -218,7 +225,13 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 	
 #if defined(NETWORK_DEVICE) || defined(VIRTIO_NETWORK_DEVICE)
 	//UserInterface *net_iface = new UserInterface();
-	net_iface = new TapInterface("virbr0-nic");
+
+	if (!cl::TAPDevice) {
+		ERROR << "You must specify a TAP interface";
+		throw 0;
+	}
+
+	net_iface = new TapInterface(cl::TAPDevice.get());
 	if (!net_iface->start()) {
         	ERROR << "Unable to start TAP interface";
         	throw 0;
@@ -233,7 +246,12 @@ Realview::Realview(devices::timers::TimerManager& timer_manager ,Variant variant
 #endif
 	
 #ifdef VIRTIO_NETWORK_DEVICE
-	VirtIONetworkDevice *net = new VirtIONetworkDevice(*gic0->get_irq_line(34), *net_iface);
+	if (!cl::MAC) {
+		ERROR << "You must specify a MAC address";
+		throw 0;
+	}
+
+	VirtIONetworkDevice *net = new VirtIONetworkDevice(*gic0->get_irq_line(34), *net_iface, strtoul(cl::MAC.get().c_str(), NULL, 16));
 	cfg.devices.push_back(GuestDeviceConfiguration(0x10101000, *net));
 #endif
 	
