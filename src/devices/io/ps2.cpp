@@ -261,19 +261,19 @@ void PS2MouseDevice::mouse_move(uint32_t x, uint32_t y)
 {
 	dx = x - last_x;
 	dy = y - last_y;
-	
+
 	last_x = x;
 	last_y = y;
-	
+
 	send_update();
 }
 
 void PS2MouseDevice::send_update()
 {
 	std::unique_lock<std::mutex> l(process_lock);
-	
+
 	if (!(status & STATUS_REPORTING)) return;
-	if (!(status & STATUS_REMOTE)) return;
+	//if ((status & STATUS_REMOTE)) return;
 
 	if (dx > 127)
 		dx = 127;
