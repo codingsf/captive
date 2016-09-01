@@ -7,7 +7,7 @@
 using namespace captive::util;
 using namespace captive::util::cl;
 
-std::map<std::string, OptionHandler *> registered_option_handlers;
+std::map<std::string, OptionHandler *> registered_option_handlers __attribute__((init_priority(500)));
 
 bool CommandLine::parse(int argc, const char **argv, config::Configuration& cfg)
 {

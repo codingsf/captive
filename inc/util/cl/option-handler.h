@@ -108,8 +108,8 @@ public: \
 	virtual HandleResult::HandleResult handle(captive::util::config::Configuration& config, std::string arg) const override; \
 }; \
 namespace registrations { \
-static __name##OptionHandler __option_handler_##__name(__oreq, __vreq); \
-static OptionHandlerRegistration __option_handler__reg__##__name(__tag, __option_handler_##__name); \
+static __name##OptionHandler __option_handler_##__name __attribute__((init_priority(600))) (__oreq, __vreq); \
+static OptionHandlerRegistration __option_handler__reg__##__name __attribute__((init_priority(700))) (__tag, __option_handler_##__name); \
 } \
 HandleResult::HandleResult __name##OptionHandler::handle(captive::util::config::Configuration& config, std::string arg) const
 
