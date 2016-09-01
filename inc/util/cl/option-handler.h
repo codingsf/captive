@@ -42,12 +42,21 @@ namespace captive
 				};
 			}
 			
+			namespace ValueRequirement
+			{
+				enum ValueRequirement
+				{
+					None,
+					Optional,
+					Required,
+				};
+			}
+			
 			namespace HandleResult
 			{
 				enum HandleResult
 				{
 					OK,
-					MissingArgument,
 					InvalidArgument
 				};
 			}
@@ -57,22 +66,25 @@ namespace captive
 				friend class util::CommandLine;
 				
 			public:
-				OptionHandler(OptionRequirement::OptionRequirement option_requirement) 
+				OptionHandler(OptionRequirement::OptionRequirement option_requirement, ValueRequirement::ValueRequirement value_requirement)
 					: _option_requirement(option_requirement),
+					_value_requirement(value_requirement),
 					_visited(0) { }
 				
 				virtual ~OptionHandler() { }
 				
-				virtual HandleResult::HandleResult handle(util::config::Configuration& config, maybe<std::string> value) const = 0;
+				virtual HandleResult::HandleResult handle(util::config::Configuration& config, std::string arg) const = 0;
 				
 			protected:
 				OptionRequirement::OptionRequirement option_requirement() const { return _option_requirement; }
+				ValueRequirement::ValueRequirement value_requirement() const { return _value_requirement; }
 				
 				int visited() const { return _visited; }
 				void visit() { _visited++; }
 			
 			private:
 				const OptionRequirement::OptionRequirement _option_requirement;
+				const ValueRequirement::ValueRequirement _value_requirement;
 				int _visited;
 			};
 			
@@ -89,17 +101,17 @@ namespace captive
 	}
 }
 
-#define DEFINE_OPTION_HANDLER(__tag, __name, __oreq) class __name##OptionHandler : public OptionHandler \
+#define DEFINE_OPTION_HANDLER(__tag, __name, __oreq, __vreq) class __name##OptionHandler : public OptionHandler \
 { \
 public: \
-	__name##OptionHandler(OptionRequirement::OptionRequirement oreq) : OptionHandler(oreq) { } \
-	virtual HandleResult::HandleResult handle(captive::util::config::Configuration& config, maybe<std::string> arg) const override; \
+	__name##OptionHandler(OptionRequirement::OptionRequirement oreq, ValueRequirement::ValueRequirement vreq) : OptionHandler(oreq, vreq) { } \
+	virtual HandleResult::HandleResult handle(captive::util::config::Configuration& config, std::string arg) const override; \
 }; \
 namespace registrations { \
-static __name##OptionHandler __option_handler_##__name(__oreq); \
+static __name##OptionHandler __option_handler_##__name(__oreq, __vreq); \
 static OptionHandlerRegistration __option_handler__reg__##__name(__tag, __option_handler_##__name); \
 } \
-HandleResult::HandleResult __name##OptionHandler::handle(captive::util::config::Configuration& config, maybe<std::string> arg) const
+HandleResult::HandleResult __name##OptionHandler::handle(captive::util::config::Configuration& config, std::string arg) const
 
 #endif /* OPTION_HANDLER_H */
 

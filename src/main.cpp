@@ -110,6 +110,11 @@ int main(int argc, const char **argv)
 		return 1;
 	}
 	
+	if (cfg.print_usage) {
+		CommandLine::print_usage();
+		return 0;
+	}
+	
 	captive::logging::configure_logging_contexts();
 
 	// Check that KVM is supported

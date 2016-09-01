@@ -27,9 +27,21 @@ bool CommandLine::parse(int argc, const char **argv, config::Configuration& cfg)
 			} else {
 				auto handler = ihandler->second;
 				
-				maybe<std::string> value;
-				if (context.have_tokens() && context.peek_token().compare(0, 2, "--") != 0) {
-					value = maybe<std::string>(context.consume_token());
+				std::string value;
+				
+				if (handler->value_requirement() == ValueRequirement::None) {
+					value = "";
+				} else if (handler->value_requirement() == ValueRequirement::Optional) {
+					if (context.have_tokens() && context.peek_token().compare(0, 2, "--") != 0) {
+						value = context.consume_token();
+					}
+				} else if (handler->value_requirement() == ValueRequirement::Required) {
+					if (context.have_tokens() && context.peek_token().compare(0, 2, "--") != 0) {
+						value = context.consume_token();
+					} else {
+						fprintf(stderr, "error: command-line option '%s' requires a value.\n", token.c_str());
+						return false;
+					}
 				}
 				
 				if (handler->visited() && handler->option_requirement() == OptionRequirement::Once) {
@@ -41,9 +53,8 @@ bool CommandLine::parse(int argc, const char **argv, config::Configuration& cfg)
 					auto result = handler->handle(cfg, value);
 					switch (result) {
 					case cl::HandleResult::InvalidArgument:
-					case cl::HandleResult::MissingArgument:
 						success = false;
-						fprintf(stderr, "error: command-line option '%s' requires argument\n", token.c_str());
+						fprintf(stderr, "error: argument to command-line option '%s' is invalid\n", token.c_str());
 						break;
 					}
 				}
@@ -66,5 +77,21 @@ bool CommandLine::parse(int argc, const char **argv, config::Configuration& cfg)
 
 void CommandLine::print_usage()
 {
-	//
+	fprintf(stderr, "command-line options:\n");
+	
+	for (auto handler : registered_option_handlers) {
+		fprintf(stderr, "  --%s", handler.first.c_str());
+		
+		if (handler.second->value_requirement() == ValueRequirement::Optional) {
+			fprintf(stderr, " [value]");
+		} else if (handler.second->value_requirement() == ValueRequirement::Required) {
+			fprintf(stderr, " <value>");
+		}
+		
+		if (handler.second->option_requirement() != OptionRequirement::None) {
+			fprintf(stderr, " (required)");
+		}
+		
+		fprintf(stderr, "\n");
+	}
 }

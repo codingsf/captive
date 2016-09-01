@@ -25,6 +25,8 @@ namespace captive
 			class Configuration
 			{
 			public:
+				bool print_usage;
+				
 				maybe<std::string> arch_module;
 				maybe<std::string> guest_kernel;
 				

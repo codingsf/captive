@@ -17,36 +17,32 @@ OptionHandlerRegistration::OptionHandlerRegistration(std::string tag, OptionHand
 
 // -------------------------------------------------------------------------------------------------------------------
 
-DEFINE_OPTION_HANDLER("engine", Engine, OptionRequirement::Once) {
-	if (!arg) return HandleResult::MissingArgument;
-	config.arch_module = arg.value();
+DEFINE_OPTION_HANDLER("engine", Engine, OptionRequirement::Once, ValueRequirement::Required) {
+	config.arch_module = arg;
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("kernel", Kernel, OptionRequirement::Once) {
-	if (!arg) return HandleResult::MissingArgument;
-	config.guest_kernel = arg.value();
+DEFINE_OPTION_HANDLER("kernel", Kernel, OptionRequirement::Once, ValueRequirement::Required) {
+	config.guest_kernel = arg;
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("block-dev-file", BlockDevFile, OptionRequirement::Once) {
-	if (!arg) return HandleResult::MissingArgument;
-	config.block_device_file = arg.value();
+DEFINE_OPTION_HANDLER("block-dev-file", BlockDevFile, OptionRequirement::Once, ValueRequirement::Required) {
+	config.block_device_file = arg;
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("tap-device", TAPDevice, OptionRequirement::Once) {
-	if (!arg) return HandleResult::MissingArgument;
-	config.net_tap_device = arg.value();
+DEFINE_OPTION_HANDLER("tap-device", TAPDevice, OptionRequirement::Once, ValueRequirement::Required) {
+	config.net_tap_device = arg;
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("mac-address", MACAddress, OptionRequirement::Once) {
-	if (!arg) return HandleResult::MissingArgument;
-	config.net_mac_addr = arg.value();
+DEFINE_OPTION_HANDLER("mac-address", MACAddress, OptionRequirement::Once, ValueRequirement::Required) {
+	config.net_mac_addr = arg;
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("foo", FOO, OptionRequirement::Once) {
+DEFINE_OPTION_HANDLER("help", Help, OptionRequirement::None, ValueRequirement::None) {
+	config.print_usage = true;
 	return HandleResult::OK;
 }
