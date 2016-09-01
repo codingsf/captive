@@ -15,7 +15,7 @@
 #include <platform/gensim-test.h>
 
 #include <util/command-line.h>
-#include <util/cl/options.h>
+#include <util/config/config.h>
 
 #include <devices/timers/timer-manager.h>
 
@@ -79,7 +79,7 @@ static void handle_usr(int sig, siginfo_t *siginfo, void *ucontext)
 	}
 }
 
-int main(int argc, char **argv)
+static void init_signals()
 {
 	struct sigaction segv_action;
 	segv_action.sa_sigaction = handle_segv;
@@ -97,15 +97,16 @@ int main(int argc, char **argv)
 	sigaction(SIGINT, &intr_action, NULL);
 	sigaction(SIGUSR1, &usr_action, NULL);
 	sigaction(SIGUSR2, &usr_action, NULL);
-	
-	const CommandLine *cl = CommandLine::parse(argc, argv);
+}
 
-	if (cl::Help) {
-		return 1;
-	}
+int main(int argc, const char **argv)
+{
+	init_signals();
 	
-	if (cl->have_errors()) {
-		cl->print_usage();
+	util::config::Configuration cfg;
+	
+	if (!CommandLine::parse(argc, argv, cfg)) {
+		CommandLine::print_usage();
 		return 1;
 	}
 	
@@ -128,21 +129,21 @@ int main(int argc, char **argv)
 	TimerManager timer_manager;
 
 	// Create the guest platform.
-	if (!cl::BlockDeviceFile) {
+	if (!cfg.block_device_file) {
 		ERROR << "Block Device File must be specified";
 		return 1;
 	}
 	
-	Platform *pfm = new Realview(timer_manager, Realview::CORTEX_A8);
+	Platform *pfm = new Realview(cfg, timer_manager, Realview::CORTEX_A8);
 	//Platform *pfm = new GensimTest(timer_manager);
 
 	// Create the engine.
-	if (!cl::Engine) {
+	if (!cfg.arch_module) {
 		ERROR << "Execution engine must be specified";
 		return 1;
 	}
 	
-	Engine engine(cl::Engine.get());
+	Engine engine(cfg.arch_module.value());
 	if (!engine.init()) {
 		delete pfm;
 		delete hv;
@@ -152,12 +153,12 @@ int main(int argc, char **argv)
 	}
 	
 	// Load the kernel
-	if (!cl::Kernel) {
+	if (!cfg.guest_kernel) {
 		ERROR << "Guest kernel must be specified";
 		return 1;
 	}
 	
-	auto kernel = KernelLoader::create_from_file(cl::Kernel.get());
+	auto kernel = KernelLoader::create_from_file(cfg.guest_kernel.value());
 	if (!kernel) {
 		delete pfm;
 		delete hv;

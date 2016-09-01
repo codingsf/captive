@@ -1,7 +1,0 @@
-DefineFlag(Help, 'h', "help", "Displays a helpful message")
-DefineFlag(Verbose, 'v', "verbose", "Increases output verbosity")
-DefineValueRequired(Engine, 'e', "engine", "Selects the execution engine to use")
-DefineValueRequired(Kernel, 'k', "kernel", "Chooses the kernel to boot")
-DefineValueRequired(BlockDeviceFile, 'b', "block-dev-file", "The backing file for the block device")
-DefineValueRequired(TAPDevice, 't', "tap-device", "The TAP device for networking")
-DefineValueRequired(MAC, 'm', "mac", "The MAC address of the network card")

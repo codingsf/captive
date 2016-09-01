@@ -12,7 +12,7 @@ using namespace captive::devices;
 using namespace captive::devices::arm;
 using namespace captive::devices::io;
 
-GensimTest::GensimTest(devices::timers::TimerManager& timer_manager) : Platform(timer_manager)
+GensimTest::GensimTest(const util::config::Configuration& hcfg, devices::timers::TimerManager& timer_manager) : Platform(hcfg, timer_manager)
 {
 	cfg.memory_regions.push_back(GuestMemoryRegionConfiguration(0, 0x10000000));
 	

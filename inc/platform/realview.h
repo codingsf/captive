@@ -13,7 +13,7 @@
 #include <string>
 #include <list>
 
-#define NULL_VIRTUAL_SCREEN
+//#define NULL_VIRTUAL_SCREEN
 
 namespace captive {
 	namespace devices {
@@ -47,7 +47,7 @@ namespace captive {
 				CORTEX_A9,
 			};
 			
-			Realview(devices::timers::TimerManager& timer_manager, Variant variant);
+			Realview(const util::config::Configuration& cfg, devices::timers::TimerManager& timer_manager, Variant variant);
 			virtual ~Realview();
 			
 			const hypervisor::GuestConfiguration& config() const override;

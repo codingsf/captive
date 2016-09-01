@@ -110,6 +110,10 @@ bool SystemStatusAndControl::write(uint64_t off, uint8_t len, uint64_t data)
 		flags &= ~data;
 		return true;
 		
+	case 0x40:
+		DEBUG << CONTEXT(SystemStatusAndControl) << "Unknown RESET register write @ " << std::hex << off << " = " << data << ENABLE;
+		return true;
+		
 	case 0x050:
 		colour_mode &= 0x3f00;
 		colour_mode |= (data & ~0x3f00);

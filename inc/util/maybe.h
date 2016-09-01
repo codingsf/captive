@@ -28,6 +28,10 @@ namespace captive {
 					return _value == check;
 				}
 			}
+			
+			inline operator bool() const {
+				return _has_value;
+			}
 
 		private:
 			bool _has_value;

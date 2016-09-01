@@ -1,130 +1,70 @@
 #include <util/command-line.h>
-#include <string.h>
+#include <util/cl/option-handler.h>
+#include <util/cl/parsing-context.h>
 
-#define CL_DEFINE_OPTIONS
-#include <util/cl/options.h>
-#undef CL_DEFINE_OPTIONS
+#include <map>
 
 using namespace captive::util;
+using namespace captive::util::cl;
 
-#define NR_COMMAND_LINE_OPTIONS (sizeof(cl::command_line_options) / sizeof(cl::command_line_options[0]))
+std::map<std::string, OptionHandler *> registered_option_handlers;
 
-CommandLine::CommandLine() : _have_unknown(false), _have_missing(false)
+bool CommandLine::parse(int argc, const char **argv, config::Configuration& cfg)
 {
-
-}
-
-const CommandLine *CommandLine::parse(int argc, char** argv)
-{
-	CommandLine *cl = new CommandLine();
-	bool readGuestCommandLine = false;
-
-	for (int i = 0; i < argc; i++) {
-		if (readGuestCommandLine) {
-			cl->guest_command_line.push_back(std::string(argv[i]));
-		} else {
-			if (argv[i][0] == '-') {
-				if (argv[i][1] == '-') {
-					if (argv[i][2] == '\0') {
-						readGuestCommandLine = true;
-					} else {
-						CommandLineOption *opt = lookup_long_option(std::string(&argv[i][2]));
-						if (opt) {
-							opt->present = true;
-							
-							if (opt->option_value == CommandLineOption::Optional) {
-								if (i == (argc - 1)) {
-									continue;
-								} else {
-									if (argv[i+1][0] == '-')
-										continue;
-									
-									i++;
-									opt->value = std::string(argv[i]);
-								}
-							} else if (opt->option_value == CommandLineOption::Required) {
-								if (i == (argc - 1)) {
-									cl->_have_missing = true;
-								} else {
-									if (argv[i+1][0] == '-')
-										cl->_have_missing = true;
-									
-									i++;
-									opt->value = std::string(argv[i]);
-								}
-							}
-							
-						} else {
-							cl->_have_unknown = true;
-						}
-					}
+	if (argc < 1) return false;
+	
+	ParsingContext context(cfg, argc-1, argv+1);
+	bool success = true;
+	
+	while (context.have_tokens()) {
+		std::string token = context.consume_token();
+		
+		if (token.compare(0, 2, "--") == 0) {
+			auto ihandler = registered_option_handlers.find(token.substr(2));
+			if (ihandler == registered_option_handlers.end()) {
+				fprintf(stderr, "error: unrecognised command-line option '%s'\n", token.c_str());
+				success = false;
+			} else {
+				auto handler = ihandler->second;
+				
+				maybe<std::string> value;
+				if (context.have_tokens() && context.peek_token().compare(0, 2, "--") != 0) {
+					value = maybe<std::string>(context.consume_token());
+				}
+				
+				if (handler->visited() && handler->option_requirement() == OptionRequirement::Once) {
+					fprintf(stderr, "error: command-line option '%s' may only be specified once.\n", token.c_str());
+					return false;
 				} else {
-					for (unsigned int n = 1; n < strlen(argv[i]); n++) {
-						CommandLineOption *opt = lookup_short_option(argv[i][n]);
-						if (opt) {
-							opt->present = true;
-						} else {
-							cl->_have_unknown = true;
-						}
+					handler->visit();
+					
+					auto result = handler->handle(cfg, value);
+					switch (result) {
+					case cl::HandleResult::InvalidArgument:
+					case cl::HandleResult::MissingArgument:
+						success = false;
+						fprintf(stderr, "error: command-line option '%s' requires argument\n", token.c_str());
+						break;
 					}
 				}
-			} else {
-				cl->args.push_back(std::string(argv[i]));
 			}
+		} else {
+			fprintf(stderr, "error: unhandled command-line argument '%s'\n", token.c_str());
+			success = false;
 		}
 	}
-
-	return cl;
-}
-
-CommandLineOption *CommandLine::lookup_short_option(char c)
-{
-	for (unsigned int i = 0; i < NR_COMMAND_LINE_OPTIONS; i++) {
-		if (cl::command_line_options[i]->short_name == c) {
-			return cl::command_line_options[i];
-		}
-	}
-
-	return NULL;
-}
-
-CommandLineOption *CommandLine::lookup_long_option(std::string l)
-{
-	for (unsigned int i = 0; i < NR_COMMAND_LINE_OPTIONS; i++) {
-		if (cl::command_line_options[i]->long_name == l) {
-			return cl::command_line_options[i];
-		}
-	}
-
-	return NULL;
-}
-
-void CommandLine::dump() const
-{
-
-}
-
-void CommandLine::print_usage() const
-{
-	fprintf(stderr, "command-line options:\n");
 	
-	for (unsigned int i = 0; i < NR_COMMAND_LINE_OPTIONS; i++) {
-		auto opt = cl::command_line_options[i];
-		
-		if (opt->short_name.has_value()) {
-			fprintf(stderr, " -%c  ", opt->short_name.value());
-		} else {
-			fprintf(stderr, "      ");
-		}
-		
-		fprintf(stderr, "--%s", opt->long_name.c_str());
-		
-		if (opt->option_value == CommandLineOption::Optional) {
-			fprintf(stderr, " [value]\n");
-		} else if (opt->option_value == CommandLineOption::Required) {
-			fprintf(stderr, " <value>\n");
-		} else {
-			fprintf(stderr, "\n");
+	for (auto handler : registered_option_handlers) {
+		if (handler.second->option_requirement() == OptionRequirement::Once && !handler.second->visited()) {
+			fprintf(stderr, "error: command-line argument '--%s' must be specified\n", handler.first.c_str());
+			success = false;
 		}
 	}
+	
+	return success;
+}
+
+void CommandLine::print_usage()
+{
+	//
 }

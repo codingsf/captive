@@ -23,7 +23,7 @@ namespace captive {
 		class GensimTest : public Platform
 		{
 		public:
-			GensimTest(devices::timers::TimerManager& timer_manager);
+			GensimTest(const util::config::Configuration& cfg, devices::timers::TimerManager& timer_manager);
 			virtual ~GensimTest();
 			
 			const hypervisor::GuestConfiguration& config() const override;

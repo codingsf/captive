@@ -2,8 +2,6 @@
 #include <devices/io/virtio/virtqueue.h>
 #include <captive.h>
 
-#include <util/cl/options.h>
-
 USE_CONTEXT(VirtIO);
 DECLARE_CHILD_CONTEXT(VirtIONetworkDevice, VirtIO);
 
