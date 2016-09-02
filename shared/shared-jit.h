@@ -143,6 +143,7 @@ namespace captive {
 
 				VERIFY,					// 1
 				COUNT,
+				FETCH,
 
 				NOP,					// 3
 				TRAP,
@@ -279,6 +280,7 @@ namespace captive {
 			static IRInstruction trap() { return IRInstruction(TRAP); }
 			static IRInstruction verify(const IROperand& pc) { return IRInstruction(VERIFY, pc); }
 			static IRInstruction count(const IROperand& pc, const IROperand& ir) { return IRInstruction(COUNT, pc, ir); }
+			static IRInstruction fetch(const IROperand& pc) { return IRInstruction(FETCH, pc); }
 
 			static IRInstruction ldpc(const IROperand& dst) { assert(dst.is_vreg() && dst.size == 4); return IRInstruction(LDPC, dst); }
 			static IRInstruction stpc(const IROperand& val) { assert(val.size == 4); return IRInstruction(STPC, val); }

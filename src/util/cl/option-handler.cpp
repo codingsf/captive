@@ -46,3 +46,8 @@ DEFINE_OPTION_HANDLER("help", Help, OptionRequirement::None, ValueRequirement::N
 	config.print_usage = true;
 	return HandleResult::OK;
 }
+
+DEFINE_OPTION_HANDLER("cache-sim", CacheSimulation, OptionRequirement::None, ValueRequirement::None) {
+	config.cache_simulation = true;
+	return HandleResult::OK;
+}

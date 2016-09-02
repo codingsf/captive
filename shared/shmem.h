@@ -70,6 +70,11 @@ namespace captive {
 	
 #define FAST_DEV_HYPERVISOR_TID	0
 #define FAST_DEV_GUEST_TID		1
+	
+#define SIM_EVENT_FETCH		(1 << 0)
+#define SIM_EVENT_READ		(1 << 1)
+#define SIM_EVENT_WRITE		(1 << 2)
+#define SIM_EVENT_COUNT		(1 << 3)
 
 	struct PerGuestData {
 		struct {
@@ -88,7 +93,9 @@ namespace captive {
 		
 		uintptr_t heap_virt_base;
 		uintptr_t heap_phys_base;
-		size_t heap_size;		
+		size_t heap_size;
+		
+		uint64_t simulation_events;
 	};
 
 	struct PerCPUData {
@@ -96,8 +103,8 @@ namespace captive {
 		
 		PerGuestData *guest_data;
 		void *event_ring;
-				
-		bool halt;
+
+		volatile bool halt;
 
 		uint32_t isr;
 		uint32_t async_action;		// Pending actions

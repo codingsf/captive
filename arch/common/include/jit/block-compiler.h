@@ -32,7 +32,7 @@ namespace captive {
 			class BlockCompiler
 			{
 			public:
-				BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, profile::Region *rgn, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs);
+				BlockCompiler(TranslationContext& ctx, malloc::Allocator& allocator, profile::Region *rgn, uint8_t isa_mode, gpa_t pa, const CPU::TaggedRegisters& tagged_regs, uint64_t sim_events);
 				bool compile(shared::block_txln_fn& fn);
 
 			private:
@@ -42,6 +42,7 @@ namespace captive {
 				uint8_t isa_mode;
 				gpa_t pa;
 				const CPU::TaggedRegisters& tagged_regs;
+				uint64_t sim_events;
 				
 				PopulatedSet<9> used_phys_regs;
 

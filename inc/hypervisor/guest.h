@@ -26,6 +26,10 @@ namespace captive {
 	namespace loader {
 		class Loader;
 	}
+	
+	namespace simulation {
+		class Simulation;
+	}
 
 	namespace hypervisor {
 		class Hypervisor;
@@ -62,11 +66,21 @@ namespace captive {
 			virtual void stop() = 0;
 			
 			virtual void debug_interrupt(int code) = 0;
+			
+			void add_simulation(simulation::Simulation& simulation);
 
+		protected:
+			const std::vector<simulation::Simulation *>& simulations() const { return _simulations; }
+			
+			bool initialise_simulations();
+			void start_simulations();
+			void stop_simulations();
+					
 		private:
 			Hypervisor& _owner;
 			engine::Engine& _engine;
 			platform::Platform& _pfm;
+			std::vector<simulation::Simulation *> _simulations;
 		};
 	}
 }

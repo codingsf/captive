@@ -1155,6 +1155,36 @@ void X86Encoder::intt(uint8_t irq)
 	emit8(irq);
 }
 
+void X86Encoder::out(const X86Register& val, const X86Register& port)
+{
+	assert(port == REG_DX && ((val == REG_AL) || (val == REG_AX) || (val == REG_EAX)));
+	
+	if (val == REG_AL) {
+		emit8(0xee);
+	} else if (val == REG_AX) {
+		emit8(0x66);
+		emit8(0xef);
+	} else {
+		emit8(0xef);
+	}
+}
+
+void X86Encoder::out(const X86Register& val, uint8_t port)
+{
+	assert((val == REG_AL) || (val == REG_AX) || (val == REG_EAX));
+	
+	if (val == REG_AL) {
+		emit8(0xe6);
+	} else if (val == REG_AX) {
+		emit8(0x66);
+		emit8(0xe7);
+	} else {
+		emit8(0xe7);
+	}
+	
+	emit8(port);
+}
+
 void X86Encoder::leave()
 {
 	emit8(0xc9);

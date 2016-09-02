@@ -108,7 +108,7 @@ namespace captive {
 				
 				void guest_entrypoint(gpa_t entrypoint) override;
 				void debug_interrupt(int code) override;
-				
+												
 			private:
 				typedef bool (*event_callback_t)(int fd, bool is_input, void *data);
 
@@ -121,7 +121,6 @@ namespace captive {
 				
 				std::vector<KVMCpu *> kvm_cpus;
 				static void core_thread_proc(KVMCpu *core);
-				static void event_thread_proc(KVMCpu *core);
 				static void device_thread_proc(KVMGuest *guest);
 								
 				bool create_cpu(const GuestCPUConfiguration& config);

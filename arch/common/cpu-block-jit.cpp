@@ -162,7 +162,7 @@ captive::shared::block_txln_fn CPU::compile_block(Region *rgn, uint8_t isa_mode,
 		fatal("jit: block translation failed\n");
 	}
 	
-	BlockCompiler compiler(ctx, malloc::code_alloc, rgn, isa_mode, pa, tagged_registers());
+	BlockCompiler compiler(ctx, malloc::code_alloc, rgn, isa_mode, pa, tagged_registers(), cpu_data().guest_data->simulation_events);
 	captive::shared::block_txln_fn fn;
 	if (!compiler.compile(fn)) {
 		fatal("jit: block compilation failed\n");
@@ -206,10 +206,14 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)GPA_TO_HVA(insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
 #endif
 
-		if (unlikely(cpu_data().verbose_enabled)) {
+		if (cpu_data().guest_data->simulation_events & SIM_EVENT_COUNT) {
 			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));
 		}
-
+		
+		if (cpu_data().guest_data->simulation_events & SIM_EVENT_FETCH) {
+			ctx.add_instruction(IRInstruction::fetch(IROperand::pc(insn->pc)));
+		}
+			
 		// Translate this instruction into the context.
 		if (unlikely(jit().trace())) {
 			ctx.add_instruction(IRInstruction::trace_start());

@@ -3,6 +3,8 @@
 #include <hypervisor/kvm/guest.h>
 #include <hypervisor/kvm/kvm.h>
 
+#include <simulation/simulation.h>
+
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -272,6 +274,13 @@ bool KVMCpu::run()
 						// Device Read
 						dev->read(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
 					}
+				}
+			} else if (cpu_run_struct->io.port == 0xef) { // && cpu_run_struct->io.port < 0xf0) {
+				struct kvm_regs regs;
+				vmioctl(KVM_GET_REGS, &regs);
+				
+				for (auto sim : kvm_guest.simulations()) {
+					sim->instruction_fetch(*this, regs.r15, regs.r15);
 				}
 			} else {
 				run_cpu = false;

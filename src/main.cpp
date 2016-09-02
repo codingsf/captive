@@ -14,6 +14,9 @@
 #include <platform/realview.h>
 #include <platform/gensim-test.h>
 
+#include <simulation/insn-count.h>
+#include <simulation/cache/cache-simulation.h>
+
 #include <util/command-line.h>
 #include <util/config/config.h>
 
@@ -203,6 +206,14 @@ int main(int argc, const char **argv)
 	}
 
 	guest->guest_entrypoint(kernel->entrypoint());
+	
+	if (cfg.cache_simulation) {
+		auto sim0 = new simulation::cache::CacheSimulation();
+		guest->add_simulation(*sim0);
+		
+		auto sim1 = new simulation::InstructionCounter();
+		guest->add_simulation(*sim1);
+	}
 
 	/*InitRDLoader initrd(argv[3], 0x8000000);
 	if (!guest->load(initrd)) {

@@ -6,6 +6,7 @@
 #include <engine/engine.h>
 #include <devices/device.h>
 #include <platform/platform.h>
+#include <simulation/simulation.h>
 #include <shmem.h>
 
 #include <thread>
@@ -29,14 +30,6 @@ extern "C" {
 #include <iomanip>
 
 #define FAST_DEVICE_ACCESS
-//#define GUEST_EVENTS
-
-#ifdef GUEST_EVENTS
-extern "C"
-{
-#include <d4.h>
-}
-#endif
 
 USE_CONTEXT(Guest);
 
@@ -227,6 +220,17 @@ std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
 
 bool KVMGuest::run()
 {
+	if (!initialise_simulations()) return false;
+	
+	for (KVMCpu *core : kvm_cpus) {
+		for (simulation::Simulation *sim : simulations()) {
+			sim->register_core(*core);
+			per_guest_data->simulation_events |= (uint64_t)sim->required_events();
+		}
+	}
+	
+	start_simulations();
+	
 #ifdef FAST_DEVICE_ACCESS
 	// Create the device thread
 	std::thread device_thread(device_thread_proc, (KVMGuest *)this);
@@ -271,6 +275,8 @@ bool KVMGuest::run()
 	for (auto thread : core_threads) {
 		if (thread->joinable()) thread->join();
 	}
+	
+	stop_simulations();
 	
 #ifndef NDEBUG
 	fprintf(stderr, "device reads:\n");
@@ -347,125 +353,8 @@ void KVMGuest::device_thread_proc(KVMGuest *guest)
 	}
 }
 
-void KVMGuest::event_thread_proc(KVMCpu *core)
-{
-	pthread_setname_np(pthread_self(), "events");
-	
-#ifdef GUEST_EVENTS
-		
-	//FILE *f = fopen("./core.events", "wt");
-	
-	d4cache *mm = d4new(NULL);
-	mm->name = "memory";
-	
-	d4cache *l2 = d4new(mm);
-	l2->name = "l2";
-	l2->flags = 0;
-		
-	l2->lg2blocksize = 6;
-	l2->lg2subblocksize = 6;
-	l2->lg2size = 20;
-	l2->assoc = 8;
-	
-	l2->replacementf = d4rep_lru;
-	l2->name_replacement = "LRU";
-	
-	l2->prefetchf = d4prefetch_none;
-	l2->name_prefetch = "demand only";
-	
-	l2->wallocf = d4walloc_never;
-	l2->name_walloc = "never";
-	
-	l2->wbackf = d4wback_never;
-	l2->name_wback = "never";
-	
-	l2->prefetch_distance = 6;
-	l2->prefetch_abortpercent = 0;
-	
-	d4cache *l1d = d4new(l2);
-	l1d->name = "l1d";
-	l1d->flags = 0;
-		
-	l1d->lg2blocksize = 6;
-	l1d->lg2subblocksize = 6;
-	l1d->lg2size = 15;
-	l1d->assoc = 4;
-	
-	l1d->replacementf = d4rep_random;
-	l1d->name_replacement = "random";
-	
-	l1d->prefetchf = d4prefetch_none;
-	l1d->name_prefetch = "demand only";
-	
-	l1d->wallocf = d4walloc_never;
-	l1d->name_walloc = "never";
-	
-	l1d->wbackf = d4wback_never;
-	l1d->name_wback = "never";
-	
-	l1d->prefetch_distance = 6;
-	l1d->prefetch_abortpercent = 0;
-	
-	int err=d4setup();
-	if (err) {
-		fprintf(stderr, "ERROR: %d\n", err);
-		_exit(-1);
-	}
-	
-	volatile uint64_t *ring = (volatile uint64_t *)core->per_cpu_data().event_ring;
-	
-	uint64_t last = ring[0];
-	while (!core->per_cpu_data().halt) {
-		uint64_t next = ring[0];
-		
-		if (next != last) {
-			for (; last != next; last++, last &= 0xff) {
-				uint64_t entry = ring[last];
-				
-				if ((entry & 0x80000000)) {
-					fprintf(stderr, "*** CACHE STATISTICS ***\n");
-					fprintf(stderr, "l1d: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XREAD], (uint64_t)l1d->fetch[D4XREAD] - (uint64_t)l1d->miss[D4XREAD], (uint64_t)l1d->miss[D4XREAD]);
-					fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XWRITE], (uint64_t)l1d->fetch[D4XWRITE] - (uint64_t)l1d->miss[D4XWRITE], (uint64_t)l1d->miss[D4XWRITE]);
-
-					fprintf(stderr, "l2:  read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l2->fetch[D4XREAD], (uint64_t)l2->fetch[D4XREAD] - (uint64_t)l2->miss[D4XREAD], (uint64_t)l2->miss[D4XREAD]);
-					fprintf(stderr, "l2:  write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l2->fetch[D4XWRITE], (uint64_t)l2->fetch[D4XWRITE] - (uint64_t)l2->miss[D4XWRITE], (uint64_t)l2->miss[D4XWRITE]);
-
-					fprintf(stderr, "mem: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XREAD], (uint64_t)mm->fetch[D4XREAD] - (uint64_t)mm->miss[D4XREAD], (uint64_t)mm->miss[D4XREAD]);
-					fprintf(stderr, "mem: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XWRITE], (uint64_t)mm->fetch[D4XWRITE] - (uint64_t)mm->miss[D4XWRITE], (uint64_t)mm->miss[D4XWRITE]);
-				} else {
-					d4memref memref;
-					memref.address = (d4addr)(entry >> 32);
-					memref.size = (entry & 0xf);
-					memref.accesstype = !!(entry & 0x10) ? D4XWRITE : D4XREAD;
-
-					d4ref(l1d, memref);
-				}
-			}
-		}
-	}
-	
-	fprintf(stderr, "*** CACHE STATISTICS ***\n");
-	fprintf(stderr, "l1d: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XREAD], (uint64_t)l1d->fetch[D4XREAD] - (uint64_t)l1d->miss[D4XREAD], (uint64_t)l1d->miss[D4XREAD]);
-	fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XWRITE], (uint64_t)l1d->fetch[D4XWRITE] - (uint64_t)l1d->miss[D4XWRITE], (uint64_t)l1d->miss[D4XWRITE]);
-
-	fprintf(stderr, "l2:  read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l2->fetch[D4XREAD], (uint64_t)l2->fetch[D4XREAD] - (uint64_t)l2->miss[D4XREAD], (uint64_t)l2->miss[D4XREAD]);
-	fprintf(stderr, "l2:  write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l2->fetch[D4XWRITE], (uint64_t)l2->fetch[D4XWRITE] - (uint64_t)l2->miss[D4XWRITE], (uint64_t)l2->miss[D4XWRITE]);
-	
-	fprintf(stderr, "mem: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XREAD], (uint64_t)mm->fetch[D4XREAD] - (uint64_t)mm->miss[D4XREAD], (uint64_t)mm->miss[D4XREAD]);
-	fprintf(stderr, "mem: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XWRITE], (uint64_t)mm->fetch[D4XWRITE] - (uint64_t)mm->miss[D4XWRITE], (uint64_t)mm->miss[D4XWRITE]);
-		
-	//fflush(f);
-	//fclose(f);
-#endif
-}
-
 void KVMGuest::core_thread_proc(KVMCpu *core)
 {
-#ifdef GUEST_EVENTS
-	// Create the core event thread
-	std::thread event_thread(event_thread_proc, (KVMCpu *)core);
-#endif
-	
 	std::string thread_name = "core-" + std::to_string(core->id());
 	pthread_setname_np(pthread_self(), thread_name.c_str());
 	
@@ -479,13 +368,7 @@ void KVMGuest::core_thread_proc(KVMCpu *core)
 	core->run();
 	core->instrument_dump();
 	
-	core->owner().stop();
-	
-#ifdef GUEST_EVENTS
-	if (event_thread.joinable()) {
-		event_thread.join();
-	}
-#endif
+	core->owner().stop();	
 }
 
 bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
@@ -668,7 +551,9 @@ bool KVMGuest::prepare_guest_memory()
 	per_guest_data->heap_virt_base = GUEST_HEAP_VIRT_BASE;
 	per_guest_data->heap_phys_base = GUEST_HEAP_PHYS_BASE;
 	per_guest_data->heap_size = HEAP_SIZE;
-
+	
+	per_guest_data->simulation_events = 0;
+		
 	if (!install_gdt()) {
 		ERROR << CONTEXT(Guest) << "Unable to install GDT";
 		return false;

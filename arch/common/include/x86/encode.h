@@ -383,6 +383,10 @@ namespace captive {
 				void sysret();
 				void int3();
 				void intt(uint8_t irq);
+				
+				void out(const X86Register& val, const X86Register& port);
+				void out(const X86Register& val, uint8_t port);
+				
 				void leave();
 				void ret();
 				void hlt();

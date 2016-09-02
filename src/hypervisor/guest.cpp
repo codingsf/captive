@@ -2,6 +2,7 @@
 #include <hypervisor/config.h>
 #include <hypervisor/guest.h>
 #include <platform/platform.h>
+#include <simulation/simulation.h>
 
 USE_CONTEXT(Hypervisor)
 DECLARE_CHILD_CONTEXT(Guest, Hypervisor);
@@ -29,4 +30,32 @@ bool Guest::init()
 		return false;
 
 	return true;
+}
+
+bool Guest::initialise_simulations()
+{
+	for (auto sim : _simulations) {
+		if (!sim->init()) return false;
+	}
+	
+	return true;
+}
+
+void Guest::start_simulations()
+{
+	for (auto sim : _simulations) {
+		sim->start();
+	}
+}
+
+void Guest::stop_simulations()
+{
+	for (auto sim : _simulations) {
+		sim->stop();
+	}
+}
+
+void Guest::add_simulation(simulation::Simulation& simulation)
+{
+	_simulations.push_back(&simulation);
 }
