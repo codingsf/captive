@@ -23,19 +23,17 @@ USE_CONTEXT(CPU);
 using namespace captive::hypervisor::kvm;
 
 KVMCpu::KVMCpu(int id, KVMGuest& owner, const GuestCPUConfiguration& config, int fd, PerCPUData *per_cpu_data)
-	: CPU(id, owner, config, per_cpu_data),
-	_initialised(false),
-	fd(fd),
-	cpu_run_struct(NULL),
-	cpu_run_struct_size(0),
-	irq_signal(owner),
-	irq_raise(owner)
-{
+: CPU(id, owner, config, per_cpu_data),
+_initialised(false),
+fd(fd),
+cpu_run_struct(NULL),
+cpu_run_struct_size(0),
+irq_signal(owner),
+irq_raise(owner) {
 
 }
 
-KVMCpu::~KVMCpu()
-{
+KVMCpu::~KVMCpu() {
 	if (initialised()) {
 		munmap(cpu_run_struct, cpu_run_struct_size);
 	}
@@ -44,8 +42,7 @@ KVMCpu::~KVMCpu()
 	close(fd);
 }
 
-bool KVMCpu::init()
-{
+bool KVMCpu::init() {
 	if (initialised()) {
 		ERROR << CONTEXT(CPU) << "KVM CPU already initialised";
 		return false;
@@ -53,26 +50,26 @@ bool KVMCpu::init()
 
 	if (!CPU::init())
 		return false;
-	
+
 	if (!setup_interrupts())
 		return false;
 
 	// Attach the CPU IRQ controller
 	config().irq_controller().attach(*this);
 
-	cpu_run_struct_size = ioctl(((KVM &)((KVMGuest &)owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
-	if ((int)cpu_run_struct_size == -1) {
+	cpu_run_struct_size = ioctl(((KVM &) ((KVMGuest &) owner()).owner()).kvm_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
+	if ((int) cpu_run_struct_size == -1) {
 		ERROR << CONTEXT(CPU) << "Unable to ascertain size of CPU run structure";
 		return false;
 	}
 
 	DEBUG << CONTEXT(CPU) << "Mapping CPU run structure size=" << std::hex << cpu_run_struct_size;
-	cpu_run_struct = (struct kvm_run *)mmap(NULL, cpu_run_struct_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	cpu_run_struct = (struct kvm_run *) mmap(NULL, cpu_run_struct_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (cpu_run_struct == MAP_FAILED) {
 		ERROR << CONTEXT(CPU) << "Unable to mmap CPU run struct";
 		return false;
 	}
-	
+
 	/*struct kvm_cpuid2 *cpuid = (struct kvm_cpuid2 *)malloc(sizeof(struct kvm_cpuid2) + (sizeof(struct kvm_cpuid_entry2) * 16));
 	cpuid->nent = 1;
 	
@@ -94,36 +91,31 @@ bool KVMCpu::init()
 	return true;
 }
 
-void KVMCpu::interrupt(uint32_t code)
-{
+void KVMCpu::interrupt(uint32_t code) {
 	per_cpu_data().async_action = code;
 	irq_signal.raise();
 }
 
-void KVMCpu::raise_guest_interrupt(uint8_t irq)
-{
+void KVMCpu::raise_guest_interrupt(uint8_t irq) {
 	if (__sync_val_compare_and_swap(&per_cpu_data().isr, 0, 2) == 0) {
 		//irq_raise.raise();
 		*per_cpu_data().interrupt_pending = 1;
 	}
 }
 
-void KVMCpu::rescind_guest_interrupt(uint8_t irq)
-{
+void KVMCpu::rescind_guest_interrupt(uint8_t irq) {
 	per_cpu_data().isr = 0;
 }
 
-void KVMCpu::acknowledge_guest_interrupt(uint8_t irq)
-{
+void KVMCpu::acknowledge_guest_interrupt(uint8_t irq) {
 }
 
 #ifndef NDEBUG
 extern std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
 #endif
 
-bool KVMCpu::run()
-{
-	KVMGuest& kvm_guest = (KVMGuest &)owner();
+bool KVMCpu::run() {
+	KVMGuest& kvm_guest = (KVMGuest &) owner();
 
 	bool run_cpu = true;
 	int rc;
@@ -135,29 +127,29 @@ bool KVMCpu::run()
 
 	struct kvm_regs regs;
 	vmioctl(KVM_GET_REGS, &regs);
-	
+
 	regs.rdi = GUEST_SYS_GUEST_DATA_VIRT + (0x100 * (id() + 1));
 	regs.rip = kvm_guest.engine().boot_entrypoint();
 	regs.rsi = id();
 	regs.rflags = 2;
 	regs.rsp = GUEST_HEAP_VIRT_BASE + HEAP_SIZE - (0x100000 * (id()));
-	
+
 	vmioctl(KVM_SET_REGS, &regs);
-	
+
 	struct kvm_sregs sregs;
 	vmioctl(KVM_GET_SREGS, &sregs);
 	sregs.idt.base = 0;
 	sregs.idt.limit = 0;
-	
+
 	sregs.gdt.base = GUEST_SYS_GDT_VIRT;
 	sregs.gdt.limit = 0x38;
-	
-	sregs.cr0 = 0x80010007;	// PG, PE, MP, EM, WP
+
+	sregs.cr0 = 0x80010007; // PG, PE, MP, EM, WP
 	sregs.cr3 = GUEST_SYS_INIT_PGT_PHYS;
 	sregs.cr4 = 0x6b0;
-	
+
 	sregs.efer |= 0x901;
-	
+
 	struct kvm_segment cs, ds, tr;
 	cs.base = 0;
 	cs.limit = 0xffffffff;
@@ -169,7 +161,7 @@ bool KVMCpu::run()
 	cs.type = 0xb;
 	cs.present = 1;
 	cs.selector = 0x08;
-	
+
 	ds.base = 0;
 	ds.limit = 0xffffffff;
 	ds.dpl = 0;
@@ -180,7 +172,7 @@ bool KVMCpu::run()
 	ds.type = 0x3;
 	ds.present = 1;
 	ds.selector = 0x10;
-	
+
 	tr.base = 0;
 	tr.limit = 0xffffffff;
 	tr.dpl = 0;
@@ -191,7 +183,7 @@ bool KVMCpu::run()
 	tr.type = 0xb;
 	tr.present = 1;
 	tr.selector = 0x2b;
-	
+
 	sregs.ss = ds;
 	sregs.cs = cs;
 	sregs.ds = ds;
@@ -199,7 +191,7 @@ bool KVMCpu::run()
 	sregs.fs = ds;
 	sregs.gs = ds;
 	sregs.tr = tr;
-	
+
 	vmioctl(KVM_SET_SREGS, &sregs);
 
 	cpu_start_time = std::chrono::high_resolution_clock::now();
@@ -213,11 +205,11 @@ bool KVMCpu::run()
 			}
 
 			ERROR << CONTEXT(CPU) << "Unable to run VCPU: " << LAST_ERROR_TEXT;
-			
+
 			run_cpu = false;
 			continue;
 		}
-		
+
 		switch (cpu_run_struct->exit_reason) {
 		case KVM_EXIT_DEBUG:
 			DEBUG << CONTEXT(CPU) << "DEBUG";
@@ -225,96 +217,36 @@ bool KVMCpu::run()
 			break;
 
 		case KVM_EXIT_IO:
-			if (cpu_run_struct->io.port == 0xff) {
-				struct kvm_regs regs;
-				vmioctl(KVM_GET_REGS, &regs);
-
-				//DEBUG << "Handling hypercall " << std::hex << regs.rax;
-				run_cpu = handle_hypercall(regs.rax, regs.rdi, regs.rsi);
-				if (!run_cpu) {
-					ERROR << CONTEXT(CPU) << "Unhandled hypercall " << std::hex << regs.rax;
-				}
-			} else if (cpu_run_struct->io.port == 0xfe) {
-				struct kvm_regs regs;
-				vmioctl(KVM_GET_REGS, &regs);
-
-				if (regs.rax == 0) {
-					kvm_guest.do_guest_printf();
-				} else {
-					fprintf(stderr, "%c", (char)regs.rax & 0xff);
-				}
-			} else if (cpu_run_struct->io.port == 0xfd) {
-				dump_regs();
-			} else if (cpu_run_struct->io.port == 0xf1) {
-				struct kvm_regs regs;
-				vmioctl(KVM_GET_REGS, &regs);
-				instrument_fn_enter(regs.rdi, regs.rsi);
-			} else if (cpu_run_struct->io.port == 0xf2) {
-				struct kvm_regs regs;
-				vmioctl(KVM_GET_REGS, &regs);
-				instrument_fn_exit(regs.rdi, regs.rsi);
-			} else if (cpu_run_struct->io.port == 0xf0) {
-				struct kvm_regs regs;
-				vmioctl(KVM_GET_REGS, &regs);
-
-				uint64_t base_addr;
-				devices::Device *dev = kvm_guest.lookup_device(regs.rdx, base_addr);
-				if (dev != NULL) {
-					uint64_t offset = regs.rdx - base_addr;
-					if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
-#ifndef NDEBUG
-						device_writes[dev]++;
-#endif			
-						// Device Write
-						dev->write(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
-					} else {
-#ifndef NDEBUG
-						device_reads[dev]++;
-#endif			
-						// Device Read
-						dev->read(offset, cpu_run_struct->io.size, *(uint64_t *)((uint64_t)cpu_run_struct + cpu_run_struct->io.data_offset));
-					}
-				}
-			} else if (cpu_run_struct->io.port == 0xef) { // && cpu_run_struct->io.port < 0xf0) {
-				struct kvm_regs regs;
-				vmioctl(KVM_GET_REGS, &regs);
-				
-				for (auto sim : kvm_guest.simulations()) {
-					sim->instruction_fetch(*this, regs.r15, regs.r15);
-				}
-			} else {
-				run_cpu = false;
-				DEBUG << CONTEXT(CPU) << "EXIT IO "
-					"port=" << std::hex << cpu_run_struct->io.port << ", "
-					"data offset=" << std::hex << cpu_run_struct->io.data_offset << ", "
-					"count=" << std::hex << cpu_run_struct->io.count;
-			}
+			struct kvm_regs regs;
+			vmioctl(KVM_GET_REGS, &regs);
+			run_cpu = handle_port_io(regs);
 			break;
+
 		case KVM_EXIT_MMIO:
 			if (cpu_run_struct->mmio.phys_addr >= 0x100000000 && cpu_run_struct->mmio.phys_addr < 0x200000000) {
 				uint64_t converted_pa = cpu_run_struct->mmio.phys_addr & 0xffffffff;
-				
+
 				uint64_t base_addr;
 				devices::Device *dev = kvm_guest.lookup_device(converted_pa, base_addr);
-				
+
 				if (dev != NULL) {
-					void *data = (void *)cpu_run_struct->mmio.data;
-					
+					void *data = (void *) cpu_run_struct->mmio.data;
+
 					uint64_t offset = converted_pa - base_addr;
 					if (cpu_run_struct->mmio.is_write) {
-						run_cpu = dev->write(offset, cpu_run_struct->mmio.len, *(uint64_t *)data);
+						run_cpu = dev->write(offset, cpu_run_struct->mmio.len, *(uint64_t *) data);
 					} else {
-						run_cpu = dev->read(offset, cpu_run_struct->mmio.len, *(uint64_t *)data);
+						run_cpu = dev->read(offset, cpu_run_struct->mmio.len, *(uint64_t *) data);
 					}
-					
+
 					if (!run_cpu) {
 						fprintf(stderr, "device io failed: %s: base=%lx, pa=%lx\n", dev->name().c_str(), base_addr, converted_pa);
 					}
-					
+
 					/*if (!(run_cpu = handle_device_access(dev, converted_pa, *cpu_run_struct))) {
 						DEBUG << CONTEXT(CPU) << "Device (" << dev->name() << ") " << (cpu_run_struct->mmio.is_write ? "Write" : "Read") << " Access Failed: " << std::hex << converted_pa;
 					}*/
-					
+
 					continue;
 				} else {
 					ERROR << CONTEXT(CPU) << "Device Not Found: " << std::hex << converted_pa;
@@ -360,39 +292,133 @@ bool KVMCpu::run()
 	} while (run_cpu && !per_cpu_data().halt);
 
 	dump_regs();
-	
+
 	return true;
 }
 
-void KVMCpu::stop()
-{
+void KVMCpu::stop() {
 	per_cpu_data().halt = true;
 	interrupt(1);
 }
 
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
-bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa, kvm_run& rs)
-{
-	uint64_t offset = pa & (device->size() - 1);
-	DEBUG << CONTEXT(CPU) << "Handling Device Access: pa=" << std::hex << pa << ", name=" << device->name() << ", is-write=" << (uint32_t)rs.mmio.is_write << ", offset=" << std::hex << offset << ", len=" << rs.mmio.len;
 
-	void *data = (void *)rs.mmio.data;
-	
-	if (rs.mmio.is_write) {
-		return device->write(offset, rs.mmio.len, *(uint64_t *)data);
+bool KVMCpu::handle_device_access(devices::Device* device, uint64_t pa) {
+	uint64_t offset = pa & (device->size() - 1);
+	DEBUG << CONTEXT(CPU) << "Handling Device Access: pa=" << std::hex << pa << ", name=" << device->name() << ", is-write=" << (uint32_t) cpu_run_struct->mmio.is_write << ", offset=" << std::hex << offset << ", len=" << cpu_run_struct->mmio.len;
+
+	void *data = (void *) cpu_run_struct->mmio.data;
+
+	if (cpu_run_struct->mmio.is_write) {
+		return device->write(offset, cpu_run_struct->mmio.len, *(uint64_t *) data);
 	} else {
-		if (!device->read(offset, rs.mmio.len, *(uint64_t *)data))
+		if (!device->read(offset, cpu_run_struct->mmio.len, *(uint64_t *) data))
 			return false;
 		return true;
 	}
 }
 #pragma GCC diagnostic pop
 
-bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
+bool KVMCpu::handle_port_io(struct kvm_regs& regs)
 {
+	KVMGuest& kvm_guest = (KVMGuest &) owner();
+	
+	switch (cpu_run_struct->io.port) {
+	case 0xff:
+		return handle_hypercall(regs.rax, regs.rdi, regs.rsi);
+
+	case 0xfe:
+		if (regs.rax == 0) {
+			kvm_guest.do_guest_printf();
+		} else {
+			fprintf(stderr, "%c", (char) regs.rax & 0xff);
+		}
+		
+		return true;
+		
+	case 0xfd:
+		dump_regs();
+		return true;
+		
+	case 0xf1:
+		instrument_fn_enter(regs.rdi, regs.rsi);
+		return true;
+		
+	case 0xf2:
+		instrument_fn_exit(regs.rdi, regs.rsi);
+		return true;
+		
+	case 0xf0:
+	{
+		uint64_t base_addr;
+		devices::Device *dev = kvm_guest.lookup_device(regs.rdx, base_addr);
+		if (dev != NULL) {
+			uint64_t offset = regs.rdx - base_addr;
+			if (cpu_run_struct->io.direction == KVM_EXIT_IO_OUT) {
+#ifndef NDEBUG
+				device_writes[dev]++;
+#endif   
+				// Device Write
+				dev->write(offset, cpu_run_struct->io.size, *(uint64_t *) ((uint64_t) cpu_run_struct + cpu_run_struct->io.data_offset));
+			} else {
+#ifndef NDEBUG
+				device_reads[dev]++;
+#endif   
+				// Device Read
+				dev->read(offset, cpu_run_struct->io.size, *(uint64_t *) ((uint64_t) cpu_run_struct + cpu_run_struct->io.data_offset));
+			}
+		}
+		
+		return true;
+	}
+	
+	case 0xe0:
+	case 0xe1:
+	case 0xe2:
+	case 0xe3:
+		for (simulation::Simulation *sim : kvm_guest.simulations()) {
+			sim->memory_read(*this, regs.rcx, regs.rcx, 1 << (cpu_run_struct->io.port & 0x3));
+		}
+		
+		return true;
+		
+	case 0xe4:
+	case 0xe5:
+	case 0xe6:
+	case 0xe7:
+		for (simulation::Simulation *sim : kvm_guest.simulations()) {
+			sim->memory_write(*this, regs.rcx, regs.rcx, 1 << (cpu_run_struct->io.port & 0x3));
+		}
+		
+		return true;
+
+	case 0xe8:
+		for (simulation::Simulation *sim : kvm_guest.simulations()) {
+			sim->instruction_fetch(*this, regs.r15, regs.r15, 4);
+		}
+		
+		return true;
+	
+	case 0xef:
+		for (simulation::Simulation *sim : kvm_guest.simulations()) {
+			sim->dump();
+		}
+		return true;
+		
+	default:
+		DEBUG << CONTEXT(CPU) << "EXIT IO "
+				"port=" << std::hex << cpu_run_struct->io.port << ", "
+				"data offset=" << std::hex << cpu_run_struct->io.data_offset << ", "
+				"count=" << std::hex << cpu_run_struct->io.count;
+		
+		return false;
+	}
+}
+
+bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2) {
 	DEBUG << CONTEXT(CPU) << "Hypercall " << data;
 
-	switch(data) {
+	switch (data) {
 	case 2:
 		DEBUG << CONTEXT(CPU) << "Abort Requested";
 		return false;
@@ -402,7 +428,8 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		dump_regs();
 		return false;
 
-	case 4: {
+	case 4:
+	{
 		std::chrono::high_resolution_clock::time_point then = std::chrono::high_resolution_clock::now();
 		std::chrono::seconds dur = std::chrono::duration_cast<std::chrono::seconds>(then - cpu_start_time);
 
@@ -416,14 +443,16 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		fgetc(stdin);
 		return true;
 
-	case 13: {
+	case 13:
+	{
 		std::stringstream cmd;
 		cmd << "addr2line -e arch/arm.arch " << std::hex << arg1;
 		system(cmd.str().c_str());
 		return true;
 	}
-	
-	case 15: {
+
+	case 15:
+	{
 		struct kvm_regs regs;
 		vmioctl(KVM_GET_REGS, &regs);
 
@@ -431,7 +460,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
 		FILE *f = fopen(fname.str().c_str(), "wb");
 
-		void *ptr = (void *)regs.rdi;
+		void *ptr = (void *) regs.rdi;
 		if (ptr) {
 			fwrite(ptr, regs.rsi, 1, f);
 		}
@@ -445,8 +474,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2)
 	return false;
 }
 
-void KVMCpu::dump_regs()
-{
+void KVMCpu::dump_regs() {
 	struct kvm_regs regs;
 	struct kvm_sregs sregs;
 
@@ -509,22 +537,20 @@ void KVMCpu::dump_regs()
 
 #undef PCREG
 
-	<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl
-	<< "idt base=" << std::hex << sregs.idt.base << ", limit=" << std::hex << sregs.idt.limit << std::endl
-	<< "apic base=" << std::hex << sregs.apic_base << std::endl
-	<< "efer=" << std::hex << sregs.efer << std::endl;
+			<< "gdt base=" << std::hex << sregs.gdt.base << ", limit=" << std::hex << sregs.gdt.limit << std::endl
+			<< "idt base=" << std::hex << sregs.idt.base << ", limit=" << std::hex << sregs.idt.limit << std::endl
+			<< "apic base=" << std::hex << sregs.apic_base << std::endl
+			<< "efer=" << std::hex << sregs.efer << std::endl;
 }
 
-bool KVMCpu::setup_interrupts()
-{
+bool KVMCpu::setup_interrupts() {
 	if (!irq_signal.attach((id() * 2) + 16)) return false;
 	if (!irq_raise.attach((id() * 2) + 17)) return false;
-	
+
 	return true;
 }
 
-IRQFD::IRQFD(KVMGuest& owner) : owner(owner), fd(-1), gsi(0)
-{
+IRQFD::IRQFD(KVMGuest& owner) : owner(owner), fd(-1), gsi(0) {
 	fd = eventfd(0, O_NONBLOCK | O_CLOEXEC);
 	if (fd < 0) {
 		ERROR << "Unable to create IRQ fd";
@@ -532,18 +558,16 @@ IRQFD::IRQFD(KVMGuest& owner) : owner(owner), fd(-1), gsi(0)
 	}
 }
 
-IRQFD::~IRQFD()
-{
+IRQFD::~IRQFD() {
 	close(fd);
 }
 
-bool IRQFD::attach(int gsi)
-{
+bool IRQFD::attach(int gsi) {
 	assert(fd >= 0);
 	DEBUG << CONTEXT(CPU) << "Attaching IRQFD to GSI=" << gsi << ENABLE;
 
 	struct kvm_irqfd irqfd;
-	bzero(&irqfd, sizeof(irqfd));
+	bzero(&irqfd, sizeof (irqfd));
 
 	irqfd.fd = fd;
 	irqfd.gsi = gsi;
@@ -552,12 +576,11 @@ bool IRQFD::attach(int gsi)
 		ERROR << "Unable to install IRQ fd";
 		return false;
 	}
-	
+
 	return true;
 }
 
-void IRQFD::raise()
-{
+void IRQFD::raise() {
 	uint64_t data = 0;
-	write(fd, &data, sizeof(data));
+	write(fd, &data, sizeof (data));
 }

@@ -44,9 +44,13 @@ namespace captive
 				void start() override;
 				void stop() override;
 				
-				void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc) override;
+				void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size) override;
+				void memory_read(hypervisor::CPU& core, uint32_t virt_addr, uint32_t phys_addr, uint8_t size) override;
+				void memory_write(hypervisor::CPU& core, uint32_t virt_addr_, uint32_t phys_addr, uint8_t size) override;
 				
-				Events::Events required_events() const override { return Events::InstructionFetch; }
+				Events::Events required_events() const override { return (Events::Events)(Events::InstructionFetch | Events::MemoryRead | Events::MemoryWrite); }
+				
+				void dump() override;
 				
 			private:
 				d4cache *mm, *l2, *l1d, *l1i;

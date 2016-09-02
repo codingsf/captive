@@ -3,14 +3,34 @@
 
 using namespace captive::simulation::cache;
 
-void CacheSimulation::instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc)
+void CacheSimulation::instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size)
 {
 	d4memref memref;
 	memref.address = (d4addr)virt_pc;
-	memref.size = 4;
+	memref.size = size;
 	memref.accesstype = D4XINSTRN;
 
 	d4ref(l1i, memref);
+}
+
+void CacheSimulation::memory_read(hypervisor::CPU& core, uint32_t virt_addr, uint32_t phys_addr, uint8_t size)
+{
+	d4memref memref;
+	memref.address = (d4addr)virt_addr;
+	memref.size = size;
+	memref.accesstype = D4XREAD;
+
+	d4ref(l1d, memref);
+}
+
+void CacheSimulation::memory_write(hypervisor::CPU& core, uint32_t virt_addr, uint32_t phys_addr, uint8_t size)
+{
+	d4memref memref;
+	memref.address = (d4addr)virt_addr;
+	memref.size = size;
+	memref.accesstype = D4XWRITE;
+
+	d4ref(l1d, memref);
 }
 
 bool CacheSimulation::init() {
@@ -106,8 +126,13 @@ void CacheSimulation::start()
 
 void CacheSimulation::stop()
 {
+
+}
+
+void CacheSimulation::dump()
+{
 	fprintf(stderr, "*** CACHE STATISTICS ***\n");
-	fprintf(stderr, "l1i: fetch:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1i->fetch[D4XINSTRN], (uint64_t)l1i->fetch[D4XINSTRN] - (uint64_t)l1i->miss[D4XINSTRN], (uint64_t)l1i->miss[D4XINSTRN]);
+	fprintf(stderr, "l1i: fetch: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1i->fetch[D4XINSTRN], (uint64_t)l1i->fetch[D4XINSTRN] - (uint64_t)l1i->miss[D4XINSTRN], (uint64_t)l1i->miss[D4XINSTRN]);
 	
 	fprintf(stderr, "l1d: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XREAD], (uint64_t)l1d->fetch[D4XREAD] - (uint64_t)l1d->miss[D4XREAD], (uint64_t)l1d->miss[D4XREAD]);
 	fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)l1d->fetch[D4XWRITE], (uint64_t)l1d->fetch[D4XWRITE] - (uint64_t)l1d->miss[D4XWRITE], (uint64_t)l1d->miss[D4XWRITE]);
@@ -117,8 +142,6 @@ void CacheSimulation::stop()
 	
 	fprintf(stderr, "mem: read:  accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XREAD], (uint64_t)mm->fetch[D4XREAD] - (uint64_t)mm->miss[D4XREAD], (uint64_t)mm->miss[D4XREAD]);
 	fprintf(stderr, "mem: write: accesses=%lu, hits=%lu, misses=%lu\n", (uint64_t)mm->fetch[D4XWRITE], (uint64_t)mm->fetch[D4XWRITE] - (uint64_t)mm->miss[D4XWRITE], (uint64_t)mm->miss[D4XWRITE]);
-	
-	//fprintf(stderr, "*** INSTRUCTION COUNT: %lu (%lu)\n", core->per_cpu_data().insns_executed, tmp);	
 }
 
 #if 0

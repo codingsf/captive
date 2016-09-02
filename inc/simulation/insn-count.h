@@ -25,13 +25,14 @@ namespace captive
 		public:
 			InstructionCounter() : _count(0) { }
 			
-			virtual void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc) override;
+			virtual void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size) override;
 			
 			Events::Events required_events() const override { return (Events::Events)(Events::InstructionFetch | Events::InstructionCount); }
 
-			virtual bool init() override;
-			virtual void start() override;
-			virtual void stop() override;
+			bool init() override;
+			void start() override;
+			void stop() override;
+			void dump() override;
 			
 		private:
 			uint64_t _count;

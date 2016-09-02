@@ -15,6 +15,11 @@ void InstructionCounter::start()
 
 void InstructionCounter::stop()
 {
+
+}
+
+void InstructionCounter::dump()
+{
 	fprintf(stderr, "*** INSTRUCTION COUNT *** (%lu)\n", _count);
 	
 	for (auto core : cores()) {
@@ -22,7 +27,7 @@ void InstructionCounter::stop()
 	}
 }
 
-void InstructionCounter::instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc)
+void InstructionCounter::instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size)
 {
 	_count++;
 }

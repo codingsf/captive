@@ -42,13 +42,17 @@ namespace captive
 		public:
 			void register_core(hypervisor::CPU& core) { _cores.push_back(&core); }
 			
-			virtual void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc);
+			virtual void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size);
+			virtual void memory_read(hypervisor::CPU& core, uint32_t virt_addr, uint32_t phys_addr, uint8_t size);
+			virtual void memory_write(hypervisor::CPU& core, uint32_t virt_addr_, uint32_t phys_addr, uint8_t size);
 			
 			virtual bool init() = 0;
 			virtual void start() = 0;
 			virtual void stop() = 0;
 			
 			virtual Events::Events required_events() const = 0;
+			
+			virtual void dump() = 0;
 			
 		protected:
 			const std::vector<hypervisor::CPU *>& cores() const { return _cores; }

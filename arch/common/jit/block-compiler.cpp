@@ -1206,7 +1206,7 @@ bool BlockCompiler::lower(uint32_t max_stack) {
 
 		case IRInstruction::FETCH:
 			if (sim_events & SIM_EVENT_FETCH) {
-				encoder.out(REG_EAX, 0xef);
+				encoder.out(REG_EAX, 0xe8);
 			}
 
 			break;

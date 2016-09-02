@@ -52,6 +52,7 @@ void Guest::stop_simulations()
 {
 	for (auto sim : _simulations) {
 		sim->stop();
+		sim->dump();
 	}
 }
 
