@@ -4,6 +4,12 @@
 #include <platform/platform.h>
 #include <simulation/simulation.h>
 
+#include <chrono>
+
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 USE_CONTEXT(Hypervisor)
 DECLARE_CHILD_CONTEXT(Guest, Hypervisor);
 
@@ -32,8 +38,10 @@ bool Guest::init()
 	return true;
 }
 
-bool Guest::initialise_simulations()
+bool Guest::initialise_simulations(void *seb)
 {
+	simulation_event_buffer = (uint64_t *)seb;
+	
 	for (auto sim : _simulations) {
 		if (!sim->init()) return false;
 	}
@@ -43,6 +51,10 @@ bool Guest::initialise_simulations()
 
 void Guest::start_simulations()
 {
+//	l1d = new simulation::cache::CPUCache<32768, 64, 2>();
+//	l1i = new simulation::cache::CPUCache<32768, 64, 2>();
+//	l2 = new simulation::cache::CPUCache<1048576, 64, 16>();
+
 	for (auto sim : _simulations) {
 		sim->start();
 	}
@@ -59,4 +71,11 @@ void Guest::stop_simulations()
 void Guest::add_simulation(simulation::Simulation& simulation)
 {
 	_simulations.push_back(&simulation);
+}
+
+void Guest::handle_simulation_events(CPU& core, uint32_t count)
+{
+	for (auto sim : _simulations) {
+		sim->process_events((const simulation::Simulation::EventPacket *)(simulation_event_buffer + 1), count);
+	}
 }

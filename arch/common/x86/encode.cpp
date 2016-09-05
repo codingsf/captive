@@ -784,6 +784,25 @@ void X86Encoder::add(uint32_t val, uint8_t size, const X86Memory& dst)
 	}
 }
 
+void X86Encoder::add1(uint8_t val, const X86Memory& dst)
+{
+	encode_opcode_mod_rm(0x80, 0, 4, dst);
+	emit8(val);
+}
+
+void X86Encoder::add2(uint16_t val, const X86Memory& dst)
+{
+	emit8(0x66);
+	
+	if (val < 127) {
+		encode_opcode_mod_rm(0x83, 0, 4, dst);
+		emit8(val);
+	} else {
+		encode_opcode_mod_rm(0x81, 0, 4, dst);
+		emit32(val);
+	}
+}
+
 void X86Encoder::add4(uint32_t val, const X86Memory& dst)
 {
 	if (val < 127) {

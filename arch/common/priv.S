@@ -24,7 +24,7 @@ int81_handler:
 // Flushing the TLB
 .globl int82_handler
 int82_handler:
-	mov $0x40090000, %eax
+	mov $0x40091000, %eax
 	mov %rax, %cr3
 	iretq
 

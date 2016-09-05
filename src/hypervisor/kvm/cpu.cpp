@@ -372,31 +372,8 @@ bool KVMCpu::handle_port_io(struct kvm_regs& regs)
 		return true;
 	}
 	
-	case 0xe0:
-	case 0xe1:
-	case 0xe2:
-	case 0xe3:
-		for (simulation::Simulation *sim : kvm_guest.simulations()) {
-			sim->memory_read(*this, regs.rcx, regs.rcx, 1 << (cpu_run_struct->io.port & 0x3));
-		}
-		
-		return true;
-		
-	case 0xe4:
-	case 0xe5:
-	case 0xe6:
-	case 0xe7:
-		for (simulation::Simulation *sim : kvm_guest.simulations()) {
-			sim->memory_write(*this, regs.rcx, regs.rcx, 1 << (cpu_run_struct->io.port & 0x3));
-		}
-		
-		return true;
-
-	case 0xe8:
-		for (simulation::Simulation *sim : kvm_guest.simulations()) {
-			sim->instruction_fetch(*this, regs.r15, regs.r15, 4);
-		}
-		
+	case 0xee:
+		kvm_guest.handle_simulation_events(*this, 8192);
 		return true;
 	
 	case 0xef:

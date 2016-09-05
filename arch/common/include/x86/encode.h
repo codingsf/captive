@@ -220,6 +220,8 @@ namespace captive {
 				void add(uint32_t val, const X86Register& dst);
 				void add(uint32_t val, uint8_t size, const X86Memory& dst);
 				void add(const X86Register& src, const X86Memory& dst);
+				void add1(uint8_t val, const X86Memory& dst);
+				void add2(uint16_t val, const X86Memory& dst);
 				void add4(uint32_t val, const X86Memory& dst);
 				void add8(uint32_t val, const X86Memory& dst);
 
@@ -304,6 +306,8 @@ namespace captive {
 				void jcc(uint8_t v, int32_t off);
 				void jcc(uint8_t v, int8_t off);
 
+				inline void jno(int8_t off) { jcc(1, off); }
+
 				inline void je(int32_t off) { jcc(4, off); }
 				inline void je(int8_t off) { jcc(4, off); }
 				inline void jz(int32_t off) { jcc(4, off); }
@@ -313,6 +317,11 @@ namespace captive {
 				inline void jnz(int8_t off) { jcc(5, off); }
 				inline void jne(int32_t off) { jcc(5, off); }
 				inline void jne(int8_t off) { jcc(5, off); }
+				
+				inline void jnc(int8_t off) { jcc(3, off); }
+				
+				inline void jl(int8_t off) { jcc(12, off); }
+				inline void jnge(int8_t off) { jcc(12, off); }
 
 				void cmov(uint8_t code, const X86Register &src, const X86Register &dst);
 				inline void cmove(const X86Register &src, const X86Register &dst) { cmov(4, src, dst); }

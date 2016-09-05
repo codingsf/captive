@@ -77,7 +77,9 @@ sim_events(sim_events) {
 	assign(i++, REG_R9, REG_R9D, REG_R9W, REG_R9B);
 	assign(i++, REG_R10, REG_R10D, REG_R10W, REG_R10B);
 	assign(i++, REG_R11, REG_R11D, REG_R11W, REG_R11B);
-	assign(i++, REG_R12, REG_R12D, REG_R12W, REG_R12B);
+	
+	if (sim_events == 0)
+		assign(i++, REG_R12, REG_R12D, REG_R12W, REG_R12B);
 }
 
 //#define VERIFY_IR
@@ -1204,13 +1206,6 @@ bool BlockCompiler::lower(uint32_t max_stack) {
 		case IRInstruction::NOP:
 			break;
 
-		case IRInstruction::FETCH:
-			if (sim_events & SIM_EVENT_FETCH) {
-				encoder.out(REG_EAX, 0xe8);
-			}
-
-			break;
-
 		case IRInstruction::CMOV:
 		{
 			printf("not implemented cmov\n");
@@ -2142,7 +2137,28 @@ do_ret_instead:
 
 			break;
 		}
+		
+		case IRInstruction::FETCH:
+		{
+			if (sim_events & SIM_EVENT_FETCH) {
+				//encoder.out(REG_EAX, 0xe8);
+				
+				encoder.mov(X86Memory::get(REG_R12), REG_R14);
+				encoder.mov(REG_R15D, REG_ECX);
+				encoder.shl(32, REG_RCX);
+				encoder.orr(0x24, REG_RCX);
 
+				encoder.add2(8, X86Memory::get(REG_R12));
+
+				encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 1));
+				
+				encoder.jnz(2);
+				encoder.out(REG_EAX, 0xee);				
+			}
+
+			break;
+		}
+		
 		case IRInstruction::READ_MEM:
 		{
 			IROperand *offset = &insn->operands[0];
@@ -2166,13 +2182,13 @@ do_ret_instead:
 						// Do Load
 						encoder.mov(X86Memory::get(REG_RCX), register_from_operand(dest));
 
-						switch (dest->size) {
-						case 1: encoder.out(REG_EAX, 0xe0); break;
-						case 2: encoder.out(REG_EAX, 0xe1);	break;
-						case 4: encoder.out(REG_EAX, 0xe2);	break;
-						case 8: encoder.out(REG_EAX, 0xe3);	break;
-						default: assert(false);
-						}
+						encoder.mov(X86Memory::get(REG_R12), REG_R14);
+						encoder.shl(32, REG_RCX);
+						encoder.orr(0x00 | (dest->size & 0xf), REG_RCX);
+						encoder.add2(8, X86Memory::get(REG_R12));
+						encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 1));
+						encoder.jnz(2);
+						encoder.out(REG_EAX, 0xee);		
 					} else {
 						encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
 					}
@@ -2214,13 +2230,13 @@ do_ret_instead:
 							// Perform store
 							encoder.mov(register_from_operand(value), X86Memory::get(REG_RCX));
 
-							switch (value->size) {
-							case 1: encoder.out(REG_EAX, 0xe4); break;
-							case 2: encoder.out(REG_EAX, 0xe5);	break;
-							case 4: encoder.out(REG_EAX, 0xe6);	break;
-							case 8: encoder.out(REG_EAX, 0xe7);	break;
-							default: assert(false);
-							}
+							encoder.mov(X86Memory::get(REG_R12), REG_R14);
+							encoder.shl(32, REG_RCX);
+							encoder.orr(0x10 | (value->size & 0xf), REG_RCX);
+							encoder.add2(8, X86Memory::get(REG_R12));
+							encoder.mov(REG_RCX, X86Memory::get(REG_R12, 8, REG_R14, 1));
+							encoder.jnz(2);
+							encoder.out(REG_EAX, 0xee);	
 						} else {
 							// Perform memory access
 							encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset), disp->value));

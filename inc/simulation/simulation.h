@@ -40,11 +40,22 @@ namespace captive
 		class Simulation
 		{
 		public:
+			struct EventPacket {
+				enum EventPacketType {
+					MEMORY_READ = 0,
+					MEMORY_WRITE = 1,
+					INSTRUCTION_FETCH = 2,
+				};
+				
+				uint8_t size : 4;
+				EventPacketType type : 2;
+				uint32_t unused: 26;
+				uint32_t address;
+			} packed;
+		
 			void register_core(hypervisor::CPU& core) { _cores.push_back(&core); }
-			
-			virtual void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size);
-			virtual void memory_read(hypervisor::CPU& core, uint32_t virt_addr, uint32_t phys_addr, uint8_t size);
-			virtual void memory_write(hypervisor::CPU& core, uint32_t virt_addr_, uint32_t phys_addr, uint8_t size);
+					
+			virtual void process_events(const EventPacket *events, uint32_t count);
 			
 			virtual bool init() = 0;
 			virtual void start() = 0;

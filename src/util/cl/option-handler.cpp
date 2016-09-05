@@ -51,3 +51,8 @@ DEFINE_OPTION_HANDLER("cache-sim", CacheSimulation, OptionRequirement::None, Val
 	config.cache_simulation = true;
 	return HandleResult::OK;
 }
+
+DEFINE_OPTION_HANDLER("icount", CountInstructions, OptionRequirement::None, ValueRequirement::None) {
+	config.insn_count = true;
+	return HandleResult::OK;
+}

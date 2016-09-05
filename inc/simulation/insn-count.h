@@ -25,9 +25,9 @@ namespace captive
 		public:
 			InstructionCounter() : _count(0) { }
 			
-			virtual void instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size) override;
-			
 			Events::Events required_events() const override { return (Events::Events)(Events::InstructionFetch | Events::InstructionCount); }
+			
+			void process_events(const EventPacket* events, uint32_t count) override;
 
 			bool init() override;
 			void start() override;

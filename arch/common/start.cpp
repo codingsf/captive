@@ -79,6 +79,8 @@ extern "C" {
 		captive::arch::x86::lapic.timer_start();
 #endif
 		
+		printf("enabled events: %08x\n", cpu_data->guest_data->simulation_events);
+		
 		printf("creating environment...\n");
 		captive::arch::Environment *env = create_environment_arm(cpu_data->guest_data);
 

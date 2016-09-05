@@ -25,7 +25,7 @@ namespace captive
 			class Configuration
 			{
 			public:
-				Configuration() : print_usage(false), cache_simulation(false) { }
+				Configuration() : print_usage(false), insn_count(false), cache_simulation(false) { }
 				
 				bool print_usage;
 				
@@ -37,6 +37,7 @@ namespace captive
 				maybe<std::string> net_mac_addr;
 				maybe<std::string> net_tap_device;
 				
+				bool insn_count;
 				bool cache_simulation;
 			};
 		}

@@ -133,7 +133,7 @@ void Environment::install_syscall()
 	*gdt++ = (gate_addr & 0xffff0000) | 0xec00;
 	*gdt++ = (gate_addr >> 32);
 	*gdt++ = 0;
-	
+		
 	asm volatile("lgdt %0" :: "m"(GDTR));
 }
 

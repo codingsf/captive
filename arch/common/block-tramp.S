@@ -14,6 +14,10 @@ block_trampoline:
 
 	// Load the register file base address
 	mov %fs:0x8, %rbp
+
+	// Load the event loop base address
+	mov %fs:0x48, %rax
+	mov 0x10(%rax), %r12
 	
 	callq *%rsi					// Run the Code
 

@@ -27,7 +27,11 @@ void InstructionCounter::dump()
 	}
 }
 
-void InstructionCounter::instruction_fetch(hypervisor::CPU& core, uint32_t virt_pc, uint32_t phys_pc, uint8_t size)
+void InstructionCounter::process_events(const EventPacket* events, uint32_t count)
 {
-	_count++;
+	for (uint32_t i = 0; i < count; i++) {
+		if (events[i].type == EventPacket::INSTRUCTION_FETCH) {
+			_count++;
+		}
+	}
 }

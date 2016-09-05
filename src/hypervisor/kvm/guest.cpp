@@ -220,7 +220,7 @@ std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
 
 bool KVMGuest::run()
 {
-	if (!initialise_simulations()) return false;
+	if (!initialise_simulations((void *)GUEST_SYS_EVENT_RING_VIRT)) return false;
 	
 	for (KVMCpu *core : kvm_cpus) {
 		for (simulation::Simulation *sim : simulations()) {
@@ -266,10 +266,13 @@ bool KVMGuest::run()
 		}
 	}
 		
+	fprintf(stderr, "--------------------------------------------------------------------\n");
 	// Signal each core to stop.
 	for (auto core : kvm_cpus) {
 		core->stop();
+		fprintf(stderr, "[core %d] instruction count: %lu\n", core->id(), core->per_cpu_data().insns_executed);
 	}
+	fprintf(stderr, "--------------------------------------------------------------------\n");
 	
 	// Wait for core threads to terminate.
 	for (auto thread : core_threads) {

@@ -20,6 +20,8 @@ bool CommandLine::parse(int argc, const char **argv, config::Configuration& cfg)
 		std::string token = context.consume_token();
 		
 		if (token.compare(0, 2, "--") == 0) {
+			if (token == "--") return false;
+			
 			auto ihandler = registered_option_handlers.find(token.substr(2));
 			if (ihandler == registered_option_handlers.end()) {
 				fprintf(stderr, "error: unrecognised command-line option '%s'\n", token.c_str());
