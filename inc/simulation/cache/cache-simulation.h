@@ -23,7 +23,7 @@ namespace captive
 	{
 		namespace cache
 		{
-			template<uint32_t total_size, uint32_t line_size, uint8_t ways>
+			template<uint32_t total_size, uint32_t line_size, uint8_t ways, bool vidx, bool vtag>
 			struct CPUCache
 			{
 				public:
@@ -57,51 +57,71 @@ namespace captive
 				uint64_t read_hits, read_misses, write_hits, write_misses;
 				uint32_t tags[number_of_lines::value * ways];
 				uint32_t rrp;
+				
+				inline constexpr uint32_t tag_addr(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
+				{
+					return vtag ? vaddr : paddr;
+				}
 						
-				inline constexpr uint32_t tag_of(uint32_t address) const __attribute__((pure))
+				inline constexpr uint32_t index_addr(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
 				{
-					return (address >> (index_bits::value + offset_bits::value)) & tag_bits::mask;
+					return vidx ? vaddr : paddr;
+				}
+						
+				inline constexpr uint32_t tag_of(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
+				{
+					return (tag_addr(vaddr, paddr) >> (index_bits::value + offset_bits::value)) & tag_bits::mask;
 				}
 				
-				inline constexpr uint32_t index_of(uint32_t address) const __attribute__((pure))
+				inline constexpr uint32_t index_of(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
 				{
-					return (address >> offset_bits::value) & index_bits::mask;
+					return (index_addr(vaddr, paddr) >> offset_bits::value) & index_bits::mask;
 				}
 				
-				inline uint32_t tag_at(uint32_t address, uint8_t way) const
+				inline uint32_t tag_at(uint32_t vaddr, uint32_t paddr, uint8_t way) const
 				{				
-					return tags[index_of(address) + number_of_lines::value * way];
+					return tags[index_of(vaddr, paddr) + number_of_lines::value * way];
 				}
 				
-				inline void tag_set(uint32_t address, uint8_t way)
+				inline void tag_set(uint32_t vaddr, uint32_t paddr, uint8_t way)
 				{				
-					tags[index_of(address) + number_of_lines::value * way] = tag_of(address);
+					tags[index_of(vaddr, paddr) + number_of_lines::value * way] = tag_of(vaddr, paddr);
 				}
 				
-				inline bool read(uint32_t address)
+				inline bool hit(uint32_t vaddr, uint32_t paddr) const
 				{
-					if (tag_at(address, 0) == tag_of(address) || tag_at(address, 1) == tag_of(address)) {
+					return tag_at(vaddr, paddr, 0) == tag_of(vaddr, paddr) || 
+							tag_at(vaddr, paddr, 1) == tag_of(vaddr, paddr) ||
+							tag_at(vaddr, paddr, 2) == tag_of(vaddr, paddr) ||
+							tag_at(vaddr, paddr, 3) == tag_of(vaddr, paddr);
+				}
+				
+				inline uint8_t replace(uint32_t vaddr, uint32_t paddr)
+				{
+					tag_set(vaddr, paddr, rrp & 2);
+					rrp = ((rrp & 1) << 31) | (rrp >> 1);
+				}
+				
+				inline bool read(uint32_t vaddr, uint32_t paddr, uint8_t sz)
+				{
+					if (hit(vaddr, paddr)) {
 						read_hits++;
 						return true;
 					} else {
 						read_misses++;
-						tag_set(address, rrp & 1);
-						rrp = ((rrp & 1) << 31) | (rrp >> 1);
-						
+						replace(vaddr, paddr);
 						return false;
 					}
 				}
 				
-				inline bool write(uint32_t address)
+				inline bool write(uint32_t vaddr, uint32_t paddr, uint8_t sz)
 				{
-					if (tag_at(address, 0) == tag_of(address) || tag_at(address, 1) == tag_of(address)) {
+					if (hit(vaddr, paddr)) {
 						write_hits++;
 						return true;
 					} else {
 						write_misses++;
-						tag_set(address, rrp & 1);
-						rrp = ((rrp & 1) << 31) | (rrp >> 1);
-						
+						replace(vaddr, paddr);
 						return false;
 					}
 				}
@@ -121,8 +141,8 @@ namespace captive
 				void dump() override;
 				
 			private:
-				simulation::cache::CPUCache<32768, 64, 2> l1i, l1d;
-				simulation::cache::CPUCache<1048576, 64, 16> l2;
+				simulation::cache::CPUCache<16384, 32, 4, true, true> l1i, l1d;
+				simulation::cache::CPUCache<1048576, 64, 16, true, true> l2;
 			};
 		}
 	}

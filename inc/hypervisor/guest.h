@@ -77,6 +77,7 @@ namespace captive {
 			bool initialise_simulations(void *seb);
 			void start_simulations();
 			void stop_simulations();
+			void dump_simulations();
 			void handle_simulation_events(CPU& core, uint32_t count);
 					
 		private:
@@ -84,13 +85,7 @@ namespace captive {
 			engine::Engine& _engine;
 			platform::Platform& _pfm;
 			std::vector<simulation::Simulation *> _simulations;
-			uint64_t *simulation_event_buffer;
-			
-			simulation::cache::CPUCache<32768, 64, 2> *l1d, *l1i;
-			simulation::cache::CPUCache<1048576, 64, 16> *l2;
-			
-			/*uint32_t l1d[1024], l1i[1024], l2[16384];
-			uint64_t hits[5], misses[5];*/
+			uint64_t *simulation_event_buffer;			
 		};
 	}
 }

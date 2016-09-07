@@ -49,7 +49,8 @@ namespace captive
 				
 				uint8_t size : 4;
 				EventPacketType type : 2;
-				uint32_t unused: 26;
+				uint32_t unused: 6;
+				uint32_t phys_page: 20;
 				uint32_t address;
 			} packed;
 		

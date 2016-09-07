@@ -51,10 +51,6 @@ bool Guest::initialise_simulations(void *seb)
 
 void Guest::start_simulations()
 {
-//	l1d = new simulation::cache::CPUCache<32768, 64, 2>();
-//	l1i = new simulation::cache::CPUCache<32768, 64, 2>();
-//	l2 = new simulation::cache::CPUCache<1048576, 64, 16>();
-
 	for (auto sim : _simulations) {
 		sim->start();
 	}
@@ -67,6 +63,15 @@ void Guest::stop_simulations()
 		sim->dump();
 	}
 }
+
+void Guest::dump_simulations()
+{
+	for (auto sim : _simulations)
+	{
+		sim->dump();
+	}
+}
+
 
 void Guest::add_simulation(simulation::Simulation& simulation)
 {
