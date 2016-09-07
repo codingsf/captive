@@ -57,6 +57,12 @@ namespace captive
 				uint64_t read_hits, read_misses, write_hits, write_misses;
 				uint32_t tags[number_of_lines::value * ways];
 				uint32_t rrp;
+				uint32_t last_line;
+				
+				inline uint32_t cache_line(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
+				{
+					return index_of(vaddr, paddr);
+				}
 				
 				inline constexpr uint32_t tag_addr(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
 				{
@@ -96,7 +102,7 @@ namespace captive
 							tag_at(vaddr, paddr, 3) == tag_of(vaddr, paddr);
 				}
 				
-				inline uint8_t replace(uint32_t vaddr, uint32_t paddr)
+				inline void replace(uint32_t vaddr, uint32_t paddr)
 				{
 					tag_set(vaddr, paddr, rrp & 2);
 					rrp = ((rrp & 1) << 31) | (rrp >> 1);
@@ -105,6 +111,9 @@ namespace captive
 				inline bool read(uint32_t vaddr, uint32_t paddr, uint8_t sz)
 				{
 					if (hit(vaddr, paddr)) {
+						if (cache_line(vaddr, paddr) == last_line) return true;
+						last_line = cache_line(vaddr, paddr);
+		
 						read_hits++;
 						return true;
 					} else {
@@ -117,6 +126,9 @@ namespace captive
 				inline bool write(uint32_t vaddr, uint32_t paddr, uint8_t sz)
 				{
 					if (hit(vaddr, paddr)) {
+						if (cache_line(vaddr, paddr) == last_line) return true;
+						last_line = cache_line(vaddr, paddr);
+		
 						write_hits++;
 						return true;
 					} else {
