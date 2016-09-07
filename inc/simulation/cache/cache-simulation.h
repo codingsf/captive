@@ -23,11 +23,11 @@ namespace captive
 	{
 		namespace cache
 		{
-			template<uint32_t total_size, uint32_t line_size, uint8_t ways, bool vidx, bool vtag>
+			template<uint32_t total_size, uint32_t line_size, uint8_t ways, bool vidx, bool vtag, bool nonseq>
 			struct CPUCache
 			{
 				public:
-					CPUCache() : read_hits(0), read_misses(0), write_hits(0), write_misses(0), rrp(0x9E3779B9) { }
+					CPUCache() : read_hits(0), read_misses(0), write_hits(0), write_misses(0), rrp(0x9E3779B9), last_line(-1) { }
 					
 				struct number_of_lines
 				{
@@ -111,9 +111,11 @@ namespace captive
 				inline bool read(uint32_t vaddr, uint32_t paddr, uint8_t sz)
 				{
 					if (hit(vaddr, paddr)) {
-						if (cache_line(vaddr, paddr) == last_line) return true;
-						last_line = cache_line(vaddr, paddr);
-		
+						if (nonseq) {
+							if (cache_line(vaddr, paddr) == last_line) return true;
+							last_line = cache_line(vaddr, paddr);
+						}
+						
 						read_hits++;
 						return true;
 					} else {
@@ -126,9 +128,11 @@ namespace captive
 				inline bool write(uint32_t vaddr, uint32_t paddr, uint8_t sz)
 				{
 					if (hit(vaddr, paddr)) {
-						if (cache_line(vaddr, paddr) == last_line) return true;
-						last_line = cache_line(vaddr, paddr);
-		
+						if (nonseq) {
+							if (cache_line(vaddr, paddr) == last_line) return true;
+							last_line = cache_line(vaddr, paddr);
+						}
+						
 						write_hits++;
 						return true;
 					} else {
@@ -152,9 +156,15 @@ namespace captive
 				
 				void dump() override;
 				
+				void begin_record() override;
+				void end_record() override;
+				
 			private:
-				simulation::cache::CPUCache<16384, 32, 4, true, true> l1i, l1d;
-				simulation::cache::CPUCache<1048576, 64, 16, true, true> l2;
+				simulation::cache::CPUCache<16384, 32, 4, true, true, true> l1d;
+				simulation::cache::CPUCache<16384, 32, 4, true, true, false> l1i;
+				
+				uint64_t l1d_read_hits, l1d_read_misses, l1d_write_hits, l1d_write_misses;
+				uint64_t l1i_fetch_hits, l1i_fetch_misses;
 			};
 		}
 	}

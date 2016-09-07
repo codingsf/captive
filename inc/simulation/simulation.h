@@ -66,6 +66,9 @@ namespace captive
 			
 			virtual void dump() = 0;
 			
+			virtual void begin_record();
+			virtual void end_record();
+			
 		protected:
 			const std::vector<hypervisor::CPU *>& cores() const { return _cores; }
 			

@@ -377,9 +377,26 @@ bool KVMCpu::handle_port_io(struct kvm_regs& regs)
 		return true;
 	
 	case 0xef:
-		for (simulation::Simulation *sim : kvm_guest.simulations()) {
-			sim->dump();
+		switch (regs.rax) {
+		case 0:
+			for (simulation::Simulation *sim : kvm_guest.simulations()) {
+				sim->dump();
+			}
+			break;
+			
+		case 1:
+			for (simulation::Simulation *sim : kvm_guest.simulations()) {
+				sim->begin_record();
+			}
+			break;
+
+		case 2:
+			for (simulation::Simulation *sim : kvm_guest.simulations()) {
+				sim->end_record();
+			}
+			break;
 		}
+		
 		return true;
 		
 	default:

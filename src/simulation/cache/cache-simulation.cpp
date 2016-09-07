@@ -4,10 +4,6 @@ using namespace captive::simulation::cache;
 
 bool CacheSimulation::init()
 {
-	/*l1d = new simulation::cache::CPUCache<32768, 64, 2>();
-	l1i = new simulation::cache::CPUCache<32768, 64, 2>();
-	l2 = new simulation::cache::CPUCache<1048576, 64, 16>();*/
-
 	return true;
 }
 
@@ -21,14 +17,14 @@ void CacheSimulation::stop()
 
 void CacheSimulation::dump()
 {
-	fprintf(stderr, "*** CACHE STATISTICS ***\n");
-	fprintf(stderr, "l1i: fetch: accesses=%lu, hits=%lu, misses=%lu\n", l1i.read_misses + l1i.read_hits, l1i.read_hits, l1i.read_misses);
+	fprintf(stderr, "*** ABSOLUTE CACHE STATISTICS ***\n\r");
+	fprintf(stderr, "l1i: fetch: accesses=%lu, hits=%lu, misses=%lu\n\r", l1i.read_misses + l1i.read_hits, l1i.read_hits, l1i.read_misses);
 
-	fprintf(stderr, "l1d:  read: accesses=%lu, hits=%lu, misses=%lu\n", l1d.read_misses + l1d.read_hits, l1d.read_hits, l1d.read_misses);
-	fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n", l1d.write_misses + l1d.write_hits, l1d.write_hits, l1d.write_misses);
+	fprintf(stderr, "l1d:  read: accesses=%lu, hits=%lu, misses=%lu\n\r", l1d.read_misses + l1d.read_hits, l1d.read_hits, l1d.read_misses);
+	fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n\r", l1d.write_misses + l1d.write_hits, l1d.write_hits, l1d.write_misses);
 	
-	fprintf(stderr, "l2:   read: accesses=%lu, hits=%lu, misses=%lu\n", l2.read_misses + l2.read_hits, l2.read_hits, l2.read_misses);
-	fprintf(stderr, "l2:  write: accesses=%lu, hits=%lu, misses=%lu\n", l2.write_misses + l2.write_hits, l2.write_hits, l2.write_misses);
+//	fprintf(stderr, "l2:   read: accesses=%lu, hits=%lu, misses=%lu\n", l2.read_misses + l2.read_hits, l2.read_hits, l2.read_misses);
+//	fprintf(stderr, "l2:  write: accesses=%lu, hits=%lu, misses=%lu\n", l2.write_misses + l2.write_hits, l2.write_hits, l2.write_misses);
 }
 
 
@@ -52,4 +48,33 @@ void CacheSimulation::process_events(const EventPacket *events, uint32_t count)
 			}
 		}
 	}
+}
+
+void CacheSimulation::begin_record()
+{
+	l1d_read_hits = l1d.read_hits;
+	l1d_read_misses = l1d.read_misses;
+	l1d_write_hits = l1d.write_hits;
+	l1d_write_misses = l1d.write_misses;
+	l1i_fetch_hits = l1i.read_hits;
+	l1i_fetch_misses = l1i.read_misses;
+}
+
+void CacheSimulation::end_record()
+{
+	fprintf(stderr, "*** DELTA CACHE STATISTICS ***\n\r");
+	fprintf(stderr, "l1i: fetch: accesses=%lu, hits=%lu, misses=%lu\n\r", 
+			(l1i.read_misses + l1i.read_hits) - (l1i_fetch_misses + l1i_fetch_hits), 
+			l1i.read_hits - l1i_fetch_hits,
+			l1i.read_misses - l1i_fetch_misses);
+
+	fprintf(stderr, "l1d:  read: accesses=%lu, hits=%lu, misses=%lu\n\r", 
+			(l1d.read_misses + l1d.read_hits) - (l1d_read_misses + l1d_read_hits), 
+			l1d.read_hits - l1d_read_hits, 
+			l1d.read_misses - l1d_read_misses);
+	
+	fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n\r",
+			(l1d.write_misses + l1d.write_hits) - (l1d_write_misses + l1d_write_hits), 
+			l1d.write_hits - l1d_write_hits, 
+			l1d.write_misses - l1d_write_misses);
 }
