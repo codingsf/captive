@@ -96,15 +96,22 @@ namespace captive
 				
 				inline bool hit(uint32_t vaddr, uint32_t paddr) const
 				{
-					return tag_at(vaddr, paddr, 0) == tag_of(vaddr, paddr) || 
-							tag_at(vaddr, paddr, 1) == tag_of(vaddr, paddr) ||
-							tag_at(vaddr, paddr, 2) == tag_of(vaddr, paddr) ||
-							tag_at(vaddr, paddr, 3) == tag_of(vaddr, paddr);
+					if (ways == 2) {
+						return tag_at(vaddr, paddr, 0) == tag_of(vaddr, paddr) || 
+								tag_at(vaddr, paddr, 1) == tag_of(vaddr, paddr);
+					} else if (ways == 4) {
+						return tag_at(vaddr, paddr, 0) == tag_of(vaddr, paddr) || 
+								tag_at(vaddr, paddr, 1) == tag_of(vaddr, paddr) ||
+								tag_at(vaddr, paddr, 2) == tag_of(vaddr, paddr) ||
+								tag_at(vaddr, paddr, 3) == tag_of(vaddr, paddr);
+					}
 				}
 				
 				inline void replace(uint32_t vaddr, uint32_t paddr)
 				{
-					tag_set(vaddr, paddr, rrp & 2);
+					if (ways == 2) tag_set(vaddr, paddr, rrp & 1);
+					else if (ways == 4) tag_set(vaddr, paddr, rrp & 2);
+					
 					rrp = ((rrp & 1) << 31) | (rrp >> 1);
 				}
 				
@@ -160,8 +167,8 @@ namespace captive
 				void end_record() override;
 				
 			private:
-				simulation::cache::CPUCache<16384, 32, 4, true, true, true> l1d;
-				simulation::cache::CPUCache<16384, 32, 4, true, true, false> l1i;
+				simulation::cache::CPUCache<32768, 32, 2, true, true, false> l1i;
+				simulation::cache::CPUCache<32768, 64, 4, true, true, true> l1d;
 				
 				uint64_t l1d_read_hits, l1d_read_misses, l1d_write_hits, l1d_write_misses;
 				uint64_t l1i_fetch_hits, l1i_fetch_misses;
