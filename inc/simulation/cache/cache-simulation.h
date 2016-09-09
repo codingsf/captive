@@ -68,7 +68,8 @@ namespace captive
 
 					inline constexpr uint32_t tag_of(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
 					{
-						return (tag_addr(vaddr, paddr) >> (set_bits + offset_bits)) & tag_mask;
+						//return (tag_addr(vaddr, paddr) >> (set_bits + offset_bits)) & tag_mask;
+						return (tag_addr(vaddr, paddr) & (tag_mask << (set_bits + offset_bits)));
 					}
 
 					inline constexpr uint32_t set_of(uint32_t vaddr, uint32_t paddr) const __attribute__((pure))
@@ -168,7 +169,7 @@ namespace captive
 				
 			private:
 				simulation::cache::CPUCache<32768, 32, 2, true, true, false> l1i;
-				simulation::cache::CPUCache<32768, 64, 4, true, true, true> l1d;
+				simulation::cache::CPUCache<32768, 64, 4, true, true, false> l1d;
 				
 				uint64_t l1d_read_hits, l1d_read_misses, l1d_write_hits, l1d_write_misses;
 				uint64_t l1i_fetch_hits, l1i_fetch_misses;

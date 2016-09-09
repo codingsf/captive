@@ -19,7 +19,7 @@ void CacheSimulation::dump()
 {
 	fprintf(stderr, "*** ABSOLUTE CACHE STATISTICS ***\n\r");
 	fprintf(stderr, "l1i: fetch: accesses=%lu, hits=%lu, misses=%lu\n\r", l1i.read_misses + l1i.read_hits, l1i.read_hits, l1i.read_misses);
-
+	fprintf(stderr, "l1d:  comb: accesses=%lu, hits=%lu, misses=%lu\n\r", l1d.write_misses + l1d.write_hits + l1d.read_misses + l1d.read_hits, l1d.write_hits + l1d.read_hits, l1d.write_misses + l1d.read_misses);
 	fprintf(stderr, "l1d:  read: accesses=%lu, hits=%lu, misses=%lu\n\r", l1d.read_misses + l1d.read_hits, l1d.read_hits, l1d.read_misses);
 	fprintf(stderr, "l1d: write: accesses=%lu, hits=%lu, misses=%lu\n\r", l1d.write_misses + l1d.write_hits, l1d.write_hits, l1d.write_misses);
 	
@@ -35,17 +35,11 @@ void CacheSimulation::process_events(const EventPacket *events, uint32_t count)
 		uint32_t phys_addr = (events[i].phys_page << 12) | (events[i].address & 0xfff);
 		
 		if (events[i].type == EventPacket::MEMORY_READ) {
-			if (!l1d.read(virt_addr, phys_addr, events[i].size)) {
-				//l2.read(virt_addr, phys_addr, events[i].size);
-			}
+			l1d.read(virt_addr, phys_addr, events[i].size);
 		} else if (events[i].type == EventPacket::MEMORY_WRITE) {
-			if (!l1d.write(virt_addr, phys_addr, events[i].size)) {
-				//l2.write(virt_addr, phys_addr, events[i].size);
-			}
+			l1d.write(virt_addr, phys_addr, events[i].size);
 		} else if (events[i].type == EventPacket::INSTRUCTION_FETCH) {
-			if (!l1i.read(virt_addr, phys_addr, events[i].size)) {
-				//l2.read(virt_addr, phys_addr, events[i].size);
-			}
+			l1i.read(virt_addr, phys_addr, events[i].size);
 		}
 	}
 }
