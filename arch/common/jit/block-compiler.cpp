@@ -2146,7 +2146,8 @@ do_ret_instead:
 				encoder.mov(X86Memory::get(REG_R12), REG_R14);
 				encoder.mov(REG_R15D, REG_ECX);
 				encoder.shl(32, REG_RCX);
-				encoder.orr(0x24, REG_RCX);
+				
+				encoder.orr((insn->operands[0].value & (~0xfff)) | 0x24, REG_RCX);
 
 				encoder.add2(8, X86Memory::get(REG_R12));
 

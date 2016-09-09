@@ -168,7 +168,7 @@ namespace captive
 				void end_record() override;
 				
 			private:
-				simulation::cache::CPUCache<32768, 32, 2, true, true, false> l1i;
+				simulation::cache::CPUCache<32768, 32, 2, true, false, false> l1i;
 				simulation::cache::CPUCache<32768, 64, 4, true, true, false> l1d;
 				
 				uint64_t l1d_read_hits, l1d_read_misses, l1d_write_hits, l1d_write_misses;
