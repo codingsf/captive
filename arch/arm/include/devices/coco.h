@@ -29,6 +29,13 @@ namespace captive {
 					bool mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, uint32_t& data) override;
 
 				private:
+					bool pmu_write(CPU& cpu, uint32_t rm, uint32_t op1, uint32_t op2, uint32_t data);
+					bool pmu_read(CPU& cpu, uint32_t rm, uint32_t op1, uint32_t op2, uint32_t& data);
+					
+					struct {
+						bool E, P, C, D, X, DP;
+					} pmu;
+					
 					bool _A, _C, _Z, _I, _EE, _TRE, _AFE, _TE;
 					
 					uint32_t DATA_TCM_REGION;

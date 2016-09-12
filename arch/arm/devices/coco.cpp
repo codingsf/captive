@@ -231,6 +231,10 @@ bool CoCo::mcr(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				break;
 			}
 			break;
+			
+		case 12:
+		case 13:
+			return pmu_write(cpu, rm, op1, op2, data);
 		}
 		break;
 		
@@ -499,17 +503,10 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 				break;
 			}
 			break;
+			
 		case 12:
-			switch (op1) {
-			case 0:
-				switch (op2) {
-				case 0:
-					data = 0;
-					return true;
-				}
-				break;
-			}
-			break;
+		case 13:
+			return pmu_read(cpu, rm, op1, op2, data);
 		}
 		break;
 		
@@ -551,6 +548,42 @@ bool CoCo::mrc(CPU& cpu, uint32_t op1, uint32_t op2, uint32_t rn, uint32_t rm, u
 	}
 
 	fatal("**** unknown system control coprocessor read: rn=%d, rm=%d, op1=%d, op2=%d\n", rn, rm, op1, op2);
+	return true;
+}
+
+bool CoCo::pmu_write(CPU& cpu, uint32_t rm, uint32_t op1, uint32_t op2, uint32_t data)
+{
+	printf("pmu: unknown pmu register write: rm=%d, op1=%d, op2=%d, data=%08x\n", rm, op1, op2, data);
+	return true;
+}
+
+bool CoCo::pmu_read(CPU& cpu, uint32_t rm, uint32_t op1, uint32_t op2, uint32_t& data)
+{
+	switch (rm) {
+	case 12:
+		switch (op1) {
+		case 0:
+			switch (op2) {
+			case 0: // PMCR
+				data = 0x41002000 | 
+						(pmu.DP << 5) |
+						(pmu.X << 4) |
+						(pmu.D << 3) |
+						(pmu.C << 2) |
+						(pmu.P << 1) |
+						(pmu.E << 0);
+				return true;
+			}
+			break;
+		}
+		break;
+		
+	default:
+		return true;
+	}
+
+	data = 0;
+	printf("pmu: unknown pmu register read: rm=%d, op1=%d, op2=%d\n", rm, op1, op2);
 	return true;
 }
 
