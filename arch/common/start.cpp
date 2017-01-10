@@ -14,6 +14,7 @@
 #include <x86/pit.h>
 
 extern captive::arch::Environment *create_environment_arm(captive::PerGuestData *per_guest_data);
+extern captive::arch::Environment *create_environment_aarch64(captive::PerGuestData *per_guest_data);
 
 extern void (*__init_array_start []) (void);
 extern void (*__init_array_end []) (void);
@@ -82,7 +83,7 @@ extern "C" {
 		printf("enabled events: %08x\n", cpu_data->guest_data->simulation_events);
 		
 		printf("creating environment...\n");
-		captive::arch::Environment *env = create_environment_arm(cpu_data->guest_data);
+		captive::arch::Environment *env = create_environment_aarch64(cpu_data->guest_data);
 
 		if (!env) {
 			printf("error: unable to create environment\n");

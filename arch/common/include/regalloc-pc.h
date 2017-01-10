@@ -1,7 +1,7 @@
 #ifndef REGALLOC_PC_H
 #define REGALLOC_PC_H
 
-register unsigned int __PC asm("r15");
+register unsigned long long int __PC asm("r15");
 
 #define read_pc() (__PC)
 #define pc_mem_ptr() ((uintptr_t)__PC)

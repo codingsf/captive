@@ -53,9 +53,9 @@ namespace captive {
 			}
 
 		private:
-			static const uint32_t cache_bits = 12;
-			static const uint32_t cache_page_count = cache_size >> cache_bits;
-			static const uint32_t cache_entry_count = 1 << cache_bits;
+			static constexpr uint32_t cache_bits = 12;
+			static constexpr uint32_t cache_page_count = cache_size >> cache_bits;
+			static constexpr uint32_t cache_entry_count = 1 << cache_bits;
 
 			inner_type_t entries[cache_size];
 			std::bitset<cache_page_count> dirty_pages;

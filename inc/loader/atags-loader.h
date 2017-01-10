@@ -21,7 +21,7 @@ namespace captive {
 			ATAGsLoader(InitRDLoader& initrd);
 
 			bool install(uint8_t* gpm) override;
-			uint32_t base_address() const override { return 0x100; }
+			gpa_t base_address() const override { return 0x100; }
 			
 		private:
 			InitRDLoader *_initrd;

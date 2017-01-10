@@ -32,12 +32,12 @@ DEFINE_OPTION_HANDLER("block-dev-file", BlockDevFile, OptionRequirement::Once, V
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("tap-device", TAPDevice, OptionRequirement::Once, ValueRequirement::Required) {
+DEFINE_OPTION_HANDLER("tap-device", TAPDevice, OptionRequirement::None, ValueRequirement::Required) {
 	config.net_tap_device = arg;
 	return HandleResult::OK;
 }
 
-DEFINE_OPTION_HANDLER("mac-address", MACAddress, OptionRequirement::Once, ValueRequirement::Required) {
+DEFINE_OPTION_HANDLER("mac-address", MACAddress, OptionRequirement::None, ValueRequirement::Required) {
 	config.net_mac_addr = arg;
 	return HandleResult::OK;
 }
@@ -54,5 +54,10 @@ DEFINE_OPTION_HANDLER("cache-sim", CacheSimulation, OptionRequirement::None, Val
 
 DEFINE_OPTION_HANDLER("icount", CountInstructions, OptionRequirement::None, ValueRequirement::None) {
 	config.insn_count = true;
+	return HandleResult::OK;
+}
+
+DEFINE_OPTION_HANDLER("platform", Platform, OptionRequirement::Once, ValueRequirement::Required) {
+	config.platform = arg;
 	return HandleResult::OK;
 }

@@ -23,7 +23,7 @@ namespace captive {
 			gpa_t entrypoint() const override;
 			bool requires_device_tree() const override;
 			
-			uint32_t base_address() const override { return 0; }
+			gpa_t base_address() const override { return 0; }
 			
 			static bool match(const uint8_t *buffer);
 

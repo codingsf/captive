@@ -813,13 +813,13 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 	pt_t pt = (pt_t)sys_guest_phys_to_host_virt(pd[pd_idx] & ADDR_MASK);
 	pt[pt_idx] = (pa & ADDR_MASK) | ((uint64_t)flags & FLAGS_MASK);
 
-	DEBUG << CONTEXT(Guest) << "Map Page VA=" << std::hex << va
+	/*DEBUG << CONTEXT(Guest) << "Map Page VA=" << std::hex << va
 		<< ", PA=" << pa
 		<< ", PM @ " << GUEST_SYS_INIT_PGT_PHYS
 		<< ", PM[" << (uint32_t)pm_idx << "] = " << pm[pm_idx]
 		<< ", PDP[" << (uint32_t)pdp_idx << "]=" << pdp[pdp_idx]
 		<< ", PD[" << (uint32_t)pd_idx << "]=" << pd[pd_idx]
-		<< ", PT[" << (uint32_t)pt_idx << "]=" << pt[pt_idx];
+		<< ", PT[" << (uint32_t)pt_idx << "]=" << pt[pt_idx];*/
 }
 
 void KVMGuest::map_huge_page(uint64_t va, uint64_t pa, uint32_t flags)

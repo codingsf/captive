@@ -17,10 +17,13 @@ namespace captive {
 		#define BITSEL(v, b)			(((v) >> b) & 1UL)
 		#define BIT_LSB(i)				(1 << (i))
 		
+#define __ROR32(v, a) (((v) >> a) | ((v) << (32 - a)))
+#define __ROR64(v, a) (((v) >> a) | ((v) << (64 - a)))
+		
 		class Decode
 		{
 		public:
-			uint32_t pc;
+			uint64_t pc;
 			uint32_t length;
 
 			bool end_of_block;
@@ -38,7 +41,7 @@ namespace captive {
 			};
 
 			JumpType type;
-			uint32_t target;
+			uint64_t target;
 		};
 	}
 }

@@ -47,7 +47,7 @@ namespace captive {
 		public:
 			struct TaggedRegisters {
 				void *base;
-				uint32_t *PC, *SP;
+				uint64_t *PC, *SP;
 				uint8_t *C, *Z, *N, *V, *Q, *I, *ISA;
 			};
 			
@@ -167,8 +167,7 @@ namespace captive {
 			} local_state;
 
 			struct block_chain_cache_entry {
-				uint32_t tag;
-				uint32_t padding;
+				uint64_t tag;
 				void *fn;
 				
 				inline void invalidate() { tag = 1; }
@@ -198,7 +197,7 @@ namespace captive {
 				uint64_t self_loop_count;
 			} packed jit_state;
 			
-			inline void trap() { dump_stack(); fatal("it's a trap!\n"); }
+			inline void trap() { fatal("it's a trap!\n"); }
 			inline void enter_kernel_mode() { kernel_mode(true); }
 			inline void enter_user_mode() { kernel_mode(false); }
 			inline void pend_interrupt() { }

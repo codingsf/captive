@@ -31,7 +31,7 @@ namespace captive {
 			bool read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data);
 
 			inline bool install_core_device(uint32_t id, CoreDevice *device) {
-				if (id > 15) {
+				if (id > 23) {
 					return false;
 				}
 
@@ -43,7 +43,7 @@ namespace captive {
 			}
 
 			inline CoreDevice *lookup_core_device(uint32_t id) {
-				if (id > 15) {
+				if (id > 23) {
 					return NULL;
 				}
 
@@ -55,7 +55,7 @@ namespace captive {
 			virtual bool prepare_bootloader() = 0;
 			
 		private:
-			CoreDevice *devices[16];
+			CoreDevice *devices[24];
 
 			void install_idt();
 			void install_syscall();

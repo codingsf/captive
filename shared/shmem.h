@@ -87,7 +87,7 @@ namespace captive {
 			volatile uint64_t operation;
 		} fast_device;
 		
-		uint32_t entrypoint;
+		uint64_t entrypoint;
 		
 		uintptr_t printf_buffer;
 		

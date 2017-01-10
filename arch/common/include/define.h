@@ -63,8 +63,8 @@ typedef unsigned long ptrdiff_t;
 typedef uintptr_t hpa_t;
 typedef uintptr_t hva_t;
 
-typedef uint32_t gpa_t;
-typedef uint32_t gva_t;
+typedef uint64_t gpa_t;
+typedef uint64_t gva_t;
 
 #define NULL 0
 

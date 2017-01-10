@@ -33,10 +33,18 @@ namespace captive
 				strcat(_buffer, tmp);
 			}
 
-			inline void append_hex(uint64_t val) {
-				char tmp[12];
+			inline void append_hex(uint32_t val) {
+				char tmp[20];
 				tmp[0] = 0;
-				sprintf(tmp, "%x", val);
+				sprintf(tmp, "0x%x", val);
+
+				strcat(_buffer, tmp);
+			}
+			
+			inline void append_hex(uint64_t val) {
+				char tmp[20];
+				tmp[0] = 0;
+				sprintf(tmp, "0x%lx", val);
 
 				strcat(_buffer, tmp);
 			}

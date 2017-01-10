@@ -15,7 +15,7 @@ export ar := ar
 export as := as
 export ld := ld
 
-archs := arm
+archs := aarch64
 
 arch-outs := $(patsubst %,$(top-dir)/%.arch,$(archs))
 arch-cleans := $(patsubst %,$(top-dir)/%.arch.clean,$(archs))

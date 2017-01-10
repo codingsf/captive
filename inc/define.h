@@ -15,8 +15,8 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-typedef uint32_t gpa_t;
-typedef uint32_t gva_t;
+typedef uint64_t gpa_t;
+typedef uint64_t gva_t;
 
 #define __packed __attribute__((packed))
 

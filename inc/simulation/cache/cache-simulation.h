@@ -27,7 +27,7 @@ namespace captive
 			struct CPUCache
 			{
 				public:
-					CPUCache() : read_hits(0), read_misses(0), write_hits(0), write_misses(0), rrp(0x9E3779B9), last_line(-1) { }
+					CPUCache() : rrp(0x9E3779B9), last_line(-1), read_hits(0), read_misses(0), write_hits(0), write_misses(0) { }
 				
 				private:
 					static constexpr int number_of_lines = (int)(total_size / line_size);

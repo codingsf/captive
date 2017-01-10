@@ -29,13 +29,15 @@ namespace captive
 				
 				bool print_usage;
 				
-				maybe<std::string> arch_module;
-				maybe<std::string> guest_kernel;
+				std::string arch_module;
+				std::string platform;
+				std::string guest_kernel;
 				
 				maybe<std::string> block_device_file;
 				
 				maybe<std::string> net_mac_addr;
 				maybe<std::string> net_tap_device;
+				
 				
 				bool insn_count;
 				bool cache_simulation;

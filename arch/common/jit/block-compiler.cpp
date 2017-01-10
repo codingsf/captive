@@ -1150,7 +1150,7 @@ bool BlockCompiler::lower_to_interpreter() {
 }
 
 bool BlockCompiler::lower(uint32_t max_stack) {
-	bool success = true, dump_this_shit = false;
+	bool success = true, dump_this_shit = true;
 
 	std::vector<std::pair<uint32_t, IRBlockId> > block_relocations;
 	block_relocations.reserve(ctx.block_count());

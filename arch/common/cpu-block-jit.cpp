@@ -15,7 +15,7 @@
 #include <list>
 
 //#define REG_STATE_PROTECTION
-//#define DEBUG_TRANSLATION
+#define DEBUG_TRANSLATION
 
 extern safepoint_t cpu_safepoint;
 
@@ -32,11 +32,11 @@ static uint64_t __native_start;
 
 bool CPU::run_block_jit()
 {
-	printf("cpu: starting block-jit cpu execution, PC=%08x\n", read_pc());
+	printf("cpu: starting block-jit cpu execution, PC=%016x\n", read_pc());
 	printf("--------------------------------------------------------------------\n");
 	
-	//trace().enable();
-	//jit().trace(true);
+	trace().enable();
+	jit().trace(true);
 
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);

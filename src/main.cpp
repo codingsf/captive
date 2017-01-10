@@ -13,6 +13,7 @@
 
 #include <platform/realview.h>
 #include <platform/gensim-test.h>
+#include <platform/juno.h>
 
 #include <simulation/insn-count.h>
 #include <simulation/cache/cache-simulation.h>
@@ -137,21 +138,18 @@ int main(int argc, const char **argv)
 	TimerManager timer_manager;
 
 	// Create the guest platform.
-	if (!cfg.block_device_file) {
-		ERROR << "Block Device File must be specified";
+	Platform *pfm;
+	
+	if (cfg.platform == "juno") {
+		pfm = new Juno(cfg, timer_manager, Juno::CORTEX_A72);
+	} else if (cfg.platform == "realview") {
+		pfm = new Realview(cfg, timer_manager, Realview::CORTEX_A8);
+	} else {
+		ERROR << "Unrecognised platform: " << cfg.platform;
 		return 1;
 	}
-	
-	Platform *pfm = new Realview(cfg, timer_manager, Realview::CORTEX_A8);
-	//Platform *pfm = new GensimTest(timer_manager);
-
-	// Create the engine.
-	if (!cfg.arch_module) {
-		ERROR << "Execution engine must be specified";
-		return 1;
-	}
-	
-	Engine engine(cfg.arch_module.value());
+		
+	Engine engine(cfg.arch_module);
 	if (!engine.init()) {
 		delete pfm;
 		delete hv;
@@ -159,14 +157,8 @@ int main(int argc, const char **argv)
 		ERROR << "Unable to initialise engine";
 		return 1;
 	}
-	
-	// Load the kernel
-	if (!cfg.guest_kernel) {
-		ERROR << "Guest kernel must be specified";
-		return 1;
-	}
-	
-	auto kernel = KernelLoader::create_from_file(cfg.guest_kernel.value());
+		
+	auto kernel = KernelLoader::create_from_file(cfg.guest_kernel);
 	if (!kernel) {
 		delete pfm;
 		delete hv;
@@ -240,7 +232,7 @@ int main(int argc, const char **argv)
 		}*/
 		
 		// Load atags
-		ATAGsLoader atags; //(initrd);
+		/*ATAGsLoader atags; //(initrd);
 		if (!guest->load(atags)) {
 			delete guest;
 			delete pfm;
@@ -248,7 +240,7 @@ int main(int argc, const char **argv)
 
 			ERROR << "Unable to load ATAGs";
 			return 1;
-		}
+		}*/
 	}
 		
 	// Start the timer manager

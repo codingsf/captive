@@ -25,7 +25,7 @@ namespace captive {
 			bool install(uint8_t* gpm) override;
 			gpa_t entrypoint() const override;
 			bool requires_device_tree() const override;
-			uint32_t base_address() const override { return ZIMAGE_BASE; }
+			gpa_t base_address() const override { return ZIMAGE_BASE; }
 			
 			static bool match(const uint8_t *buffer);
 			

@@ -2,6 +2,7 @@
 #include <loader/kernel-loader.h>
 #include <loader/zimage-loader.h>
 #include <loader/elf-loader.h>
+#include <loader/arm64-loader.h>
 
 #include <stdio.h>
 #include <unistd.h>
@@ -34,6 +35,8 @@ KernelLoader *KernelLoader::create_from_file(std::string filename)
 		return new ZImageLoader(filename);
 	} else if (ELFLoader::match(buffer)) {
 		return new ELFLoader(filename);
+	} else if (ARM64Loader::match(buffer)) {
+		return new ARM64Loader(filename);
 	} else {
 		ERROR << CONTEXT(KernelLoader) << "Unable to detect file type";
 		return NULL;

@@ -18,10 +18,10 @@ namespace captive {
 			DeviceTreeLoader(std::string filename, uint32_t base_address);
 
 			virtual bool install(uint8_t* gpm) override;
-			uint32_t base_address() const override { return _base_address; }
+			gpa_t base_address() const override { return _base_address; }
 
 		private:
-			uint32_t _base_address;
+			gpa_t _base_address;
 		};
 	}
 }
