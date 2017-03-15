@@ -78,7 +78,7 @@ namespace captive
 			private:
 				uint64_t _frequency;
 				
-				#define LAPIC_MEM_BASE ((volatile uint32_t *)0x67fffee00000ULL)
+				#define LAPIC_MEM_BASE ((volatile uint32_t *)0xffff8000fee00000ULL)
 
 				inline void lapic_write(uint32_t reg, uint32_t value)
 				{

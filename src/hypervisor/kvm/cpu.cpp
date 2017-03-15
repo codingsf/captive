@@ -128,11 +128,11 @@ bool KVMCpu::run() {
 	struct kvm_regs regs;
 	vmioctl(KVM_GET_REGS, &regs);
 
-	regs.rdi = GUEST_SYS_GUEST_DATA_VIRT + (0x100 * (id() + 1));
+	regs.rdi = kvm_guest.vm_phys_to_vm_virt(VM_PHYS_CPU_DATA + (0x100 * id()));
 	regs.rip = kvm_guest.engine().boot_entrypoint();
 	regs.rsi = id();
 	regs.rflags = 2;
-	regs.rsp = GUEST_HEAP_VIRT_BASE + HEAP_SIZE - (0x100000 * (id()));
+	regs.rsp = kvm_guest.vm_phys_to_vm_virt(VM_PHYS_HEAP_BASE + VM_HEAP_SIZE);
 
 	vmioctl(KVM_SET_REGS, &regs);
 
@@ -141,11 +141,11 @@ bool KVMCpu::run() {
 	sregs.idt.base = 0;
 	sregs.idt.limit = 0;
 
-	sregs.gdt.base = GUEST_SYS_GDT_VIRT;
+	sregs.gdt.base = kvm_guest.vm_phys_to_vm_virt(VM_PHYS_GDT);
 	sregs.gdt.limit = 0x38;
 
 	sregs.cr0 = 0x80010007; // PG, PE, MP, EM, WP
-	sregs.cr3 = GUEST_SYS_INIT_PGT_PHYS;
+	sregs.cr3 = VM_PHYS_PML4_0;
 	sregs.cr4 = 0x6b0;
 
 	sregs.efer |= 0x901;
@@ -440,7 +440,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2) {
 	case 13:
 	{
 		std::stringstream cmd;
-		cmd << "addr2line -e arch/arm.arch " << std::hex << arg1;
+		cmd << "addr2line -e arch/aarch64.arch " << std::hex << arg1;
 		system(cmd.str().c_str());
 		return true;
 	}
@@ -454,7 +454,7 @@ bool KVMCpu::handle_hypercall(uint64_t data, uint64_t arg1, uint64_t arg2) {
 		fname << "code-" << std::hex << std::setw(8) << std::setfill('0') << regs.rdx << ".bin";
 		FILE *f = fopen(fname.str().c_str(), "wb");
 
-		void *ptr = (void *) regs.rdi;
+		void *ptr = ((KVMGuest&)owner()).vm_phys_to_host_virt(regs.rdi);
 		if (ptr) {
 			fwrite(ptr, regs.rsi, 1, f);
 		}

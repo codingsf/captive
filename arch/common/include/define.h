@@ -25,22 +25,41 @@
 #define PAGE_INDEX_OF(_addr)	(((uint64_t)(_addr)) >> PAGE_BITS)
 #define PAGE_ADDRESS_OF(_addr)	(((uint64_t)(_addr)) & PAGE_ADDRESS_MASK)
 
-#define PHYS_TO_VIRT_BASE		((uintptr_t)(0x680000000000ULL))
+// SOMETHING ABOUT THIS IS WRONG, and PROBABLY THE GPA/HPA/HVA STUFF BELOW TOO
+/*#define PHYS_TO_VIRT_BASE		((uintptr_t)(0xffff800000000000ULL))
 #define CODE_PHYS_BASE			((uintptr_t)0)
 #define CODE_VIRT_BASE			(PHYS_TO_VIRT_BASE | CODE_PHYS_BASE)
 #define GPM_PHYS_BASE			((uintptr_t)0x100000000ULL)
 #define GPM_VIRT_BASE			(PHYS_TO_VIRT_BASE | GPM_PHYS_BASE)
 #define GPM_VIRT_START			((uintptr_t)0)
-#define GPM_EMULATED_VIRT_START	((uintptr_t)0x8000000000ULL)
 #define HEAP_PHYS_BASE			((uintptr_t)0x200000000ULL)
 #define HEAP_VIRT_BASE			(PHYS_TO_VIRT_BASE | HEAP_PHYS_BASE)
 
 #define GPA_TO_HPA(_gpa)		((hpa_t)(GPM_PHYS_BASE | (uint32_t)(_gpa)))
 #define GPA_TO_HVA(_gpa)		((hva_t)(GPM_VIRT_BASE | (uint32_t)(_gpa)))
 #define HPA_TO_HVA(_hpa)		((hva_t)(PHYS_TO_VIRT_BASE | (uintptr_t)(_hpa)))
-#define HVA_TO_HPA(_hva)		((hpa_t)((uintptr_t)(_hva) & ~0xfff000000000ULL))
+#define HVA_TO_HPA(_hva)		((hpa_t)((uintptr_t)(_hva) & ~0xfff000000000ULL))*/
 
-#define GVA_TO_EMULATED_HVA(_gva) ((hva_t)(GPM_EMULATED_VIRT_START | (uint32_t)(_gva)))
+#define VM_PHYS_CODE_BASE			0ULL
+#define VM_CODE_SIZE				0x100000000ULL
+#define VM_PHYS_HEAP_BASE			0x100000000ULL
+#define VM_HEAP_SIZE				0x100000000ULL
+#define VM_PHYS_GPM_BASE			0x200000000ULL
+
+#define VM_PHYS_GUEST_DATA			0x1000ULL
+#define VM_PHYS_CPU_DATA			0x2000ULL
+#define VM_PHYS_PRINTF_BUFFER		0x3000ULL
+#define VM_PHYS_GDT					0x4000ULL
+#define VM_PHYS_TSS					0x4100ULL
+#define VM_PHYS_KSTACK				0x5000ULL
+
+#define VM_PHYS_PAGE_TABLES			0x10000ULL
+#define VM_PHYS_PML4_0				VM_PHYS_PAGE_TABLES
+#define VM_PHYS_PML4_1				(VM_PHYS_PML4_0 + 0x1000ULL)
+#define VM_INIT_CR3					VM_PHYS_PML4_0
+
+#define VM_VIRT_SPLIT				0xffff800000000000ULL
+#define VM_VIRT_KERNEL				0xffffffff80000000ULL
 
 #define ALIGN(_addr, _alignment) ((_addr) + ((_alignment) - ((_addr) % (_alignment))))
 
@@ -66,7 +85,36 @@ typedef uintptr_t hva_t;
 typedef uint64_t gpa_t;
 typedef uint64_t gva_t;
 
-#define NULL 0
+#define NULL nullptr
+
+static inline void *vm_phys_to_virt(uintptr_t ptr) {
+	return (void *)((uintptr_t)VM_VIRT_SPLIT + ptr);
+}
+
+static inline uintptr_t vm_virt_to_phys(void *ptr) {
+	if ((uintptr_t)ptr >= VM_VIRT_KERNEL) {
+		assert(false);
+		__builtin_unreachable();
+	} else {
+		return (uintptr_t)((uintptr_t)ptr - (uintptr_t)VM_VIRT_SPLIT);
+	}
+}
+
+static inline uintptr_t vm_phys_to_guest_phys(uintptr_t ptr) {
+	return (uintptr_t)(ptr - VM_PHYS_GPM_BASE);
+}
+
+static inline void *guest_phys_to_vm_virt(uintptr_t ptr) {
+	return vm_phys_to_virt(VM_PHYS_GPM_BASE + ptr);
+}
+
+static inline uintptr_t guest_phys_to_vm_phys(uintptr_t ptr) {
+	return VM_PHYS_GPM_BASE + ptr;
+}
+
+static inline uintptr_t convert_guest_va_to_local_va(uintptr_t ptr) {
+	return ptr & 0x7fffffffffffULL;
+}
 
 struct mcontext
 {
@@ -83,6 +131,8 @@ static inline __attribute__((noreturn)) void abort()
 	for(;;) {
 		asm volatile("hlt\n");
 	}
+	
+	__builtin_unreachable();
 }
 
 #define unreachable() __builtin_unreachable()

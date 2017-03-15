@@ -28,20 +28,10 @@ namespace captive {
 			public:
 				aarch64_mmu(aarch64_cpu& cpu);
 				virtual ~aarch64_mmu();
-
-				bool enable() override;
-				bool disable() override;
-
-				bool enabled() const override {
-					return _enabled;
-				}
 				
 				bool resolve_gpa(resolution_context& context, bool have_side_effects) override;
 				
-				static MMU *create(aarch64_cpu& cpu);
-				
-			protected:
-				bool _enabled;
+				static MMU *create(aarch64_cpu& cpu);				
 			};
 		}
 	}

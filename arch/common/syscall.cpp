@@ -42,9 +42,8 @@ extern "C" {
 			captive::arch::CPU::get_active_cpu()->mmu().page_table_change();
 			break;
 			
-		case 11:
-			printf("SDFSDFSDFSDFSFDFS\n");
-			captive::arch::Memory::flush_tlb();
+		case 11: // Flush TLB
+			assert(false);
 			break;
 		}
 	}

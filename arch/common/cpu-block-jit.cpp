@@ -35,8 +35,8 @@ bool CPU::run_block_jit()
 	printf("cpu: starting block-jit cpu execution, PC=%016x\n", read_pc());
 	printf("--------------------------------------------------------------------\n");
 	
-	trace().enable();
-	jit().trace(true);
+	//trace().enable();
+	//jit().trace(true);
 
 	// Create a safepoint for returning from a memory access fault
 	int rc = record_safepoint(&cpu_safepoint);
@@ -70,8 +70,8 @@ bool CPU::run_block_jit_safepoint()
 	bool step_ok = true;
 
 	Region *rgn = NULL;
-	uint32_t region_virt_base = 1;
-	uint32_t region_phys_base = 1;
+	uint64_t region_virt_base = 1;
+	uint64_t region_phys_base = 1;
 
 	do {
 		// Check the ISR to determine if there is an interrupt pending,
@@ -92,10 +92,14 @@ bool CPU::run_block_jit_safepoint()
 		}
 		
 		gva_t virt_pc = (gva_t)read_pc();
+		
+		/*if (virt_pc >= 0x100000000) {
+			fatal("runtime: 64-bit branch to %p\n", virt_pc);
+		}*/
 
 		if (PAGE_ADDRESS_OF(virt_pc) != region_virt_base) {
-			hpa_t phys_pc;
-			if (!Memory::quick_fetch((hva_t)virt_pc, phys_pc, !kernel_mode())) {
+			gpa_t phys_pc;
+			if (!mmu().quick_fetch(virt_pc, phys_pc, !kernel_mode())) {
 				// This will perform a FETCH with side effects, so that we can impose the
 				// correct permissions checking for the block we're about to execute.
 				MMU::resolution_context rc(virt_pc);
@@ -110,12 +114,20 @@ bool CPU::run_block_jit_safepoint()
 				phys_pc = rc.pa;
 			}
 
-			rgn = image->get_region((gpa_t)phys_pc);
+			rgn = image->get_region(phys_pc);
 			region_virt_base = PAGE_ADDRESS_OF(virt_pc);
 			region_phys_base = PAGE_ADDRESS_OF(phys_pc);
 
-			mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
+			//mmu().set_page_executed(GPA_TO_HVA(region_phys_base));
 		}
+		
+		/*if (virt_pc > 0xffff000008390600 && virt_pc <= 0xffff000008390640) {
+			trace().disable();
+			jit().trace(false);
+		} else {
+			trace().enable();
+			jit().trace(true);
+		}*/
 		
 		assert_privilege_mode();
 		
@@ -131,23 +143,8 @@ bool CPU::run_block_jit_safepoint()
 		ptr->fn = (void *)txln;
 
 		_exec_txl = true;
-		//__native_start = __rdtsc();
 		step_ok = block_trampoline(&jit_state, (void*)txln) == 0;
-		//printf("TIME: %lu\n", __rdtsc() - __native_start);
 		_exec_txl = false;
-
-		/*extern uint64_t __intra_pd, __inter_pd, __isr;
-		if (PAGE_ADDRESS_OF(read_pc()) == PAGE_ADDRESS_OF(virt_pc)) {
-			__intra_pd++;
-		} else {
-			__inter_pd++;
-		}
-
-		if (unlikely(cpu_data().isr)) {
-			__isr++;
-		}*/
-		
-		//printf("slc: f=%x, t=%x, %lx\n", virt_pc, read_pc(), jit_state.self_loop_count);
 	} while(step_ok);
 		
 	if (!step_ok) printf("step was not okay\n");
@@ -182,7 +179,7 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 	assert(ctx.current_block() == 0);
 	
 #ifdef DEBUG_TRANSLATION
-	printf("jit: translating block %x in mode %d\n", pa, isa);
+	printf("jit: translating block %lx in mode %d\n", pa, isa);
 #endif
 	
 	std::set<uint32_t> seen_pcs;
@@ -196,20 +193,20 @@ bool CPU::translate_block(TranslationContext& ctx, uint8_t isa, gpa_t pa)
 	do {
 		// Attempt to decode the current instruction.
 		if (!decode_instruction_phys(isa, pc, insn)) {
-			printf("jit: unhandled decode fault @ isa=%d %08x (%08x)\n", isa, pc, *(uint32_t *)(GPA_TO_HVA(insn->pc)));
+			printf("jit: unhandled decode fault @ isa=%d %016x (%08x)\n", isa, pc, *(uint32_t *)(guest_phys_to_vm_virt(insn->pc)));
 			return false;
 		}
 		
-		ctx.add_instruction(IRInstruction::barrier(IROperand::pc(insn->pc), IROperand::const32(*(uint32_t *)(GPA_TO_HVA(insn->pc)))));
+		ctx.add_instruction(IRInstruction::barrier(IROperand::pc(insn->pc), IROperand::const32(*(uint32_t *)(guest_phys_to_vm_virt(insn->pc)))));
 		
 #ifdef DEBUG_TRANSLATION
-		printf("jit: translating insn @ [%08x] (%08x) %s\n", insn->pc, *(uint32_t *)GPA_TO_HVA(insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
+		printf("jit: translating insn @ [%016x] (%08x) %s\n", insn->pc, *(uint32_t *)guest_phys_to_vm_virt(insn->pc), trace().disasm().disassemble(insn->pc, (const uint8_t *)insn));
 #endif
 
 		if (cpu_data().guest_data->simulation_events & SIM_EVENT_COUNT) {
 			ctx.add_instruction(IRInstruction::count(IROperand::pc(insn->pc), IROperand::const32(0)));
 		}
-		
+				
 		if (cpu_data().guest_data->simulation_events & SIM_EVENT_FETCH) {
 			ctx.add_instruction(IRInstruction::fetch(IROperand::pc(insn->pc)));
 		}

@@ -547,6 +547,7 @@ static struct insn_descriptor insn_descriptors[] = {
 	{ .mnemonic = "sar", .format = "IBXXXX", .has_side_effects = false},
 	{ .mnemonic = "ror", .format = "IBXXXX", .has_side_effects = false},
 	{ .mnemonic = "clz", .format = "IOXXXX", .has_side_effects = false},
+	{ .mnemonic = "bswap", .format = "BXXXXX", .has_side_effects = false},
 
 	{ .mnemonic = "not", .format = "BXXXXX", .has_side_effects = false},
 	{ .mnemonic = "and", .format = "IBXXXX", .has_side_effects = false},
@@ -1358,7 +1359,7 @@ bool BlockCompiler::lower(uint32_t max_stack) {
 						encoder.lea(X86Memory::get(PC_REG64, next->operands[0].value), register_from_operand(target));
 						ir_idx++;
 					} else {
-						encoder.mov(PC_REG, register_from_operand(target));
+						encoder.mov(PC_REG64, register_from_operand(target));
 					}
 				} else {
 					fatal("WHOA");
@@ -1875,15 +1876,15 @@ do_ret_instead:
 
 			if (offset->type == IROperand::CONSTANT) {
 				if (offset->value == REG_OFFSET_OF(PC)) {
-					assert(value->size == 4);
+					assert(value->size == 8);
 
 					if (value->type == IROperand::CONSTANT) {
-						encoder.mov(value->value, PC_REG);
+						encoder.mov(value->value, PC_REG64);
 					} else if (value->type == IROperand::VREG) {
 						if (value->is_alloc_reg()) {
-							encoder.mov(register_from_operand(value), PC_REG);
+							encoder.mov(register_from_operand(value), PC_REG64);
 						} else if (value->is_alloc_stack()) {
-							encoder.mov(stack_from_operand(value), PC_REG);
+							encoder.mov(stack_from_operand(value), PC_REG64);
 						} else {
 							assert(false);
 						}
@@ -2115,7 +2116,7 @@ do_ret_instead:
 			IROperand *amount = &insn->operands[0];
 
 			if (amount->is_constant()) {
-				encoder.lea(X86Memory::get(PC_REG64, amount->value), PC_REG);
+				encoder.lea(X86Memory::get(PC_REG64, amount->value), PC_REG64);
 			} else {
 				assert(false);
 			}
@@ -2128,9 +2129,9 @@ do_ret_instead:
 			IROperand *value = &insn->operands[0];
 
 			if (value->is_constant()) {
-				encoder.mov(value->value, PC_REG);
+				encoder.mov(value->value, PC_REG64);
 			} else if (value->is_alloc_reg()) {
-				encoder.mov(register_from_operand(value), PC_REG);
+				encoder.mov(register_from_operand(value), PC_REG64);
 			} else {
 				assert(false);
 			}
@@ -2191,14 +2192,19 @@ do_ret_instead:
 						encoder.jnz(2);
 						encoder.out(REG_EAX, 0xee);		
 					} else {
-						encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), register_from_operand(dest));
+						encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_RCX);
+						encoder.intt(0x60);
+						encoder.mov(X86Memory::get(REG_RCX), register_from_operand(dest));
 					}
 				} else {
 					// TODO: FIXME: ACCOUNT FOR THIS IN SIMULATION
 					
 					// Destination is sometimes not allocated, e.g. if an ldrd loads to a location, then only one
 					// of the loaded registers is used but the other is killed
-					encoder.mov(X86Memory::get(register_from_operand(offset), disp->value), get_temp(0, dest->size));
+					encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_RCX);
+					encoder.intt(0x60);
+					
+					encoder.mov(X86Memory::get(REG_RCX), get_temp(0, dest->size));
 				}
 			} else {
 				assert(false);
@@ -2220,6 +2226,10 @@ do_ret_instead:
 #endif
 
 			if (offset->is_vreg()) {
+				if (offset->size == 8) {
+					//printf("XXXX 64-bit memory access\n");
+				}
+				
 				if (value->is_vreg()) {
 					if (offset->is_alloc_reg() && value->is_alloc_reg()) {
 						// mov reg, const(reg)
@@ -2240,11 +2250,40 @@ do_ret_instead:
 							encoder.out(REG_EAX, 0xee);	
 						} else {
 							// Perform memory access
-							encoder.mov(register_from_operand(value), X86Memory::get(register_from_operand(offset), disp->value));
+							
+							encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_RCX);
+							encoder.intt(0x60);
+							
+							encoder.mov(register_from_operand(value), X86Memory::get(REG_RCX)); //register_from_operand(offset), disp->value));
 						}
 					} else {
 						assert(false);
 					}
+				} else if (value->is_constant()) {
+					switch (value->size) {
+					case 1: encoder.mov1(value->value, X86Memory::get(register_from_operand(offset), disp->value)); break;
+					case 2: encoder.mov2(value->value, X86Memory::get(register_from_operand(offset), disp->value)); break;
+					case 4: encoder.mov4(value->value, X86Memory::get(register_from_operand(offset), disp->value)); break;
+					case 8: 
+						encoder.lea(X86Memory::get(register_from_operand(offset), disp->value), REG_RCX);
+						encoder.intt(0x60);
+						
+						if (value->value == 0) {
+							encoder.xorr(REG_R14D, REG_R14D);
+						/*} else if (value < UINT32_MAX) {
+							encoder.mov(value->value, REG_ECX);*/
+						} else {
+							encoder.mov(value->value, REG_R14);
+						}
+						
+						encoder.mov(REG_R14, X86Memory::get(REG_RCX)); 
+						break;
+						
+					default: assert(false);
+						
+					}
+					
+					//encoder.mov(value->value, X86Memory::get(register_from_operand(offset), disp->value));
 				} else {
 					assert(false);
 				}
@@ -2584,6 +2623,12 @@ do_ret_instead:
 						encoder.mov(stack_from_operand(source), get_temp(0, source->size));
 						encoder.mov(get_temp(0, dest->size), stack_from_operand(dest));
 					}
+				} else {
+					assert(false);
+				}
+			} else if (source->is_constant()) {
+				if (dest->is_alloc_reg()) {
+					encoder.mov(source->value, register_from_operand(dest));
 				} else {
 					assert(false);
 				}
@@ -3413,7 +3458,7 @@ do_ret_instead:
 	}
 
 	if (dump_this_shit) {
-		asm volatile("out %0, $0xff\n" ::"a"(15), "D"(encoder.get_buffer()), "S"(encoder.get_buffer_size()), "d"(pa));
+		asm volatile("out %0, $0xff\n" ::"a"(15), "D"(vm_virt_to_phys(encoder.get_buffer())), "S"(encoder.get_buffer_size()), "d"(pa));
 	}
 
 	return success;

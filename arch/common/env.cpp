@@ -19,6 +19,7 @@ extern "C" void int80_handler(struct mcontext *);
 extern "C" void int81_handler(struct mcontext *);
 extern "C" void int82_handler(struct mcontext *);
 extern "C" void int90_handler(struct mcontext *);
+extern "C" void int60_handler(struct mcontext *);
 
 extern "C" void call_gate_tramp(void);
 
@@ -78,7 +79,7 @@ void Environment::install_idt()
 	} packed IDTR;
 
 	IDTR.limit = sizeof(struct IDT) * 0x100;
-	IDTR.base = 0x680040001000ULL;
+	IDTR.base = (uint64_t)vm_phys_to_virt(0x5000ULL);
 
 	IDT *idt = (IDT *)IDTR.base;
 
@@ -105,6 +106,9 @@ void Environment::install_idt()
 	// IRQ Handler
 	set_idt(&idt[0x30], trap_irq0);
 	set_idt(&idt[0x31], trap_irq1);
+	
+	// 64-bit Memory Handler
+	set_idt(&idt[0x60], int60_handler, true);
 
 	// Software-interrupt handlers
 	set_idt(&idt[0x80], int80_handler, true);
@@ -184,40 +188,6 @@ bool Environment::run(PerCPUData *per_cpu_data)
 	
 	printf("env: preparing boot core entrypoint=%08x\n", per_guest_data->entrypoint);
 	prepare_boot_cpu(core);
-	
-	core->mmu().set_page_device(GPA_TO_HVA(0x10000000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10001000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1001A000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1e000000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1e001000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10011000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10018000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10019000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10012000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1000f000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10010000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10013000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10014000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10015000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10017000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10004000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1000d000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10009000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1000a000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1000b000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1000c000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10030000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1000e000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10005000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x100e1000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10002000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10006000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10007000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10020000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x10100000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1f000000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1f001000));
-	core->mmu().set_page_device(GPA_TO_HVA(0x1f002000));
 
 	bool result = core->run();
 	delete core;
@@ -225,7 +195,7 @@ bool Environment::run(PerCPUData *per_cpu_data)
 	return result;
 }
 
-bool Environment::read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data)
+bool Environment::read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint64_t& data)
 {
 	if (id > 23 || devices[id] == NULL) {
 		printf("attempted read of invalid device %d @ %08x (%08x)\n", id, read_pc(), *(uint32_t *)pc_mem_ptr());
@@ -235,7 +205,7 @@ bool Environment::read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t
 	return devices[id]->read(cpu, reg, data);
 }
 
-bool Environment::write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t data)
+bool Environment::write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint64_t data)
 {
 	if (id > 23 || devices[id] == NULL) {
 		printf("attempted write of invalid device %d @ %08x (%08x)\n", id, read_pc(), *(uint32_t *)pc_mem_ptr());

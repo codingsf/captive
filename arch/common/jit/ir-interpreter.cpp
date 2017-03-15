@@ -366,7 +366,7 @@ static bool execute_ir(CPU *cpu, IRInstruction *ir, uint32_t count)
 			
 		case IRInstruction::READ_DEVICE:
 		{
-			uint32_t data;
+			uint64_t data;
 			
 			cpu->env().read_core_device(*cpu, load_value(ctx, oper0), load_value(ctx, oper1), data);
 			store_value(ctx, oper2, data);

@@ -34,6 +34,7 @@ namespace captive
 				std::string guest_kernel;
 				
 				maybe<std::string> block_device_file;
+				maybe<std::string> device_tree;
 				
 				maybe<std::string> net_mac_addr;
 				maybe<std::string> net_tap_device;

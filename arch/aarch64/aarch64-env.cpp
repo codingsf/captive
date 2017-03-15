@@ -31,7 +31,16 @@ CPU *aarch64_environment::create_cpu(PerCPUData *per_cpu_data)
 
 bool aarch64_environment::prepare_boot_cpu(CPU* core)
 {
+	aarch64_cpu *arm_core = (aarch64_cpu *)core;
+	
+	arm_core->reg_offsets.RBX[0] = 0x1000;
+	arm_core->reg_offsets.RBX[1] = 0x0;
+	arm_core->reg_offsets.RBX[2] = 0x0;
+	arm_core->reg_offsets.RBX[3] = 0x0;
+	arm_core->reg_offsets.EL[0] = 4;
+	
 	write_pc(core->cpu_data().guest_data->entrypoint);
+	
 	return true;
 }
 

@@ -67,8 +67,16 @@ namespace captive {
 			inline const char *disassemble_address(uint8_t isa, gva_t va)
 			{
 				char decode_data[128];
-				decode_instruction_virt(isa, va, (Decode *)decode_data);
-				return trace().disasm().disassemble(va, (const uint8_t *)decode_data);
+				
+				MMU::resolution_context ctx(va);
+				ctx.requested_permissions = MMU::KERNEL_FETCH;
+				
+				if (!mmu().resolve_gpa(ctx, false)) {
+					return "<txln fail>";
+				}
+				
+				decode_instruction_phys(isa, ctx.pa, (Decode *)decode_data);
+				return trace().disasm().disassemble(ctx.va, (const uint8_t *)decode_data);
 			}
 
 			virtual void dump_state(bool dump_hidden = false) const = 0;

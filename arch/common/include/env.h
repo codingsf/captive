@@ -27,8 +27,8 @@ namespace captive {
 
 			virtual CPU *create_cpu(PerCPUData *per_cpu_data) = 0;
 
-			bool write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t data);
-			bool read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint32_t& data);
+			bool write_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint64_t data);
+			bool read_core_device(CPU& cpu, uint32_t id, uint32_t reg, uint64_t& data);
 
 			inline bool install_core_device(uint32_t id, CoreDevice *device) {
 				if (id > 23) {

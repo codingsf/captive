@@ -60,7 +60,7 @@ extern "C" {
 		printf_init(cpu_data->guest_data->printf_buffer, 0x1000);
 
 		// Initialise the malloc() memory allocation system.
-		printf("initialising malloc @ pa=%p, va=%p, size=%x\n", cpu_data->guest_data->heap_phys_base, cpu_data->guest_data->heap_virt_base, cpu_data->guest_data->heap_size);
+		printf("initialising malloc @ pa=%p, va=%p, size=%lx\n", cpu_data->guest_data->heap_phys_base, cpu_data->guest_data->heap_virt_base, cpu_data->guest_data->heap_size);
 		captive::arch::malloc::page_alloc.init(cpu_data->guest_data->heap_virt_base, cpu_data->guest_data->heap_phys_base, cpu_data->guest_data->heap_size);
 		
 		// Initialise the memory manager.
@@ -136,7 +136,7 @@ extern "C" {
 			}
 		}
 
-		printf("general protection fault: rip=0x%lx, code=0x%lx, pc=0x%08x, ir=%08x\n", mctx->rip, mctx->extra, cpu ? read_pc() : 0, cpu ? *((uint32_t *)pc_mem_ptr()) : 0);
+		printf("general protection fault: rip=0x%lx, code=0x%lx, pc=0x%016lx, ir=%08x\n", mctx->rip, mctx->extra, cpu ? read_pc() : 0, cpu ? *((uint32_t *)pc_mem_ptr()) : 0);
 		dump_mcontext(mctx);
 		dump_code(mctx->rip);
 		dump_stack();

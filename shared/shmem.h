@@ -91,6 +91,10 @@ namespace captive {
 		
 		uintptr_t printf_buffer;
 		
+		uintptr_t code_virt_base;
+		uintptr_t code_phys_base;
+		size_t code_size;
+		
 		uintptr_t heap_virt_base;
 		uintptr_t heap_phys_base;
 		size_t heap_size;

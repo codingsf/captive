@@ -4,6 +4,7 @@
 *.arch
 *.a
 *.ll
+*.bin
 nbproject/
 bin/
 bios.bin

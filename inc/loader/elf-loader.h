@@ -29,6 +29,9 @@ namespace captive {
 
 		private:
 			gpa_t _entrypoint;
+			
+			bool install32(uint8_t* gpm);
+			bool install64(uint8_t* gpm);
 		};
 	}
 }

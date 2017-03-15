@@ -15,22 +15,24 @@ extern "C" void cpu_trap(void *cpu)
 	assert(false);
 }
 
-extern "C" void cpu_write_device(captive::arch::CPU *cpu, uint32_t devid, uint32_t reg, uint32_t val)
+extern "C" void cpu_write_device(captive::arch::CPU *cpu, uint32_t devid, uint32_t reg, uint64_t val)
 {
 	cpu->env().write_core_device(*cpu, devid, reg, val);
 }
 
-extern "C" void cpu_read_device(captive::arch::CPU *cpu, uint32_t devid, uint32_t reg, uint32_t& val)
+extern "C" void cpu_read_device(captive::arch::CPU *cpu, uint32_t devid, uint32_t reg, uint64_t& val)
 {
 	cpu->env().read_core_device(*cpu, devid, reg, val);
 }
 
 extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4)
 {
+	assert(cpu);
+	
 	switch (opcode) {
 	case 0:	// START
 	{
-		printf("[%08x] %25s ", __PC, cpu->disassemble_address(*cpu->tagged_registers().ISA, __PC));
+		printf("[%016lx] %25s ", __PC, cpu->disassemble_address(*cpu->tagged_registers().ISA, __PC));
 		break;
 	}
 	
@@ -40,36 +42,50 @@ extern "C" void jit_trace(captive::arch::CPU *cpu, uint8_t opcode, uint64_t a1, 
 		
 	case 2: // READ MEM
 		switch (a3) {
-		case 1: printf("M1[%08x] => 0x%02x ", a1, a2 & 0xff); break;
-		case 2: printf("M2[%08x] => 0x%04x ", a1, a2 & 0xffff); break;
-		case 4: printf("M4[%08x] => 0x%08x ", a1, a2 & 0xffffffff); break;
-		case 8: printf("M8[%08x] => 0x%016x ", a1, a2); break;
-		default: printf("M?[%08x] => 0x%08x ", a1, a2); break;
+		case 1: printf("M1[%016lx] => 0x%02x ", a1, a2 & 0xff); break;
+		case 2: printf("M2[%016lx] => 0x%04x ", a1, a2 & 0xffff); break;
+		case 4: printf("M4[%016lx] => 0x%08x ", a1, a2 & 0xffffffff); break;
+		case 8: printf("M8[%016lx] => 0x%016lx ", a1, a2); break;
+		default: printf("M?[%016lx] => 0x%016lx ", a1, a2); break;
 		}
 		break;
 		
 	case 3: // WRITE MEM
 		switch (a3) {
-		case 1: printf("M1[%08x] <= 0x%02x ", a1, a2 & 0xff); break;
-		case 2: printf("M2[%08x] <= 0x%04x ", a1, a2 & 0xffff); break;
-		case 4: printf("M4[%08x] <= 0x%08x ", a1, a2 & 0xffffffff); break;
-		case 8: printf("M8[%08x] <= 0x%016x ", a1, a2); break;
-		default: printf("M?[%08x] <= 0x%08x ", a1, a2); break;
+		case 1: printf("M1[%016lx] <= 0x%02x ", a1, a2 & 0xff); break;
+		case 2: printf("M2[%016lx] <= 0x%04x ", a1, a2 & 0xffff); break;
+		case 4: printf("M4[%016lx] <= 0x%08x ", a1, a2 & 0xffffffff); break;
+		case 8: printf("M8[%016lx] <= 0x%016lx ", a1, a2); break;
+		default: printf("M?[%016lx] <= 0x%08lx ", a1, a2); break;
 		}
 		break;
 
 	case 4: // READ REG
-		printf("R[%s] => 0x%08x ", cpu->get_reg_name(a1), a2);
+		switch (a3) {
+		case 1: printf("R[%s] => 0x%02x ", cpu->get_reg_name(a1), a2 & 0xff); break;
+		case 2: printf("R[%s] => 0x%04x ", cpu->get_reg_name(a1), a2 & 0xffff); break;
+		case 4: printf("R[%s] => 0x%08x ", cpu->get_reg_name(a1), a2 & 0xffffffff); break;
+		case 8: printf("R[%s] => 0x%016lx ", cpu->get_reg_name(a1), a2); break;
+		default: printf("R[%s] => 0x%016lx ", cpu->get_reg_name(a1), a2); break;
+		}
+		
 		break;
 	case 5: // WRITE REG
-		printf("R[%s] <= 0x%08x ", cpu->get_reg_name(a1), a2);
+		switch (a3) {
+		case 1: printf("R[%s] <= 0x%02x ", cpu->get_reg_name(a1), a2 & 0xff); break;
+		case 2: printf("R[%s] <= 0x%04x ", cpu->get_reg_name(a1), a2 & 0xffff); break;
+		case 4: printf("R[%s] <= 0x%08x ", cpu->get_reg_name(a1), a2 & 0xffffffff); break;
+		case 8: printf("R[%s] <= 0x%016lx ", cpu->get_reg_name(a1), a2); break;
+		default: printf("R[%s] <= 0x%016lx ", cpu->get_reg_name(a1), a2); break;
+		}
+		
 		break;
 		
 	case 6: // READ DEV
-		printf("D[%02d @ %02d] => 0x%08x ", a1, a2, a3);
+		printf("D[%02u @ %02u] => 0x%08x ", a1, a2, a3);
 		break;
 	case 7: // WRITE DEV
-		printf("D[%02d @ %02d] <= 0x%08x ", a1, a2, a3);
+		printf("D[%02u @ %02u] <= 0x%08x ", a1, a2, a3);
 		break;
 		
 	case 8:

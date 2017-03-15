@@ -57,7 +57,7 @@ bool Engine::install(uint8_t* base)
 		DEBUG << CONTEXT(Engine) << "Program Header: type=" << phdr->p_type << ", flags=" << phdr->p_flags << ", file offset=" << phdr->p_offset << ", file size=" << phdr->p_filesz << ", paddr=" << std::hex << phdr->p_paddr << ", vaddr=" << phdr->p_vaddr;
 
 		if (phdr->p_type == PT_LOAD) {
-			uint64_t offset = phdr->p_vaddr - 0xffffffff80000000ULL;
+			uint64_t offset = phdr->p_paddr;
 
 			DEBUG << CONTEXT(Engine) << "Loading @ " << std::hex << offset << " hva=" << ((uintptr_t)base + offset);
 			memcpy(base + offset, lib + phdr->p_offset, phdr->p_filesz);
@@ -94,7 +94,7 @@ bool Engine::install(uint8_t* base)
 			Elf64_Sym *symbol = (Elf64_Sym *)(lib + shdr->sh_offset);
 			Elf64_Sym *symbol_end = (Elf64_Sym *)(lib + shdr->sh_offset + shdr->sh_size);
 			while (symbol < symbol_end) {
-				DEBUG << CONTEXT(Engine) << "Loading symbol " << std::string(&strtab[symbol->st_name]) << " = " << std::hex << symbol->st_value;
+				//DEBUG << CONTEXT(Engine) << "Loading symbol " << std::string(&strtab[symbol->st_name]) << " = " << std::hex << symbol->st_value;
 				symbols[std::string(&strtab[symbol->st_name])] = (uint64_t)symbol->st_value;
 				symbol++;
 			}

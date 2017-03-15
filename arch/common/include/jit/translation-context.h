@@ -33,7 +33,7 @@ namespace captive {
 					if (_ir_insn_count > 1048576/sizeof(shared::IRInstruction)) {
 						fatal("NOPE\n");
 					}
-					
+										
 					_ir_insns[_ir_insn_count] = instruction;
 					_ir_insns[_ir_insn_count].ir_block = block_id;
 					_ir_insn_count++;

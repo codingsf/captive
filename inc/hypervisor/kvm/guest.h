@@ -24,53 +24,31 @@
 
 #include <util/range.h>
 
-#define HOST_GPM_BASE			(uintptr_t)0x680100000000ULL
-#define GUEST_GPM_VIRT_BASE		(uintptr_t)0x680100000000ULL
-#define GUEST_GPM_PHYS_BASE		(uintptr_t)0x100000000ULL
-#define GPM_SIZE				(size_t)0x100000000ULL
+#define VM_PHYS_CODE_BASE			0ULL
+#define VM_CODE_SIZE				0x080000000ULL
+#define VM_PHYS_HEAP_BASE			0x100000000ULL
+#define VM_HEAP_SIZE				0x100000000ULL
+#define VM_PHYS_GPM_BASE			0x200000000ULL
 
-#define HOST_HEAP_BASE			(uintptr_t)0x680200000000ULL
-#define GUEST_HEAP_VIRT_BASE	(uintptr_t)0x680200000000ULL
-#define GUEST_HEAP_PHYS_BASE	(uintptr_t)0x200000000ULL
-#define HEAP_SIZE				(size_t)0x100000000ULL
+#define VM_PHYS_LAPIC_BASE			0xfee00000ULL
+#define VM_LAPIC_SIZE				0x1000ULL
 
-#define HOST_CODE_BASE			(uintptr_t)0x680000000000ULL
-#define GUEST_CODE_VIRT_BASE	(uintptr_t)0xffffffff80000000ULL
-#define GUEST_CODE_PHYS_BASE	(uintptr_t)0x0000000000000000ULL
-#define CODE_SIZE				(size_t)0x40000000ULL
+#define VM_PHYS_GUEST_DATA			0x1000ULL
+#define VM_PHYS_CPU_DATA			0x2000ULL
+#define VM_PHYS_PRINTF_BUFFER		0x3000ULL
+#define VM_PHYS_GDT					0x4000ULL
+#define VM_PHYS_TSS					0x4100ULL
+#define VM_PHYS_IDT					0x5000ULL
+#define VM_PHYS_KSTACK				0x6000ULL
 
-#define HOST_SYS_BASE			(uintptr_t)0x680040000000ULL
-#define GUEST_SYS_VIRT_BASE		(uintptr_t)0x680040000000ULL
-#define GUEST_SYS_PHYS_BASE		(uintptr_t)0x000040000000ULL
-#define SYS_SIZE				(size_t)0x40000000ULL
+#define VM_PHYS_PAGE_TABLES			0x10000ULL
+#define VM_PHYS_PML4_0				VM_PHYS_PAGE_TABLES
+#define VM_PHYS_PML4_1				(VM_PHYS_PML4_0 + 0x1000ULL)
 
-#define GUEST_LAPIC_PHYS_BASE	(uintptr_t)0x0000fee00000ULL
-#define GUEST_LAPIC_VIRT_BASE	(uintptr_t)0x67fffee00000ULL
+#define VM_VIRT_SPLIT				0xffff800000000000ULL
+#define VM_VIRT_KERNEL				0xffffffff80000000ULL
 
-#define SYS_GDT_OFFSET			0
-#define SYS_IDT_OFFSET			0x1000
-#define SYS_TSS_OFFSET			0x2000
-#define SYS_PRINTF_OFFSET		0x3000
-#define SYS_GUEST_DATA_OFFSET	0x4000
-#define SYS_EVENT_RING_OFFSET	0x10000
-#define SYS_INIT_PGT_OFFSET		0x91000
-
-#define HOST_SYS_GDT				(HOST_SYS_BASE + SYS_GDT_OFFSET)
-#define HOST_SYS_IDT				(HOST_SYS_BASE + SYS_IDT_OFFSET)
-#define HOST_SYS_TSS				(HOST_SYS_BASE + SYS_TSS_OFFSET)
-#define HOST_SYS_PRINTF				(HOST_SYS_BASE + SYS_PRINTF_OFFSET)
-#define HOST_SYS_GUEST_DATA			(HOST_SYS_BASE + SYS_GUEST_DATA_OFFSET)
-#define HOST_SYS_EVENT_RING			(HOST_SYS_BASE + SYS_EVENT_RING_OFFSET)
-#define HOST_SYS_INIT_PGT			(HOST_SYS_BASE + SYS_INIT_PGT_OFFSET)
-#define HOST_SYS_KERNEL_STACK_TOP	(HOST_SYS_BASE + SYS_SIZE)
-
-#define GUEST_SYS_GDT_PHYS			(GUEST_SYS_PHYS_BASE + SYS_GDT_OFFSET)
-#define GUEST_SYS_GDT_VIRT			(GUEST_SYS_VIRT_BASE + SYS_GDT_OFFSET)
-#define GUEST_SYS_INIT_PGT_PHYS		(GUEST_SYS_PHYS_BASE + SYS_INIT_PGT_OFFSET)
-#define GUEST_SYS_PRINTF_VIRT		(GUEST_SYS_VIRT_BASE + SYS_PRINTF_OFFSET)
-#define GUEST_SYS_GUEST_DATA_VIRT	(GUEST_SYS_VIRT_BASE + SYS_GUEST_DATA_OFFSET)
-#define GUEST_SYS_EVENT_RING_VIRT	(GUEST_SYS_VIRT_BASE + SYS_EVENT_RING_OFFSET)
-#define GUEST_SYS_KERNEL_STACK_TOP	(GUEST_SYS_VIRT_BASE + SYS_SIZE)
+#define HOST_VIRT_GPM				0x680000000000ULL
 
 extern void MMIOThreadTrampoline(void *);
 
@@ -177,6 +155,8 @@ namespace captive {
 				vm_mem_region *alloc_guest_memory(uint64_t gpa, uint64_t size, uint32_t flags = 0, void *fixed_addr = NULL);
 				void release_guest_memory(vm_mem_region *rgn);
 				void release_all_guest_memory();
+				
+				void *_vm_code_region, *_vm_heap_region;
 
 				typedef uint64_t pte_t;
 				typedef pte_t *pm_t;
@@ -190,15 +170,15 @@ namespace captive {
 				{
 					uint64_t next = next_init_pgt_page;
 					next_init_pgt_page += 0x1000;
-					
+										
 					return next;
 				}
 				
-				void *sys_guest_phys_to_host_virt(uint64_t addr);
+				//void *sys_guest_phys_to_host_virt(uint64_t addr);
 
-				void map_pages(uint64_t va, uint64_t pa, uint64_t size, uint32_t flags, bool use_huge_pages=true);
-				void map_page(uint64_t va, uint64_t pa, uint32_t flags);
-				void map_huge_page(uint64_t va, uint64_t pa, uint32_t flags);
+				void map_pages(uint64_t va, uint64_t pa, uint64_t size, uint32_t flags, bool use_huge_pages=true, uintptr_t pml4=VM_PHYS_PML4_0);
+				void map_page(uint64_t va, uint64_t pa, uint32_t flags, uintptr_t pml4);
+				void map_huge_page(uint64_t va, uint64_t pa, uint32_t flags, uintptr_t pml4);
 
 				inline int vmioctl(unsigned long int req) const {
 					return vmioctl(req, (unsigned long int)0);
@@ -213,6 +193,31 @@ namespace captive {
 				}
 				
 				static bool intr_callback(int fd, bool is_input, void *p);
+				
+				void *vm_phys_to_host_virt(uintptr_t ptr)
+				{
+					if (ptr >= VM_PHYS_CODE_BASE && ptr < (VM_PHYS_CODE_BASE + VM_CODE_SIZE))
+						return (void *)((uintptr_t)_vm_code_region + (ptr - VM_PHYS_CODE_BASE));
+					else if (ptr >= VM_PHYS_HEAP_BASE && ptr < (VM_PHYS_HEAP_BASE + VM_HEAP_SIZE))
+						return (void *)((uintptr_t)_vm_heap_region + (ptr - VM_PHYS_HEAP_BASE));
+					else
+						return nullptr;
+				}
+				
+				void *guest_phys_to_host_virt(uintptr_t ptr) const
+				{
+					return (void *)((uintptr_t)HOST_VIRT_GPM + ptr);
+				}
+				
+				uintptr_t vm_phys_to_vm_virt(uintptr_t ptr) const
+				{
+					return (uintptr_t)((uintptr_t)VM_VIRT_SPLIT + ptr);
+				}
+				
+				uintptr_t vm_phys_to_vm_kernel_virt(uintptr_t ptr) const
+				{
+					return (uintptr_t)((uintptr_t)VM_VIRT_KERNEL + ptr);
+				}
 			};
 		}
 	}

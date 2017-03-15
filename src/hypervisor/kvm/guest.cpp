@@ -47,8 +47,7 @@ using namespace captive::hypervisor::kvm;
 #define PT_DIRTY			(1 << 6)
 #define PT_HUGE_PAGE		(1 << 7)
 #define PT_GLOBAL			(1 << 8)
-
-#define HOST_BIOS_BASE				(HOST_CODE_BASE + 0xf0000ULL)
+#define PT_VRT_DEVICE		(1 << 9)
 
 #define DEFAULT_NR_SLOTS		32
 
@@ -203,7 +202,7 @@ bool KVMGuest::load(loader::Loader& loader)
 	}
 	
 	DEBUG << CONTEXT(Guest) << "Installing Loader";
-	if (!loader.install((uint8_t *)HOST_GPM_BASE)) {
+	if (!loader.install((uint8_t *)guest_phys_to_host_virt(0))) {
 		ERROR << CONTEXT(Guest) << "Loader failed to install";
 		return false;
 	}
@@ -222,7 +221,7 @@ std::map<captive::devices::Device *, uint64_t> device_reads, device_writes;
 
 bool KVMGuest::run()
 {
-	if (!initialise_simulations((void *)GUEST_SYS_EVENT_RING_VIRT)) return false;
+	//if (!initialise_simulations((void *)GUEST_SYS_EVENT_RING_VIRT)) return false;
 	
 	for (KVMCpu *core : kvm_cpus) {
 		for (simulation::Simulation *sim : simulations()) {
@@ -383,9 +382,10 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 		return false;
 	}
 
-	DEBUG << CONTEXT(Guest) << "Creating KVM VCPU";
+	DEBUG << CONTEXT(Guest) << "Creating KVM VCPU " << next_cpu_id;
 	int cpu_fd = ioctl(fd, KVM_CREATE_VCPU, next_cpu_id);
 	if (cpu_fd < 0) {
+		perror("XXXX");
 		ERROR << "Failed to create KVM VCPU: " << LAST_ERROR_TEXT;
 		return false;
 	}
@@ -416,10 +416,10 @@ bool KVMGuest::create_cpu(const GuestCPUConfiguration& config)
 	}
 
 	// Locate the storage location for the Per-CPU data, and initialise the structure.
-	PerCPUData *per_cpu_data = (PerCPUData *)(HOST_SYS_GUEST_DATA + (0x100 * (next_cpu_id + 1)));
+	PerCPUData *per_cpu_data = (PerCPUData *)vm_phys_to_host_virt(VM_PHYS_CPU_DATA + (0x100 * next_cpu_id));
 	per_cpu_data->id = next_cpu_id;
-	per_cpu_data->guest_data = (PerGuestData *)GUEST_SYS_GUEST_DATA_VIRT;
-	per_cpu_data->event_ring = (void *)GUEST_SYS_EVENT_RING_VIRT;
+	per_cpu_data->guest_data = (PerGuestData *)vm_phys_to_vm_virt(VM_PHYS_GUEST_DATA);
+	per_cpu_data->event_ring = nullptr;
 	per_cpu_data->async_action = 0;
 	per_cpu_data->execution_mode = 0;
 	per_cpu_data->insns_executed = 0;
@@ -452,6 +452,8 @@ bool KVMGuest::attach_guest_devices()
 		desc.dev = &device.device();
 
 		devices[devices_range_type(device.base_address(), device.base_address() + device.device().size())] = desc;
+		
+		map_pages(vm_phys_to_vm_virt(VM_PHYS_GPM_BASE + device.base_address()), VM_PHYS_GPM_BASE + device.base_address(), device.device().size(), PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL | PT_VRT_DEVICE, false);
 	}
 
 	return true;
@@ -489,13 +491,43 @@ bool KVMGuest::prepare_guest_irq()
 
 bool KVMGuest::prepare_guest_memory()
 {
-	// Prepare Guest Physical Memory
+	struct vm_mem_region *vm_region_check;
+
+	// Code Area
+	DEBUG << CONTEXT(Guest) << "Installing CODE region, base=" << std::hex << VM_PHYS_CODE_BASE << ", size=" << VM_CODE_SIZE;
+	vm_region_check = alloc_guest_memory(VM_PHYS_CODE_BASE, VM_CODE_SIZE, 0, (void *)0x670000000000);
+	if (!vm_region_check) {
+		release_all_guest_memory();
+		ERROR << "Unable to allocate guest memory heap region";
+		return false;
+	}
+	
+	_vm_code_region = vm_region_check->host_buffer;
+	
+	// Install the engine code
+	if (!engine().install((uint8_t *)_vm_code_region)) {
+		ERROR << "Unable to install execution engine";
+		return false;
+	}
+	
+	// Heap Area
+	DEBUG << CONTEXT(Guest) << "Installing HEAP region, base=" << std::hex << VM_PHYS_HEAP_BASE << ", size=" << VM_HEAP_SIZE;
+	vm_region_check = alloc_guest_memory(VM_PHYS_HEAP_BASE, VM_HEAP_SIZE, 0, (void *)0x670100000000);
+	if (!vm_region_check) {
+		release_all_guest_memory();
+		ERROR << "Unable to allocate guest memory heap region";
+		return false;
+	}
+	
+	_vm_heap_region = vm_region_check->host_buffer;
+	
+	// Guest Physical Memory
 	for (auto& region : platform().config().memory_regions) {
-		void *hva = (void *)((uint64_t)HOST_GPM_BASE + region.base_address());
+		void *host_virt_addr = (void *)((uintptr_t)HOST_VIRT_GPM + (uintptr_t)region.base_address());
 		
-		DEBUG << CONTEXT(Guest) << "Installing GPM region, base=" << std::hex << region.base_address() << ", size=" << region.size() << ", hva=" << hva;
+		DEBUG << CONTEXT(Guest) << "Installing GPM region, base=" << std::hex << region.base_address() << ", size=" << region.size() << ", addr=" << host_virt_addr;
 		
-		struct vm_mem_region *vm_region = alloc_guest_memory(GUEST_GPM_PHYS_BASE + region.base_address(), region.size(), 0, hva);
+		struct vm_mem_region *vm_region = alloc_guest_memory(VM_PHYS_GPM_BASE + region.base_address(), region.size(), 0, host_virt_addr);
 		if (!vm_region) {
 			release_all_guest_memory();
 			ERROR << "Unable to allocate guest memory region";
@@ -509,40 +541,15 @@ bool KVMGuest::prepare_guest_memory()
 		gpm.push_back(desc);
 	}
 	
-	struct vm_mem_region *vm_region_check;
-
-	// Prepare Engine Heap
-	DEBUG << CONTEXT(Guest) << "Installing heap, base=" << std::hex << GUEST_HEAP_PHYS_BASE << ", size=" << HEAP_SIZE << ", hva=" << HOST_HEAP_BASE;
-	vm_region_check = alloc_guest_memory(GUEST_HEAP_PHYS_BASE, HEAP_SIZE, 0, (void *)HOST_HEAP_BASE);
-	if (!vm_region_check) {
-		release_all_guest_memory();
-		ERROR << "Unable to allocate guest memory heap region";
-		return false;
-	}
-
-	// Prepare Engine Code
-	DEBUG << CONTEXT(Guest) << "Installing code, base=" << std::hex << GUEST_CODE_PHYS_BASE << ", size=" << CODE_SIZE << ", hva=" << HOST_CODE_BASE;
-	vm_region_check = alloc_guest_memory(GUEST_CODE_PHYS_BASE, CODE_SIZE, 0, (void *)HOST_CODE_BASE);
-	if (!vm_region_check) {
-		release_all_guest_memory();
-		ERROR << "Unable to allocate guest memory code region";
-		return false;
-	}
+	// Initial PGT page is the PML4
+	next_init_pgt_page = VM_PHYS_PML4_0;
 	
-	// Prepare System Data
-	DEBUG << CONTEXT(Guest) << "Installing code, base=" << std::hex << GUEST_SYS_PHYS_BASE << ", size=" << SYS_SIZE << ", hva=" << HOST_SYS_BASE;
-	vm_region_check = alloc_guest_memory(GUEST_SYS_PHYS_BASE, SYS_SIZE, 0, (void *)HOST_SYS_BASE);
-	if (!vm_region_check) {
-		release_all_guest_memory();
-		ERROR << "Unable to allocate guest memory sys region";
-		return false;
-	}
-
-	// Next initial page-table is AFTER the PML
-	next_init_pgt_page = GUEST_SYS_INIT_PGT_PHYS + 0x1000;
+	// Zero it out?
+	
+	next_init_pgt_page += 0x2000;
 	DEBUG << CONTEXT(Guest) << "Next phys page for init pgt = " << std::hex << next_init_pgt_page;
 	
-	per_guest_data = (PerGuestData *)(HOST_SYS_GUEST_DATA);
+	per_guest_data = (PerGuestData *)vm_phys_to_host_virt(VM_PHYS_GUEST_DATA);
 
 	DEBUG << CONTEXT(Guest) << "Initialising per-guest data structure @ " << std::hex << per_guest_data;
 	per_guest_data->fast_device.address = 0;
@@ -552,10 +559,15 @@ bool KVMGuest::prepare_guest_memory()
 	captive::lock::barrier_init(&per_guest_data->fast_device.hypervisor_barrier);
 	captive::lock::barrier_init(&per_guest_data->fast_device.guest_barrier);
 	
-	per_guest_data->printf_buffer = GUEST_SYS_PRINTF_VIRT;
-	per_guest_data->heap_virt_base = GUEST_HEAP_VIRT_BASE;
-	per_guest_data->heap_phys_base = GUEST_HEAP_PHYS_BASE;
-	per_guest_data->heap_size = HEAP_SIZE;
+	per_guest_data->printf_buffer = vm_phys_to_vm_virt(VM_PHYS_PRINTF_BUFFER);
+	
+	per_guest_data->code_virt_base = vm_phys_to_vm_virt(VM_PHYS_CODE_BASE);
+	per_guest_data->code_phys_base = VM_PHYS_CODE_BASE;
+	per_guest_data->code_size = VM_CODE_SIZE;
+	
+	per_guest_data->heap_virt_base = vm_phys_to_vm_virt(VM_PHYS_HEAP_BASE);
+	per_guest_data->heap_phys_base = VM_PHYS_HEAP_BASE;
+	per_guest_data->heap_size = VM_HEAP_SIZE;
 	
 	per_guest_data->simulation_events = 0;
 		
@@ -569,19 +581,26 @@ bool KVMGuest::prepare_guest_memory()
 		return false;
 	}
 	
-	map_pages(GUEST_GPM_VIRT_BASE, GUEST_GPM_PHYS_BASE, GPM_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, false);
-	map_pages(GUEST_HEAP_VIRT_BASE, GUEST_HEAP_PHYS_BASE, HEAP_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL);
-	map_pages(0x680000000000, GUEST_CODE_PHYS_BASE, CODE_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL);
-	map_pages(GUEST_CODE_VIRT_BASE, GUEST_CODE_PHYS_BASE, CODE_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL);
-	map_pages(GUEST_SYS_VIRT_BASE, GUEST_SYS_PHYS_BASE, SYS_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL);
-
-	// Map the LAPIC
-	map_page(GUEST_LAPIC_VIRT_BASE, GUEST_LAPIC_PHYS_BASE, PT_PRESENT | PT_WRITABLE | PT_GLOBAL);
+	DEBUG << CONTEXT(Guest) << "Mapping CODE LOW";
+	map_pages(vm_phys_to_vm_virt(VM_PHYS_CODE_BASE), VM_PHYS_CODE_BASE, VM_CODE_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, true);
 	
-	// Install the engine code
-	if (!engine().install((uint8_t *)HOST_CODE_BASE)) {
-		ERROR << "Unable to install execution engine";
-		return false;
+	DEBUG << CONTEXT(Guest) << "Mapping CODE HIGH @ " << std::hex << vm_phys_to_vm_kernel_virt(VM_PHYS_CODE_BASE);
+	map_pages(vm_phys_to_vm_kernel_virt(VM_PHYS_CODE_BASE), VM_PHYS_CODE_BASE, 0x70000000, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, true);
+	
+	DEBUG << CONTEXT(Guest) << "Mapping HEAP";
+	map_pages(vm_phys_to_vm_virt(VM_PHYS_HEAP_BASE), VM_PHYS_HEAP_BASE, VM_HEAP_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, true);
+	
+	DEBUG << CONTEXT(Guest) << "Mapping LAPIC";
+	map_pages(vm_phys_to_vm_virt(VM_PHYS_LAPIC_BASE), VM_PHYS_LAPIC_BASE, VM_LAPIC_SIZE, PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL | PT_CACHE_DISABLED | PT_WRITE_THROUGH, false);
+
+	DEBUG << CONTEXT(Guest) << "Mapping GPM" << ENABLE;
+	for (const auto& g : gpm) {
+		map_pages(vm_phys_to_vm_virt(VM_PHYS_GPM_BASE + g.cfg->base_address()), VM_PHYS_GPM_BASE + g.cfg->base_address(), g.cfg->size(), PT_WRITABLE | PT_USER_ACCESS | PT_GLOBAL, true);
+		
+		// TODO: FIXME: HACK HACK HACK
+		if (g.cfg->base_address() < 0x100000000) {
+			map_pages(g.cfg->base_address(), VM_PHYS_GPM_BASE + g.cfg->base_address(), g.cfg->size(), PT_WRITABLE | PT_USER_ACCESS, true, VM_PHYS_PML4_1);
+		}
 	}
 
 	return true;
@@ -590,7 +609,7 @@ bool KVMGuest::prepare_guest_memory()
 bool KVMGuest::install_gdt()
 {
 	// Hack in the GDT
-	uint64_t *gdt = (uint64_t *)HOST_SYS_GDT;
+	uint64_t *gdt = (uint64_t *)vm_phys_to_host_virt(VM_PHYS_GDT);
 	
 	DEBUG << CONTEXT(Guest) << "Installing GDT @ " << std::hex << gdt;
 
@@ -599,20 +618,26 @@ bool KVMGuest::install_gdt()
 	*gdt++ = 0x0000920000000000;		// KERNEL DS		10
 	*gdt++ = 0x0020f80000000000;		// USER CS			18
 	*gdt++ = 0x0000f20000000000;		// USER DS			20
-	*gdt++ = 0x40408900200000d0;		// TSS				28
-	*gdt++ = 0x6800;					//					30
+	*gdt++ = 0x00408900410000d0;		// TSS				28
+	*gdt++ = 0x00000000ffff8000;		//					30
 	
+	//0xfffffffd00002000ULL
+	//0x
+	
+	// 4100
+	// 0xffff800000004100ULL
+			
 	return true;
 }
 
 bool KVMGuest::install_tss()
 {
 	// Hack in the TSS
-	uint64_t *tss = (uint64_t *)(HOST_SYS_TSS + 4);
+	uint64_t *tss = (uint64_t *)(vm_phys_to_host_virt(VM_PHYS_TSS + 4));
 	
 	DEBUG << CONTEXT(Guest) << "Installing TSS @ " << std::hex << tss;
 
-	tss[0] = GUEST_SYS_KERNEL_STACK_TOP;
+	tss[0] = vm_phys_to_vm_virt(VM_PHYS_KSTACK + 0x2000);
 
 	return true;
 }
@@ -703,7 +728,7 @@ KVMGuest::vm_mem_region *KVMGuest::alloc_guest_memory(uint64_t gpa, uint64_t siz
 	// Store the buffer address in the KVM memory structure.
 	rgn->kvm.userspace_addr = (uint64_t) rgn->host_buffer;
 
-	DEBUG << CONTEXT(Guest) << "Installing memory region into guest gpa=" << std::hex << rgn->kvm.guest_phys_addr;
+	DEBUG << CONTEXT(Guest) << "Installing memory region into guest gpa=" << std::hex << rgn->kvm.guest_phys_addr << ", hva=" << std::hex << rgn->kvm.userspace_addr;
 
 	// Install the memory region into the guest.
 	int rc = ioctl(fd, KVM_SET_USER_MEMORY_REGION, &rgn->kvm);
@@ -751,15 +776,15 @@ void KVMGuest::release_all_guest_memory()
 	gpm.clear();
 }
 
-void KVMGuest::map_pages(uint64_t va_base, uint64_t pa_base, uint64_t size, uint32_t flags, bool use_huge_pages)
+void KVMGuest::map_pages(uint64_t va_base, uint64_t pa_base, uint64_t size, uint32_t flags, bool use_huge_pages, uintptr_t pml4)
 {
 	if (use_huge_pages && (size % 0x200000) == 0) {
 		for (uint64_t va = va_base, pa = pa_base; va < (va_base + size); va += 0x200000, pa += 0x200000) {
-			map_huge_page(va, pa, PT_PRESENT | flags);
+			map_huge_page(va, pa, PT_PRESENT | flags, pml4);
 		}
 	} else {
 		for (uint64_t va = va_base, pa = pa_base; va < (va_base + size); va += 0x1000, pa += 0x1000) {
-			map_page(va, pa, PT_PRESENT | flags);
+			map_page(va, pa, PT_PRESENT | flags, pml4);
 		}
 	}
 }
@@ -769,7 +794,7 @@ void KVMGuest::map_pages(uint64_t va_base, uint64_t pa_base, uint64_t size, uint
 
 #define BITS(val, start, end) ((val >> start) & (((1 << (end - start + 1)) - 1)))
 
-void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
+void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags, uintptr_t pml4)
 {
 	// VA must be page-aligned
 	assert((va & 0xfff) == 0);
@@ -787,21 +812,21 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 	assert(pd_idx < 0x200);
 	assert(pt_idx < 0x200);
 
-	pm_t pm = (pm_t)sys_guest_phys_to_host_virt(GUEST_SYS_INIT_PGT_PHYS);
+	pm_t pm = (pm_t)vm_phys_to_host_virt(pml4);
 	if (pm[pm_idx] == 0) {
 		uint64_t new_page = alloc_init_pgt_page();
 
 		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pdp_t pdp = (pdp_t)sys_guest_phys_to_host_virt(pm[pm_idx] & ADDR_MASK);
+	pdp_t pdp = (pdp_t)vm_phys_to_host_virt(pm[pm_idx] & ADDR_MASK);
 	if (pdp[pdp_idx] == 0) {
 		uint64_t new_page = alloc_init_pgt_page();
 
 		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pd_t pd = (pd_t)sys_guest_phys_to_host_virt(pdp[pdp_idx] & ADDR_MASK);
+	pd_t pd = (pd_t)vm_phys_to_host_virt(pdp[pdp_idx] & ADDR_MASK);
 	if (pd[pd_idx] == 0) {
 		uint64_t new_page = alloc_init_pgt_page();
 
@@ -810,19 +835,19 @@ void KVMGuest::map_page(uint64_t va, uint64_t pa, uint32_t flags)
 
 	assert(!(pd[pd_idx] & PT_HUGE_PAGE));
 
-	pt_t pt = (pt_t)sys_guest_phys_to_host_virt(pd[pd_idx] & ADDR_MASK);
+	pt_t pt = (pt_t)vm_phys_to_host_virt(pd[pd_idx] & ADDR_MASK);
 	pt[pt_idx] = (pa & ADDR_MASK) | ((uint64_t)flags & FLAGS_MASK);
 
 	/*DEBUG << CONTEXT(Guest) << "Map Page VA=" << std::hex << va
 		<< ", PA=" << pa
-		<< ", PM @ " << GUEST_SYS_INIT_PGT_PHYS
+		<< ", PM @ " << (void *)pm
 		<< ", PM[" << (uint32_t)pm_idx << "] = " << pm[pm_idx]
 		<< ", PDP[" << (uint32_t)pdp_idx << "]=" << pdp[pdp_idx]
 		<< ", PD[" << (uint32_t)pd_idx << "]=" << pd[pd_idx]
 		<< ", PT[" << (uint32_t)pt_idx << "]=" << pt[pt_idx];*/
 }
 
-void KVMGuest::map_huge_page(uint64_t va, uint64_t pa, uint32_t flags)
+void KVMGuest::map_huge_page(uint64_t va, uint64_t pa, uint32_t flags, uintptr_t pml4)
 {
 	// VA must be huge-page-aligned
 	assert((va & 0x1fffff) == 0);
@@ -831,57 +856,40 @@ void KVMGuest::map_huge_page(uint64_t va, uint64_t pa, uint32_t flags)
 	uint16_t pdp_idx = BITS(va, 30, 38);
 	uint16_t pd_idx = BITS(va, 21, 29);
 
-	pm_t pm = (pm_t)sys_guest_phys_to_host_virt(GUEST_SYS_INIT_PGT_PHYS);
+	pm_t pm = (pm_t)vm_phys_to_host_virt(pml4);
 	if (pm[pm_idx] == 0) {
 		uint64_t new_page = alloc_init_pgt_page();
 		pm[pm_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pdp_t pdp = (pdp_t)sys_guest_phys_to_host_virt(pm[pm_idx] & ADDR_MASK);
+	pdp_t pdp = (pdp_t)vm_phys_to_host_virt(pm[pm_idx] & ADDR_MASK);
 	if (pdp[pdp_idx] == 0) {
 		uint64_t new_page = alloc_init_pgt_page();
 		pdp[pdp_idx] = new_page | PT_PRESENT | PT_WRITABLE | PT_USER_ACCESS;
 	}
 
-	pd_t pd = (pd_t)sys_guest_phys_to_host_virt(pdp[pdp_idx] & ADDR_MASK);
+	pd_t pd = (pd_t)vm_phys_to_host_virt(pdp[pdp_idx] & ADDR_MASK);
 
 	assert(pd[pd_idx] == 0);
 
 	flags |= PT_HUGE_PAGE;
 	pd[pd_idx] = (pa & ADDR_MASK) | ((uint64_t)flags & FLAGS_MASK);
 
-	DEBUG << CONTEXT(Guest) << "Map Huge Page VA=" << std::hex << va
+	/*DEBUG << CONTEXT(Guest) << "Map Huge Page VA=" << std::hex << va
 		<< ", PA=" << pa
-		<< ", PM @ " << GUEST_SYS_INIT_PGT_PHYS
+		<< ", PM @ " << (void *)pm
 		<< ", PM[" << (uint32_t)pm_idx << "] = " << pm[pm_idx]
 		<< ", PDP[" << (uint32_t)pdp_idx << "]=" << pdp[pdp_idx]
-		<< ", PD[" << (uint32_t)pd_idx << "]=" << pd[pd_idx];
+		<< ", PD[" << (uint32_t)pd_idx << "]=" << pd[pd_idx] << ENABLE;*/
 }
-
-void* KVMGuest::sys_guest_phys_to_host_virt(uint64_t addr)
-{
-	assert(addr > GUEST_SYS_PHYS_BASE && addr < GUEST_SYS_PHYS_BASE + SYS_SIZE);
-	return (void *)(HOST_SYS_BASE + (addr & (SYS_SIZE - 1)));
-}
-
 
 bool KVMGuest::resolve_gpa(gpa_t gpa, void*& out_addr) const
 {
-	out_addr = (void *)(HOST_GPM_BASE | (uint64_t)gpa);
+	out_addr = guest_phys_to_host_virt((uintptr_t)gpa);
 	return true;
-	
-	/*for (auto pmr : gpm) {
-		if (gpa >= pmr.cfg->base_address() && gpa < (pmr.cfg->base_address() + pmr.cfg->size())) {
-			uint64_t offset = (uint64_t)gpa - (uint64_t)pmr.cfg->base_address();
-			out_addr = (void *)((uint64_t)pmr.vmr->host_buffer + offset);
-			return true;
-		}
-	}
-
-	return false;*/
 }
 
 void KVMGuest::do_guest_printf()
 {
-	fprintf(stderr, "%s", (const char *)HOST_SYS_PRINTF);
+	fprintf(stderr, "%s", (const char *)vm_phys_to_host_virt(VM_PHYS_PRINTF_BUFFER));
 }

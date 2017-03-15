@@ -23,7 +23,7 @@ namespace captive {
 			uint64_t flags;
 			uint64_t pad0, pad1;
 			
-			inline void *data() const { return (void *)HPA_TO_HVA(phys_addr); }
+			inline void *data() const { return vm_phys_to_virt(phys_addr); }
 		} packed;
 	}
 }

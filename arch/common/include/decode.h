@@ -19,6 +19,7 @@ namespace captive {
 		
 #define __ROR32(v, a) (((v) >> a) | ((v) << (32 - a)))
 #define __ROR64(v, a) (((v) >> a) | ((v) << (64 - a)))
+#define __SEXT64(v, from) (((int64_t)(((uint64_t)(v)) << (64 - (from)))) >> (64 - (from)))
 		
 		class Decode
 		{

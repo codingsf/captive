@@ -209,38 +209,26 @@ int main(int argc, const char **argv)
 		guest->add_simulation(*sim);
 	}
 
-	/*InitRDLoader initrd(argv[3], 0x8000000);
-	if (!guest->load(initrd)) {
-		delete guest;
-		delete pfm;
-		delete hv;
-
-		ERROR << "Unable to load initrd";
-		return 1;
-	}*/
-
 	// Load the device-tree
 	if (kernel->requires_device_tree()) {
-		/*DeviceTreeLoader device_tree(argv[3], 0x1000);
-		if (!guest->load(device_tree)) {
+		if (!cfg.device_tree) {
 			delete guest;
 			delete pfm;
 			delete hv;
-
-			ERROR << "Unable to load device tree";
+			
+			ERROR << "You must specify a device-tree";
 			return 1;
-		}*/
-		
-		// Load atags
-		/*ATAGsLoader atags; //(initrd);
-		if (!guest->load(atags)) {
-			delete guest;
-			delete pfm;
-			delete hv;
+		} else {
+			DeviceTreeLoader device_tree(cfg.device_tree.value(), 0x1000);
+			if (!guest->load(device_tree)) {
+				delete guest;
+				delete pfm;
+				delete hv;
 
-			ERROR << "Unable to load ATAGs";
-			return 1;
-		}*/
+				ERROR << "Unable to load device tree";
+				return 1;
+			}
+		}
 	}
 		
 	// Start the timer manager

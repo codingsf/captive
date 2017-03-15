@@ -9,10 +9,10 @@ using namespace captive::arch::x86;
 
 void LAPIC::initialise()
 {
-	Memory::disable_caching((hva_t)LAPIC_MEM_BASE);
-	
 	uint64_t lapic_msr_val = __rdmsr(0x1b);
-	printf("lapic: msr=%lx, base=%p\n", lapic_msr_val, LAPIC_MEM_BASE);
+	void *lapic_mem_base = vm_phys_to_virt (lapic_msr_val & ~0xfff);
+	
+	printf("lapic: msr=%lx, base=%p\n", lapic_msr_val, lapic_mem_base);
 
 	lapic_write(SVR, 0x1ff);
 

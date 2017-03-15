@@ -61,3 +61,8 @@ DEFINE_OPTION_HANDLER("platform", Platform, OptionRequirement::Once, ValueRequir
 	config.platform = arg;
 	return HandleResult::OK;
 }
+
+DEFINE_OPTION_HANDLER("device-tree", DeviceTree, OptionRequirement::None, ValueRequirement::Required) {
+	config.device_tree = arg;
+	return HandleResult::OK;
+}

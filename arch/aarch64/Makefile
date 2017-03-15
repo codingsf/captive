@@ -16,9 +16,10 @@ clean:
 	$(rm) -f $(obj)
 	$(rm) -f $(dep)
 
-$(arch-out): $(obj) $(cmn-out)
+$(arch-out): $(obj) $(cmn-out) aarch64.ld
 	@echo "  LD      $(notdir $@)"
-	$(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start --export-dynamic --whole-archive $(obj) $(cmn-out)
+# $(q)$(ld) -o $@ -static -Ttext-segment 0xFFFFFFFF80000000 -nostdlib -e start --export-dynamic --whole-archive $(obj) $(cmn-out)
+	$(q)$(ld) -o $@ -static -Taarch64.ld -nostdlib -e start --export-dynamic --whole-archive $(obj) $(cmn-out)
 
 %.o: %.S
 	@echo "  AS      $(patsubst $(src-dir)/%,%,$@)"

@@ -69,8 +69,8 @@ CPU::CPU(Environment& env, PerCPUData *per_cpu_data)
 	__wrmsr(0xc0000100, (uint64_t)&jit_state);
 	
 	// Populate the GS register with the address of the emulated user page table.
-	__wrmsr(0xc0000101, (uint64_t)GPM_EMULATED_VIRT_START);	// GS Base
-	__wrmsr(0xc0000102, (uint64_t)GPM_EMULATED_VIRT_START);	// Kernel GS Base
+	__wrmsr(0xc0000101, (uint64_t)0);	// GS Base
+	__wrmsr(0xc0000102, (uint64_t)0);	// Kernel GS Base
 
 	invalidate_virtual_mappings_all();
 }
@@ -126,9 +126,9 @@ bool CPU::run_test()
 
 	*v1; *v2;
 
-	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((hva_t)v1), mmu().is_page_dirty((hva_t)v2), *v1, *v2);
+	//printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((hva_t)v1), mmu().is_page_dirty((hva_t)v2), *v1, *v2);
 	*v1 = 1;
-	printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((hva_t)v1), mmu().is_page_dirty((hva_t)v2), *v1, *v2);
+	//printf("dirty: map0=%d map1=%d val0=%d val1=%d\n", mmu().is_page_dirty((hva_t)v1), mmu().is_page_dirty((hva_t)v2), *v1, *v2);
 
 
 	return true;
@@ -152,11 +152,11 @@ void CPU::invalidate_translation_phys(gpa_t phys_addr)
 void CPU::invalidate_translation_virt(gva_t virt_addr)
 {
 	hpa_t phys_addr;
-	if (Memory::quick_txl((virt_addr & 0xfffff000), phys_addr)) {
-		invalidate_translation_phys((gpa_t)phys_addr);
-	} else {
+	//if (Memory::quick_txl((virt_addr & 0xfffff000), phys_addr)) {
+	//	invalidate_translation_phys((gpa_t)phys_addr);
+	//} else {
 		image->invalidate();
-	}
+	//}
 	
 	invalidate_virtual_mappings_current();
 }

@@ -76,4 +76,6 @@ void __assertion_failure(const char *filename, int lineno, const char *expressio
 
 	dump_stack();
 	asm volatile("out %0, $0xff\n" :: "a"(3));
+	
+	__builtin_unreachable();
 }

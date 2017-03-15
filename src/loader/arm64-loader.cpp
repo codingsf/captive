@@ -41,7 +41,7 @@ bool ARM64Loader::install(uint8_t* gpm)
 
 bool ARM64Loader::requires_device_tree() const
 {
-	return false;
+	return true;
 }
 
 bool ARM64Loader::match(const uint8_t* buffer)

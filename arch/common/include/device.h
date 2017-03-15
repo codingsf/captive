@@ -35,8 +35,8 @@ namespace captive
 			CoreDevice(Environment& env);
 			virtual ~CoreDevice();
 
-			virtual bool read(CPU& cpu, uint32_t reg, uint32_t& data) = 0;
-			virtual bool write(CPU& cpu, uint32_t reg, uint32_t data) = 0;
+			virtual bool read(CPU& cpu, uint32_t reg, uint64_t& data) = 0;
+			virtual bool write(CPU& cpu, uint32_t reg, uint64_t data) = 0;
 		};
 		
 		extern void mmio_device_read(gpa_t pa, uint8_t size, uint64_t& value);
